@@ -27,3 +27,6 @@ build/Release
 .DS_Store
 .npm
 .eslintcache
+
+# Firebase
+**/serviceAccount.json
