@@ -42,3 +42,40 @@ src/
 - serviceAccount.json is NEVER pushed to GitHub (contains secret keys!)
 - .env is NEVER pushed to GitHub
 - Ask Milena for serviceAccount.json if you need to run the backend locally
+
+## 25.03.2026 — Authentication (Google Sign-In)
+
+### What I did today:
+- Implemented Google Sign-In authentication flow on the backend
+- Created `authController.ts` — verifies Firebase ID token sent from frontend,
+  creates or updates user document in Firestore on login
+- Created `routes/auth.ts` — registers POST /auth/login route
+- Registered auth routes in `index.ts` under `/auth`
+- Added Postman workspace config (`.postman/`) for API testing
+
+### New folder structure:
+src/
+├── config/
+│   └── firebase.ts           # Firebase connection
+├── controllers/
+│   └── authController.ts     # Google login logic
+├── middleware/                # Auth, validation (coming soon)
+├── routes/
+│   └── auth.ts               # POST /auth/login
+└── index.ts                  # Server entry point
+
+### How authentication works:
+1. Frontend sends Google ID token to POST /auth/login
+2. Backend verifies token using Firebase Admin SDK
+3. User is created or updated in Firestore (merge: true)
+4. Backend returns uid, email and name to frontend
+
+### API Endpoints added:
+| Method | Endpoint     | Description                        |
+|--------|--------------|------------------------------------|
+| POST   | /auth/login  | Verify Google token, save user     |
+
+### Important notes:
+- Frontend still needs to implement Google Sign-In button 
+- Route is currently /auth/login — needs to be aligned with frontend
+- Postman can be used to test the endpoint locally without the frontend
