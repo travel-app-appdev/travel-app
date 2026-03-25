@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
   body: {
     fontSize: typography.size.md,
     color: colors.textPrimary,
-    fontFamily: typography.fontFamily.body,
+    fontFamily: typography.fontFamily.bodySemiBold,
   },
   title: {
     fontSize: typography.size.xl,
@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: typography.size.lg,
     color: colors.textPrimary,
-    fontFamily: typography.fontFamily.body,
+    fontFamily: typography.fontFamily.bodyBold,
   },
   caption: {
     fontSize: typography.size.sm,

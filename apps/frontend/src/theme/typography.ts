@@ -7,6 +7,8 @@ export const typography = {
   },
   fontFamily: {
     title: 'BagelFatOne_400Regular',
-    body: 'System',
+    body: 'Nunito_400Regular',
+    bodySemiBold: 'Nunito_600SemiBold',
+    bodyBold: 'Nunito_700Bold',
   },
 };

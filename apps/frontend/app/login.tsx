@@ -4,6 +4,7 @@ import { AppButton } from '@/src/components/common/AppButton';
 import { AppInput } from '@/src/components/common/AppInput';
 import { AppText } from '@/src/components/common/AppText';
 import { colors, spacing } from '@/src/theme';
+import Back from '@/assets/icons/back.svg';
 
 export default function LoginScreen() {
   return (
@@ -11,7 +12,7 @@ export default function LoginScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
           <Link href="/" style={styles.backLink}>
-            ←
+            <Back width={20} height={20} />
           </Link>
 
           <AppText variant="body" style={styles.smallLabel}>
