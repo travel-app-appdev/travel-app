@@ -1,5 +1,7 @@
+// components/common/ScreenContainer.tsx
 import { ReactNode } from "react";
-import { SafeAreaView, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, spacing } from "@/src/theme";
 
 type ScreenContainerProps = {
