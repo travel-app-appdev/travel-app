@@ -1,3 +1,4 @@
+// app/_layout.tsx
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -7,6 +8,7 @@ import {
   Nunito_600SemiBold,
   Nunito_700Bold,
 } from '@expo-google-fonts/nunito';
+import { View, ActivityIndicator } from 'react-native';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -17,7 +19,11 @@ export default function RootLayout() {
   });
 
   if (!fontsLoaded) {
-    return null;
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator />
+      </View>
+    );
   }
 
   return (
