@@ -124,7 +124,7 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
     }
 };
 
-//testing
+//testing integration
 
 export const createTripWithoutAuth = async (req: Request, res: Response): Promise<void> => {
     const { userId, title, destination, start_date, end_date } = req.body;
