@@ -1,3 +1,4 @@
+
 import { ReactNode } from "react";
 import { SafeAreaView, StyleSheet, View } from "react-native";
 import { colors, spacing } from "@/src/theme";
