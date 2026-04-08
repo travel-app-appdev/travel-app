@@ -1,26 +1,64 @@
-import { Link } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
-import { AppButton } from '@/src/components/common/AppButton';
-import { AppInput } from '@/src/components/common/AppInput';
-import { AppText } from '@/src/components/common/AppText';
-import { colors, spacing } from '@/src/theme';
-import Back from '@/assets/icons/back.svg';
+import { Link, router } from "expo-router";
+import { useState } from "react";
+import { Alert, StyleSheet, View } from "react-native";
+import { signInWithEmailAndPassword } from "firebase/auth";
+
+import { AppButton } from "@/src/components/common/AppButton";
+import { AppInput } from "@/src/components/common/AppInput";
+import { AppText } from "@/src/components/common/AppText";
+import { auth } from "@/src/lib/firebase";
+import { colors, spacing, typography } from "@/src/theme";
+
+import Back from "@/assets/icons/back.svg";
+import MascotHelloSeaBlue from "@/assets/mascots/mascot-hello-seablue.svg";
+import BlueBackground from "@/assets/visuals/blue-background.svg";
 
 export default function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleLogin() {
+    try {
+      setIsSubmitting(true);
+
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+
+      router.replace("/landing");
+    } catch (error: any) {
+      Alert.alert("Login failed", error?.message ?? "Something went wrong.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <View style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Link href="/" style={styles.backLink}>
-            <Back width={20} height={20} />
-          </Link>
+      <BlueBackground style={styles.backgroundSvg} />
 
-          <AppText variant="body" style={styles.smallLabel}>
-            Login
-          </AppText>
+      <View style={styles.backWrapper}>
+        <Link href="/">
+          <Back width={20} height={20} />
+        </Link>
+      </View>
+
+      <View style={styles.content}>
+        <View style={styles.labelRow}>
+          <View style={styles.labelWrapper}>
+            <AppText variant="body" style={styles.smallLabel}>
+              Login
+            </AppText>
+            <View style={styles.loginHighlight} />
+          </View>
+        </View>
+
+        <View style={styles.titleBlock}>
+          <View style={styles.mascotWrapper}>
+            <MascotHelloSeaBlue width={110} height={110} />
+          </View>
 
           <AppText variant="title" style={styles.title}>
-            Welcome back
+            Welcome{"\n"}Back!
           </AppText>
         </View>
 
@@ -30,9 +68,12 @@ export default function LoginScreen() {
               Your email
             </AppText>
             <AppInput
-              placeholder="Enter your email"
+              value={email}
+              onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.inputPlain}
             />
           </View>
 
@@ -40,23 +81,24 @@ export default function LoginScreen() {
             <AppText variant="body" style={styles.label}>
               Your password
             </AppText>
-            <AppInput placeholder="Enter your password" secureTextEntry />
+            <AppInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.inputPlain}
+            />
           </View>
+        </View>
 
-          <AppButton 
-            title="LOGIN" 
-            onPress={() => {}}
-            style={styles.loginButton} 
+        <View style={styles.buttonWrapper}>
+          <AppButton
+            title={isSubmitting ? "LOGGING IN..." : "LET'S GOOOO"}
+            onPress={handleLogin}
+            style={styles.loginButton}
+            textStyle={styles.loginButtonText}
           />
-
-          <View style={styles.registerRow}>
-            <AppText variant="caption" style={styles.captionDark}>
-              No account yet?
-            </AppText>
-            <Link href="/register" style={styles.registerLink}>
-              Register here
-            </Link>
-          </View>
         </View>
       </View>
     </View>
@@ -67,57 +109,97 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.beachYellow,
-    paddingHorizontal: spacing.xl,
-    paddingTop: 72,
+  },
+  backgroundSvg: {
+    position: "absolute",
+    top: -30,
+    left: 0,
+    right: 0,
+    width: "100%",
+    height: 460,
+  },
+  backWrapper: {
+    position: "absolute",
+    top: 56,
+    left: spacing.xxl,
+    zIndex: 10,
   },
   content: {
     flex: 1,
-    gap: spacing.xxl,
+    paddingHorizontal: spacing.xxxl,
+    paddingTop: 170,
+    gap: spacing.xl,
+    zIndex: 2,
   },
-  header: {
-    gap: spacing.lg,
+  labelRow: {
+    marginTop: spacing.sm,
   },
-  backLink: {
-    fontSize: 28,
-    color: colors.textPrimary,
-    width: 32,
+  labelWrapper: {
+    alignSelf: "flex-start",
+    position: "relative",
+    paddingBottom: 6,
   },
   smallLabel: {
     color: colors.textPrimary,
-    textDecorationLine: 'underline',
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: 20,
+    zIndex: 2,
+  },
+  loginHighlight: {
+    position: "absolute",
+    top: 17,
+    left: 0,
+    bottom: 0,
+    width: "100%",
+    height: 8,
+    backgroundColor: colors.seaBlue,
+    borderRadius: 6,
+    zIndex: 1,
+  },
+  titleBlock: {
+    position: "relative",
+    marginTop: spacing.md,
+  },
+  mascotWrapper: {
+    position: "absolute",
+    top: -100,
+    right: 12,
+    zIndex: 3,
   },
   title: {
     color: colors.textPrimary,
-    fontSize: 52,
-    lineHeight: 58,
-    textTransform: 'uppercase',
-    maxWidth: 260,
+    fontSize: 70,
+    lineHeight: 62,
+    textTransform: "uppercase",
+    maxWidth: 400,
+    marginTop: 8,
   },
   form: {
-    gap: spacing.lg,
+    gap: spacing.xl,
+    marginTop: spacing.lg,
   },
   fieldGroup: {
     gap: spacing.sm,
   },
   label: {
     color: colors.textPrimary,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: 18,
   },
-  loginButton:{
-    backgroundColor: colors.sunsetPink,
-    marginTop: spacing.lg,
+  inputPlain: {
+    borderWidth: 0,
   },
-  registerRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 4,
-    marginTop: spacing.sm,
+  buttonWrapper: {
+    width: "70%",
+    alignSelf: "center",
+    marginTop: spacing.xxxl,
   },
-  captionDark: {
-    color: colors.textPrimary,
+  loginButton: {
+    backgroundColor: colors.seaBlue,
   },
-  registerLink: {
-    color: colors.plantGreen,
-    fontSize: 14,
+  loginButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
   },
 });
 import { PlaceholderScreen } from '@/src/components/common/placeholder-screen';

@@ -34,6 +34,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ title: 'Home' }} />
         <Stack.Screen name="login" options={{ title: 'Login' }} />
         <Stack.Screen name="register" options={{ title: 'Register' }} />
+        <Stack.Screen name="landing" options={{ title: "Landing" }} />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="create-trip" options={{ title: 'Create Trip' }} />
         <Stack.Screen name="join-trip" options={{ title: 'Join Trip' }} />
