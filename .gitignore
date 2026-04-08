@@ -30,3 +30,6 @@ build/Release
 
 # Firebase
 **/serviceAccount.json
+
+# IDE
+.idea/

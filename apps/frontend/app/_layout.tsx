@@ -1,11 +1,34 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import { BagelFatOne_400Regular } from '@expo-google-fonts/bagel-fat-one';
+import {
+  Nunito_400Regular, 
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+} from '@expo-google-fonts/nunito';
+
+export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    BagelFatOne_400Regular,
+    Nunito_400Regular,
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
 
 export default function RootLayout() {
   return (
     <>
       <Stack
         screenOptions={{
+          headerShown: false,
+        }}
+      >
           headerTitleAlign: 'center',
         }}>
         <Stack.Screen name="index" options={{ title: 'Home' }} />
@@ -28,6 +51,10 @@ export default function RootLayout() {
         <Stack.Screen name="itinerary" options={{ title: 'Itinerary' }} />
         <Stack.Screen name="past-trips" options={{ title: 'Past Trips' }} />
       </Stack>
+      <StatusBar style="dark" />
+    </>
+  );
+}
       <StatusBar style="auto" />
     </>
   );

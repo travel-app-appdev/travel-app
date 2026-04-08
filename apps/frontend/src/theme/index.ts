@@ -1,3 +1,7 @@
+export { colors } from "./colors";
+export { spacing } from "./spacing";
+export { radius } from "./radius";
+export { typography } from "./typography";
 export const appColors = {
   background: '#f4f7fb',
   surface: '#ffffff',

@@ -1,4 +1,7 @@
 import { Link, type Href } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
+import { AppText } from '@/src/components/common/AppText';
+import { colors, spacing } from '@/src/theme';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { appColors, spacing } from '@/src/theme';
@@ -19,6 +22,19 @@ export function PlaceholderScreen({
 }: PlaceholderScreenProps) {
   return (
     <View style={styles.container}>
+      <AppText variant="title" style={styles.title}>
+        {title}
+      </AppText>
+
+      <AppText variant="body" style={styles.description}>
+        {description}
+      </AppText>
+
+      {primaryLink ? (
+        <Link href={primaryLink.href} style={styles.link}>
+          {primaryLink.label}
+        </Link>
+      ) : null}
       <View style={styles.card}>
         <Text style={styles.eyebrow}>Student Group Trip Planner</Text>
         <Text style={styles.title}>{title}</Text>
@@ -36,6 +52,25 @@ export function PlaceholderScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  title: {
+    textAlign: 'center',
+  },
+  description: {
+    textAlign: 'center',
+    maxWidth: 320,
+  },
+  link: {
+    marginTop: spacing.md,
+    color: colors.primary,
+    fontSize: 16,
+  },
+});
     backgroundColor: appColors.background,
     padding: spacing.lg,
     justifyContent: 'center',
