@@ -20,6 +20,8 @@ export default function RootLayout() {
     return null;
   }
 
+
+export default function RootLayout() {
   return (
     <>
       <Stack
@@ -27,6 +29,8 @@ export default function RootLayout() {
           headerShown: false,
         }}
       >
+          headerTitleAlign: 'center',
+        }}>
         <Stack.Screen name="index" options={{ title: 'Home' }} />
         <Stack.Screen name="login" options={{ title: 'Login' }} />
         <Stack.Screen name="register" options={{ title: 'Register' }} />
@@ -48,6 +52,10 @@ export default function RootLayout() {
         <Stack.Screen name="past-trips" options={{ title: 'Past Trips' }} />
       </Stack>
       <StatusBar style="dark" />
+    </>
+  );
+}
+      <StatusBar style="auto" />
     </>
   );
 }
