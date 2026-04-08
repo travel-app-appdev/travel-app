@@ -56,21 +56,33 @@ export const getMyTrips = async (req: Request, res: Response): Promise<void> => 
 };
 
 export const createTrip = async (req: Request, res: Response): Promise<void> => {
-    const { userId, title, destination, start_date, end_date } = req.body;
+    const { idToken, title, destination, start_date, end_date } = req.body;
 
-    if (!userId || !title || !destination || !start_date || !end_date) {
+    if (!idToken || !title || !destination || !start_date || !end_date) {
         res.status(400).json({
-            error: "userId, title, destination, start_date and end_date are required",
+            error: "idToken, title, destination, start_date and end_date are required",
         });
         return;
     }
 
-    if (new Date(end_date) < new Date(start_date)) {
+    const start = new Date(start_date);
+    const end = new Date(end_date);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        res.status(400).json({ error: "start_date and end_date must be valid dates" });
+        return;
+    }
+
+    if (end < start) {
         res.status(400).json({ error: "end_date cannot be before start_date" });
         return;
     }
 
     try {
+        // 1) verify token and get authenticated user id
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        const userId = decoded.uid;
+
         const db = admin.firestore();
 
         const tripRef = db.collection("trips").doc();
@@ -78,6 +90,7 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
 
         const batch = db.batch();
 
+        // 2) use userId from token (not from the body)
         batch.set(tripRef, {
             admin_user_id: userId,
             title,
@@ -107,6 +120,6 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
         });
     } catch (error) {
         console.error("Error creating trip:", error);
-        res.status(500).json({ error: "Failed to create trip" });
+        res.status(401).json({ error: "Invalid token or failed to create trip" });
     }
 };
