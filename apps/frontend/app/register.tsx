@@ -1,12 +1,18 @@
 import { Link, router } from "expo-router";
 import { useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppText } from "@/src/components/common/AppText";
 import { auth } from "@/src/lib/firebase";
+import { getFirebaseAuthMessage } from "@/src/lib/authErrors";
+import {
+  hasErrors,
+  type AuthFieldErrors,
+  validateRegister,
+} from "@/src/lib/authValidation";
 import { colors, spacing, typography } from "@/src/theme";
 
 import Back from "@/assets/icons/back.svg";
@@ -18,9 +24,21 @@ export default function RegisterScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  function clearFieldError(field: keyof AuthFieldErrors) {
+    setErrors((prev) => ({ ...prev, [field]: undefined, general: undefined }));
+  }
+
   async function handleRegister() {
+    if (isSubmitting) return;
+
+    const nextErrors = validateRegister({ name, email, password });
+    setErrors(nextErrors);
+
+    if (hasErrors(nextErrors)) return;
+
     try {
       setIsSubmitting(true);
 
@@ -30,18 +48,18 @@ export default function RegisterScreen() {
         password,
       );
 
-      if (name.trim()) {
-        await updateProfile(credential.user, {
-          displayName: name.trim(),
-        });
-      }
+      await updateProfile(credential.user, {
+        displayName: name.trim(),
+      });
 
       router.replace("/landing");
-    } catch (error: any) {
-      Alert.alert(
-        "Registration failed",
-        error?.message ?? "Something went wrong.",
-      );
+    } catch (error) {
+      const message = getFirebaseAuthMessage(error);
+
+      setErrors((prev) => ({
+        ...prev,
+        general: message,
+      }));
     } finally {
       setIsSubmitting(false);
     }
@@ -84,10 +102,21 @@ export default function RegisterScreen() {
             </AppText>
             <AppInput
               value={name}
-              onChangeText={setName}
+              onChangeText={(value) => {
+                setName(value);
+                clearFieldError("name");
+              }}
               autoCapitalize="words"
-              style={styles.inputPlain}
+              autoCorrect={false}
+              autoComplete="name"
+              textContentType="name"
+              style={[styles.inputPlain, errors.name && styles.inputError]}
             />
+            {errors.name ? (
+              <AppText variant="caption" style={styles.errorText}>
+                {errors.name}
+              </AppText>
+            ) : null}
           </View>
 
           <View style={styles.fieldGroup}>
@@ -96,12 +125,22 @@ export default function RegisterScreen() {
             </AppText>
             <AppInput
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                clearFieldError("email");
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
-              style={styles.inputPlain}
+              autoComplete="email"
+              textContentType="emailAddress"
+              style={[styles.inputPlain, errors.email && styles.inputError]}
             />
+            {errors.email ? (
+              <AppText variant="caption" style={styles.errorText}>
+                {errors.email}
+              </AppText>
+            ) : null}
           </View>
 
           <View style={styles.fieldGroup}>
@@ -110,19 +149,36 @@ export default function RegisterScreen() {
             </AppText>
             <AppInput
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                clearFieldError("password");
+              }}
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
-              style={styles.inputPlain}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              style={[styles.inputPlain, errors.password && styles.inputError]}
             />
+            {errors.password ? (
+              <AppText variant="caption" style={styles.errorText}>
+                {errors.password}
+              </AppText>
+            ) : null}
           </View>
+
+          {errors.general ? (
+            <AppText variant="caption" style={styles.errorText}>
+              {errors.general}
+            </AppText>
+          ) : null}
         </View>
 
         <View style={styles.buttonWrapper}>
           <AppButton
             title={isSubmitting ? "CREATING..." : "LET’S GOOOO"}
             onPress={handleRegister}
+            disabled={isSubmitting}
             style={styles.registerButton}
             textStyle={styles.registerButtonText}
           />
@@ -154,6 +210,9 @@ const styles = StyleSheet.create({
     top: 56,
     left: spacing.xxl,
     zIndex: 10,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
   },
   content: {
     flex: 1,
@@ -218,7 +277,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   inputPlain: {
-    borderWidth: 0,
+    borderWidth: 1,
+  },
+  inputError: {
+    borderColor: "#D62828",
+  },
+  errorText: {
+    color: "#D62828",
+    fontSize: 14,
+    lineHeight: 18,
   },
   buttonWrapper: {
     width: "70%",
