@@ -1,8 +1,10 @@
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
+import { useEffect } from "react";
 import { StyleSheet, View, Image } from "react-native";
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, spacing, typography } from "@/src/theme";
+import { useGoogleLogin } from "@/src/lib/googleAuth";
 import VoteyLogo from "@/assets/logos/votey-logo1.svg";
 import CurlyGreen from "@/assets/visuals/curly-green.svg";
 import PalmLeaf from "@/assets/visuals/palm-leaf.svg";
@@ -11,6 +13,22 @@ import Google from "@/assets/icons/google.svg";
 import Stars from "@/assets/visuals/stars.svg";
 
 export default function StartPage() {
+  const { response, promptAsync, signInWithGoogleToken } =
+    useGoogleLogin();
+  useEffect(() => {
+    async function handleGoogleResponse() {
+      if (response?.type === "success") {
+        const idToken = response.authentication?.idToken;
+        if (!idToken) return;
+
+        await signInWithGoogleToken(idToken);
+        router.replace("/landing");
+      }
+    }
+
+    handleGoogleResponse();
+  }, [response, signInWithGoogleToken]);
+  
   return (
     <View style={styles.container}>
       {/* Decorative background visuals */}

@@ -1,14 +1,37 @@
-import { Link } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { Link, router } from "expo-router";
+import { useState } from "react";
+import { Alert, StyleSheet, View } from "react-native";
+import { signInWithEmailAndPassword } from "firebase/auth";
+
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppText } from "@/src/components/common/AppText";
+import { auth } from "@/src/lib/firebase";
 import { colors, spacing, typography } from "@/src/theme";
+
 import Back from "@/assets/icons/back.svg";
 import MascotHelloSeaBlue from "@/assets/mascots/mascot-hello-seablue.svg";
 import BlueBackground from "@/assets/visuals/blue-background.svg";
 
 export default function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleLogin() {
+    try {
+      setIsSubmitting(true);
+
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+
+      router.replace("/landing");
+    } catch (error: any) {
+      Alert.alert("Login failed", error?.message ?? "Something went wrong.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <BlueBackground style={styles.backgroundSvg} />
@@ -45,9 +68,11 @@ export default function LoginScreen() {
               Your email
             </AppText>
             <AppInput
-              placeholder=""
+              value={email}
+              onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
               style={styles.inputPlain}
             />
           </View>
@@ -57,8 +82,11 @@ export default function LoginScreen() {
               Your password
             </AppText>
             <AppInput
-              placeholder=""
+              value={password}
+              onChangeText={setPassword}
               secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
               style={styles.inputPlain}
             />
           </View>
@@ -66,8 +94,8 @@ export default function LoginScreen() {
 
         <View style={styles.buttonWrapper}>
           <AppButton
-            title="LET'S GOOOO"
-            onPress={() => {}}
+            title={isSubmitting ? "LOGGING IN..." : "LET'S GOOOO"}
+            onPress={handleLogin}
             style={styles.loginButton}
             textStyle={styles.loginButtonText}
           />
@@ -82,7 +110,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.beachYellow,
   },
-
   backgroundSvg: {
     position: "absolute",
     top: -30,
@@ -91,14 +118,12 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 460,
   },
-
   backWrapper: {
     position: "absolute",
     top: 56,
     left: spacing.xxl,
     zIndex: 10,
   },
-
   content: {
     flex: 1,
     paddingHorizontal: spacing.xxxl,
@@ -106,24 +131,20 @@ const styles = StyleSheet.create({
     gap: spacing.xl,
     zIndex: 2,
   },
-
   labelRow: {
     marginTop: spacing.sm,
   },
-
   labelWrapper: {
     alignSelf: "flex-start",
     position: "relative",
     paddingBottom: 6,
   },
-
   smallLabel: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: 20,
     zIndex: 2,
   },
-
   loginHighlight: {
     position: "absolute",
     top: 17,
@@ -135,19 +156,16 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     zIndex: 1,
   },
-
   titleBlock: {
     position: "relative",
     marginTop: spacing.md,
   },
-
   mascotWrapper: {
     position: "absolute",
     top: -100,
     right: 12,
     zIndex: 3,
   },
-
   title: {
     color: colors.textPrimary,
     fontSize: 70,
@@ -156,36 +174,29 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     marginTop: 8,
   },
-
   form: {
     gap: spacing.xl,
     marginTop: spacing.lg,
   },
-
   fieldGroup: {
     gap: spacing.sm,
   },
-
   label: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: 18,
   },
-
   inputPlain: {
     borderWidth: 0,
   },
-
   buttonWrapper: {
     width: "70%",
     alignSelf: "center",
     marginTop: spacing.xxxl,
   },
-
   loginButton: {
     backgroundColor: colors.seaBlue,
   },
-
   loginButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,

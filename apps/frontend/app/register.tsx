@@ -1,28 +1,62 @@
-import { Link } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { Link, router } from "expo-router";
+import { useState } from "react";
+import { Alert, StyleSheet, View } from "react-native";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppText } from "@/src/components/common/AppText";
+import { auth } from "@/src/lib/firebase";
 import { colors, spacing, typography } from "@/src/theme";
+
 import Back from "@/assets/icons/back.svg";
 import MascotHelloPink from "@/assets/mascots/mascot-hello-pink.svg";
 import RegisterYellowBg from "@/assets/visuals/yellow-background.svg";
 import Flowers from "@/assets/visuals/flowers-blue.svg";
 
 export default function RegisterScreen() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleRegister() {
+    try {
+      setIsSubmitting(true);
+
+      const credential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password,
+      );
+
+      if (name.trim()) {
+        await updateProfile(credential.user, {
+          displayName: name.trim(),
+        });
+      }
+
+      router.replace("/landing");
+    } catch (error: any) {
+      Alert.alert(
+        "Registration failed",
+        error?.message ?? "Something went wrong.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <View style={styles.container}>
-      {/* Pink page background + yellow top shape */}
       <RegisterYellowBg style={styles.backgroundSvg} />
 
-      {/* Back arrow */}
       <View style={styles.backWrapper}>
         <Link href="/login">
           <Back width={20} height={20} />
         </Link>
       </View>
 
-      {/* Main content */}
       <View style={styles.content}>
         <View style={styles.labelRow}>
           <View style={styles.labelWrapper}>
@@ -49,7 +83,8 @@ export default function RegisterScreen() {
               Your name
             </AppText>
             <AppInput
-              placeholder=""
+              value={name}
+              onChangeText={setName}
               autoCapitalize="words"
               style={styles.inputPlain}
             />
@@ -60,9 +95,11 @@ export default function RegisterScreen() {
               Your email
             </AppText>
             <AppInput
-              placeholder=""
+              value={email}
+              onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
               style={styles.inputPlain}
             />
           </View>
@@ -72,8 +109,11 @@ export default function RegisterScreen() {
               Your password
             </AppText>
             <AppInput
-              placeholder=""
+              value={password}
+              onChangeText={setPassword}
               secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
               style={styles.inputPlain}
             />
           </View>
@@ -81,8 +121,8 @@ export default function RegisterScreen() {
 
         <View style={styles.buttonWrapper}>
           <AppButton
-            title="LET’S GOOOO"
-            onPress={() => {}}
+            title={isSubmitting ? "CREATING..." : "LET’S GOOOO"}
+            onPress={handleRegister}
             style={styles.registerButton}
             textStyle={styles.registerButtonText}
           />
@@ -101,7 +141,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.sunsetPink,
   },
-
   backgroundSvg: {
     position: "absolute",
     top: 0,
@@ -110,14 +149,12 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 935,
   },
-
   backWrapper: {
     position: "absolute",
     top: 56,
     left: spacing.xxl,
     zIndex: 10,
   },
-
   content: {
     flex: 1,
     paddingHorizontal: spacing.xxxl,
@@ -125,25 +162,21 @@ const styles = StyleSheet.create({
     gap: spacing.xl,
     zIndex: 2,
   },
-
   labelRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-
   labelWrapper: {
     alignSelf: "flex-start",
     position: "relative",
   },
-
   smallLabel: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: 20,
     zIndex: 2,
   },
-
   registerHighlight: {
     position: "absolute",
     left: 0,
@@ -154,7 +187,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     zIndex: 1,
   },
-
   title: {
     color: colors.textPrimary,
     fontSize: 70,
@@ -163,53 +195,43 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     marginTop: 8,
   },
-
   titleBlock: {
     position: "relative",
     marginTop: spacing.md,
   },
-
   mascotWrapper: {
     position: "absolute",
     top: -35,
     right: 40,
     zIndex: 3,
   },
-
   form: {
     gap: spacing.xl,
     marginTop: spacing.lg,
   },
-
   fieldGroup: {
     gap: spacing.sm,
   },
-
   label: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: 18,
   },
-
   inputPlain: {
     borderWidth: 0,
   },
-
   buttonWrapper: {
     width: "70%",
     alignSelf: "center",
     marginTop: spacing.xxxl,
   },
-
   registerButton: {
     backgroundColor: colors.sunsetPink,
   },
-
   registerButtonText: {
     color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold
+    fontFamily: typography.fontFamily.bodyBold,
   },
-
   flowersWrapper: {
     alignItems: "center",
     marginTop: spacing.xl,
