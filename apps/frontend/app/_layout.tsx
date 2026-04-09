@@ -39,6 +39,8 @@ export default function RootLayout() {
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="create-trip" options={{ title: 'Create Trip' }} />
         <Stack.Screen name="join-trip" options={{ title: 'Join Trip' }} />
+        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="trip-settings" options={{ title: 'Trip Settings' }} />
         <Stack.Screen name="questionnaire" options={{ title: 'Questionnaire' }} />
         <Stack.Screen
           name="destination-voting"
