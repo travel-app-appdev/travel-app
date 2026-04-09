@@ -89,6 +89,7 @@ export default function LoginScreen() {
               Your email
             </AppText>
             <AppInput
+              testID="login-email-input"
               value={email}
               onChangeText={(value) => {
                 setEmail(value);
@@ -113,6 +114,7 @@ export default function LoginScreen() {
               Your password
             </AppText>
             <AppInput
+              testID="login-password-input"
               value={password}
               onChangeText={(value) => {
                 setPassword(value);

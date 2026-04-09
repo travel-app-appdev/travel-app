@@ -101,6 +101,7 @@ export default function RegisterScreen() {
               Your name
             </AppText>
             <AppInput
+              testID="register-name-input"
               value={name}
               onChangeText={(value) => {
                 setName(value);
@@ -124,6 +125,7 @@ export default function RegisterScreen() {
               Your email
             </AppText>
             <AppInput
+              testID="register-email-input"
               value={email}
               onChangeText={(value) => {
                 setEmail(value);
@@ -148,6 +150,7 @@ export default function RegisterScreen() {
               Your password
             </AppText>
             <AppInput
+              testID="register-password-input"
               value={password}
               onChangeText={(value) => {
                 setPassword(value);
