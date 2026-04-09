@@ -1,12 +1,11 @@
 import { Link, router } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { handleRegister as registerUser } from "@/src/services/authServices";
 
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppText } from "@/src/components/common/AppText";
-import { auth } from "@/src/lib/firebase";
 import { getFirebaseAuthMessage } from "@/src/lib/authErrors";
 import {
   hasErrors,
@@ -42,15 +41,7 @@ export default function RegisterScreen() {
     try {
       setIsSubmitting(true);
 
-      const credential = await createUserWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password,
-      );
-
-      await updateProfile(credential.user, {
-        displayName: name.trim(),
-      });
+      await registerUser(name.trim(), email.trim(), password);
 
       router.replace("/landing");
     } catch (error) {
