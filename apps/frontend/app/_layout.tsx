@@ -1,3 +1,4 @@
+// app/_layout.tsx
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -7,6 +8,7 @@ import {
   Nunito_600SemiBold,
   Nunito_700Bold,
 } from '@expo-google-fonts/nunito';
+import { View, ActivityIndicator } from 'react-native';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -17,7 +19,11 @@ export default function RootLayout() {
   });
 
   if (!fontsLoaded) {
-    return null;
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator />
+      </View>
+    );
   }
 
   return (
@@ -34,6 +40,8 @@ export default function RootLayout() {
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="create-trip" options={{ title: 'Create Trip' }} />
         <Stack.Screen name="join-trip" options={{ title: 'Join Trip' }} />
+        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="trip-settings" options={{ title: 'Trip Settings' }} />
         <Stack.Screen name="questionnaire" options={{ title: 'Questionnaire' }} />
         <Stack.Screen
           name="destination-voting"
