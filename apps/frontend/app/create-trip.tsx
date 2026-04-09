@@ -1,6 +1,6 @@
 // app/create-trip.tsx
-import { Link } from 'expo-router';
-import { useState } from 'react';
+import { Link } from "expo-router";
+import { useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -10,23 +10,25 @@ import {
   Platform,
   Dimensions,
   KeyboardAvoidingView,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Clipboard from 'expo-clipboard';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { AppText } from '@/src/components/common/AppText';
-import { colors, spacing, radius, typography } from '@/src/theme';
-import Back from '@/assets/icons/back.svg';
-import Plane from '@/assets/icons/plane.svg';
-import CityScape from '@/assets/icons/city_scape.svg';
-import CurlyYellow from '@/assets/visuals/curly-yellow.svg';
-import Location from '@/assets/icons/location.svg';
-import Copy from '@/assets/icons/copy.svg';
-import ShareLink from '@/assets/icons/share_link.svg';
-import Calendar from '@/assets/icons/calendar.svg';
-import TripTitle from '@/assets/icons/trip_title.svg';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import * as Clipboard from "expo-clipboard";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
+import { AppText } from "@/src/components/common/AppText";
+import { colors, spacing, radius, typography } from "@/src/theme";
+import Back from "@/assets/icons/back.svg";
+import Plane from "@/assets/icons/plane.svg";
+import CityScape from "@/assets/icons/city_scape.svg";
+import CurlyYellow from "@/assets/visuals/curly-yellow.svg";
+import Location from "@/assets/icons/location.svg";
+import Copy from "@/assets/icons/copy.svg";
+import ShareLink from "@/assets/icons/share_link.svg";
+import Calendar from "@/assets/icons/calendar.svg";
+import TripTitle from "@/assets/icons/trip_title.svg";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 function generateTripCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -34,8 +36,8 @@ function generateTripCode() {
 
 export default function CreateTripScreen() {
   const [step, setStep] = useState<1 | 2>(1);
-  const [destination, setDestination] = useState('');
-  const [tripName, setTripName] = useState('');
+  const [destination, setDestination] = useState("");
+  const [tripName, setTripName] = useState("");
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [showStartPicker, setShowStartPicker] = useState(false);
@@ -44,7 +46,7 @@ export default function CreateTripScreen() {
   const [copied, setCopied] = useState(false);
 
   const formatDate = (date: Date) =>
-    date.toLocaleDateString('en-GB').replace(/\//g, '.');
+    date.toLocaleDateString("en-GB").replace(/\//g, ".");
 
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(tripCode);
@@ -53,17 +55,18 @@ export default function CreateTripScreen() {
   };
 
   return (
-    <View style={[styles.fullScreen, step === 1 ? styles.bgStep1 : styles.bgStep2]}>
-      <SafeAreaView
-        style={styles.safeArea}
-        edges={['top', 'left', 'right']}
-      >
-        <View style={[styles.root, step === 1 ? styles.bgStep1 : styles.bgStep2]}>
+    <View
+      style={[styles.fullScreen, step === 1 ? styles.bgStep1 : styles.bgStep2]}
+    >
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+        <View
+          style={[styles.root, step === 1 ? styles.bgStep1 : styles.bgStep2]}
+        >
           {step === 1 ? (
             <>
               <KeyboardAvoidingView
                 style={styles.scroll}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
               >
                 <ScrollView
                   contentContainerStyle={styles.containerStep1}
@@ -77,7 +80,9 @@ export default function CreateTripScreen() {
                     </Link>
                     <View style={styles.headerTitle}>
                       <Plane width={25} height={25} />
-                      <AppText variant="body" style={styles.headerLabel}>Create trip</AppText>
+                      <AppText variant="body" style={styles.headerLabel}>
+                        Create trip
+                      </AppText>
                     </View>
                   </View>
 
@@ -88,7 +93,9 @@ export default function CreateTripScreen() {
                   <View style={[styles.fieldGroup, { marginTop: 20 }]}>
                     <View style={styles.fieldLabelRow}>
                       <Location width={20} height={20} />
-                      <AppText variant="body" style={styles.fieldLabel}>Destination</AppText>
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Destination
+                      </AppText>
                     </View>
                     <TextInput
                       style={styles.input}
@@ -107,7 +114,9 @@ export default function CreateTripScreen() {
                   style={styles.continueButton}
                   onPress={() => setStep(2)}
                 >
-                  <AppText variant="body" style={styles.continueButtonText}>Continue</AppText>
+                  <AppText variant="body" style={styles.continueButtonText}>
+                    Continue
+                  </AppText>
                 </Pressable>
               </View>
 
@@ -128,7 +137,7 @@ export default function CreateTripScreen() {
 
               <KeyboardAvoidingView
                 style={styles.scroll}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
               >
                 <ScrollView
                   contentContainerStyle={styles.containerStep2}
@@ -137,12 +146,17 @@ export default function CreateTripScreen() {
                 >
                   {/* Header */}
                   <View style={styles.header}>
-                    <Pressable onPress={() => setStep(1)} style={styles.backLink}>
+                    <Pressable
+                      onPress={() => setStep(1)}
+                      style={styles.backLink}
+                    >
                       <Back width={20} height={20} />
                     </Pressable>
                     <View style={styles.headerTitle}>
                       <Plane width={25} height={25} />
-                      <AppText variant="body" style={styles.headerLabel}>Create trip</AppText>
+                      <AppText variant="body" style={styles.headerLabel}>
+                        Create trip
+                      </AppText>
                     </View>
                   </View>
 
@@ -154,7 +168,9 @@ export default function CreateTripScreen() {
                   <View style={styles.fieldGroup}>
                     <View style={styles.fieldLabelRow}>
                       <TripTitle width={20} height={20} />
-                      <AppText variant="body" style={styles.fieldLabel}>Trip name</AppText>
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Trip name
+                      </AppText>
                     </View>
                     <TextInput
                       style={styles.input}
@@ -169,7 +185,9 @@ export default function CreateTripScreen() {
                   <View style={styles.fieldGroup}>
                     <View style={styles.fieldLabelRow}>
                       <Calendar width={20} height={20} />
-                      <AppText variant="body" style={styles.fieldLabel}>Trip date</AppText>
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Trip date
+                      </AppText>
                     </View>
                     <Pressable
                       style={styles.dateInput}
@@ -188,7 +206,7 @@ export default function CreateTripScreen() {
                       <DateTimePicker
                         value={startDate}
                         mode="date"
-                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        display={Platform.OS === "ios" ? "spinner" : "default"}
                         onChange={(_: DateTimePickerEvent, date?: Date) => {
                           setShowStartPicker(false);
                           if (date) {
@@ -203,7 +221,7 @@ export default function CreateTripScreen() {
                         value={endDate}
                         mode="date"
                         minimumDate={startDate}
-                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        display={Platform.OS === "ios" ? "spinner" : "default"}
                         onChange={(_: DateTimePickerEvent, date?: Date) => {
                           setShowEndPicker(false);
                           if (date) setEndDate(date);
@@ -217,17 +235,21 @@ export default function CreateTripScreen() {
                     <View style={styles.membersRow}>
                       <View style={styles.fieldLabelRow}>
                         <ShareLink width={20} height={20} />
-                        <AppText variant="body" style={styles.fieldLabel}>Add members to trip</AppText>
+                        <AppText variant="body" style={styles.fieldLabel}>
+                          Add members to trip
+                        </AppText>
                       </View>
                     </View>
                     <AppText variant="caption" style={styles.codeCaption}>
                       Copy this code to share the trip.
                     </AppText>
                     <Pressable style={styles.codeRow} onPress={handleCopyCode}>
-                      <AppText variant="body" style={styles.codeText}>{tripCode}</AppText>
+                      <AppText variant="body" style={styles.codeText}>
+                        {tripCode}
+                      </AppText>
                       <View style={styles.copyActionArea}>
                         <AppText variant="caption" style={styles.copiedText}>
-                          {copied ? '✓ Copied!' : 'Tap to copy'}
+                          {copied ? "✓ Copied!" : "Tap to copy"}
                         </AppText>
                         <Copy width={20} height={20} />
                       </View>
@@ -244,7 +266,9 @@ export default function CreateTripScreen() {
                     // TODO: submit trip to backend
                   }}
                 >
-                  <AppText variant="body" style={styles.createButtonText}>Create trip</AppText>
+                  <AppText variant="body" style={styles.createButtonText}>
+                    Create trip
+                  </AppText>
                 </Pressable>
               </View>
             </>
@@ -264,7 +288,7 @@ const styles = StyleSheet.create({
   },
   root: {
     flex: 1,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   bgStep1: {
     backgroundColor: colors.beachYellow,
@@ -290,24 +314,24 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
   },
   backLink: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     padding: spacing.xs,
   },
   headerTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
   headerLabel: {
     fontSize: 25,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     color: colors.textPrimary,
   },
 
@@ -316,15 +340,15 @@ const styles = StyleSheet.create({
     fontSize: 36,
     lineHeight: 52,
     color: colors.textPrimary,
-    textAlign: 'left',
-    alignSelf: 'stretch',
+    textAlign: "left",
+    alignSelf: "stretch",
   },
   titleStep2: {
     fontSize: 36,
     lineHeight: 52,
     color: colors.textPrimary,
-    textAlign: 'left',
-    alignSelf: 'stretch',
+    textAlign: "left",
+    alignSelf: "stretch",
   },
 
   // Fields
@@ -332,13 +356,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   fieldLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   fieldLabel: {
     color: colors.nightBlack,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 20,
   },
   input: {
@@ -359,9 +383,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     borderWidth: 2,
     borderColor: colors.nightBlack,
   },
@@ -372,32 +396,32 @@ const styles = StyleSheet.create({
 
   // Members
   membersRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   codeCaption: {
     color: colors.nightBlack,
     fontSize: 13,
   },
   codeRow: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: "rgba(255,255,255,0.2)",
     borderRadius: radius.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   codeText: {
     color: colors.nightBlack,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 20,
     letterSpacing: 3,
   },
   copyActionArea: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   copiedText: {
@@ -407,7 +431,7 @@ const styles = StyleSheet.create({
 
   // Continue button
   continueWrapper: {
-    position: 'absolute',
+    position: "absolute",
     bottom: SCREEN_WIDTH * (221 / 393) + 47,
     left: spacing.xl,
     right: spacing.xl,
@@ -418,18 +442,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.sunsetOrange,
     borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   continueButtonText: {
     color: colors.nightBlack,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 20,
   },
 
   // CityScape
   cityScapeWrapper: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     width: SCREEN_WIDTH,
@@ -439,18 +463,18 @@ const styles = StyleSheet.create({
 
   // CurlyYellow
   curlyWrapper: {
-    position: 'absolute',
+    position: "absolute",
     top: SCREEN_HEIGHT * 0.73,
     left: -100,
     width: 448,
     height: 442,
     zIndex: 0,
-    transform: [{ rotate: '10.84deg' }],
+    transform: [{ rotate: "10.84deg" }],
   },
 
   // Create trip button
   createWrapper: {
-    position: 'absolute',
+    position: "absolute",
     bottom: SCREEN_HEIGHT * 0.08,
     left: spacing.xl,
     right: spacing.xl,
@@ -461,12 +485,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.seaBlue,
     borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   createButtonText: {
     color: colors.nightBlack,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 20,
   },
 });

@@ -1,30 +1,25 @@
 // app/settings.tsx
-import { Link } from 'expo-router';
-import { useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppText } from '@/src/components/common/AppText';
-import { colors, spacing, radius } from '@/src/theme';
-import Back from '@/assets/icons/back.svg';
-import Settings from '@/assets/icons/settings.svg';
-import Profile from '@/assets/icons/profile.svg';
-import ArrowRight from '@/assets/icons/arrow_right.svg';
+import { Link } from "expo-router";
+import { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { AppText } from "@/src/components/common/AppText";
+import { colors, spacing, radius } from "@/src/theme";
+import Back from "@/assets/icons/back.svg";
+import Settings from "@/assets/icons/settings.svg";
+import Profile from "@/assets/icons/profile.svg";
+import ArrowRight from "@/assets/icons/arrow_right.svg";
 
-type CreatedTab = 'created' | 'createdArchive';
-type JoinedTab = 'joined' | 'joinedArchive';
+type CreatedTab = "created" | "createdArchive";
+type JoinedTab = "joined" | "joinedArchive";
 
 export default function SettingsScreen() {
-  const [createdTab, setCreatedTab] = useState<CreatedTab>('created');
-  const [joinedTab, setJoinedTab] = useState<JoinedTab>('joined');
+  const [createdTab, setCreatedTab] = useState<CreatedTab>("created");
+  const [joinedTab, setJoinedTab] = useState<JoinedTab>("joined");
 
   return (
     <View style={styles.fullScreen}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.container}
@@ -37,7 +32,9 @@ export default function SettingsScreen() {
             </Link>
             <View style={styles.headerTitle}>
               <Settings width={20} height={20} />
-              <AppText variant="body" style={styles.headerLabel}>Settings</AppText>
+              <AppText variant="body" style={styles.headerLabel}>
+                Settings
+              </AppText>
             </View>
           </View>
 
@@ -67,45 +64,50 @@ export default function SettingsScreen() {
             <View style={styles.sectionHeader}>
               {/* "Trips you created" tab */}
               <Pressable
-                onPress={() => setCreatedTab('created')}
+                onPress={() => setCreatedTab("created")}
                 style={styles.tabItem}
               >
                 <AppText
                   variant="body"
                   style={[
                     styles.sectionTitle,
-                    createdTab !== 'created' && styles.sectionTitleMuted,
+                    createdTab !== "created" && styles.sectionTitleMuted,
                   ]}
                 >
                   Trips you created
                 </AppText>
-                {createdTab === 'created' && <View style={styles.tabUnderline} />}
+                {createdTab === "created" && (
+                  <View style={styles.tabUnderline} />
+                )}
               </Pressable>
 
               {/* "Archive" tab */}
               <Pressable
-                onPress={() => setCreatedTab('createdArchive')}
+                onPress={() => setCreatedTab("createdArchive")}
                 style={styles.tabItem}
               >
                 <AppText
                   variant="caption"
                   style={[
                     styles.archiveLabel,
-                    createdTab === 'createdArchive' && styles.archiveLabelActive,
+                    createdTab === "createdArchive" &&
+                      styles.archiveLabelActive,
                   ]}
                 >
                   Archive
                 </AppText>
-                {createdTab === 'createdArchive' && <View style={styles.tabUnderline} />}
+                {createdTab === "createdArchive" && (
+                  <View style={styles.tabUnderline} />
+                )}
               </Pressable>
             </View>
 
             {/* TODO: replace with real trips created by user */}
             <View style={styles.emptySection}>
               <AppText variant="caption" style={styles.emptyText}>
-                {createdTab === 'created'
-                  ? 'No trips created yet.'
-                  : 'No archived trips.'}
+                {createdTab === "created"
+                  ? "No trips created yet."
+                  : "No archived trips."}
               </AppText>
             </View>
           </View>
@@ -115,45 +117,47 @@ export default function SettingsScreen() {
             <View style={styles.sectionHeader}>
               {/* "Trips you joined" tab */}
               <Pressable
-                onPress={() => setJoinedTab('joined')}
+                onPress={() => setJoinedTab("joined")}
                 style={styles.tabItem}
               >
                 <AppText
                   variant="body"
                   style={[
                     styles.sectionTitle,
-                    joinedTab !== 'joined' && styles.sectionTitleMuted,
+                    joinedTab !== "joined" && styles.sectionTitleMuted,
                   ]}
                 >
                   Trips you joined
                 </AppText>
-                {joinedTab === 'joined' && <View style={styles.tabUnderline} />}
+                {joinedTab === "joined" && <View style={styles.tabUnderline} />}
               </Pressable>
 
               {/* "Archive" tab */}
               <Pressable
-                onPress={() => setJoinedTab('joinedArchive')}
+                onPress={() => setJoinedTab("joinedArchive")}
                 style={styles.tabItem}
               >
                 <AppText
                   variant="caption"
                   style={[
                     styles.archiveLabel,
-                    joinedTab === 'joinedArchive' && styles.archiveLabelActive,
+                    joinedTab === "joinedArchive" && styles.archiveLabelActive,
                   ]}
                 >
                   Archive
                 </AppText>
-                {joinedTab === 'joinedArchive' && <View style={styles.tabUnderline} />}
+                {joinedTab === "joinedArchive" && (
+                  <View style={styles.tabUnderline} />
+                )}
               </Pressable>
             </View>
 
             {/* TODO: replace with real trips joined by user */}
             <View style={styles.emptySection}>
               <AppText variant="caption" style={styles.emptyText}>
-                {joinedTab === 'joined'
-                  ? 'No trips joined yet.'
-                  : 'No archived trips.'}
+                {joinedTab === "joined"
+                  ? "No trips joined yet."
+                  : "No archived trips."}
               </AppText>
             </View>
           </View>
@@ -183,24 +187,24 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
   },
   backLink: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     padding: spacing.xs,
   },
   headerTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
   headerLabel: {
     fontSize: 25,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     color: colors.textPrimary,
   },
 
@@ -221,8 +225,8 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   profileLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.md,
   },
   profileIconWrapper: {
@@ -232,14 +236,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lightWhite,
     borderWidth: 1,
     borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   profileInfo: {
     gap: spacing.xs,
   },
   profileName: {
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 16,
     color: colors.textPrimary,
   },
@@ -253,17 +257,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
   },
 
   // Tab items (wraps label + underline)
   tabItem: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   sectionTitle: {
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 16,
     color: colors.textPrimary,
   },
@@ -273,7 +277,7 @@ const styles = StyleSheet.create({
   archiveLabel: {
     color: colors.textMuted,
     fontSize: 14,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
   },
   archiveLabelActive: {
     color: colors.textPrimary,
@@ -282,13 +286,13 @@ const styles = StyleSheet.create({
     height: 5,
     backgroundColor: colors.beachYellow,
     borderRadius: radius.pill,
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     marginTop: -1,
   },
 
   emptySection: {
     paddingVertical: spacing.lg,
-    alignItems: 'center',
+    alignItems: "center",
   },
   emptyText: {
     color: colors.textMuted,

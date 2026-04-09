@@ -2,20 +2,26 @@ import { getFirebaseAuthMessage } from "@/src/lib/authErrors";
 
 describe("getFirebaseAuthMessage", () => {
   it("maps email already in use", () => {
-    expect(
-      getFirebaseAuthMessage({ code: "auth/email-already-in-use" }),
-    ).toBe("This email is already registered.");
+    expect(getFirebaseAuthMessage({ code: "auth/email-already-in-use" })).toBe(
+      "This email is already registered."
+    );
   });
 
   it("maps invalid credential", () => {
-    expect(
-      getFirebaseAuthMessage({ code: "auth/invalid-credential" }),
-    ).toBe("Incorrect email or password.");
+    expect(getFirebaseAuthMessage({ code: "auth/invalid-credential" })).toBe(
+      "Incorrect email or password."
+    );
   });
 
   it("falls back to generic message", () => {
     expect(getFirebaseAuthMessage({ code: "unknown" })).toBe(
-      "Something went wrong. Please try again.",
+      "Something went wrong. Please try again."
+    );
+  });
+
+  it("falls back to generic message for missing code", () => {
+    expect(getFirebaseAuthMessage({})).toBe(
+      "Something went wrong. Please try again."
     );
   });
 });

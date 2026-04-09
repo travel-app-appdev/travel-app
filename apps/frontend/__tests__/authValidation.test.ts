@@ -21,7 +21,7 @@ describe("validateLogin", () => {
 
   it("returns no errors for valid input", () => {
     expect(
-      validateLogin({ email: "test@test.com", password: "123456" }),
+      validateLogin({ email: "test@test.com", password: "123456" })
     ).toEqual({});
   });
 });
@@ -33,9 +33,33 @@ describe("validateRegister", () => {
         name: "",
         email: "test@test.com",
         password: "123456",
-      }),
+      })
     ).toEqual({
       name: "Please enter your name.",
+    });
+  });
+
+  it("returns error for invalid email", () => {
+    expect(
+      validateRegister({
+        name: "Helen",
+        email: "abc",
+        password: "123456",
+      })
+    ).toEqual({
+      email: "Please enter a valid email address.",
+    });
+  });
+
+  it("returns error for empty password", () => {
+    expect(
+      validateRegister({
+        name: "Helen",
+        email: "test@test.com",
+        password: "",
+      })
+    ).toEqual({
+      password: "Please enter your password.",
     });
   });
 
@@ -45,7 +69,7 @@ describe("validateRegister", () => {
         name: "Helen",
         email: "test@test.com",
         password: "123",
-      }),
+      })
     ).toEqual({
       password: "Password must be at least 6 characters.",
     });
@@ -57,7 +81,7 @@ describe("validateRegister", () => {
         name: "Helen",
         email: "test@test.com",
         password: "123456",
-      }),
+      })
     ).toEqual({});
   });
 });

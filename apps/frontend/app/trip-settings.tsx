@@ -1,6 +1,6 @@
 // app/trip-settings.tsx
-import { Link } from 'expo-router';
-import { useState } from 'react';
+import { Link } from "expo-router";
+import { useState } from "react";
 import {
   Alert,
   Pressable,
@@ -9,56 +9,58 @@ import {
   TextInput,
   View,
   Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { AppText } from '@/src/components/common/AppText';
-import { colors, spacing, radius, typography } from '@/src/theme';
-import Back from '@/assets/icons/back.svg';
-import Plane from '@/assets/icons/plane.svg';
-import TripTitle from '@/assets/icons/trip_title.svg';
-import Calendar from '@/assets/icons/calendar.svg';
-import Location from '@/assets/icons/location.svg';
-import AddPeople from '@/assets/icons/add_people.svg';
-import RemovePerson from '@/assets/icons/remove_person.svg';
-import ArrowRight from '@/assets/icons/arrow_right.svg';
-import ArrowDown from '@/assets/icons/arrow_down.svg';
-import Hourglass0 from '@/assets/icons/hourglass_0.svg';
-import Hourglass1 from '@/assets/icons/hourglass_1.svg';
-import Timepoint from '@/assets/icons/timepoint.svg';
-import CheckMark from '@/assets/icons/check_mark.svg';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
+import { AppText } from "@/src/components/common/AppText";
+import { colors, spacing, radius, typography } from "@/src/theme";
+import Back from "@/assets/icons/back.svg";
+import Plane from "@/assets/icons/plane.svg";
+import TripTitle from "@/assets/icons/trip_title.svg";
+import Calendar from "@/assets/icons/calendar.svg";
+import Location from "@/assets/icons/location.svg";
+import AddPeople from "@/assets/icons/add_people.svg";
+import RemovePerson from "@/assets/icons/remove_person.svg";
+import ArrowRight from "@/assets/icons/arrow_right.svg";
+import ArrowDown from "@/assets/icons/arrow_down.svg";
+import Hourglass0 from "@/assets/icons/hourglass_0.svg";
+import Hourglass1 from "@/assets/icons/hourglass_1.svg";
+import Timepoint from "@/assets/icons/timepoint.svg";
+import CheckMark from "@/assets/icons/check_mark.svg";
 
 // TODO: replace with real trip data from backend
 const TRIP = {
-  name: 'Japan Spring',
-  startDate: new Date('2026-01-01'),
-  endDate: new Date('2026-03-15'),
-  destination: 'Tokyo, Japan',
-  members: ['Sophie', 'Lukas', 'Franz'],
+  name: "Japan Spring",
+  startDate: new Date("2026-01-01"),
+  endDate: new Date("2026-03-15"),
+  destination: "Tokyo, Japan",
+  members: ["Sophie", "Lukas", "Franz"],
   phases: [
     {
-      id: 'planning',
-      label: 'Planning',
+      id: "planning",
+      label: "Planning",
       color: colors.beachYellow,
       active: true,
-      startDate: new Date('2026-01-01'),
-      endDate: new Date('2026-03-15'),
+      startDate: new Date("2026-01-01"),
+      endDate: new Date("2026-03-15"),
     },
     {
-      id: 'voting',
-      label: 'Voting',
+      id: "voting",
+      label: "Voting",
       color: colors.sunsetPink,
       active: false,
-      startDate: new Date('2026-03-16'),
-      endDate: new Date('2026-03-18'),
+      startDate: new Date("2026-03-16"),
+      endDate: new Date("2026-03-18"),
     },
     {
-      id: 'final',
-      label: 'Final',
+      id: "final",
+      label: "Final",
       color: colors.neonGreen,
       active: false,
-      startDate: new Date('2026-03-20'),
-      endDate: new Date('2026-03-20'),
+      startDate: new Date("2026-03-20"),
+      endDate: new Date("2026-03-20"),
     },
   ],
 };
@@ -74,8 +76,8 @@ type FieldKey = 'name' | 'date' | 'destination' | 'members';
 type PhaseKey = 'planning' | 'voting' | 'final';
 
 function formatDateDisplay(date: Date) {
-  const d = date.getDate().toString().padStart(2, '0');
-  const m = (date.getMonth() + 1).toString().padStart(2, '0');
+  const d = date.getDate().toString().padStart(2, "0");
+  const m = (date.getMonth() + 1).toString().padStart(2, "0");
   const y = date.getFullYear();
   return `${d}.${m}.${y}`;
 }
@@ -86,7 +88,7 @@ function calcDays(start: Date, end: Date) {
 }
 
 function dayLabel(days: number) {
-  return days === 1 ? '1 day' : `${days} days`;
+  return days === 1 ? "1 day" : `${days} days`;
 }
 
 export default function TripSettingsScreen() {
@@ -112,16 +114,22 @@ export default function TripSettingsScreen() {
 
   // Members
   const [members, setMembers] = useState(TRIP.members);
-  const [newMember, setNewMember] = useState('');
+  const [newMember, setNewMember] = useState("");
   const [membersUpdated, setMembersUpdated] = useState(false);
 
   // Phase dates
   const [phaseDates, setPhaseDates] = useState(
-    Object.fromEntries(TRIP.phases.map((p) => [p.id, { start: p.startDate, end: p.endDate }]))
+    Object.fromEntries(
+      TRIP.phases.map((p) => [p.id, { start: p.startDate, end: p.endDate }])
+    )
   );
   const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
-  const [showPhaseStartPicker, setShowPhaseStartPicker] = useState<string | null>(null);
-  const [showPhaseEndPicker, setShowPhaseEndPicker] = useState<string | null>(null);
+  const [showPhaseStartPicker, setShowPhaseStartPicker] = useState<
+    string | null
+  >(null);
+  const [showPhaseEndPicker, setShowPhaseEndPicker] = useState<string | null>(
+    null
+  );
 
   const toggleField = (key: FieldKey) => {
     setOpenField((prev) => (prev === key ? null : key));
@@ -167,7 +175,7 @@ export default function TripSettingsScreen() {
   const handleAddMember = () => {
     if (newMember.trim()) {
       setMembers((prev) => [...prev, newMember.trim()]);
-      setNewMember('');
+      setNewMember("");
       setMembersUpdated(true);
       // TODO: call API
       setTimeout(() => setMembersUpdated(false), 1500);
@@ -176,13 +184,13 @@ export default function TripSettingsScreen() {
 
   const handleRemoveMember = (name: string) => {
     Alert.alert(
-      'Remove member',
+      "Remove member",
       `Are you sure you want to remove ${name} from the trip?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Remove',
-          style: 'destructive',
+          text: "Remove",
+          style: "destructive",
           onPress: () => {
             setMembers((prev) => prev.filter((m) => m !== name));
             // TODO: call API
@@ -203,7 +211,7 @@ export default function TripSettingsScreen() {
 
   return (
     <View style={styles.fullScreen}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.container}
@@ -217,40 +225,61 @@ export default function TripSettingsScreen() {
             </Link>
             <View style={styles.headerTitle}>
               <Plane width={22} height={22} />
-              <AppText variant="body" style={styles.headerLabel}>Trip settings</AppText>
+              <AppText variant="body" style={styles.headerLabel}>
+                Trip settings
+              </AppText>
             </View>
           </View>
 
           {/* ── Trip name ── */}
           <View style={styles.fieldGroup}>
-            <Pressable style={styles.infoRow} onPress={() => toggleField('name')}>
+            <Pressable
+              style={styles.infoRow}
+              onPress={() => toggleField("name")}
+            >
               <View style={styles.infoLeft}>
                 <View style={styles.infoLabelRow}>
                   <TripTitle width={20} height={20} />
-                  <AppText variant="body" style={styles.fieldLabel}>Trip name</AppText>
+                  <AppText variant="body" style={styles.fieldLabel}>
+                    Trip name
+                  </AppText>
                 </View>
-                <AppText variant="caption" style={styles.infoValue}>{tripName}</AppText>
+                <AppText variant="caption" style={styles.infoValue}>
+                  {tripName}
+                </AppText>
               </View>
-              {openField === 'name'
-                ? <ArrowDown width={20} height={20} />
-                : <ArrowRight width={20} height={20} />}
+              {openField === "name" ? (
+                <ArrowDown width={20} height={20} />
+              ) : (
+                <ArrowRight width={20} height={20} />
+              )}
             </Pressable>
-            {openField === 'name' && (
+            {openField === "name" && (
               <View style={styles.expandedField}>
                 <TextInput
                   style={styles.input}
                   value={tripNameInput}
-                  onChangeText={(t) => { setTripNameInput(t); setTripNameUpdated(false); }}
+                  onChangeText={(t) => {
+                    setTripNameInput(t);
+                    setTripNameUpdated(false);
+                  }}
                   placeholderTextColor={colors.textMuted}
                   autoFocus
                 />
-                <Pressable style={styles.updateButton} onPress={handleUpdateName}>
-                  <AppText variant="body" style={styles.updateButtonText}>Update</AppText>
+                <Pressable
+                  style={styles.updateButton}
+                  onPress={handleUpdateName}
+                >
+                  <AppText variant="body" style={styles.updateButtonText}>
+                    Update
+                  </AppText>
                 </Pressable>
                 {tripNameUpdated && (
                   <View style={styles.successRow}>
                     <CheckMark width={18} height={18} />
-                    <AppText variant="caption" style={styles.successText}>Name is updated!</AppText>
+                    <AppText variant="caption" style={styles.successText}>
+                      Name is updated!
+                    </AppText>
                   </View>
                 )}
               </View>
@@ -259,28 +288,39 @@ export default function TripSettingsScreen() {
 
           {/* ── Trip date ── */}
           <View style={styles.fieldGroup}>
-            <Pressable style={styles.infoRow} onPress={() => toggleField('date')}>
+            <Pressable
+              style={styles.infoRow}
+              onPress={() => toggleField("date")}
+            >
               <View style={styles.infoLeft}>
                 <View style={styles.infoLabelRow}>
                   <Calendar width={20} height={20} />
-                  <AppText variant="body" style={styles.fieldLabel}>Trip date</AppText>
+                  <AppText variant="body" style={styles.fieldLabel}>
+                    Trip date
+                  </AppText>
                 </View>
                 <AppText variant="caption" style={styles.infoValue}>
                   {formatDateDisplay(tripStart)} - {formatDateDisplay(tripEnd)}
                 </AppText>
               </View>
-              {openField === 'date'
-                ? <ArrowDown width={20} height={20} />
-                : <ArrowRight width={20} height={20} />}
+              {openField === "date" ? (
+                <ArrowDown width={20} height={20} />
+              ) : (
+                <ArrowRight width={20} height={20} />
+              )}
             </Pressable>
-            {openField === 'date' && (
+            {openField === "date" && (
               <View style={styles.expandedField}>
                 <Pressable
                   style={styles.dateInput}
-                  onPress={() => { setShowTripStartPicker(true); setShowTripEndPicker(false); }}
+                  onPress={() => {
+                    setShowTripStartPicker(true);
+                    setShowTripEndPicker(false);
+                  }}
                 >
                   <AppText variant="body" style={styles.dateText}>
-                    {formatDateDisplay(tripStart)} - {formatDateDisplay(tripEnd)}
+                    {formatDateDisplay(tripStart)} -{" "}
+                    {formatDateDisplay(tripEnd)}
                   </AppText>
                   <Calendar width={20} height={20} />
                 </Pressable>
@@ -288,10 +328,13 @@ export default function TripSettingsScreen() {
                   <DateTimePicker
                     value={tripStart}
                     mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
                     onChange={(_: DateTimePickerEvent, date?: Date) => {
                       setShowTripStartPicker(false);
-                      if (date) { setTripStart(date); setShowTripEndPicker(true); }
+                      if (date) {
+                        setTripStart(date);
+                        setShowTripEndPicker(true);
+                      }
                     }}
                   />
                 )}
@@ -300,20 +343,27 @@ export default function TripSettingsScreen() {
                     value={tripEnd}
                     mode="date"
                     minimumDate={tripStart}
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
                     onChange={(_: DateTimePickerEvent, date?: Date) => {
                       setShowTripEndPicker(false);
                       if (date) setTripEnd(date);
                     }}
                   />
                 )}
-                <Pressable style={styles.updateButton} onPress={handleUpdateTripDate}>
-                  <AppText variant="body" style={styles.updateButtonText}>Update</AppText>
+                <Pressable
+                  style={styles.updateButton}
+                  onPress={handleUpdateTripDate}
+                >
+                  <AppText variant="body" style={styles.updateButtonText}>
+                    Update
+                  </AppText>
                 </Pressable>
                 {tripDateUpdated && (
                   <View style={styles.successRow}>
                     <CheckMark width={18} height={18} />
-                    <AppText variant="caption" style={styles.successText}>Date is updated!</AppText>
+                    <AppText variant="caption" style={styles.successText}>
+                      Date is updated!
+                    </AppText>
                   </View>
                 )}
               </View>
@@ -322,34 +372,53 @@ export default function TripSettingsScreen() {
 
           {/* ── Destination ── */}
           <View style={styles.fieldGroup}>
-            <Pressable style={styles.infoRow} onPress={() => toggleField('destination')}>
+            <Pressable
+              style={styles.infoRow}
+              onPress={() => toggleField("destination")}
+            >
               <View style={styles.infoLeft}>
                 <View style={styles.infoLabelRow}>
                   <Location width={20} height={20} />
-                  <AppText variant="body" style={styles.fieldLabel}>Destination</AppText>
+                  <AppText variant="body" style={styles.fieldLabel}>
+                    Destination
+                  </AppText>
                 </View>
-                <AppText variant="caption" style={styles.infoValue}>{destination}</AppText>
+                <AppText variant="caption" style={styles.infoValue}>
+                  {destination}
+                </AppText>
               </View>
-              {openField === 'destination'
-                ? <ArrowDown width={20} height={20} />
-                : <ArrowRight width={20} height={20} />}
+              {openField === "destination" ? (
+                <ArrowDown width={20} height={20} />
+              ) : (
+                <ArrowRight width={20} height={20} />
+              )}
             </Pressable>
-            {openField === 'destination' && (
+            {openField === "destination" && (
               <View style={styles.expandedField}>
                 <TextInput
                   style={styles.input}
                   value={destinationInput}
-                  onChangeText={(t) => { setDestinationInput(t); setDestinationUpdated(false); }}
+                  onChangeText={(t) => {
+                    setDestinationInput(t);
+                    setDestinationUpdated(false);
+                  }}
                   placeholderTextColor={colors.textMuted}
                   autoFocus
                 />
-                <Pressable style={styles.updateButton} onPress={handleUpdateDestination}>
-                  <AppText variant="body" style={styles.updateButtonText}>Update</AppText>
+                <Pressable
+                  style={styles.updateButton}
+                  onPress={handleUpdateDestination}
+                >
+                  <AppText variant="body" style={styles.updateButtonText}>
+                    Update
+                  </AppText>
                 </Pressable>
                 {destinationUpdated && (
                   <View style={styles.successRow}>
                     <CheckMark width={18} height={18} />
-                    <AppText variant="caption" style={styles.successText}>Destination is updated!</AppText>
+                    <AppText variant="caption" style={styles.successText}>
+                      Destination is updated!
+                    </AppText>
                   </View>
                 )}
               </View>
@@ -358,25 +427,34 @@ export default function TripSettingsScreen() {
 
           {/* ── Members ── */}
           <View style={styles.fieldGroup}>
-            <Pressable style={styles.infoRow} onPress={() => toggleField('members')}>
+            <Pressable
+              style={styles.infoRow}
+              onPress={() => toggleField("members")}
+            >
               <View style={styles.infoLeft}>
                 <View style={styles.infoLabelRow}>
                   <AddPeople width={20} height={20} />
-                  <AppText variant="body" style={styles.fieldLabel}>Members</AppText>
+                  <AppText variant="body" style={styles.fieldLabel}>
+                    Members
+                  </AppText>
                 </View>
                 <AppText variant="caption" style={styles.infoValue}>
-                  {members.join(', ')}
+                  {members.join(", ")}
                 </AppText>
               </View>
-              {openField === 'members'
-                ? <ArrowDown width={20} height={20} />
-                : <ArrowRight width={20} height={20} />}
+              {openField === "members" ? (
+                <ArrowDown width={20} height={20} />
+              ) : (
+                <ArrowRight width={20} height={20} />
+              )}
             </Pressable>
-            {openField === 'members' && (
+            {openField === "members" && (
               <View style={styles.expandedField}>
                 {members.map((member) => (
                   <View key={member} style={styles.memberRow}>
-                    <AppText variant="body" style={styles.memberName}>{member}</AppText>
+                    <AppText variant="body" style={styles.memberName}>
+                      {member}
+                    </AppText>
                     <Pressable
                       onPress={() => handleRemoveMember(member)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -392,13 +470,20 @@ export default function TripSettingsScreen() {
                   placeholder="Add member name"
                   placeholderTextColor={colors.textMuted}
                 />
-                <Pressable style={styles.updateButton} onPress={handleAddMember}>
-                  <AppText variant="body" style={styles.updateButtonText}>Add member</AppText>
+                <Pressable
+                  style={styles.updateButton}
+                  onPress={handleAddMember}
+                >
+                  <AppText variant="body" style={styles.updateButtonText}>
+                    Add member
+                  </AppText>
                 </Pressable>
                 {membersUpdated && (
                   <View style={styles.successRow}>
                     <CheckMark width={18} height={18} />
-                    <AppText variant="caption" style={styles.successText}>Member added!</AppText>
+                    <AppText variant="caption" style={styles.successText}>
+                      Member added!
+                    </AppText>
                   </View>
                 )}
               </View>
@@ -414,7 +499,10 @@ export default function TripSettingsScreen() {
 
             return (
               <View key={phaseId} style={styles.fieldGroup}>
-                <Pressable style={styles.phaseRow} onPress={() => togglePhase(phaseId)}>
+                <Pressable
+                  style={styles.phaseRow}
+                  onPress={() => togglePhase(phaseId)}
+                >
                   <View style={styles.phaseLeft}>
                     <View style={[styles.phaseBadge, { backgroundColor: phase.color }]}>
                       <AppText
@@ -425,26 +513,29 @@ export default function TripSettingsScreen() {
                       </AppText>
                     </View>
                     <View style={styles.phaseTimerRow}>
-                      {phase.active
-                        ? <Hourglass1 width={20} height={20} />
-                        : <Hourglass0 width={20} height={20} />
-                      }
+                      {phase.active ? (
+                        <Hourglass1 width={20} height={20} />
+                      ) : (
+                        <Hourglass0 width={20} height={20} />
+                      )}
                       <AppText variant="body" style={styles.phaseDays}>
                         {dayLabel(days)}
                       </AppText>
                       {phase.active && <Timepoint width={8} height={8} />}
                     </View>
                   </View>
-                  {isOpen
-                    ? <ArrowDown width={20} height={20} />
-                    : <ArrowRight width={20} height={20} />}
+                  {isOpen ? (
+                    <ArrowDown width={20} height={20} />
+                  ) : (
+                    <ArrowRight width={20} height={20} />
+                  )}
                 </Pressable>
 
                 <AppText variant="caption" style={styles.phaseDateLabel}>
                   {formatDateDisplay(dates.start)}
                   {dates.start.getTime() !== dates.end.getTime()
                     ? ` - ${formatDateDisplay(dates.end)}`
-                    : ''}
+                    : ""}
                 </AppText>
 
                 {isOpen && (
@@ -457,7 +548,8 @@ export default function TripSettingsScreen() {
                       }}
                     >
                       <AppText variant="body" style={styles.dateText}>
-                        {formatDateDisplay(dates.start)} - {formatDateDisplay(dates.end)}
+                        {formatDateDisplay(dates.start)} -{" "}
+                        {formatDateDisplay(dates.end)}
                       </AppText>
                       <Calendar width={20} height={20} />
                     </Pressable>
@@ -466,7 +558,7 @@ export default function TripSettingsScreen() {
                       <DateTimePicker
                         value={dates.start}
                         mode="date"
-                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        display={Platform.OS === "ios" ? "spinner" : "default"}
                         onChange={(_: DateTimePickerEvent, date?: Date) => {
                           setShowPhaseStartPicker(null);
                           if (date) {
@@ -484,7 +576,7 @@ export default function TripSettingsScreen() {
                         value={dates.end}
                         mode="date"
                         minimumDate={dates.start}
-                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        display={Platform.OS === "ios" ? "spinner" : "default"}
                         onChange={(_: DateTimePickerEvent, date?: Date) => {
                           setShowPhaseEndPicker(null);
                           if (date) {
@@ -501,13 +593,17 @@ export default function TripSettingsScreen() {
                       style={styles.updateButton}
                       onPress={() => handleUpdatePhaseDate(phaseId)}
                     >
-                      <AppText variant="body" style={styles.updateButtonText}>Update</AppText>
+                      <AppText variant="body" style={styles.updateButtonText}>
+                        Update
+                      </AppText>
                     </Pressable>
 
                     {phaseUpdated[phaseId] && (
                       <View style={styles.successRow}>
                         <CheckMark width={18} height={18} />
-                        <AppText variant="caption" style={styles.successText}>Timer is updated!</AppText>
+                        <AppText variant="caption" style={styles.successText}>
+                          Timer is updated!
+                        </AppText>
                       </View>
                     )}
                   </View>
@@ -541,24 +637,24 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
   },
   backLink: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     padding: spacing.xs,
   },
   headerTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
   headerLabel: {
     fontSize: 25,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     color: colors.textPrimary,
   },
 
@@ -567,9 +663,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: spacing.xs,
   },
   infoLeft: {
@@ -577,12 +673,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   fieldLabel: {
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 20,
     color: colors.textPrimary,
   },
@@ -612,9 +708,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     borderWidth: 2,
     borderColor: colors.nightBlack,
   },
@@ -628,31 +724,31 @@ const styles = StyleSheet.create({
     backgroundColor: colors.beachYellow,
     borderRadius: radius.pill,
     paddingVertical: spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
   },
   updateButtonText: {
     color: colors.nightBlack,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 20,
   },
 
   // Success
   successRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   successText: {
     color: colors.textPrimary,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 14,
   },
 
   // Members
   memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     backgroundColor: colors.white,
@@ -667,13 +763,13 @@ const styles = StyleSheet.create({
 
   // Phase rows
   phaseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   phaseLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.md,
   },
   phaseBadge: {
@@ -682,16 +778,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   phaseBadgeText: {
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 15,
   },
   phaseTimerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   phaseDays: {
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 15,
     color: colors.textPrimary,
   },
