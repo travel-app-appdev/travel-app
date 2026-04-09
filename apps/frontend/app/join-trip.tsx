@@ -73,7 +73,7 @@ export default function JoinTripScreen() {
             </View>
             <TextInput
               style={styles.input}
-              placeholder="Enter Code here"
+              placeholder="Enter code here"
               placeholderTextColor={colors.textMuted}
               value={code}
               onChangeText={setCode}
