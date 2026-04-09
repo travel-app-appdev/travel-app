@@ -1,7 +1,6 @@
-
 import { Link, router } from "expo-router";
 import { useEffect } from "react";
-import { StyleSheet, View, Image } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, spacing, typography } from "@/src/theme";
@@ -14,8 +13,7 @@ import Google from "@/assets/icons/google.svg";
 import Stars from "@/assets/visuals/stars.svg";
 
 export default function StartPage() {
-  const { response, promptAsync, signInWithGoogleToken } =
-    useGoogleLogin();
+  const { response, signInWithGoogleToken } = useGoogleLogin();
   useEffect(() => {
     async function handleGoogleResponse() {
       if (response?.type === "success") {
@@ -23,13 +21,13 @@ export default function StartPage() {
         if (!idToken) return;
 
         await signInWithGoogleToken(idToken);
-        router.replace("/landing");
+        router.replace("/home");
       }
     }
 
     handleGoogleResponse();
   }, [response, signInWithGoogleToken]);
-  
+
   return (
     <View style={styles.container}>
       {/* Decorative background visuals */}

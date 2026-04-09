@@ -3,8 +3,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import RegisterScreen from "@/app/register";
 
 const mockReplace = jest.fn();
-const mockCreateUser = jest.fn();
-const mockUpdateProfile = jest.fn();
+const mockHandleRegister = jest.fn();
 
 jest.mock("expo-router", () => ({
   Link: ({ children }: any) => children,
@@ -13,13 +12,8 @@ jest.mock("expo-router", () => ({
   },
 }));
 
-jest.mock("firebase/auth", () => ({
-  createUserWithEmailAndPassword: (...args: any[]) => mockCreateUser(...args),
-  updateProfile: (...args: any[]) => mockUpdateProfile(...args),
-}));
-
-jest.mock("@/src/lib/firebase", () => ({
-  auth: {},
+jest.mock("@/src/services/authService", () => ({
+  handleRegister: (...args: any[]) => mockHandleRegister(...args),
 }));
 
 jest.mock("@/assets/icons/back.svg", () => "Back");
@@ -44,11 +38,12 @@ describe("RegisterScreen", () => {
     });
   });
 
-  it("redirects to landing after successful registration", async () => {
-    mockCreateUser.mockResolvedValueOnce({
-      user: { uid: "123" },
+  it("redirects to home page after successful registration", async () => {
+    mockHandleRegister.mockResolvedValueOnce({
+      uid: "123",
+      email: "test@test.com",
+      name: "Helen",
     });
-    mockUpdateProfile.mockResolvedValueOnce(undefined);
 
     const { getByText, getByTestId } = render(<RegisterScreen />);
 
@@ -59,18 +54,35 @@ describe("RegisterScreen", () => {
     fireEvent.press(getByText("LET’S GOOOO"));
 
     await waitFor(() => {
-      expect(mockCreateUser).toHaveBeenCalledWith({}, "test@test.com", "123456");
-    });
-
-    await waitFor(() => {
-      expect(mockUpdateProfile).toHaveBeenCalledWith(
-        { uid: "123" },
-        { displayName: "Helen" },
+      expect(mockHandleRegister).toHaveBeenCalledWith(
+        "Helen",
+        "test@test.com",
+        "123456"
       );
     });
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith("/landing");
+      expect(mockReplace).toHaveBeenCalledWith("/home");
     });
+  });
+
+  it("shows service error message on failed registration", async () => {
+    mockHandleRegister.mockRejectedValueOnce(
+      new Error("Email is already registered")
+    );
+
+    const { getByText, getByTestId } = render(<RegisterScreen />);
+
+    fireEvent.changeText(getByTestId("register-name-input"), "Helen");
+    fireEvent.changeText(getByTestId("register-email-input"), "test@test.com");
+    fireEvent.changeText(getByTestId("register-password-input"), "123456");
+
+    fireEvent.press(getByText("LET’S GOOOO"));
+
+    await waitFor(() => {
+      expect(getByText("Email is already registered")).toBeTruthy();
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

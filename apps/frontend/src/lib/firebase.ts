@@ -21,4 +21,3 @@ if (__DEV__ && process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
     disableWarnings: true,
   });
 }
-

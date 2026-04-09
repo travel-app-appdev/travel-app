@@ -1,6 +1,6 @@
 // app/join-trip.tsx
-import { Link } from 'expo-router';
-import { useState } from 'react';
+import { Link } from "expo-router";
+import { useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -8,39 +8,32 @@ import {
   TextInput,
   View,
   Dimensions,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppText } from '@/src/components/common/AppText';
-import { colors, spacing, radius, typography } from '@/src/theme';
-import Back from '@/assets/icons/back.svg';
-import LinkIcon from '@/assets/icons/link.svg';
-import KeyFrame from '@/assets/icons/key_frame.svg';
-import LeafUp from '@/assets/visuals/leaf_up.svg';
-import LeafDown from '@/assets/visuals/leaf_down.svg';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { AppText } from "@/src/components/common/AppText";
+import { colors, spacing, radius, typography } from "@/src/theme";
+import Back from "@/assets/icons/back.svg";
+import LinkIcon from "@/assets/icons/link.svg";
+import KeyFrame from "@/assets/icons/key_frame.svg";
+import LeafUp from "@/assets/visuals/leaf_up.svg";
+import LeafDown from "@/assets/visuals/leaf_down.svg";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function JoinTripScreen() {
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState("");
 
   return (
     <View style={styles.fullScreen}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         {/* Leaf top right */}
         <View style={styles.leafTopRight} pointerEvents="none">
-          <LeafUp
-            width={SCREEN_WIDTH * 0.4}
-            height={SCREEN_WIDTH * 0.4}
-          />
+          <LeafUp width={SCREEN_WIDTH * 0.4} height={SCREEN_WIDTH * 0.4} />
         </View>
 
         {/* Leaf bottom left */}
         <View style={styles.leafBottomLeft} pointerEvents="none">
-          <LeafDown
-            width={SCREEN_WIDTH * 0.45}
-            height={SCREEN_WIDTH * 0.45}
-          />
+          <LeafDown width={SCREEN_WIDTH * 0.45} height={SCREEN_WIDTH * 0.45} />
         </View>
 
         <ScrollView
@@ -56,7 +49,9 @@ export default function JoinTripScreen() {
             </Link>
             <View style={styles.headerTitle}>
               <LinkIcon width={20} height={20} />
-              <AppText variant="body" style={styles.headerLabel}>Join Trip</AppText>
+              <AppText variant="body" style={styles.headerLabel}>
+                Join Trip
+              </AppText>
             </View>
           </View>
 
@@ -69,7 +64,9 @@ export default function JoinTripScreen() {
           <View style={styles.fieldGroup}>
             <View style={styles.fieldLabelRow}>
               <KeyFrame width={20} height={20} />
-              <AppText variant="body" style={styles.fieldLabel}>Code</AppText>
+              <AppText variant="body" style={styles.fieldLabel}>
+                Code
+              </AppText>
             </View>
             <TextInput
               style={styles.input}
@@ -91,7 +88,9 @@ export default function JoinTripScreen() {
               // TODO: validate and join trip
             }}
           >
-            <AppText variant="body" style={styles.joinButtonText}>Join</AppText>
+            <AppText variant="body" style={styles.joinButtonText}>
+              Join
+            </AppText>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
@@ -119,43 +118,43 @@ const styles = StyleSheet.create({
 
   // Leaf decorations
   leafTopRight: {
-    position: 'absolute',
+    position: "absolute",
     top: SCREEN_HEIGHT * -0.001,
     right: SCREEN_WIDTH * -0.05,
     zIndex: 0,
     opacity: 0.6,
-    transform: [{ rotate: '-0.01deg' }],
+    transform: [{ rotate: "-0.01deg" }],
   },
   leafBottomLeft: {
-    position: 'absolute',
+    position: "absolute",
     bottom: SCREEN_HEIGHT * 0.02,
     left: SCREEN_WIDTH * -0.08,
     zIndex: 0,
     opacity: 0.6,
-    transform: [{ rotate: '5deg' }],
+    transform: [{ rotate: "5deg" }],
   },
 
   // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
     zIndex: 1,
   },
   backLink: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     padding: spacing.xs,
   },
   headerTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
   headerLabel: {
     fontSize: 25,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     color: colors.textPrimary,
   },
 
@@ -164,8 +163,8 @@ const styles = StyleSheet.create({
     fontSize: 36,
     lineHeight: 52,
     color: colors.textPrimary,
-    textAlign: 'left',
-    alignSelf: 'stretch',
+    textAlign: "left",
+    alignSelf: "stretch",
     zIndex: 1,
   },
 
@@ -175,13 +174,13 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   fieldLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   fieldLabel: {
     color: colors.nightBlack,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 20,
   },
   input: {
@@ -198,7 +197,7 @@ const styles = StyleSheet.create({
   hint: {
     color: colors.nightBlack,
     fontSize: 18,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
   },
 
   // Join button
@@ -206,13 +205,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neonGreen,
     borderRadius: radius.pill,
     paddingVertical: spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
     zIndex: 1,
     marginTop: spacing.xxxl, // Extra space to separate from field
   },
   joinButtonText: {
     color: colors.nightBlack,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 20,
   },
 });

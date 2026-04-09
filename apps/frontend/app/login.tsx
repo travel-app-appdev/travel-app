@@ -1,18 +1,16 @@
 import { Link, router } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { signInWithEmailAndPassword } from "firebase/auth";
 
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppText } from "@/src/components/common/AppText";
-import { auth } from "@/src/lib/firebase";
-import { getFirebaseAuthMessage } from "@/src/lib/authErrors";
 import {
   hasErrors,
   type AuthFieldErrors,
   validateLogin,
 } from "@/src/lib/authValidation";
+import { handleLogin as loginUser } from "@/src/services/authServices";
 import { colors, spacing, typography } from "@/src/theme";
 
 import Back from "@/assets/icons/back.svg";
@@ -40,13 +38,16 @@ export default function LoginScreen() {
     try {
       setIsSubmitting(true);
 
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      await loginUser(email.trim(), password);
 
-      router.replace("/landing");
+      router.replace("/home");
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong";
+
       setErrors((prev) => ({
         ...prev,
-        general: getFirebaseAuthMessage(error),
+        general: message,
       }));
     } finally {
       setIsSubmitting(false);

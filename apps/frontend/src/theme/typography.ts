@@ -6,9 +6,9 @@ export const typography = {
     xl: 32,
   },
   fontFamily: {
-    title: 'BagelFatOne_400Regular',
-    body: 'Nunito_400Regular',
-    bodySemiBold: 'Nunito_600SemiBold',
-    bodyBold: 'Nunito_700Bold',
+    title: "BagelFatOne_400Regular",
+    body: "Nunito_400Regular",
+    bodySemiBold: "Nunito_600SemiBold",
+    bodyBold: "Nunito_700Bold",
   },
 };

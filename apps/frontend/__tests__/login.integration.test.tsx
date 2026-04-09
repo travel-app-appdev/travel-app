@@ -3,7 +3,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import LoginScreen from "@/app/login";
 
 const mockReplace = jest.fn();
-const mockSignIn = jest.fn();
+const mockHandleLogin = jest.fn();
 
 jest.mock("expo-router", () => ({
   Link: ({ children }: any) => children,
@@ -12,18 +12,14 @@ jest.mock("expo-router", () => ({
   },
 }));
 
-jest.mock("firebase/auth", () => ({
-  signInWithEmailAndPassword: (...args: any[]) => mockSignIn(...args),
-}));
-
-jest.mock("@/src/lib/firebase", () => ({
-  auth: {},
+jest.mock("@/src/services/authService", () => ({
+  handleLogin: (...args: any[]) => mockHandleLogin(...args),
 }));
 
 jest.mock("@/assets/icons/back.svg", () => "Back");
 jest.mock(
   "@/assets/mascots/mascot-hello-seablue.svg",
-  () => "MascotHelloSeaBlue",
+  () => "MascotHelloSeaBlue"
 );
 jest.mock("@/assets/visuals/blue-background.svg", () => "BlueBackground");
 
@@ -43,8 +39,12 @@ describe("LoginScreen", () => {
     });
   });
 
-  it("redirects to landing after successful login", async () => {
-    mockSignIn.mockResolvedValueOnce({ user: { uid: "123" } });
+  it("redirects to home page after successful login", async () => {
+    mockHandleLogin.mockResolvedValueOnce({
+      uid: "123",
+      email: "test@test.com",
+      name: "Helen",
+    });
 
     const { getByText, getByTestId } = render(<LoginScreen />);
 
@@ -54,11 +54,30 @@ describe("LoginScreen", () => {
     fireEvent.press(getByText("LET'S GOOOO"));
 
     await waitFor(() => {
-      expect(mockSignIn).toHaveBeenCalledWith({}, "test@test.com", "123456");
+      expect(mockHandleLogin).toHaveBeenCalledWith("test@test.com", "123456");
     });
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith("/landing");
+      expect(mockReplace).toHaveBeenCalledWith("/home");
     });
+  });
+
+  it("shows service error message on failed login", async () => {
+    mockHandleLogin.mockRejectedValueOnce(
+      new Error("Incorrect email or password.")
+    );
+
+    const { getByText, getByTestId } = render(<LoginScreen />);
+
+    fireEvent.changeText(getByTestId("login-email-input"), "test@test.com");
+    fireEvent.changeText(getByTestId("login-password-input"), "wrongpass");
+
+    fireEvent.press(getByText("LET'S GOOOO"));
+
+    await waitFor(() => {
+      expect(getByText("Incorrect email or password.")).toBeTruthy();
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

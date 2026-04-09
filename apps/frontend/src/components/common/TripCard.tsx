@@ -1,9 +1,9 @@
 // src/components/common/TripCard.tsx
-import { Pressable, StyleSheet, View } from 'react-native';
-import { AppText } from './AppText';
-import { colors, spacing, radius } from '@/src/theme';
+import { Pressable, StyleSheet, View } from "react-native";
+import { AppText } from "./AppText";
+import { colors, spacing, radius } from "@/src/theme";
 
-type TripStatus = 'planning' | 'voting';
+type TripStatus = "planning" | "voting";
 
 type Member = {
   id: string;
@@ -41,11 +41,12 @@ export function TripCard({
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
 
   return (
-    <Pressable style={[styles.card, { backgroundColor: cardColor }]} onPress={onPress}>
-      
+    <Pressable
+      style={[styles.card, { backgroundColor: cardColor }]}
+      onPress={onPress}
+    >
       {/* Trip info */}
       <View style={styles.info}>
-        
         {/* Title + badge row */}
         <View style={styles.titleRow}>
           <AppText variant="title" style={styles.title}>
@@ -75,7 +76,10 @@ export function TripCard({
               key={member.id}
               style={[
                 styles.avatar,
-                { backgroundColor: member.color, marginLeft: index === 0 ? 0 : -10 },
+                {
+                  backgroundColor: member.color,
+                  marginLeft: index === 0 ? 0 : -10,
+                },
               ]}
             >
               <AppText variant="caption" style={styles.avatarText}>
@@ -106,9 +110,9 @@ const styles = StyleSheet.create({
   },
 
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
 
   badge: {
@@ -118,7 +122,7 @@ const styles = StyleSheet.create({
   },
 
   badgeText: {
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 13,
   },
 
@@ -127,33 +131,33 @@ const styles = StyleSheet.create({
     lineHeight: 36,
     color: colors.nightBlack,
     flex: 1,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
   },
 
   destination: {
     color: colors.nightBlack,
     fontSize: 16,
-    fontFamily: 'Nunito_400Regular',
+    fontFamily: "Nunito_400Regular",
   },
 
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: spacing.sm,
   },
 
   avatars: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
 
   avatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
     borderColor: colors.white,
   },
@@ -161,12 +165,12 @@ const styles = StyleSheet.create({
   avatarText: {
     color: colors.white,
     fontSize: 11,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
   },
 
   date: {
     color: colors.nightBlack,
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: "Nunito_700Bold",
     fontSize: 14,
   },
 });

@@ -21,9 +21,8 @@
       },
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "pan",
-      "package": "com.anonymous.frontend"
+      "package": "com.anonymous.frontend",
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
       "googleServicesFile": "./google-services.json"
     },
     "web": {
@@ -47,7 +46,7 @@
       "expo-font",
       "expo-image",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
       "expo-web-browser",
       "@react-native-google-signin/google-signin"
     ],
