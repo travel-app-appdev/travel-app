@@ -90,7 +90,7 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
 
         const batch = db.batch();
 
-        // 2) use userId from token (not from the body)
+        // use userId
         batch.set(tripRef, {
             admin_user_id: userId,
             title,
