@@ -1,13 +1,13 @@
-import { TextInput, TextInputProps, StyleSheet } from 'react-native';
-import { colors, radius, spacing, typography } from '@/src/theme';
+import { TextInput, TextInputProps, StyleSheet } from "react-native";
+import { colors, radius, spacing, typography } from "@/src/theme";
 
 type AppInputProps = TextInputProps;
 
-export function AppInput(props: AppInputProps) {
+export function AppInput({ style, ...props }: AppInputProps) {
   return (
     <TextInput
       placeholderTextColor={colors.textMuted}
-      style={styles.input}
+      style={[styles.input, style]}
       {...props}
     />
   );
@@ -15,9 +15,9 @@ export function AppInput(props: AppInputProps) {
 
 const styles = StyleSheet.create({
   input: {
-    width: '100%',
+    width: "100%",
     backgroundColor: colors.white,
-    borderRadius: radius.lg,
+    borderRadius: radius.sm,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     fontSize: typography.size.md,
