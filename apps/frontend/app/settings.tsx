@@ -212,13 +212,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: colors.border,
     // iOS shadow
     shadowColor: colors.sunsetOrange,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.7,
-    shadowRadius: 16,
+    shadowRadius: radius.xl,
     // Android shadow
     elevation: 10,
   },
