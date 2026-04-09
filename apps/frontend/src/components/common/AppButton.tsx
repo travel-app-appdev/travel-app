@@ -17,6 +17,7 @@ type AppButtonProps = {
   style?: StyleProp<ViewStyle>;
   icon?: ReactNode;
   textStyle?: StyleProp<TextStyle>;
+  disabled?: boolean;
 };
 
 export function AppButton({
@@ -26,23 +27,28 @@ export function AppButton({
   style,
   icon,
   textStyle,
+  disabled = false,
 }: AppButtonProps) {
   return (
     <Pressable
       style={[
         styles.button,
         variant === "secondary" && styles.secondaryButton,
+        disabled && styles.disabledButton,
         style,
       ]}
       onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
     >
-      {icon && <View style={styles.iconWrapper}>{icon}</View>}
+      {icon ? <View style={styles.iconWrapper}>{icon}</View> : null}
 
       <AppText
         variant="body"
         style={[
           styles.text,
           variant === "secondary" && styles.secondaryText,
+          disabled && styles.disabledText,
           textStyle,
         ]}
       >
@@ -55,6 +61,7 @@ export function AppButton({
 const styles = StyleSheet.create({
   button: {
     width: "100%",
+    minHeight: 48,
     backgroundColor: colors.seaBlue,
     paddingVertical: spacing.lg,
     borderRadius: radius.pill,
@@ -67,6 +74,9 @@ const styles = StyleSheet.create({
     borderWidth: 2.5,
     borderColor: colors.seaBlue,
   },
+  disabledButton: {
+    opacity: 0.6,
+  },
   text: {
     color: colors.white,
     fontFamily: "Nunito_700Bold",
@@ -74,6 +84,9 @@ const styles = StyleSheet.create({
   },
   secondaryText: {
     color: colors.seaBlue,
+  },
+  disabledText: {
+    opacity: 0.9,
   },
   iconWrapper: {
     marginRight: spacing.sm,

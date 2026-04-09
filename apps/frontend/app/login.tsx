@@ -1,12 +1,18 @@
 import { Link, router } from "expo-router";
 import { useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
 
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppText } from "@/src/components/common/AppText";
 import { auth } from "@/src/lib/firebase";
+import { getFirebaseAuthMessage } from "@/src/lib/authErrors";
+import {
+  hasErrors,
+  type AuthFieldErrors,
+  validateLogin,
+} from "@/src/lib/authValidation";
 import { colors, spacing, typography } from "@/src/theme";
 
 import Back from "@/assets/icons/back.svg";
@@ -16,17 +22,32 @@ import BlueBackground from "@/assets/visuals/blue-background.svg";
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  function clearFieldError(field: keyof AuthFieldErrors) {
+    setErrors((prev) => ({ ...prev, [field]: undefined, general: undefined }));
+  }
+
   async function handleLogin() {
+    if (isSubmitting) return;
+
+    const nextErrors = validateLogin({ email, password });
+    setErrors(nextErrors);
+
+    if (hasErrors(nextErrors)) return;
+
     try {
       setIsSubmitting(true);
 
       await signInWithEmailAndPassword(auth, email.trim(), password);
 
       router.replace("/landing");
-    } catch (error: any) {
-      Alert.alert("Login failed", error?.message ?? "Something went wrong.");
+    } catch (error) {
+      setErrors((prev) => ({
+        ...prev,
+        general: getFirebaseAuthMessage(error),
+      }));
     } finally {
       setIsSubmitting(false);
     }
@@ -68,13 +89,24 @@ export default function LoginScreen() {
               Your email
             </AppText>
             <AppInput
+              testID="login-email-input"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                clearFieldError("email");
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
-              style={styles.inputPlain}
+              autoComplete="email"
+              textContentType="emailAddress"
+              style={[styles.inputPlain, errors.email && styles.inputError]}
             />
+            {errors.email ? (
+              <AppText variant="caption" style={styles.errorText}>
+                {errors.email}
+              </AppText>
+            ) : null}
           </View>
 
           <View style={styles.fieldGroup}>
@@ -82,20 +114,38 @@ export default function LoginScreen() {
               Your password
             </AppText>
             <AppInput
+              testID="login-password-input"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                clearFieldError("password");
+              }}
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
-              style={styles.inputPlain}
+              autoComplete="password"
+              textContentType="password"
+              style={[styles.inputPlain, errors.password && styles.inputError]}
             />
+            {errors.password ? (
+              <AppText variant="caption" style={styles.errorText}>
+                {errors.password}
+              </AppText>
+            ) : null}
           </View>
+
+          {errors.general ? (
+            <AppText variant="caption" style={styles.errorText}>
+              {errors.general}
+            </AppText>
+          ) : null}
         </View>
 
         <View style={styles.buttonWrapper}>
           <AppButton
             title={isSubmitting ? "LOGGING IN..." : "LET'S GOOOO"}
             onPress={handleLogin}
+            disabled={isSubmitting}
             style={styles.loginButton}
             textStyle={styles.loginButtonText}
           />
@@ -123,6 +173,9 @@ const styles = StyleSheet.create({
     top: 56,
     left: spacing.xxl,
     zIndex: 10,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
   },
   content: {
     flex: 1,
@@ -187,7 +240,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   inputPlain: {
-    borderWidth: 0,
+    borderWidth: 1,
+  },
+  inputError: {
+    borderColor: "#D62828",
+  },
+  errorText: {
+    color: "#D62828",
+    fontSize: 14,
+    lineHeight: 18,
   },
   buttonWrapper: {
     width: "70%",
