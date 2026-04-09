@@ -92,7 +92,7 @@ export default function CreateTripScreen() {
                     </View>
                     <TextInput
                       style={styles.input}
-                      placeholder="New York"
+                      placeholder="Enter city or country"
                       placeholderTextColor={colors.textMuted}
                       value={destination}
                       onChangeText={setDestination}
@@ -158,7 +158,7 @@ export default function CreateTripScreen() {
                     </View>
                     <TextInput
                       style={styles.input}
-                      placeholder="Wild Cats"
+                      placeholder="Enter trip name"
                       placeholderTextColor={colors.textMuted}
                       value={tripName}
                       onChangeText={setTripName}
@@ -219,18 +219,18 @@ export default function CreateTripScreen() {
                         <ShareLink width={20} height={20} />
                         <AppText variant="body" style={styles.fieldLabel}>Add members to trip</AppText>
                       </View>
-                      <Pressable onPress={handleCopyCode}>
-                        <Copy width={24} height={24} />
-                      </Pressable>
                     </View>
                     <AppText variant="caption" style={styles.codeCaption}>
                       Copy this code to share the trip.
                     </AppText>
                     <Pressable style={styles.codeRow} onPress={handleCopyCode}>
                       <AppText variant="body" style={styles.codeText}>{tripCode}</AppText>
-                      <AppText variant="caption" style={styles.copiedText}>
-                        {copied ? '✓ Copied!' : 'Tap to copy'}
-                      </AppText>
+                      <View style={styles.copyActionArea}>
+                        <AppText variant="caption" style={styles.copiedText}>
+                          {copied ? '✓ Copied!' : 'Tap to copy'}
+                        </AppText>
+                        <Copy width={20} height={20} />
+                      </View>
                     </Pressable>
                   </View>
                 </ScrollView>
@@ -390,17 +390,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   codeText: {
-    color: colors.white,
+    color: colors.nightBlack,
     fontFamily: 'Nunito_700Bold',
     fontSize: 20,
     letterSpacing: 3,
+  },
+  copyActionArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   copiedText: {
     color: colors.nightBlack,
     fontSize: 13,
   },
 
-  // Continue button — increase + 47 to move higher
+  // Continue button
   continueWrapper: {
     position: 'absolute',
     bottom: SCREEN_WIDTH * (221 / 393) + 47,
@@ -422,7 +427,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
 
-  // CityScape — always pinned to bottom, no adjustment needed
+  // CityScape
   cityScapeWrapper: {
     position: 'absolute',
     bottom: 0,
@@ -432,7 +437,7 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
 
-  // CurlyYellow — decrease 0.78 to move up, increase to move down
+  // CurlyYellow
   curlyWrapper: {
     position: 'absolute',
     top: SCREEN_HEIGHT * 0.73,
@@ -443,7 +448,7 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '10.84deg' }],
   },
 
-  // Create trip button — increase 0.08 to move higher
+  // Create trip button
   createWrapper: {
     position: 'absolute',
     bottom: SCREEN_HEIGHT * 0.08,
