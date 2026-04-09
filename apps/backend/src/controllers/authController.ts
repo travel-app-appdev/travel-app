@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import admin from "../config/firebase";
+import admin from '../config/firebase.js';
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   const { idToken } = req.body;

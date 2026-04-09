@@ -1,9 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import './config/firebase';
-import tripsRouter from "./routes/trips";
-import authRoutes from "./routes/auth";
+import './config/firebase.js';
+import authRoutes from './routes/auth.js';
+import tripsRouter from './routes/trips.js';
 
 dotenv.config();
 
