@@ -40,7 +40,6 @@ const TRIP = {
       id: 'planning',
       label: 'Planning',
       color: colors.beachYellow,
-      textColor: colors.nightBlack,
       active: true,
       startDate: new Date('2026-01-01'),
       endDate: new Date('2026-03-15'),
@@ -49,7 +48,6 @@ const TRIP = {
       id: 'voting',
       label: 'Voting',
       color: colors.sunsetPink,
-      textColor: colors.white,
       active: false,
       startDate: new Date('2026-03-16'),
       endDate: new Date('2026-03-18'),
@@ -58,12 +56,18 @@ const TRIP = {
       id: 'final',
       label: 'Final',
       color: colors.neonGreen,
-      textColor: colors.nightBlack,
       active: false,
       startDate: new Date('2026-03-20'),
       endDate: new Date('2026-03-20'),
     },
   ],
+};
+
+// Text color for each phase badge — kept on the frontend, never from backend
+const PHASE_TEXT_COLORS: Record<string, string> = {
+  planning: colors.nightBlack,
+  voting: colors.nightBlack,
+  final: colors.nightBlack,
 };
 
 type FieldKey = 'name' | 'date' | 'destination' | 'members';
@@ -413,7 +417,10 @@ export default function TripSettingsScreen() {
                 <Pressable style={styles.phaseRow} onPress={() => togglePhase(phaseId)}>
                   <View style={styles.phaseLeft}>
                     <View style={[styles.phaseBadge, { backgroundColor: phase.color }]}>
-                      <AppText variant="caption" style={[styles.phaseBadgeText, { color: phase.textColor }]}>
+                      <AppText
+                        variant="caption"
+                        style={[styles.phaseBadgeText, { color: PHASE_TEXT_COLORS[phase.id] }]}
+                      >
                         {phase.label}
                       </AppText>
                     </View>
