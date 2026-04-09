@@ -9,7 +9,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
 import { AppText } from '@/src/components/common/AppText';
+import { TripCard } from '@/src/components/common/TripCard';
 import { colors, spacing, radius } from '@/src/theme';
 import Settings from '@/assets/icons/settings.svg';
 import ButtonCreate from '@/assets/icons/Button_Create.svg';
@@ -17,8 +19,44 @@ import ButtonJoin from '@/assets/icons/Button_Join.svg';
 
 type Tab = 'your' | 'past';
 
+// TODO: replace with real data from backend
+const DUMMY_YOUR_TRIPS = [
+  {
+    id: '1',
+    title: 'Japan Spring',
+    destination: 'Tokyo, Japan',
+    startDate: 'Mar 21',
+    endDate: 'Mar 28',
+    status: 'planning' as const,
+    cardColor: colors.seaBlue,
+    members: [
+      { id: '1', initials: 'ST', color: colors.sunsetOrange },
+      { id: '2', initials: 'LK', color: colors.plantGreen },
+      { id: '3', initials: 'FR', color: colors.sunsetPink },
+    ],
+  },
+  {
+    id: '2',
+    title: 'Greek Islands',
+    destination: 'Santorini, Greece',
+    startDate: 'Aug 14',
+    endDate: 'Aug 22',
+    status: 'voting' as const,
+    cardColor: colors.sunsetOrange,
+    members: [
+      { id: '1', initials: 'ST', color: colors.seaBlue },
+      { id: '2', initials: 'LK', color: colors.plantGreen },
+    ],
+  },
+];
+
+const DUMMY_PAST_TRIPS: typeof DUMMY_YOUR_TRIPS = [];
+
 export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<Tab>('your');
+  const router = useRouter();
+
+  const trips = activeTab === 'your' ? DUMMY_YOUR_TRIPS : DUMMY_PAST_TRIPS;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -30,7 +68,7 @@ export default function HomeScreen() {
       >
         {/* Header Row */}
         <View style={styles.headerRow}>
-          <Pressable style={styles.settingsButton}>
+          <Pressable style={styles.settingsButton} onPress={() => router.push('/settings')}>
             <Settings width={24} height={24} />
             <AppText variant="caption" style={styles.settingsLabel}>Settings</AppText>
           </Pressable>
@@ -96,14 +134,34 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Empty State */}
-        <View style={styles.emptyState}>
-          <AppText variant="caption" style={styles.emptyText}>
-            {activeTab === 'your'
-              ? 'No upcoming trips yet. Create or join one!'
-              : 'No past trips yet. Your memories will live here.'}
-          </AppText>
-        </View>
+        {/* Trip Cards or Empty State */}
+        {trips.length > 0 ? (
+          <View style={styles.tripList}>
+            {trips.map((trip) => (
+              <TripCard
+                key={trip.id}
+                title={trip.title}
+                destination={trip.destination}
+                startDate={trip.startDate}
+                endDate={trip.endDate}
+                status={trip.status}
+                cardColor={trip.cardColor}
+                members={trip.members}
+                onPress={() => {
+                  // TODO: navigate to trip detail screen
+                }}
+              />
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <AppText variant="caption" style={styles.emptyText}>
+              {activeTab === 'your'
+                ? 'No upcoming trips yet. Create or join one!'
+                : 'No past trips yet. Your memories will live here.'}
+            </AppText>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -167,9 +225,9 @@ const styles = StyleSheet.create({
   },
   squadUnderline: {
     height: 4,
-    backgroundColor: colors.plantGreen,
+    backgroundColor: colors.neonGreen,
     borderRadius: radius.pill,
-    marginTop: 0,
+    marginTop: -1,
   },
 
   // Action Cards
@@ -191,6 +249,8 @@ const styles = StyleSheet.create({
   // Tabs
   tabRow: {
     flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     gap: spacing.xl,
   },
   tabItem: {
@@ -208,7 +268,12 @@ const styles = StyleSheet.create({
     height: 5,
     backgroundColor: colors.beachYellow,
     borderRadius: radius.pill,
-    marginTop: 0,
+    marginTop: -1,
+  },
+
+  // Trip list
+  tripList: {
+    gap: spacing.md,
   },
 
   // Empty State
