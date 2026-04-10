@@ -4,7 +4,7 @@ import * as path from 'path';
 
 // Read the file manually instead of importing it directly
 const serviceAccount = JSON.parse(
-  fs.readFileSync(path.resolve(__dirname, './serviceAccount.json'), 'utf-8')
+  fs.readFileSync(path.resolve(__dirname, '../../src/config/serviceAccount.json'), 'utf-8')
 );
 
 if (!admin.apps.length) {
