@@ -1,10 +1,9 @@
-// app/settings.tsx
 import { Link } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/common/AppText";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, typography } from "@/src/theme";
 import Back from "@/assets/icons/back.svg";
 import Settings from "@/assets/icons/settings.svg";
 import Profile from "@/assets/icons/profile.svg";
@@ -25,11 +24,16 @@ export default function SettingsScreen() {
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
           <View style={styles.header}>
-            <Link href="/home" style={styles.backLink}>
+            <Link
+              href="/home"
+              style={styles.backLink}
+              accessibilityRole="link"
+              accessibilityLabel="Go back to home"
+            >
               <Back width={20} height={20} />
             </Link>
+
             <View style={styles.headerTitle}>
               <Settings width={20} height={20} />
               <AppText variant="body" style={styles.headerLabel}>
@@ -38,16 +42,20 @@ export default function SettingsScreen() {
             </View>
           </View>
 
-          {/* Profile Card — with orange shadow */}
           <Link href="/profile" asChild>
-            <Pressable style={styles.profileCard}>
+            <Pressable
+              style={styles.profileCard}
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile"
+              accessibilityHint="Opens your profile settings"
+            >
               <View style={styles.profileLeft}>
                 <View style={styles.profileIconWrapper}>
                   <Profile width={32} height={32} />
                 </View>
+
                 <View style={styles.profileInfo}>
                   <AppText variant="body" style={styles.profileName}>
-                    {/* TODO: replace with real user name from auth */}
                     Sophie Trudl
                   </AppText>
                   <AppText variant="caption" style={styles.profileEdit}>
@@ -55,17 +63,19 @@ export default function SettingsScreen() {
                   </AppText>
                 </View>
               </View>
+
               <ArrowRight width={20} height={20} />
             </Pressable>
           </Link>
 
-          {/* Trips you created */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              {/* "Trips you created" tab */}
               <Pressable
                 onPress={() => setCreatedTab("created")}
                 style={styles.tabItem}
+                accessibilityRole="button"
+                accessibilityLabel="Show trips you created"
+                accessibilityState={{ selected: createdTab === "created" }}
               >
                 <AppText
                   variant="body"
@@ -81,10 +91,14 @@ export default function SettingsScreen() {
                 )}
               </Pressable>
 
-              {/* "Archive" tab */}
               <Pressable
                 onPress={() => setCreatedTab("createdArchive")}
                 style={styles.tabItem}
+                accessibilityRole="button"
+                accessibilityLabel="Show archived created trips"
+                accessibilityState={{
+                  selected: createdTab === "createdArchive",
+                }}
               >
                 <AppText
                   variant="caption"
@@ -102,7 +116,6 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
-            {/* TODO: replace with real trips created by user */}
             <View style={styles.emptySection}>
               <AppText variant="caption" style={styles.emptyText}>
                 {createdTab === "created"
@@ -112,13 +125,14 @@ export default function SettingsScreen() {
             </View>
           </View>
 
-          {/* Trips you joined */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              {/* "Trips you joined" tab */}
               <Pressable
                 onPress={() => setJoinedTab("joined")}
                 style={styles.tabItem}
+                accessibilityRole="button"
+                accessibilityLabel="Show trips you joined"
+                accessibilityState={{ selected: joinedTab === "joined" }}
               >
                 <AppText
                   variant="body"
@@ -132,10 +146,14 @@ export default function SettingsScreen() {
                 {joinedTab === "joined" && <View style={styles.tabUnderline} />}
               </Pressable>
 
-              {/* "Archive" tab */}
               <Pressable
                 onPress={() => setJoinedTab("joinedArchive")}
                 style={styles.tabItem}
+                accessibilityRole="button"
+                accessibilityLabel="Show archived joined trips"
+                accessibilityState={{
+                  selected: joinedTab === "joinedArchive",
+                }}
               >
                 <AppText
                   variant="caption"
@@ -152,7 +170,6 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
-            {/* TODO: replace with real trips joined by user */}
             <View style={styles.emptySection}>
               <AppText variant="caption" style={styles.emptyText}>
                 {joinedTab === "joined"
@@ -184,8 +201,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxxl,
     gap: spacing.xxl,
   },
-
-  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -195,6 +210,9 @@ const styles = StyleSheet.create({
   backLink: {
     position: "absolute",
     left: 0,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
     padding: spacing.xs,
   },
   headerTitle: {
@@ -203,26 +221,23 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   headerLabel: {
-    fontSize: 25,
-    fontFamily: "Nunito_700Bold",
+    fontSize: typography.size.xxl,
+    lineHeight: typography.lineHeight.xxl,
+    fontFamily: typography.fontFamily.bodyBold,
     color: colors.textPrimary,
   },
-
-  // Profile card — orange shadow via shadowColor + elevation
   profileCard: {
     backgroundColor: colors.white,
     borderRadius: radius.xl,
     padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    // iOS shadow
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     shadowColor: colors.sunsetOrange,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.7,
+    shadowOpacity: 0.25,
     shadowRadius: radius.xl,
-    // Android shadow
-    elevation: 10,
+    elevation: 6,
   },
   profileLeft: {
     flexDirection: "row",
@@ -243,16 +258,16 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   profileName: {
-    fontFamily: "Nunito_700Bold",
-    fontSize: 16,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
     color: colors.textPrimary,
   },
   profileEdit: {
     color: colors.textMuted,
-    fontSize: 13,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
   },
-
-  // Sections
   section: {
     gap: spacing.md,
   },
@@ -260,15 +275,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    gap: spacing.md,
   },
-
-  // Tab items (wraps label + underline)
   tabItem: {
     alignItems: "center",
+    minHeight: 44,
+    justifyContent: "center",
   },
   sectionTitle: {
-    fontFamily: "Nunito_700Bold",
-    fontSize: 16,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
     color: colors.textPrimary,
   },
   sectionTitleMuted: {
@@ -276,8 +293,9 @@ const styles = StyleSheet.create({
   },
   archiveLabel: {
     color: colors.textMuted,
-    fontSize: 14,
-    fontFamily: "Nunito_700Bold",
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.bodyBold,
   },
   archiveLabelActive: {
     color: colors.textPrimary,
@@ -289,7 +307,6 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     marginTop: -1,
   },
-
   emptySection: {
     paddingVertical: spacing.lg,
     alignItems: "center",
