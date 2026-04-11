@@ -18,6 +18,7 @@ type AppButtonProps = {
   icon?: ReactNode;
   textStyle?: StyleProp<TextStyle>;
   disabled?: boolean;
+  accessibilityLabel?: string; // 👈 added
 };
 
 export function AppButton({
@@ -28,6 +29,7 @@ export function AppButton({
   icon,
   textStyle,
   disabled = false,
+  accessibilityLabel, // 👈 added
 }: AppButtonProps) {
   return (
     <Pressable
@@ -40,6 +42,7 @@ export function AppButton({
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel} // 👈 added
     >
       {icon ? <View style={styles.iconWrapper}>{icon}</View> : null}
 

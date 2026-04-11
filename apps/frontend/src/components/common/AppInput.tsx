@@ -1,17 +1,23 @@
+import { forwardRef } from "react";
 import { TextInput, TextInputProps, StyleSheet } from "react-native";
 import { colors, radius, spacing, typography } from "@/src/theme";
 
 type AppInputProps = TextInputProps;
 
-export function AppInput({ style, ...props }: AppInputProps) {
-  return (
-    <TextInput
-      placeholderTextColor={colors.textMuted}
-      style={[styles.input, style]}
-      {...props}
-    />
-  );
-}
+export const AppInput = forwardRef<TextInput, AppInputProps>(
+  ({ style, ...props }, ref) => {
+    return (
+      <TextInput
+        ref={ref}
+        placeholderTextColor={colors.textMuted}
+        style={[styles.input, style]}
+        {...props}
+      />
+    );
+  }
+);
+
+AppInput.displayName = "AppInput";
 
 const styles = StyleSheet.create({
   input: {
