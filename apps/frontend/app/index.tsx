@@ -43,6 +43,8 @@ export default function StartPage() {
       <View
         style={[styles.palmTreeWrapper, { top: -245 * sh, right: -560 * sw }]}
         pointerEvents="none"
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
       >
         <PalmTree width={1000 * sw} height={1000 * sh} />
       </View>
@@ -50,6 +52,8 @@ export default function StartPage() {
       <View
         style={[styles.palmLeafWrapper, { top: 50 * sh, left: -240 * sw }]}
         pointerEvents="none"
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
       >
         <PalmLeaf width={350 * sw} height={350 * sw} />
       </View>
@@ -60,6 +64,8 @@ export default function StartPage() {
           { bottom: -220 * sh, left: -215 * sw },
         ]}
         pointerEvents="none"
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
       >
         <CurlyGreen width={500 * sw} height={500 * sw} />
       </View>
@@ -113,12 +119,15 @@ export default function StartPage() {
 
         <View style={styles.actions}>
           <Link href="/login" asChild>
-            <AppButton
-              title="Login"
-              onPress={() => {}}
-              textStyle={styles.primaryButtonText}
-              accessibilityLabel="Go to login screen"
-            />
+            <View>
+              <AppButton
+                title="Login"
+                onPress={() => {}}
+                textStyle={styles.primaryButtonText}
+                accessibilityLabel="Go to login screen"
+                accessibilityHint="Opens the login page"
+              />
+            </View>
           </Link>
 
           <View style={styles.registerRow}>
@@ -128,7 +137,7 @@ export default function StartPage() {
 
             <Link
               href="/register"
-              accessibilityLabel="Register here"
+              accessibilityLabel="Go to registration screen"
               accessibilityRole="link"
             >
               <View>
@@ -205,7 +214,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   actions: {
-    width: "70%",
+    width: "100%",
+    maxWidth: 320,
     alignSelf: "center",
     gap: spacing.md,
   },
@@ -230,6 +240,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.sm,
+  },
+  registerLinkWrapper: {
+    minHeight: 44,
+    justifyContent: "center",
   },
   registerLink: {
     color: colors.textPrimary,

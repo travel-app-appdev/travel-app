@@ -72,7 +72,11 @@ export default function RegisterScreen() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
       <View style={styles.container}>
-        <RegisterYellowBg style={[styles.backgroundSvg, { height: height }]} />
+        <RegisterYellowBg
+          style={[styles.backgroundSvg, { height: height }]}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        />
 
         <ScrollView
           style={styles.flex}
@@ -86,9 +90,10 @@ export default function RegisterScreen() {
           {/* Back button scrolls with content — same as login */}
           <View style={styles.backWrapper}>
             <Link
-              href="/login"
-              accessibilityLabel="Go back to login"
+              href="/"
+              accessibilityLabel="Go back to welcome screen"
               accessibilityRole="link"
+              style={styles.backWrapper}
             >
               <Back width={20} height={20} />
             </Link>
@@ -106,7 +111,11 @@ export default function RegisterScreen() {
 
           {/* Title + Mascot */}
           <View style={styles.titleBlock}>
-            <View style={styles.mascotWrapper}>
+            <View
+              style={styles.mascotWrapper}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+            >
               <MascotHelloPink width={110 * scale} height={110 * scale} />
             </View>
 
@@ -173,6 +182,7 @@ export default function RegisterScreen() {
                 blurOnSubmit={false}
                 accessibilityLabel="Full name"
                 accessibilityHint="Enter your name to create an account"
+                hasError={!!errors.name}
                 style={[styles.inputPlain, errors.name && styles.inputError]}
               />
               {errors.name ? (
@@ -204,7 +214,8 @@ export default function RegisterScreen() {
                 blurOnSubmit={false}
                 accessibilityLabel="Email address"
                 accessibilityHint="Enter your email to create an account"
-                style={[styles.inputPlain, errors.email && styles.inputError]}
+                hasError={!!errors.email}
+                style={styles.inputPlain}
               />
               {errors.email ? (
                 <AppText variant="caption" style={styles.errorText}>
@@ -234,6 +245,7 @@ export default function RegisterScreen() {
                 onSubmitEditing={handleRegister}
                 accessibilityLabel="Password"
                 accessibilityHint="Enter a password to create your account"
+                hasError={!!errors.password}
                 style={[
                   styles.inputPlain,
                   errors.password && styles.inputError,
@@ -261,6 +273,8 @@ export default function RegisterScreen() {
               disabled={isSubmitting}
               style={styles.registerButton}
               textStyle={styles.registerButtonText}
+              loading={isSubmitting}
+              accessibilityHint="Creates your account"
               accessibilityLabel={
                 isSubmitting ? "Creating account" : "Create account"
               }
@@ -312,7 +326,7 @@ const styles = StyleSheet.create({
   smallLabel: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
-    fontSize: 20,
+    fontSize: typography.size.lg,
     zIndex: 2,
   },
   // Inline highlight — same pattern as login and welcome screen
@@ -352,13 +366,14 @@ const styles = StyleSheet.create({
   label: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
-    fontSize: 18,
+    fontSize: typography.size.lg,
   },
   inputPlain: { borderWidth: 1 },
-  inputError: { borderColor: "#D62828" },
-  errorText: { color: "#D62828", fontSize: 14, lineHeight: 18 },
+  inputError: { borderColor: colors.error },
+  errorText: { color: colors.error, fontSize: typography.size.sm, lineHeight: 18 },
   buttonWrapper: {
-    width: "70%",
+    width: "100%",
+    maxWidth: 320,
     alignSelf: "center",
     marginTop: spacing.xxxl,
   },

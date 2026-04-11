@@ -70,6 +70,8 @@ export default function LoginScreen() {
       <View style={styles.container}>
         <BlueBackground
           style={[styles.backgroundSvg, { height: Math.round(460 * scale) }]}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
         />
         <ScrollView
           style={styles.flex}
@@ -83,8 +85,9 @@ export default function LoginScreen() {
           <View style={styles.backWrapper}>
             <Link
               href="/"
-              accessibilityLabel="Go back"
+              accessibilityLabel="Go back to welcome screen"
               accessibilityRole="link"
+              style={styles.backWrapper}
             >
               <Back width={20} height={20} />
             </Link>
@@ -102,7 +105,11 @@ export default function LoginScreen() {
 
           {/* Title + Mascot */}
           <View style={styles.titleBlock}>
-            <View style={styles.mascotWrapper}>
+            <View
+              style={styles.mascotWrapper}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+            >
               <MascotHelloSeaBlue width={110 * scale} height={110 * scale} />
             </View>
 
@@ -168,7 +175,8 @@ export default function LoginScreen() {
                 blurOnSubmit={false}
                 accessibilityLabel="Email address"
                 accessibilityHint="Enter your email to log in"
-                style={[styles.inputPlain, errors.email && styles.inputError]}
+                hasError={!!errors.email}
+                style={styles.inputPlain}
               />
               {errors.email ? (
                 <AppText variant="caption" style={styles.errorText}>
@@ -198,20 +206,29 @@ export default function LoginScreen() {
                 onSubmitEditing={handleLogin}
                 accessibilityLabel="Password"
                 accessibilityHint="Enter your password to log in"
+                hasError={!!errors.password}
                 style={[
                   styles.inputPlain,
                   errors.password && styles.inputError,
                 ]}
               />
               {errors.password ? (
-                <AppText variant="caption" style={styles.errorText}>
+                <AppText
+                  variant="caption"
+                  style={styles.errorText}
+                  accessibilityRole="alert"
+                >
                   {errors.password}
                 </AppText>
               ) : null}
             </View>
 
             {errors.general ? (
-              <AppText variant="caption" style={styles.errorText}>
+              <AppText
+                variant="caption"
+                style={styles.errorText}
+                accessibilityRole="alert"
+              >
                 {errors.general}
               </AppText>
             ) : null}
@@ -222,10 +239,11 @@ export default function LoginScreen() {
             <AppButton
               title={isSubmitting ? "LOGGING IN..." : "LET'S GOOOO"}
               onPress={handleLogin}
-              disabled={isSubmitting}
+              loading={isSubmitting}
               style={styles.loginButton}
               textStyle={styles.loginButtonText}
               accessibilityLabel={isSubmitting ? "Logging in" : "Log in"}
+              accessibilityHint="Logs you into your account"
             />
           </View>
 
@@ -266,7 +284,7 @@ const styles = StyleSheet.create({
   smallLabel: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
-    fontSize: 20,
+    fontSize: typography.size.xl,
     zIndex: 2,
   },
   labelWrapper: {
@@ -309,13 +327,14 @@ const styles = StyleSheet.create({
   label: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
-    fontSize: 18,
+    fontSize: typography.size.lg,
   },
   inputPlain: { borderWidth: 1 },
-  inputError: { borderColor: "#D62828" },
-  errorText: { color: "#D62828", fontSize: 14, lineHeight: 18 },
+  inputError: { borderColor: colors.error },
+  errorText: { color: colors.error, fontSize: typography.size.sm, lineHeight: 18 },
   buttonWrapper: {
-    width: "70%",
+    width: "100%",
+    maxWidth: 320,
     alignSelf: "center",
     marginTop: spacing.xxxl,
   },

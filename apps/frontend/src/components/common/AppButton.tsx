@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -6,9 +7,8 @@ import {
   TextStyle,
   StyleProp,
 } from "react-native";
-import { colors, radius, spacing } from "@/src/theme";
+import { colors, radius, spacing, typography } from "@/src/theme";
 import { AppText } from "./AppText";
-import { ReactNode } from "react";
 
 type AppButtonProps = {
   title: string;
@@ -18,7 +18,9 @@ type AppButtonProps = {
   icon?: ReactNode;
   textStyle?: StyleProp<TextStyle>;
   disabled?: boolean;
-  accessibilityLabel?: string; // 👈 added
+  loading?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 };
 
 export function AppButton({
@@ -29,20 +31,27 @@ export function AppButton({
   icon,
   textStyle,
   disabled = false,
-  accessibilityLabel, // 👈 added
+  loading = false,
+  accessibilityLabel,
+  accessibilityHint,
 }: AppButtonProps) {
+  const isDisabled = disabled || loading;
+
   return (
     <Pressable
-      style={[
+      style={({ pressed }) => [
         styles.button,
         variant === "secondary" && styles.secondaryButton,
-        disabled && styles.disabledButton,
+        isDisabled && styles.disabledButton,
+        pressed && !isDisabled && styles.pressedButton,
         style,
       ]}
       onPress={onPress}
-      disabled={disabled}
+      disabled={isDisabled}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel} // 👈 added
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
     >
       {icon ? <View style={styles.iconWrapper}>{icon}</View> : null}
 
@@ -51,7 +60,7 @@ export function AppButton({
         style={[
           styles.text,
           variant === "secondary" && styles.secondaryText,
-          disabled && styles.disabledText,
+          isDisabled && styles.disabledText,
           textStyle,
         ]}
       >
@@ -65,33 +74,39 @@ const styles = StyleSheet.create({
   button: {
     width: "100%",
     minHeight: 48,
-    backgroundColor: colors.seaBlue,
     paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
+    backgroundColor: colors.seaBlue,
   },
   secondaryButton: {
     backgroundColor: colors.lightWhite,
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: colors.seaBlue,
   },
   disabledButton: {
     opacity: 0.6,
   },
+  pressedButton: {
+    opacity: 0.85,
+  },
   text: {
-    color: colors.white,
-    fontFamily: "Nunito_700Bold",
-    fontSize: 16,
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
   },
   secondaryText: {
     color: colors.seaBlue,
   },
   disabledText: {
-    opacity: 0.9,
+    opacity: 0.95,
   },
   iconWrapper: {
     marginRight: spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
