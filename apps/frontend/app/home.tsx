@@ -58,10 +58,19 @@ function getInitials(name: string): string {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
-function getCardColor(state: Trip["state"]): string {
-  if (state === "Voting") return colors.sunsetOrange;
-  if (state === "Final") return colors.plantGreen;
-  return colors.seaBlue;
+function getCardColor(tripId: string): string {
+  const palette = [
+    colors.plantGreen,
+    colors.sunsetOrange,
+    colors.seaBlue,
+  ];
+
+  let hash = 0;
+  for (let i = 0; i < tripId.length; i++) {
+    hash = tripId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  return palette[Math.abs(hash) % palette.length];
 }
 
 function getUiStatus(state: Trip["state"]): "planning" | "voting" | "final" {
@@ -89,7 +98,7 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     startDate: formatDate(trip.start_date),
     endDate: formatDate(trip.end_date),
     status: getUiStatus(trip.state),
-    cardColor: getCardColor(trip.state),
+    cardColor: getCardColor(trip.trip_id),
     members: (trip.members ?? []).map(
         (member: TripMemberFromApi, index: number) => ({
           id: member.id,
@@ -122,15 +131,18 @@ export default function HomeScreen() {
 
         const backendTrips = await fetchMyTrips(userId);
 
-        const now = new Date();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         const upcoming: TripCardItem[] = [];
         const past: TripCardItem[] = [];
 
         (backendTrips as TripWithMembers[]).forEach((trip: TripWithMembers) => {
           const mappedTrip = mapTripToCardTrip(trip);
           const tripEndDate = new Date(trip.end_date);
+          tripEndDate.setHours(0, 0, 0, 0);
 
-          if (tripEndDate < now) {
+          if (tripEndDate < today) {
             past.push(mappedTrip);
           } else {
             upcoming.push(mappedTrip);
