@@ -127,7 +127,7 @@ export default function HomeScreen() {
         }
 
         const userId = user.uid;
-        console.log("Loading trips for user:", userId);
+        console.log("Loading trips for user");
 
         const backendTrips = await fetchMyTrips(userId);
 
