@@ -31,7 +31,7 @@ type TripCardItem = {
   destination: string;
   startDate: string;
   endDate: string;
-  status: "planning" | "voting";
+  status: "planning" | "voting" | "final";
   cardColor: string;
   members: {
     id: string;
@@ -64,8 +64,9 @@ function getCardColor(state: Trip["state"]): string {
   return colors.seaBlue;
 }
 
-function getUiStatus(state: Trip["state"]): "planning" | "voting" {
+function getUiStatus(state: Trip["state"]): "planning" | "voting" | "final" {
   if (state === "Voting") return "voting";
+  if (state === "Final") return "final";
   return "planning";
 }
 

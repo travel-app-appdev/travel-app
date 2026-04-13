@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "./AppText";
 import { colors, spacing, radius } from "@/src/theme";
 
-type TripStatus = "planning" | "voting";
+type TripStatus = "planning" | "voting" | "final";
 
 type Member = {
   id: string;
@@ -25,6 +25,7 @@ type TripCardProps = {
 const STATUS_COLORS: Record<TripStatus, { bg: string; text: string }> = {
   planning: { bg: colors.beachYellow, text: colors.nightBlack },
   voting: { bg: colors.sunsetPink, text: colors.nightBlack },
+  final: { bg: colors.neonGreen, text: colors.nightBlack },
 };
 
 export function TripCard({
