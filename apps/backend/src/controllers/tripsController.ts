@@ -10,8 +10,9 @@ export const getMyTrips = async (req: Request, res: Response): Promise<void> => 
     }
 
     try {
-        const memberSnapshot = await admin
-            .firestore()
+        const db = admin.firestore();
+
+        const memberSnapshot = await db
             .collection("trip_members")
             .where("user_id", "==", userId)
             .where("invite_status", "==", "accepted")
@@ -26,27 +27,51 @@ export const getMyTrips = async (req: Request, res: Response): Promise<void> => 
         const tripIds = memberships.map((member) => member.trip_id);
 
         const tripPromises = tripIds.map((tripId) =>
-            admin.firestore().collection("trips").doc(tripId).get()
+            db.collection("trips").doc(tripId).get()
         );
 
         const tripDocs = await Promise.all(tripPromises);
 
-        const trips = tripDocs
-            .filter((doc) => doc.exists)
-            .map((doc) => {
-                const data = doc.data();
-                const membership = memberships.find((m) => m.trip_id === doc.id);
+        const trips = await Promise.all(
+            tripDocs
+                .filter((doc) => doc.exists)
+                .map(async (tripDoc) => {
+                    const tripData = tripDoc.data();
+                    const membership = memberships.find((m) => m.trip_id === tripDoc.id);
 
-                return {
-                    trip_id: doc.id,
-                    title: data?.title,
-                    destination: data?.destination,
-                    start_date: data?.start_date,
-                    end_date: data?.end_date,
-                    state: data?.state,
-                    role: membership?.role,
-                };
-            });
+                    const tripMembersSnapshot = await db
+                        .collection("trip_members")
+                        .where("trip_id", "==", tripDoc.id)
+                        .where("invite_status", "==", "accepted")
+                        .get();
+
+                    const tripMembers = tripMembersSnapshot.docs.map((doc) => doc.data());
+
+                    const members = await Promise.all(
+                        tripMembers.map(async (member) => {
+                            const userDoc = await db.collection("users").doc(member.user_id).get();
+                            const userData = userDoc.data();
+
+                            return {
+                                id: member.user_id,
+                                name: userData?.name ?? "Unknown User",
+                                role: member.role,
+                            };
+                        })
+                    );
+
+                    return {
+                        trip_id: tripDoc.id,
+                        title: tripData?.title,
+                        destination: tripData?.destination,
+                        start_date: tripData?.start_date,
+                        end_date: tripData?.end_date,
+                        state: tripData?.state,
+                        role: membership?.role,
+                        members,
+                    };
+                })
+        );
 
         res.json(trips);
     } catch (error) {
@@ -133,19 +158,6 @@ export const createTripWithoutAuth = async (req: Request, res: Response): Promis
         res.status(400).json({
             error: "userId, title, destination, start_date and end_date are required",
         });
-        return;
-    }
-
-    const start = new Date(start_date);
-    const end = new Date(end_date);
-
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        res.status(400).json({ error: "start_date and end_date must be valid dates" });
-        return;
-    }
-
-    if (end < start) {
-        res.status(400).json({ error: "end_date cannot be before start_date" });
         return;
     }
 
