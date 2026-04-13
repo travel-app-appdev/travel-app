@@ -2,6 +2,7 @@ import { Link, router } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { handleRegister as registerUser } from "@/src/services/authServices";
+import { useAuth } from "@/src/context/AuthContext";
 
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppInput } from "@/src/components/common/AppInput";
@@ -25,6 +26,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { setUser } = useAuth();
 
   function clearFieldError(field: keyof AuthFieldErrors) {
     setErrors((prev) => ({ ...prev, [field]: undefined, general: undefined }));
@@ -41,7 +43,8 @@ export default function RegisterScreen() {
     try {
       setIsSubmitting(true);
 
-      await registerUser(name.trim(), email.trim(), password);
+      const backendUser = await registerUser(name.trim(), email.trim(), password);
+      setUser(backendUser);
 
       router.replace("/home");
     } catch (error) {
