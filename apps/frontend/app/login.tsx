@@ -35,7 +35,16 @@ export default function LoginScreen() {
   const { width, height } = useWindowDimensions();
   const scale = Math.min(width / 390, height / 844);
 
-  const titleSize = Math.round(Math.max(60 * scale, 40));
+  const isSmallPhone = height < 760;
+  const isVerySmallPhone = height < 700;
+
+  const titleSize = Math.round(Math.min(52 * scale, isSmallPhone ? 36 : 44));
+  const mascotSize = Math.round(Math.min(100 * scale, isSmallPhone ? 78 : 100));
+  const headerTop = Math.round(isVerySmallPhone ? 34 : isSmallPhone ? 44 : 56);
+  const headerBottom = isVerySmallPhone ? spacing.sm : spacing.lg;
+
+  const bgHeight = Math.min(height * 0.42, 360);
+  const bgWidth = width;
 
   function clearFieldError(field: keyof AuthFieldErrors) {
     setErrors((prev) => ({ ...prev, [field]: undefined, general: undefined }));
@@ -62,95 +71,124 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
-    >
-      <View style={styles.container}>
-        <BlueBackground
-          style={[styles.backgroundSvg, { height: Math.round(460 * scale) }]}
-          {...(Platform.OS !== "web" ? { accessible: false } : {})}
-        />
+    <View style={styles.container}>
+      <BlueBackground
+        width={bgWidth}
+        height={bgHeight}
+        style={styles.backgroundSvg}
+        {...(Platform.OS !== "web" ? { accessible: false } : {})}
+      />
+
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: headerTop,
+            paddingBottom: headerBottom,
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        <View style={styles.backWrapper}>
+          <Link
+            href="/"
+            accessibilityLabel="Go back to welcome screen"
+            accessibilityRole="link"
+            style={styles.backTouchable}
+          >
+            <Back width={20} height={20} />
+          </Link>
+        </View>
+
+        <View style={styles.labelRow}>
+          <View style={styles.labelWrapper}>
+            <AppText variant="body" style={styles.smallLabel}>
+              Login
+            </AppText>
+            <View style={styles.loginHighlight} />
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.titleBlock,
+            {
+              minHeight: mascotSize * 0.95,
+              marginTop: isSmallPhone ? spacing.sm : spacing.md,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.mascotWrapper,
+              {
+                top: isSmallPhone ? -8 : -16,
+                right: 0,
+              },
+            ]}
+            {...(Platform.OS !== "web" ? { accessible: false } : {})}
+          >
+            <MascotHelloSeaBlue width={mascotSize} height={mascotSize} />
+          </View>
+
+          <View
+            style={[
+              styles.titleLines,
+              {
+                paddingRight: mascotSize * 0.8,
+                paddingTop: isSmallPhone ? 10 : 16,
+              },
+            ]}
+          >
+            <View style={styles.titleWordWrapper}>
+              <AppText
+                variant="title"
+                style={[
+                  styles.title,
+                  {
+                    fontSize: titleSize,
+                    lineHeight: Math.round(titleSize * 1.08),
+                  },
+                ]}
+              >
+                Welcome
+              </AppText>
+            </View>
+            <View style={styles.titleWordWrapper}>
+              <AppText
+                variant="title"
+                style={[
+                  styles.title,
+                  {
+                    fontSize: titleSize,
+                    lineHeight: Math.round(titleSize * 1.08),
+                  },
+                ]}
+              >
+                Back!
+              </AppText>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <KeyboardAvoidingView
+        style={styles.keyboardArea}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+      >
         <ScrollView
-          style={styles.flex}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingTop: Math.round(70 * scale) },
+            {
+              paddingTop: isVerySmallPhone ? spacing.md : spacing.xl,
+              paddingBottom: isVerySmallPhone ? spacing.xl : spacing.xxxxl2,
+            },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          bounces={false}
         >
-          <View style={styles.backWrapper}>
-            <Link
-              href="/"
-              accessibilityLabel="Go back to welcome screen"
-              accessibilityRole="link"
-              style={styles.backWrapper}
-            >
-              <Back width={20} height={20} />
-            </Link>
-          </View>
-
-          {/* Label with inline highlight — same pattern as welcome screen */}
-          <View style={styles.labelRow}>
-            <View style={styles.labelWrapper}>
-              <AppText variant="body" style={styles.smallLabel}>
-                Login
-              </AppText>
-              <View style={styles.loginHighlight} />
-            </View>
-          </View>
-
-          {/* Title + Mascot */}
-          <View style={styles.titleBlock}>
-            <View
-              style={styles.mascotWrapper}
-              {...(Platform.OS !== "web" ? { accessible: false } : {})}
-            >
-              <MascotHelloSeaBlue width={110 * scale} height={110 * scale} />
-            </View>
-
-            {/* Each word on its own line, each with its own highlight — same as register */}
-            <View
-              style={[
-                styles.titleLines,
-                { paddingRight: Math.round(120 * scale) },
-              ]}
-            >
-              <View style={styles.titleWordWrapper}>
-                <AppText
-                  variant="title"
-                  style={[
-                    styles.title,
-                    {
-                      fontSize: titleSize,
-                      lineHeight: Math.round(titleSize * 1.15),
-                    },
-                  ]}
-                >
-                  Welcome
-                </AppText>
-              </View>
-
-              <View style={styles.titleWordWrapper}>
-                <AppText
-                  variant="title"
-                  style={[
-                    styles.title,
-                    {
-                      fontSize: titleSize,
-                      lineHeight: Math.round(titleSize * 1.15),
-                    },
-                  ]}
-                >
-                  Back!
-                </AppText>
-              </View>
-            </View>
-          </View>
-
-          {/* Form */}
           <View style={styles.form}>
             <View style={styles.fieldGroup}>
               <AppText variant="body" style={styles.label}>
@@ -174,7 +212,7 @@ export default function LoginScreen() {
                 accessibilityLabel="Email address"
                 accessibilityHint="Enter your email to log in"
                 hasError={!!errors.email}
-                style={styles.inputPlain}
+                style={[styles.inputPlain, errors.email && styles.inputError]}
               />
               {errors.email ? (
                 <AppText variant="caption" style={styles.errorText}>
@@ -232,7 +270,6 @@ export default function LoginScreen() {
             ) : null}
           </View>
 
-          {/* Button */}
           <View style={styles.buttonWrapper}>
             <AppButton
               title={isSubmitting ? "LOGGING IN..." : "LET'S GOOOO"}
@@ -244,49 +281,49 @@ export default function LoginScreen() {
               accessibilityHint="Logs you into your account"
             />
           </View>
-
-          <View style={styles.bottomSpacer} />
         </ScrollView>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   container: {
     flex: 1,
     backgroundColor: colors.beachYellow,
   },
   backgroundSvg: {
     position: "absolute",
-    top: -30,
+    top: 0,
     left: 0,
-    right: 0,
-    width: "100%",
+    zIndex: 0,
+  },
+
+  header: {
+    paddingHorizontal: spacing.xxxl,
+    zIndex: 2,
   },
   backWrapper: {
     minWidth: 44,
     minHeight: 44,
     justifyContent: "center",
   },
-  scrollContent: {
-    paddingHorizontal: spacing.xxxl,
-    paddingBottom: spacing.xl,
-    gap: spacing.xl,
-    zIndex: 2,
+  backTouchable: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
   },
   labelRow: {
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  labelWrapper: {
+    alignSelf: "flex-start",
   },
   smallLabel: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.xl,
+    fontSize: typography.size.lg,
     zIndex: 2,
-  },
-  labelWrapper: {
-    alignSelf: "flex-start",
   },
   loginHighlight: {
     height: 4,
@@ -296,18 +333,14 @@ const styles = StyleSheet.create({
   },
   titleBlock: {
     position: "relative",
-    marginTop: spacing.md,
   },
   mascotWrapper: {
     position: "absolute",
-    top: -110,
-    right: 0,
     zIndex: 3,
   },
   titleLines: {
     alignSelf: "flex-start",
-    gap: 2,
-    paddingRight: 120,
+    gap: 0,
   },
   titleWordWrapper: {
     alignSelf: "flex-start",
@@ -317,18 +350,33 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontFamily: typography.fontFamily.title,
   },
+
+  keyboardArea: {
+    flex: 1,
+    zIndex: 2,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.xxxl,
+    justifyContent: "space-between",
+  },
   form: {
     gap: spacing.xl,
-    marginTop: spacing.lg,
   },
-  fieldGroup: { gap: spacing.sm },
+  fieldGroup: {
+    gap: spacing.sm,
+  },
   label: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.lg,
   },
-  inputPlain: { borderWidth: 1 },
-  inputError: { borderColor: colors.error },
+  inputPlain: {
+    borderWidth: 1,
+  },
+  inputError: {
+    borderColor: colors.error,
+  },
   errorText: {
     color: colors.error,
     fontSize: typography.size.sm,
@@ -340,10 +388,11 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginTop: spacing.xxxl,
   },
-  loginButton: { backgroundColor: colors.seaBlue },
+  loginButton: {
+    backgroundColor: colors.seaBlue,
+  },
   loginButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
   },
-  bottomSpacer: { height: spacing.xxxxl2 },
 });

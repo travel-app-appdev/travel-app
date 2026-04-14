@@ -24,7 +24,7 @@ import { colors, radius, spacing, typography } from "@/src/theme";
 
 import Back from "@/assets/icons/back.svg";
 import MascotHelloPink from "@/assets/mascots/mascot-hello-pink.svg";
-import RegisterYellowBg from "@/assets/visuals/yellow-background.svg";
+import PinkBackground from "@/assets/visuals/pink-background.svg";
 import Flowers from "@/assets/visuals/flowers-blue.svg";
 
 export default function RegisterScreen() {
@@ -39,8 +39,19 @@ export default function RegisterScreen() {
   const { width, height } = useWindowDimensions();
   const scale = Math.min(width / 390, height / 844);
 
-  // Same as login — 70 on iPhone 14 Pro, shrinks on narrower screens
-  const titleSize = Math.round(60 * scale);
+  const isSmallPhone = height < 760;
+  const isVerySmallPhone = height < 700;
+
+  const titleSize = Math.round(Math.min(52 * scale, isSmallPhone ? 36 : 44));
+  const mascotSize = Math.round(Math.min(100 * scale, isSmallPhone ? 78 : 100));
+  const headerTop = Math.round(isVerySmallPhone ? 34 : isSmallPhone ? 44 : 56);
+  const headerBottom = isVerySmallPhone ? spacing.sm : spacing.lg;
+  const bgScale = isVerySmallPhone ? 1.05 : isSmallPhone ? 1.1 : 1.2;
+  const backgroundOffsetY = isVerySmallPhone
+    ? -110
+    : isSmallPhone
+      ? -130
+      : -150;
 
   function clearFieldError(field: keyof AuthFieldErrors) {
     setErrors((prev) => ({ ...prev, [field]: undefined, general: undefined }));
@@ -66,101 +77,142 @@ export default function RegisterScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
-    >
-      <View style={styles.container}>
-        <RegisterYellowBg
-          style={[styles.backgroundSvg, { height: height }]}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
-        />
+    <View style={styles.container}>
+      <View style={styles.backgroundLayer} pointerEvents="none">
+        <View
+          style={[
+            styles.backgroundClip,
+            {
+              top: backgroundOffsetY,
+              height: Math.min(height * 0.34, 260),
+            },
+          ]}
+        >
+          <PinkBackground
+            width={width * bgScale}
+            height={Math.min(height * 0.42 * bgScale, 380)}
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              marginLeft: -(width * (bgScale - 1)) / 2,
+            }}
+          />
+        </View>
+      </View>
 
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: headerTop,
+            paddingBottom: headerBottom,
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        <View style={styles.backWrapper}>
+          <Link
+            href="/"
+            accessibilityLabel="Go back to welcome screen"
+            accessibilityRole="link"
+            style={styles.backTouchable}
+          >
+            <Back width={20} height={20} />
+          </Link>
+        </View>
+
+        <View style={styles.labelRow}>
+          <View style={styles.labelWrapper}>
+            <AppText variant="body" style={styles.smallLabel}>
+              Register
+            </AppText>
+            <View style={styles.registerHighlight} />
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.titleBlock,
+            {
+              minHeight: mascotSize * 0.95,
+              marginTop: isSmallPhone ? spacing.sm : spacing.md,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.mascotWrapper,
+              {
+                top: isSmallPhone ? -8 : -16,
+                right: 0,
+              },
+            ]}
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+          >
+            <MascotHelloPink width={mascotSize} height={mascotSize} />
+          </View>
+
+          <View
+            style={[
+              styles.titleLines,
+              {
+                paddingRight: mascotSize * 0.8,
+                paddingTop: isSmallPhone ? 10 : 16,
+              },
+            ]}
+          >
+            <View style={styles.titleWordWrapper}>
+              <AppText
+                variant="title"
+                style={[
+                  styles.title,
+                  {
+                    fontSize: titleSize,
+                    lineHeight: Math.round(titleSize * 1.08),
+                  },
+                ]}
+              >
+                Who
+              </AppText>
+            </View>
+            <View style={styles.titleWordWrapper}>
+              <AppText
+                variant="title"
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                style={[
+                  styles.title,
+                  {
+                    fontSize: titleSize,
+                    lineHeight: Math.round(titleSize * 1.08),
+                  },
+                ]}
+              >
+                Are You?
+              </AppText>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <KeyboardAvoidingView
+        style={styles.keyboardArea}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+      >
         <ScrollView
-          style={styles.flex}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingTop: Math.round(70 * scale) },
+            {
+              paddingTop: isVerySmallPhone ? spacing.md : spacing.xl,
+              paddingBottom: isVerySmallPhone ? spacing.xl : spacing.xxxxl2,
+            },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          bounces={false}
         >
-          {/* Back button scrolls with content — same as login */}
-          <View style={styles.backWrapper}>
-            <Link
-              href="/"
-              accessibilityLabel="Go back to welcome screen"
-              accessibilityRole="link"
-              style={styles.backWrapper}
-            >
-              <Back width={20} height={20} />
-            </Link>
-          </View>
-
-          {/* Label with inline highlight */}
-          <View style={styles.labelRow}>
-            <View style={styles.labelWrapper}>
-              <AppText variant="body" style={styles.smallLabel}>
-                Register
-              </AppText>
-              <View style={styles.registerHighlight} />
-            </View>
-          </View>
-
-          {/* Title + Mascot */}
-          <View style={styles.titleBlock}>
-            <View
-              style={styles.mascotWrapper}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
-            >
-              <MascotHelloPink width={110 * scale} height={110 * scale} />
-            </View>
-
-            {/* Same word-wrapper pattern as login */}
-            <View
-              style={[
-                styles.titleLines,
-                { paddingRight: Math.round(80 * scale) },
-              ]}
-            >
-              <View style={styles.titleWordWrapper}>
-                <AppText
-                  variant="title"
-                  style={[
-                    styles.title,
-                    {
-                      fontSize: titleSize,
-                      lineHeight: Math.round(titleSize * 1.15),
-                    },
-                  ]}
-                >
-                  Who
-                </AppText>
-              </View>
-
-              <View style={styles.titleWordWrapper}>
-                <AppText
-                  variant="title"
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  style={[
-                    styles.title,
-                    {
-                      fontSize: titleSize,
-                      lineHeight: Math.round(titleSize * 1.15),
-                    },
-                  ]}
-                >
-                  Are You?
-                </AppText>
-              </View>
-            </View>
-          </View>
-
-          {/* Form */}
           <View style={styles.form}>
             <View style={styles.fieldGroup}>
               <AppText variant="body" style={styles.label}>
@@ -215,7 +267,7 @@ export default function RegisterScreen() {
                 accessibilityLabel="Email address"
                 accessibilityHint="Enter your email to create an account"
                 hasError={!!errors.email}
-                style={styles.inputPlain}
+                style={[styles.inputPlain, errors.email && styles.inputError]}
               />
               {errors.email ? (
                 <AppText variant="caption" style={styles.errorText}>
@@ -265,60 +317,67 @@ export default function RegisterScreen() {
             ) : null}
           </View>
 
-          {/* Button */}
-          <View style={styles.buttonWrapper}>
-            <AppButton
-              title={isSubmitting ? "CREATING..." : "LET'S GOOOO"}
-              onPress={handleRegister}
-              disabled={isSubmitting}
-              style={styles.registerButton}
-              textStyle={styles.registerButtonText}
-              loading={isSubmitting}
-              accessibilityHint="Creates your account"
-              accessibilityLabel={
-                isSubmitting ? "Creating account" : "Create account"
-              }
-            />
-          </View>
+          <View style={styles.bottomArea}>
+            <View style={styles.buttonWrapper}>
+              <AppButton
+                title={isSubmitting ? "CREATING..." : "LET'S GOOOO"}
+                onPress={handleRegister}
+                disabled={isSubmitting}
+                style={styles.registerButton}
+                textStyle={styles.registerButtonText}
+                loading={isSubmitting}
+                accessibilityHint="Creates your account"
+                accessibilityLabel={
+                  isSubmitting ? "Creating account" : "Create account"
+                }
+              />
+            </View>
 
-          <View style={styles.flowersWrapper}>
-            <Flowers width={64} height={24} />
+            <View style={styles.flowersWrapper}>
+              <Flowers width={64} height={24} />
+            </View>
           </View>
-
-          <View style={styles.bottomSpacer} />
         </ScrollView>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   container: {
     flex: 1,
-    backgroundColor: colors.sunsetPink,
+    backgroundColor: colors.beachYellow,
+    overflow: "hidden",
   },
-  backgroundSvg: {
+  backgroundLayer: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    width: "100%",
+    zIndex: 0,
   },
-  // Back button now in scroll flow — no more position absolute
+  backgroundClip:{
+    position: "absolute",
+    left: 0,
+    right: 0,
+    overflow: "hidden",
+  },
+  header: {
+    paddingHorizontal: spacing.xxxl,
+    zIndex: 2,
+  },
   backWrapper: {
     minWidth: 44,
     minHeight: 44,
     justifyContent: "center",
   },
-  scrollContent: {
-    paddingHorizontal: spacing.xxxl,
-    gap: spacing.xl,
-    paddingBottom: spacing.xl,
-    zIndex: 2,
+  backTouchable: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
   },
   labelRow: {
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
   labelWrapper: {
     alignSelf: "flex-start",
@@ -329,7 +388,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.lg,
     zIndex: 2,
   },
-  // Inline highlight — same pattern as login and welcome screen
   registerHighlight: {
     height: 4,
     backgroundColor: colors.sunsetPink,
@@ -338,17 +396,14 @@ const styles = StyleSheet.create({
   },
   titleBlock: {
     position: "relative",
-    marginTop: spacing.md,
   },
   mascotWrapper: {
     position: "absolute",
-    top: -50,
-    right: 0,
     zIndex: 3,
   },
   titleLines: {
     alignSelf: "flex-start",
-    gap: 2,
+    gap: 0,
   },
   titleWordWrapper: {
     alignSelf: "flex-start",
@@ -358,26 +413,50 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontFamily: typography.fontFamily.title,
   },
+
+  keyboardArea: {
+    flex: 1,
+    zIndex: 2,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.xxxl,
+    justifyContent: "space-between",
+  },
   form: {
     gap: spacing.xl,
-    marginTop: spacing.lg,
   },
-  fieldGroup: { gap: spacing.sm },
+  fieldGroup: {
+    gap: spacing.sm,
+  },
   label: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.lg,
   },
-  inputPlain: { borderWidth: 1 },
-  inputError: { borderColor: colors.error },
-  errorText: { color: colors.error, fontSize: typography.size.sm, lineHeight: 18 },
+  inputPlain: {
+    borderWidth: 1,
+  },
+  inputError: {
+    borderColor: colors.error,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: typography.size.sm,
+    lineHeight: 18,
+  },
+  bottomArea: {
+    marginTop: spacing.xxxl,
+    alignItems: "center",
+  },
   buttonWrapper: {
     width: "100%",
     maxWidth: 320,
     alignSelf: "center",
-    marginTop: spacing.xxxl,
   },
-  registerButton: { backgroundColor: colors.sunsetPink },
+  registerButton: {
+    backgroundColor: colors.sunsetPink,
+  },
   registerButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
@@ -386,5 +465,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: spacing.xl,
   },
-  bottomSpacer: { height: spacing.xxxxl2 },
 });
