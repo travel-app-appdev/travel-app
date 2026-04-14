@@ -122,7 +122,7 @@ export default function StartPage() {
             <View>
               <AppButton
                 title="Login"
-                onPress={() => {}}
+                onPress={() => router.push("/login")}
                 textStyle={styles.primaryButtonText}
                 accessibilityLabel="Go to login screen"
                 accessibilityHint="Opens the login page"

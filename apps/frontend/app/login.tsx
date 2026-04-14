@@ -70,8 +70,7 @@ export default function LoginScreen() {
       <View style={styles.container}>
         <BlueBackground
           style={[styles.backgroundSvg, { height: Math.round(460 * scale) }]}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          {...(Platform.OS !== "web" ? { accessible: false } : {})}
         />
         <ScrollView
           style={styles.flex}
@@ -107,8 +106,7 @@ export default function LoginScreen() {
           <View style={styles.titleBlock}>
             <View
               style={styles.mascotWrapper}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...(Platform.OS !== "web" ? { accessible: false } : {})}
             >
               <MascotHelloSeaBlue width={110 * scale} height={110 * scale} />
             </View>
@@ -331,7 +329,11 @@ const styles = StyleSheet.create({
   },
   inputPlain: { borderWidth: 1 },
   inputError: { borderColor: colors.error },
-  errorText: { color: colors.error, fontSize: typography.size.sm, lineHeight: 18 },
+  errorText: {
+    color: colors.error,
+    fontSize: typography.size.sm,
+    lineHeight: 18,
+  },
   buttonWrapper: {
     width: "100%",
     maxWidth: 320,
