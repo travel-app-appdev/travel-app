@@ -8,6 +8,7 @@ import {
   Platform,
   useWindowDimensions,
   TextInput,
+  Keyboard,
 } from "react-native";
 
 import { AppButton } from "@/src/components/common/AppButton";
@@ -56,6 +57,7 @@ export default function LoginScreen() {
     const nextErrors = validateLogin({ email, password });
     setErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
+    Keyboard.dismiss();
 
     try {
       setIsSubmitting(true);
@@ -298,7 +300,6 @@ const styles = StyleSheet.create({
     left: 0,
     zIndex: 0,
   },
-
   header: {
     paddingHorizontal: spacing.xxxl,
     zIndex: 2,

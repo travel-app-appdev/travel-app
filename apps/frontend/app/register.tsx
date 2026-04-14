@@ -8,6 +8,7 @@ import {
   Platform,
   useWindowDimensions,
   TextInput,
+  Keyboard,
 } from "react-native";
 import { handleRegister as registerUser } from "@/src/services/authServices";
 
@@ -44,14 +45,12 @@ export default function RegisterScreen() {
 
   const titleSize = Math.round(Math.min(52 * scale, isSmallPhone ? 36 : 44));
   const mascotSize = Math.round(Math.min(100 * scale, isSmallPhone ? 78 : 100));
+
   const headerTop = Math.round(isVerySmallPhone ? 34 : isSmallPhone ? 44 : 56);
   const headerBottom = isVerySmallPhone ? spacing.sm : spacing.lg;
-  const bgScale = isVerySmallPhone ? 1.05 : isSmallPhone ? 1.1 : 1.2;
-  const backgroundOffsetY = isVerySmallPhone
-    ? -110
-    : isSmallPhone
-      ? -130
-      : -150;
+
+  const bgHeight = Math.min(height * 0.42, 360);
+  const bgWidth = width;
 
   function clearFieldError(field: keyof AuthFieldErrors) {
     setErrors((prev) => ({ ...prev, [field]: undefined, general: undefined }));
@@ -63,6 +62,7 @@ export default function RegisterScreen() {
     const nextErrors = validateRegister({ name, email, password });
     setErrors(nextErrors);
     if (hasErrors(nextErrors)) return;
+    Keyboard.dismiss();
 
     try {
       setIsSubmitting(true);
@@ -78,27 +78,12 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.backgroundLayer} pointerEvents="none">
-        <View
-          style={[
-            styles.backgroundClip,
-            {
-              top: backgroundOffsetY,
-              height: Math.min(height * 0.34, 260),
-            },
-          ]}
-        >
-          <PinkBackground
-            width={width * bgScale}
-            height={Math.min(height * 0.42 * bgScale, 380)}
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
-            style={{
-              marginLeft: -(width * (bgScale - 1)) / 2,
-            }}
-          />
-        </View>
-      </View>
+      <PinkBackground
+        width={bgWidth}
+        height={bgHeight}
+        style={styles.backgroundSvg}
+        {...(Platform.OS !== "web" ? { accessible: false } : {})}
+      />
 
       <View
         style={[
@@ -347,20 +332,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.beachYellow,
-    overflow: "hidden",
   },
-  backgroundLayer: {
+  backgroundSvg: {
     position: "absolute",
     top: 0,
     left: 0,
-    right: 0,
     zIndex: 0,
-  },
-  backgroundClip:{
-    position: "absolute",
-    left: 0,
-    right: 0,
-    overflow: "hidden",
   },
   header: {
     paddingHorizontal: spacing.xxxl,
