@@ -1,8 +1,9 @@
 module.exports = {
-    preset: 'ts-jest',
-    testEnvironment: 'node',
-    testMatch: ['**/__tests__/**/*.test.ts', '**/?(*.)+(spec|test).ts'],
-    roots: ['<rootDir>/src'],
-    moduleFileExtensions: ['ts', 'js', 'json'],
-    clearMocks: true,
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  testMatch: ['**/tests/**/*.test.ts', '**/__tests__/**/*.test.ts'],
+  forceExit: true,
+  transformIgnorePatterns: [
+    'node_modules/(?!(uuid)/)'
+  ],
 };

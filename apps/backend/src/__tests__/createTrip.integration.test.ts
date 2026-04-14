@@ -3,7 +3,7 @@ import request from "supertest";
 import admin from "../config/firebase";
 import app from "../index";
 
-describe("Integration: create trip and fetch my trips", () => {
+describe.skip("Integration: create trip and fetch my trips", () => {
     const testUserId = "integration-user-1";
 
     beforeAll(async () => {

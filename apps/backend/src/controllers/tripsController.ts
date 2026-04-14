@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import admin from "../config/firebase";
+import { v4 as uuidv4 } from 'uuid';
 
 export const getMyTrips = async (req: Request, res: Response): Promise<void> => {
     const userId = req.query.userId as string;
@@ -112,6 +113,7 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
 
         const tripRef = db.collection("trips").doc();
         const memberRef = db.collection("trip_members").doc();
+        const inviteCode = uuidv4(); // generate invite code
 
         const batch = db.batch();
 
@@ -123,6 +125,7 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
             start_date,
             end_date,
             state: "Planning",
+            invite_code: inviteCode, // save invite code
         });
 
         batch.set(memberRef, {
@@ -142,6 +145,7 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
             end_date,
             state: "Planning",
             role: "admin",
+            invite_code: inviteCode, // return invite code to frontend
         });
     } catch (error) {
         console.error("Error creating trip:", error);
@@ -166,6 +170,7 @@ export const createTripWithoutAuth = async (req: Request, res: Response): Promis
 
         const tripRef = db.collection("trips").doc();
         const memberRef = db.collection("trip_members").doc();
+        const inviteCode = uuidv4(); // generate invite code
 
         const batch = db.batch();
 
@@ -176,6 +181,7 @@ export const createTripWithoutAuth = async (req: Request, res: Response): Promis
             start_date,
             end_date,
             state: "Planning",
+            invite_code: inviteCode, // save invite code
         });
 
         batch.set(memberRef, {
@@ -195,9 +201,73 @@ export const createTripWithoutAuth = async (req: Request, res: Response): Promis
             end_date,
             state: "Planning",
             role: "admin",
+            invite_code: inviteCode, // return invite code
         });
     } catch (error) {
         console.error("Error creating trip without auth:", error);
         res.status(500).json({ error: "Failed to create trip" });
+    }
+};
+
+export const joinTrip = async (req: Request, res: Response): Promise<void> => {
+    const { idToken, inviteCode } = req.body;
+
+    if (!idToken || !inviteCode) {
+        res.status(400).json({ error: "idToken and inviteCode are required" });
+        return;
+    }
+
+    try {
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        const userId = decoded.uid;
+
+        const db = admin.firestore();
+
+        const inviteSnapshot = await db
+            .collection("trips")
+            .where("invite_code", "==", inviteCode)
+            .get();
+
+        if (inviteSnapshot.empty) {
+            res.status(404).json({ error: "Invalid invite code" });
+            return;
+        }
+
+        const tripDoc = inviteSnapshot.docs[0];
+        const tripId = tripDoc.id;
+
+        const existingMember = await db
+            .collection("trip_members")
+            .where("trip_id", "==", tripId)
+            .where("user_id", "==", userId)
+            .get();
+
+        if (!existingMember.empty) {
+            res.status(409).json({ error: "User is already a member of this trip" });
+            return;
+        }
+
+        await db.collection("trip_members").doc().set({
+            user_id: userId,
+            trip_id: tripId,
+            role: "member",
+            invite_status: "accepted",
+        });
+
+        const tripData = tripDoc.data();
+
+        res.status(200).json({
+            trip_id: tripId,
+            title: tripData?.title,
+            destination: tripData?.destination,
+            start_date: tripData?.start_date,
+            end_date: tripData?.end_date,
+            state: tripData?.state,
+            role: "member",
+        });
+
+    } catch (error) {
+        console.error("Error joining trip:", error);
+        res.status(401).json({ error: "Invalid token or failed to join trip" });
     }
 };

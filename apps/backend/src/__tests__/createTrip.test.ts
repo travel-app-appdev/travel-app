@@ -94,6 +94,7 @@ describe("createTrip controller", () => {
             end_date: "2026-05-15",
             state: "Planning",
             role: "admin",
+             invite_code: expect.any(String),
         });
     });
 
@@ -147,6 +148,7 @@ describe("createTrip controller", () => {
                 start_date: "2026-05-10",
                 end_date: "2026-05-15",
                 state: "Planning",
+                invite_code: expect.any(String),
             }
         );
 

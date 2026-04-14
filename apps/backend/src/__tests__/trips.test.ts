@@ -97,6 +97,7 @@ describe('GET /trips/my', () => {
                 end_date: '2026-04-15',
                 state: 'Planning',
                 role: 'admin',
+                 members: [], 
             },
         ]);
     });
