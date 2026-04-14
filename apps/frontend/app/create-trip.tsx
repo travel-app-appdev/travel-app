@@ -1,5 +1,9 @@
-import { Link } from "expo-router";
+// app/create-trip.tsx
+import { Link, useRouter } from "expo-router";
 import { useState } from "react";
+import { useAuth } from "@/src/context/AuthContext";
+import { createTrip } from "@/src/api/trips";
+import { auth } from "@/src/lib/firebase";
 import {
   Pressable,
   ScrollView,
@@ -8,6 +12,7 @@ import {
   Platform,
   Dimensions,
   KeyboardAvoidingView,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
@@ -34,6 +39,11 @@ function generateTripCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
+function toDateOnlyString(date: Date) {
+  // "2026-04-13TXX:XX:XXXX" → "2026-04-13"
+  return date.toISOString().split("T")[0];
+}
+
 export default function CreateTripScreen() {
   const [step, setStep] = useState<1 | 2>(1);
   const [destination, setDestination] = useState("");
@@ -44,9 +54,13 @@ export default function CreateTripScreen() {
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [tripCode] = useState(generateTripCode());
   const [copied, setCopied] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { user } = useAuth();
+  const router = useRouter();
 
   const formatDate = (date: Date) =>
-    date.toLocaleDateString("en-GB").replace(/\//g, ".");
+      date.toLocaleDateString("en-GB").replace(/\//g, ".");
 
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(tripCode);
@@ -54,46 +68,124 @@ export default function CreateTripScreen() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleContinue = () => {
+    if (!destination.trim()) {
+      Alert.alert("Missing destination", "Please enter a destination first.");
+      return;
+    }
+
+    setStep(2);
+  };
+
+  const handleCreateTrip = async () => {
+    if (isSubmitting) return;
+
+    if (!user) {
+      Alert.alert("Not logged in", "Please log in again and try creating a trip.");
+      return;
+    }
+
+    if (!destination.trim()) {
+      Alert.alert("Missing destination", "Please enter a destination.");
+      return;
+    }
+
+    if (!tripName.trim()) {
+      Alert.alert("Missing trip name", "Please enter a trip name.");
+      return;
+    }
+
+    if (endDate < startDate) {
+      Alert.alert("Invalid dates", "End date cannot be before start date.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        Alert.alert("Authentication error", "No Firebase user found. Please log in again.");
+        return;
+      }
+
+      const idToken = await currentUser.getIdToken();
+
+      await createTrip({
+        idToken,
+        title: tripName.trim(),
+        destination: destination.trim(),
+        start_date: toDateOnlyString(startDate),
+        end_date: toDateOnlyString(endDate),
+      });
+
+      router.replace("/home");
+    } catch (error) {
+      console.error("Error creating trip:", error);
+
+      const message =
+          error instanceof Error ? error.message : "Failed to create trip";
+
+      Alert.alert("Create trip failed", message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <View
-      style={[styles.fullScreen, step === 1 ? styles.bgStep1 : styles.bgStep2]}
-    >
-      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-        <View
-          style={[styles.root, step === 1 ? styles.bgStep1 : styles.bgStep2]}
-        >
-          {step === 1 ? (
-            <>
-              <KeyboardAvoidingView
-                style={styles.scroll}
-                behavior={Platform.OS === "ios" ? "padding" : undefined}
-              >
-                <ScrollView
-                  contentContainerStyle={styles.containerStep1}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  <View style={styles.header}>
-                    <Link
-                      href="/home"
-                      style={styles.backLink}
-                      accessibilityRole="link"
-                      accessibilityLabel="Go back to home"
+      <View
+          style={[styles.fullScreen, step === 1 ? styles.bgStep1 : styles.bgStep2]}
+      >
+        <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+          <View
+              style={[styles.root, step === 1 ? styles.bgStep1 : styles.bgStep2]}
+          >
+            {step === 1 ? (
+                <>
+                  <KeyboardAvoidingView
+                      style={styles.scroll}
+                      behavior={Platform.OS === "ios" ? "padding" : undefined}
+                  >
+                    <ScrollView
+                        contentContainerStyle={styles.containerStep1}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
                     >
-                      <Back width={20} height={20} />
-                    </Link>
+                      {/* Header */}
+                      <View style={styles.header}>
+                        <Link href="/home" style={styles.backLink}>
+                          <Back width={20} height={20} />
+                        </Link>
+                        <View style={styles.headerTitle}>
+                          <Plane width={25} height={25} />
+                          <AppText variant="body" style={styles.headerLabel}>
+                            Create trip
+                          </AppText>
+                        </View>
+                      </View>
 
-                    <View style={styles.headerTitle}>
-                      <Plane width={25} height={25} />
-                      <AppText variant="body" style={styles.headerLabel}>
-                        Create trip
+                      <AppText variant="title" style={styles.titleStep1}>
+                        Where is your trip taking place?
                       </AppText>
-                    </View>
-                  </View>
 
-                  <AppText variant="title" style={styles.titleStep1}>
-                    Where is your trip taking place?
-                  </AppText>
+                      <View style={[styles.fieldGroup, { marginTop: 20 }]}>
+                        <View style={styles.fieldLabelRow}>
+                          <Location width={20} height={20} />
+                          <AppText variant="body" style={styles.fieldLabel}>
+                            Destination
+                          </AppText>
+                        </View>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter city or country"
+                            placeholderTextColor={colors.textMuted}
+                            value={destination}
+                            onChangeText={setDestination}
+                        />
+                      </View>
+                    </ScrollView>
+                  </KeyboardAvoidingView>
 
                   <View style={[styles.fieldGroup, { marginTop: 20 }]}>
                     <View style={styles.fieldLabelRow}>
@@ -173,7 +265,7 @@ export default function CreateTripScreen() {
                       <AppText variant="body" style={styles.headerLabel}>
                         Create trip
                       </AppText>
-                    </View>
+                    </Pressable>
                   </View>
 
                   <AppText variant="title" style={styles.titleStep2}>
@@ -196,6 +288,13 @@ export default function CreateTripScreen() {
                       accessibilityHint="Enter a name for the trip"
                     />
                   </View>
+                </>
+            ) : (
+                <>
+                  {/* CurlyYellow behind everything */}
+                  <View style={styles.curlyWrapper} pointerEvents="none">
+                    <CurlyYellow width={448} height={442} />
+                  </View>
 
                   <View style={styles.fieldGroup}>
                     <View style={styles.fieldLabelRow}>
@@ -215,72 +314,137 @@ export default function CreateTripScreen() {
                       accessibilityLabel="Select trip dates"
                       accessibilityHint="Opens the date picker"
                     >
-                      <AppText variant="body" style={styles.dateText}>
-                        {formatDate(startDate)} – {formatDate(endDate)}
-                      </AppText>
-                      <Calendar width={20} height={20} />
-                    </Pressable>
-
-                    {showStartPicker && (
-                      <DateTimePicker
-                        value={startDate}
-                        mode="date"
-                        display={Platform.OS === "ios" ? "spinner" : "default"}
-                        onChange={(_: DateTimePickerEvent, date?: Date) => {
-                          setShowStartPicker(false);
-                          if (date) {
-                            setStartDate(date);
-                            setShowEndPicker(true);
-                          }
-                        }}
-                      />
-                    )}
-
-                    {showEndPicker && (
-                      <DateTimePicker
-                        value={endDate}
-                        mode="date"
-                        minimumDate={startDate}
-                        display={Platform.OS === "ios" ? "spinner" : "default"}
-                        onChange={(_: DateTimePickerEvent, date?: Date) => {
-                          setShowEndPicker(false);
-                          if (date) setEndDate(date);
-                        }}
-                      />
-                    )}
-                  </View>
-
-                  <View style={styles.fieldGroup}>
-                    <View style={styles.membersRow}>
-                      <View style={styles.fieldLabelRow}>
-                        <ShareLink width={20} height={20} />
-                        <AppText variant="body" style={styles.fieldLabel}>
-                          Add members to trip
-                        </AppText>
+                      {/* Header */}
+                      <View style={styles.header}>
+                        <Pressable
+                            onPress={() => setStep(1)}
+                            style={styles.backLink}
+                        >
+                          <Back width={20} height={20} />
+                        </Pressable>
+                        <View style={styles.headerTitle}>
+                          <Plane width={25} height={25} />
+                          <AppText variant="body" style={styles.headerLabel}>
+                            Create trip
+                          </AppText>
+                        </View>
                       </View>
-                    </View>
 
-                    <AppText variant="caption" style={styles.codeCaption}>
-                      Copy this code to share the trip.
-                    </AppText>
+                      <AppText variant="title" style={styles.titleStep2}>
+                        Give your trip a name and choose a date
+                      </AppText>
 
+                      {/* Trip Name */}
+                      <View style={styles.fieldGroup}>
+                        <View style={styles.fieldLabelRow}>
+                          <TripTitle width={20} height={20} />
+                          <AppText variant="body" style={styles.fieldLabel}>
+                            Trip name
+                          </AppText>
+                        </View>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter trip name"
+                            placeholderTextColor={colors.textMuted}
+                            value={tripName}
+                            onChangeText={setTripName}
+                        />
+                      </View>
+
+                      {/* Trip Date */}
+                      <View style={styles.fieldGroup}>
+                        <View style={styles.fieldLabelRow}>
+                          <Calendar width={20} height={20} />
+                          <AppText variant="body" style={styles.fieldLabel}>
+                            Trip date
+                          </AppText>
+                        </View>
+                        <Pressable
+                            style={styles.dateInput}
+                            onPress={() => {
+                              setShowStartPicker(true);
+                              setShowEndPicker(false);
+                            }}
+                        >
+                          <AppText variant="body" style={styles.dateText}>
+                            {formatDate(startDate)} – {formatDate(endDate)}
+                          </AppText>
+                          <Calendar width={20} height={20} />
+                        </Pressable>
+
+                        {showStartPicker && (
+                            <DateTimePicker
+                                value={startDate}
+                                mode="date"
+                                display={Platform.OS === "ios" ? "spinner" : "default"}
+                                onChange={(_: DateTimePickerEvent, date?: Date) => {
+                                  setShowStartPicker(false);
+                                  if (date) {
+                                    setStartDate(date);
+                                    if (endDate < date) {
+                                      setEndDate(date);
+                                    }
+                                    setShowEndPicker(true);
+                                  }
+                                }}
+                            />
+                        )}
+
+                        {showEndPicker && (
+                            <DateTimePicker
+                                value={endDate}
+                                mode="date"
+                                minimumDate={startDate}
+                                display={Platform.OS === "ios" ? "spinner" : "default"}
+                                onChange={(_: DateTimePickerEvent, date?: Date) => {
+                                  setShowEndPicker(false);
+                                  if (date) setEndDate(date);
+                                }}
+                            />
+                        )}
+                      </View>
+
+                      {/* Add Members */}
+                      <View style={styles.fieldGroup}>
+                        <View style={styles.membersRow}>
+                          <View style={styles.fieldLabelRow}>
+                            <ShareLink width={20} height={20} />
+                            <AppText variant="body" style={styles.fieldLabel}>
+                              Add members to trip
+                            </AppText>
+                          </View>
+                        </View>
+                        <AppText variant="caption" style={styles.codeCaption}>
+                          Copy this code to share the trip.
+                        </AppText>
+                        <Pressable style={styles.codeRow} onPress={handleCopyCode}>
+                          <AppText variant="body" style={styles.codeText}>
+                            {tripCode}
+                          </AppText>
+                          <View style={styles.copyActionArea}>
+                            <AppText variant="caption" style={styles.copiedText}>
+                              {copied ? "✓ Copied!" : "Tap to copy"}
+                            </AppText>
+                            <Copy width={20} height={20} />
+                          </View>
+                        </Pressable>
+                      </View>
+                    </ScrollView>
+                  </KeyboardAvoidingView>
+
+                  {/* Create trip button */}
+                  <View style={styles.createWrapper}>
                     <Pressable
-                      style={styles.codeRow}
-                      onPress={handleCopyCode}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Trip code ${tripCode}`}
-                      accessibilityHint="Copies the trip code"
+                        style={[
+                          styles.createButton,
+                          isSubmitting && styles.createButtonDisabled,
+                        ]}
+                        onPress={handleCreateTrip}
+                        disabled={isSubmitting}
                     >
-                      <AppText variant="body" style={styles.codeText}>
-                        {tripCode}
+                      <AppText variant="body" style={styles.createButtonText}>
+                        {isSubmitting ? "Creating..." : "Create trip"}
                       </AppText>
-
-                      <View style={styles.copyActionArea}>
-                        <AppText variant="caption" style={styles.copiedText}>
-                          {copied ? "✓ Copied!" : "Tap to copy"}
-                        </AppText>
-                        <Copy width={20} height={20} />
-                      </View>
                     </Pressable>
                   </View>
                 </ScrollView>
@@ -487,6 +651,9 @@ const styles = StyleSheet.create({
   },
   createButton: {
     backgroundColor: colors.seaBlue,
+  },
+  createButtonDisabled: {
+    opacity: 0.7,
   },
   createButtonText: {
     color: colors.nightBlack,

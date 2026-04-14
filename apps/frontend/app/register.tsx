@@ -11,6 +11,7 @@ import {
   Keyboard,
 } from "react-native";
 import { handleRegister as registerUser } from "@/src/services/authServices";
+import { useAuth } from "@/src/context/AuthContext";
 
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppInput } from "@/src/components/common/AppInput";
@@ -34,6 +35,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { setUser } = useAuth();
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);

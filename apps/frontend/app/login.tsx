@@ -31,6 +31,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { setUser } = useAuth();
 
   const passwordRef = useRef<TextInput>(null);
   const { width, height } = useWindowDimensions();

@@ -6,7 +6,19 @@ type RegisterPayload = {
   password: string;
 };
 
-export async function registerUser(payload: RegisterPayload) {
+export type AuthResponse = {
+  uid: string;
+  email: string | null;
+  name: string | null;
+};
+
+type ApiErrorResponse = {
+  error?: string;
+};
+
+export async function registerUser(
+    payload: RegisterPayload
+): Promise<AuthResponse> {
   const response = await fetch(`${API_URL}/auth/register`, {
     method: "POST",
     headers: {
@@ -15,16 +27,18 @@ export async function registerUser(payload: RegisterPayload) {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
+  const data: AuthResponse | ApiErrorResponse = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || "Registration failed");
+    throw new Error((data as ApiErrorResponse).error || "Registration failed");
   }
 
-  return data;
+  return data as AuthResponse;
 }
 
-export async function loginWithToken(idToken: string) {
+export async function loginWithToken(
+    idToken: string
+): Promise<AuthResponse> {
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: {
@@ -33,11 +47,11 @@ export async function loginWithToken(idToken: string) {
     body: JSON.stringify({ idToken }),
   });
 
-  const data = await response.json();
+  const data: AuthResponse | ApiErrorResponse = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || "Login failed");
+    throw new Error((data as ApiErrorResponse).error || "Login failed");
   }
 
-  return data;
+  return data as AuthResponse;
 }

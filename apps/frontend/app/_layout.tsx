@@ -9,6 +9,7 @@ import {
   Nunito_700Bold,
 } from "@expo-google-fonts/nunito";
 import { View, ActivityIndicator } from "react-native";
+import { AuthProvider } from "@/src/context/AuthContext";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -27,7 +28,7 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <AuthProvider>
       <Stack
         screenOptions={{
           headerShown: false,
@@ -63,6 +64,6 @@ export default function RootLayout() {
         <Stack.Screen name="past-trips" options={{ title: "Past Trips" }} />
       </Stack>
       <StatusBar style="dark" />
-    </>
+    </AuthProvider>
   );
 }
