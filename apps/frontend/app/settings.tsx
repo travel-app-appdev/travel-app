@@ -1,13 +1,9 @@
-// app/settings.tsx
 import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/common/AppText";
-import { TripCard } from "@/src/components/common/TripCard";
-import { colors, spacing, radius } from "@/src/theme";
-import { useAuth } from "@/src/context/AuthContext";
-import { fetchMyTrips, type Trip } from "@/src/api/trips";
+import { colors, spacing, radius, typography } from "@/src/theme";
 import Back from "@/assets/icons/back.svg";
 import Settings from "@/assets/icons/settings.svg";
 import Profile from "@/assets/icons/profile.svg";
@@ -232,6 +228,7 @@ export default function SettingsScreen() {
                       ]}
                   >
                     Trips you created
+
                   </AppText>
                   {createdTab === "created" && (
                       <View style={styles.tabUnderline} />
@@ -305,9 +302,21 @@ export default function SettingsScreen() {
                   )}
                 </Pressable>
 
-                <Pressable
-                    onPress={() => setJoinedTab("joinedArchive")}
-                    style={styles.tabItem}
+              <Pressable
+                onPress={() => setJoinedTab("joinedArchive")}
+                style={styles.tabItem}
+                accessibilityRole="button"
+                accessibilityLabel="Show archived joined trips"
+                accessibilityState={{
+                  selected: joinedTab === "joinedArchive",
+                }}
+              >
+                <AppText
+                  variant="caption"
+                  style={[
+                    styles.archiveLabel,
+                    joinedTab === "joinedArchive" && styles.archiveLabelActive,
+                  ]}
                 >
                   <AppText
                       variant="caption"
@@ -375,8 +384,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxxl,
     gap: spacing.xxl,
   },
-
-  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -386,6 +393,9 @@ const styles = StyleSheet.create({
   backLink: {
     position: "absolute",
     left: 0,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
     padding: spacing.xs,
   },
   headerTitle: {
@@ -394,26 +404,23 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   headerLabel: {
-    fontSize: 25,
-    fontFamily: "Nunito_700Bold",
+    fontSize: typography.size.xxl,
+    lineHeight: typography.lineHeight.xxl,
+    fontFamily: typography.fontFamily.bodyBold,
     color: colors.textPrimary,
   },
-
-  // Profile card — orange shadow via shadowColor + elevation
   profileCard: {
     backgroundColor: colors.white,
     borderRadius: radius.xl,
     padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    // iOS shadow
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     shadowColor: colors.sunsetOrange,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.7,
+    shadowOpacity: 0.25,
     shadowRadius: radius.xl,
-    // Android shadow
-    elevation: 10,
+    elevation: 6,
   },
   profileLeft: {
     flexDirection: "row",
@@ -434,16 +441,16 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   profileName: {
-    fontFamily: "Nunito_700Bold",
-    fontSize: 16,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
     color: colors.textPrimary,
   },
   profileEdit: {
     color: colors.textMuted,
-    fontSize: 13,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
   },
-
-  // Sections
   section: {
     gap: spacing.md,
   },
@@ -451,15 +458,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    gap: spacing.md,
   },
-
-  // Tab items (wraps label + underline)
   tabItem: {
     alignItems: "center",
+    minHeight: 44,
+    justifyContent: "center",
   },
   sectionTitle: {
-    fontFamily: "Nunito_700Bold",
-    fontSize: 16,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
     color: colors.textPrimary,
   },
   sectionTitleMuted: {
@@ -467,8 +476,9 @@ const styles = StyleSheet.create({
   },
   archiveLabel: {
     color: colors.textMuted,
-    fontSize: 14,
-    fontFamily: "Nunito_700Bold",
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.bodyBold,
   },
   archiveLabelActive: {
     color: colors.textPrimary,
@@ -480,7 +490,6 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     marginTop: -1,
   },
-
   emptySection: {
     paddingVertical: spacing.lg,
     alignItems: "center",

@@ -1,7 +1,6 @@
-// src/components/common/TripCard.tsx
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "./AppText";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, typography } from "@/src/theme";
 
 type TripStatus = "planning" | "voting" | "final";
 
@@ -45,12 +44,13 @@ export function TripCard({
     <Pressable
       style={[styles.card, { backgroundColor: cardColor }]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}, ${destination}, ${startDate} to ${endDate}, ${statusLabel}`}
+      accessibilityHint="Opens trip details"
     >
-      {/* Trip info */}
       <View style={styles.info}>
-        {/* Title + badge row */}
         <View style={styles.titleRow}>
-          <AppText variant="title" style={styles.title}>
+          <AppText variant="title" style={styles.title} numberOfLines={2}>
             {title}
           </AppText>
 
@@ -64,12 +64,11 @@ export function TripCard({
           </View>
         </View>
 
-        <AppText variant="caption" style={styles.destination}>
+        <AppText variant="caption" style={styles.destination} numberOfLines={1}>
           {destination}
         </AppText>
       </View>
 
-      {/* Footer: avatars + date */}
       <View style={styles.footer}>
         <View style={styles.avatars}>
           {members.slice(0, 4).map((member, index) => (
@@ -89,7 +88,8 @@ export function TripCard({
             </View>
           ))}
         </View>
-        <AppText variant="caption" style={styles.date}>
+
+        <AppText variant="caption" style={styles.date} numberOfLines={1}>
           {startDate} – {endDate}
         </AppText>
       </View>
@@ -101,58 +101,52 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: radius.xl,
     padding: spacing.xl,
-    paddingVertical: spacing.xxl,
     gap: spacing.lg,
-    minHeight: 160,
+    minHeight: 148,
   },
-
   info: {
     gap: spacing.xs,
   },
-
   titleRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
+    gap: spacing.sm,
   },
-
   badge: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radius.pill,
+    alignSelf: "flex-start",
   },
-
   badgeText: {
-    fontFamily: "Nunito_700Bold",
-    fontSize: 13,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
   },
-
   title: {
-    fontSize: 28,
-    lineHeight: 36,
-    color: colors.nightBlack,
     flex: 1,
-    flexWrap: "wrap",
+    color: colors.nightBlack,
+    fontSize: typography.size.xxl,
+    lineHeight: typography.lineHeight.xxl,
   },
-
   destination: {
     color: colors.nightBlack,
-    fontSize: 16,
-    fontFamily: "Nunito_400Regular",
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
+    fontFamily: typography.fontFamily.body,
   },
-
   footer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: spacing.sm,
+    gap: spacing.md,
   },
-
   avatars: {
     flexDirection: "row",
     alignItems: "center",
+    flexShrink: 0,
   },
-
   avatar: {
     width: 32,
     height: 32,
@@ -162,16 +156,18 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.white,
   },
-
   avatarText: {
     color: colors.white,
     fontSize: 11,
-    fontFamily: "Nunito_700Bold",
+    lineHeight: 14,
+    fontFamily: typography.fontFamily.bodyBold,
   },
-
   date: {
+    flex: 1,
+    textAlign: "right",
     color: colors.nightBlack,
-    fontFamily: "Nunito_700Bold",
-    fontSize: 14,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
   },
 });

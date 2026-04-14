@@ -1,21 +1,38 @@
-import { TextInput, TextInputProps, StyleSheet } from "react-native";
+import { forwardRef } from "react";
+import {
+  TextInput,
+  TextInputProps,
+  StyleSheet,
+  StyleProp,
+  ViewStyle,
+} from "react-native";
 import { colors, radius, spacing, typography } from "@/src/theme";
 
-type AppInputProps = TextInputProps;
+type AppInputProps = TextInputProps & {
+  hasError?: boolean;
+  style?: StyleProp<ViewStyle>;
+};
 
-export function AppInput({ style, ...props }: AppInputProps) {
-  return (
-    <TextInput
-      placeholderTextColor={colors.textMuted}
-      style={[styles.input, style]}
-      {...props}
-    />
-  );
-}
+export const AppInput = forwardRef<TextInput, AppInputProps>(
+  ({ style, hasError = false, ...props }, ref) => {
+    return (
+      <TextInput
+        ref={ref}
+        placeholderTextColor={colors.textMuted}
+        style={[styles.input, hasError && styles.inputError, style]}
+        accessibilityState={{ disabled: props.editable === false }}
+        {...props}
+      />
+    );
+  }
+);
+
+AppInput.displayName = "AppInput";
 
 const styles = StyleSheet.create({
   input: {
     width: "100%",
+    minHeight: 48,
     backgroundColor: colors.white,
     borderRadius: radius.sm,
     paddingVertical: spacing.md,
@@ -25,5 +42,8 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  inputError: {
+    borderColor: colors.error,
   },
 });

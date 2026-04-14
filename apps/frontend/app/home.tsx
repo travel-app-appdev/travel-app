@@ -1,4 +1,3 @@
-// app/home.tsx
 import { Link, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
@@ -7,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
-import { colors, spacing, radius } from "@/src/theme";
+import { colors, spacing, radius, typography } from "@/src/theme";
 import { fetchMyTrips, type Trip } from "@/src/api/trips";
 import Settings from "@/assets/icons/settings.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
@@ -205,7 +204,12 @@ export default function HomeScreen() {
           {/* Action Cards */}
           <View style={styles.actionRow}>
             <Link href="/create-trip" asChild>
-              <Pressable style={styles.actionCard}>
+              <Pressable
+              style={styles.actionCard}
+              accessibilityRole="button"
+              accessibilityLabel="Create trip"
+              accessibilityHint="Opens the create trip screen"
+            >
                 <ButtonCreate width={140} height={140} />
                 <View>
                   <AppText variant="body" style={styles.actionLabel}>
@@ -247,23 +251,82 @@ export default function HomeScreen() {
               </View>
             </Pressable>
 
+          <Link href="/join-trip" asChild>
             <Pressable
-                onPress={() => setActiveTab("past")}
-                style={styles.tabItem}
+              style={styles.actionCard}
+              accessibilityRole="button"
+              accessibilityLabel="Join trip"
+              accessibilityHint="Opens the join trip screen"
             >
-              <View>
-                <AppText
-                    variant="body"
-                    style={[
-                      styles.tabText,
-                      activeTab === "past" && styles.tabTextActive,
-                    ]}
-                >
-                  Past Trips
-                </AppText>
-                {activeTab === "past" && <View style={styles.tabUnderline} />}
-              </View>
+              <ButtonJoin width={140} height={140} />
+              <AppText variant="body" style={styles.actionLabel}>
+                Join trip
+              </AppText>
             </Pressable>
+          </Link>
+        </View>
+
+        <View style={styles.tabRow}>
+          <Pressable
+            onPress={() => setActiveTab("your")}
+            style={styles.tabItem}
+            accessibilityRole="button"
+            accessibilityLabel="Show your trips"
+            accessibilityState={{ selected: activeTab === "your" }}
+          >
+            <View>
+              <AppText
+                variant="body"
+                style={[
+                  styles.tabText,
+                  activeTab === "your" && styles.tabTextActive,
+                ]}
+              >
+                Your Trips
+              </AppText>
+              {activeTab === "your" && <View style={styles.tabUnderline} />}
+            </View>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setActiveTab("past")}
+            style={styles.tabItem}
+            accessibilityRole="button"
+            accessibilityLabel="Show past trips"
+            accessibilityState={{ selected: activeTab === "past" }}
+          >
+            <View>
+              <AppText
+                variant="body"
+                style={[
+                  styles.tabText,
+                  activeTab === "past" && styles.tabTextActive,
+                ]}
+              >
+                Past Trips
+              </AppText>
+              {activeTab === "past" && <View style={styles.tabUnderline} />}
+            </View>
+          </Pressable>
+        </View>
+
+        {trips.length > 0 ? (
+          <View style={styles.tripList}>
+            {trips.map((trip) => (
+              <TripCard
+                key={trip.id}
+                title={trip.title}
+                destination={trip.destination}
+                startDate={trip.startDate}
+                endDate={trip.endDate}
+                status={trip.status}
+                cardColor={trip.cardColor}
+                members={trip.members}
+                onPress={() => {
+                  // TODO: navigate to trip detail screen
+                }}
+              />
+            ))}
           </View>
 
           {/* Trip Cards or Empty State */}
@@ -313,8 +376,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxxl,
     gap: spacing.xxl,
   },
-
-  // Header
   headerRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
@@ -323,19 +384,22 @@ const styles = StyleSheet.create({
   settingsButton: {
     alignItems: "center",
     gap: spacing.xs,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
   },
   settingsLabel: {
     color: colors.textPrimary,
-    fontSize: 12,
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
   },
-
-  // Title
   titleBlock: {
     alignItems: "center",
     gap: spacing.xs,
   },
   helloText: {
-    fontSize: 40,
+    fontSize: typography.size.displayMd,
+    lineHeight: typography.lineHeight.displayMd,
     color: colors.sunsetOrange,
     textAlign: "center",
   },
@@ -346,13 +410,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   subtitle: {
-    fontSize: 18.24,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
     color: colors.textPrimary,
-    fontFamily: "Nunito_400Regular",
+    fontFamily: typography.fontFamily.body,
   },
   subtitleBold: {
-    fontSize: 18.24,
-    fontFamily: "Nunito_700Bold",
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
+    fontFamily: typography.fontFamily.bodyBold,
     color: colors.textPrimary,
   },
   squadUnderline: {
@@ -361,11 +427,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     marginTop: -1,
   },
-
-  // Action Cards
   actionRow: {
     flexDirection: "row",
     justifyContent: "center",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
     gap: spacing.xl,
   },
   actionCard: {
@@ -374,24 +440,27 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     color: colors.textPrimary,
-    fontSize: 20,
-    fontFamily: "Nunito_700Bold",
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+    fontFamily: typography.fontFamily.bodyBold,
   },
-
-  // Tabs
   tabRow: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: spacing.xl,
+    flexWrap: "wrap",
   },
   tabItem: {
     alignItems: "center",
+    minHeight: 44,
+    justifyContent: "center",
   },
   tabText: {
-    fontSize: 20,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
     color: colors.textMuted,
-    fontFamily: "Nunito_700Bold",
+    fontFamily: typography.fontFamily.bodyBold,
   },
   tabTextActive: {
     color: colors.textPrimary,
@@ -402,13 +471,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     marginTop: -1,
   },
-
-  // Trip list
   tripList: {
     gap: spacing.md,
   },
-
-  // Empty State
   emptyState: {
     paddingVertical: spacing.xxl,
     alignItems: "center",
@@ -416,6 +481,6 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: "center",
     maxWidth: 260,
-    lineHeight: 22,
+    lineHeight: typography.lineHeight.md,
   },
 });

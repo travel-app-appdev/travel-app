@@ -8,7 +8,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
   Platform,
   Dimensions,
@@ -21,6 +20,8 @@ import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { AppText } from "@/src/components/common/AppText";
+import { AppInput } from "@/src/components/common/AppInput";
+import { AppButton } from "@/src/components/common/AppButton";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import Back from "@/assets/icons/back.svg";
 import Plane from "@/assets/icons/plane.svg";
@@ -186,23 +187,105 @@ export default function CreateTripScreen() {
                     </ScrollView>
                   </KeyboardAvoidingView>
 
-                  {/* Continue button pinned above cityscape */}
-                  <View style={styles.continueWrapper} pointerEvents="box-none">
+                  <View style={[styles.fieldGroup, { marginTop: 20 }]}>
+                    <View style={styles.fieldLabelRow}>
+                      <Location width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Destination
+                      </AppText>
+                    </View>
+
+                    <AppInput
+                      placeholder="Enter city or country"
+                      value={destination}
+                      onChangeText={setDestination}
+                      accessibilityLabel="Destination"
+                      accessibilityHint="Enter the city or country for the trip"
+                    />
+                  </View>
+                </ScrollView>
+              </KeyboardAvoidingView>
+
+              <View style={styles.continueWrapper} pointerEvents="box-none">
+                <AppButton
+                  title="Continue"
+                  onPress={() => setStep(2)}
+                  disabled={!destination.trim()}
+                  style={styles.continueButton}
+                  textStyle={styles.continueButtonText}
+                  accessibilityLabel="Continue to next step"
+                  accessibilityHint="Moves to trip name and date step"
+                />
+              </View>
+
+              <View
+                style={styles.cityScapeWrapper}
+                pointerEvents="none"
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
+                <CityScape
+                  width={SCREEN_WIDTH}
+                  height={SCREEN_WIDTH * (221 / 393)}
+                />
+              </View>
+            </>
+          ) : (
+            <>
+              <View
+                style={styles.curlyWrapper}
+                pointerEvents="none"
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
+                <CurlyYellow width={448} height={442} />
+              </View>
+
+              <KeyboardAvoidingView
+                style={styles.scroll}
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
+              >
+                <ScrollView
+                  contentContainerStyle={styles.containerStep2}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <View style={styles.header}>
                     <Pressable
-                        style={styles.continueButton}
-                        onPress={handleContinue}
+                      onPress={() => setStep(1)}
+                      style={styles.backLink}
+                      accessibilityRole="button"
+                      accessibilityLabel="Go back to previous step"
                     >
-                      <AppText variant="body" style={styles.continueButtonText}>
-                        Continue
+                      <Back width={20} height={20} />
+                    </Pressable>
+
+                    <View style={styles.headerTitle}>
+                      <Plane width={25} height={25} />
+                      <AppText variant="body" style={styles.headerLabel}>
+                        Create trip
                       </AppText>
                     </Pressable>
                   </View>
 
-                  {/* CityScape pinned to bottom */}
-                  <View style={styles.cityScapeWrapper} pointerEvents="none">
-                    <CityScape
-                        width={SCREEN_WIDTH}
-                        height={SCREEN_WIDTH * (221 / 393)}
+                  <AppText variant="title" style={styles.titleStep2}>
+                    Give your trip a name and choose a date
+                  </AppText>
+
+                  <View style={styles.fieldGroup}>
+                    <View style={styles.fieldLabelRow}>
+                      <TripTitle width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Trip name
+                      </AppText>
+                    </View>
+
+                    <AppInput
+                      placeholder="Enter trip name"
+                      value={tripName}
+                      onChangeText={setTripName}
+                      accessibilityLabel="Trip name"
+                      accessibilityHint="Enter a name for the trip"
                     />
                   </View>
                 </>
@@ -213,14 +296,23 @@ export default function CreateTripScreen() {
                     <CurlyYellow width={448} height={442} />
                   </View>
 
-                  <KeyboardAvoidingView
-                      style={styles.scroll}
-                      behavior={Platform.OS === "ios" ? "padding" : undefined}
-                  >
-                    <ScrollView
-                        contentContainerStyle={styles.containerStep2}
-                        showsVerticalScrollIndicator={false}
-                        keyboardShouldPersistTaps="handled"
+                  <View style={styles.fieldGroup}>
+                    <View style={styles.fieldLabelRow}>
+                      <Calendar width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Trip date
+                      </AppText>
+                    </View>
+
+                    <Pressable
+                      style={styles.dateInput}
+                      onPress={() => {
+                        setShowStartPicker(true);
+                        setShowEndPicker(false);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Select trip dates"
+                      accessibilityHint="Opens the date picker"
                     >
                       {/* Header */}
                       <View style={styles.header}>
@@ -355,11 +447,27 @@ export default function CreateTripScreen() {
                       </AppText>
                     </Pressable>
                   </View>
-                </>
-            )}
-          </View>
-        </SafeAreaView>
-      </View>
+                </ScrollView>
+              </KeyboardAvoidingView>
+
+              <View style={styles.createWrapper}>
+                <AppButton
+                  title="Create trip"
+                  onPress={() => {
+                    // TODO: submit trip to backend
+                  }}
+                  disabled={!tripName.trim() || !destination.trim()}
+                  style={styles.createButton}
+                  textStyle={styles.createButtonText}
+                  accessibilityLabel="Create trip"
+                  accessibilityHint="Creates the trip with the selected details"
+                />
+              </View>
+            </>
+          )}
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -395,7 +503,6 @@ const styles = StyleSheet.create({
     paddingBottom: SCREEN_HEIGHT * 0.18,
     gap: spacing.xl,
   },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -405,6 +512,9 @@ const styles = StyleSheet.create({
   backLink: {
     position: "absolute",
     left: 0,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
     padding: spacing.xs,
   },
   headerTitle: {
@@ -413,26 +523,25 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   headerLabel: {
-    fontSize: 25,
-    fontFamily: "Nunito_700Bold",
+    fontSize: typography.size.xxl,
+    lineHeight: typography.lineHeight.xxl,
+    fontFamily: typography.fontFamily.bodyBold,
     color: colors.textPrimary,
   },
-
   titleStep1: {
-    fontSize: 36,
-    lineHeight: 52,
+    fontSize: typography.size.displaySm,
+    lineHeight: typography.lineHeight.displayLg,
     color: colors.textPrimary,
     textAlign: "left",
     alignSelf: "stretch",
   },
   titleStep2: {
-    fontSize: 36,
-    lineHeight: 52,
+    fontSize: typography.size.displaySm,
+    lineHeight: typography.lineHeight.displayLg,
     color: colors.textPrimary,
     textAlign: "left",
     alignSelf: "stretch",
   },
-
   fieldGroup: {
     gap: spacing.sm,
   },
@@ -443,21 +552,10 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     color: colors.nightBlack,
-    fontFamily: "Nunito_700Bold",
-    fontSize: 20,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
   },
-  input: {
-    backgroundColor: colors.white,
-    borderRadius: 10,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    fontSize: typography.size.md,
-    fontFamily: typography.fontFamily.body,
-    color: colors.textPrimary,
-    borderWidth: 2,
-    borderColor: colors.nightBlack,
-  },
-
   dateInput: {
     backgroundColor: colors.white,
     borderRadius: 10,
@@ -468,12 +566,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 2,
     borderColor: colors.nightBlack,
+    minHeight: 48,
   },
   dateText: {
     fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
     color: colors.textPrimary,
   },
-
   membersRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -481,7 +580,9 @@ const styles = StyleSheet.create({
   },
   codeCaption: {
     color: colors.nightBlack,
-    fontSize: 13,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.body,
   },
   codeRow: {
     backgroundColor: "rgba(255,255,255,0.2)",
@@ -491,11 +592,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    minHeight: 48,
   },
   codeText: {
     color: colors.nightBlack,
-    fontFamily: "Nunito_700Bold",
-    fontSize: 20,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
     letterSpacing: 3,
   },
   copyActionArea: {
@@ -505,30 +608,23 @@ const styles = StyleSheet.create({
   },
   copiedText: {
     color: colors.nightBlack,
-    fontSize: 13,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
   },
-
   continueWrapper: {
     position: "absolute",
     bottom: SCREEN_WIDTH * (221 / 393) + 47,
     left: spacing.xl,
     right: spacing.xl,
-    height: 56,
     zIndex: 10,
   },
   continueButton: {
-    flex: 1,
     backgroundColor: colors.sunsetOrange,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
   },
   continueButtonText: {
     color: colors.nightBlack,
-    fontFamily: "Nunito_700Bold",
-    fontSize: 20,
+    fontFamily: typography.fontFamily.bodyBold,
   },
-
   cityScapeWrapper: {
     position: "absolute",
     bottom: 0,
@@ -537,7 +633,6 @@ const styles = StyleSheet.create({
     height: SCREEN_WIDTH * (221 / 393),
     zIndex: 5,
   },
-
   curlyWrapper: {
     position: "absolute",
     top: SCREEN_HEIGHT * 0.73,
@@ -547,28 +642,21 @@ const styles = StyleSheet.create({
     zIndex: 0,
     transform: [{ rotate: "10.84deg" }],
   },
-
   createWrapper: {
     position: "absolute",
     bottom: SCREEN_HEIGHT * 0.08,
     left: spacing.xl,
     right: spacing.xl,
-    height: 56,
     zIndex: 10,
   },
   createButton: {
-    flex: 1,
     backgroundColor: colors.seaBlue,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
   },
   createButtonDisabled: {
     opacity: 0.7,
   },
   createButtonText: {
     color: colors.nightBlack,
-    fontFamily: "Nunito_700Bold",
-    fontSize: 20,
+    fontFamily: typography.fontFamily.bodyBold,
   },
 });
