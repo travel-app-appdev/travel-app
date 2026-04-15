@@ -20,8 +20,8 @@ import {
   validateLogin,
 } from "@/src/lib/authValidation";
 import { handleLogin as loginUser } from "@/src/services/authServices";
+import { useAuth } from "@/src/context/AuthContext";
 import { colors, radius, spacing, typography } from "@/src/theme";
-
 import Back from "@/assets/icons/back.svg";
 import MascotHelloSeaBlue from "@/assets/mascots/mascot-hello-seablue.svg";
 import BlueBackground from "@/assets/visuals/blue-background.svg";

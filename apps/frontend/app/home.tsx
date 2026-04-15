@@ -58,11 +58,7 @@ function getInitials(name: string): string {
 }
 
 function getCardColor(tripId: string): string {
-  const palette = [
-    colors.plantGreen,
-    colors.sunsetOrange,
-    colors.seaBlue,
-  ];
+  const palette = [colors.plantGreen, colors.sunsetOrange, colors.seaBlue];
 
   let hash = 0;
   for (let i = 0; i < tripId.length; i++) {
@@ -99,11 +95,11 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     status: getUiStatus(trip.state),
     cardColor: getCardColor(trip.trip_id),
     members: (trip.members ?? []).map(
-        (member: TripMemberFromApi, index: number) => ({
-          id: member.id,
-          initials: getInitials(member.name),
-          color: getMemberColor(index),
-        })
+      (member: TripMemberFromApi, index: number) => ({
+        id: member.id,
+        initials: getInitials(member.name),
+        color: getMemberColor(index),
+      })
     ),
   };
 }
@@ -163,93 +159,61 @@ export default function HomeScreen() {
   const trips = activeTab === "your" ? yourTrips : pastTrips;
 
   return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="dark" />
-        <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.container}
-            showsVerticalScrollIndicator={false}
-        >
-          {/* Header Row */}
-          <View style={styles.headerRow}>
-            <Pressable
-                style={styles.settingsButton}
-                onPress={() => router.push("/settings")}
-            >
-              <Settings width={24} height={24} />
-              <AppText variant="caption" style={styles.settingsLabel}>
-                Settings
-              </AppText>
-            </Pressable>
-          </View>
-
-          {/* Title */}
-          <View style={styles.titleBlock}>
-            <AppText variant="title" style={styles.helloText}>
-              Helloooo
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="dark" />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header Row */}
+        <View style={styles.headerRow}>
+          <Pressable
+            style={styles.settingsButton}
+            onPress={() => router.push("/settings")}
+          >
+            <Settings width={24} height={24} />
+            <AppText variant="caption" style={styles.settingsLabel}>
+              Settings
             </AppText>
-            <View style={styles.subtitleRow}>
-              <AppText variant="body" style={styles.subtitle}>
-                where is the{" "}
+          </Pressable>
+        </View>
+
+        {/* Title */}
+        <View style={styles.titleBlock}>
+          <AppText variant="title" style={styles.helloText}>
+            Helloooo
+          </AppText>
+          <View style={styles.subtitleRow}>
+            <AppText variant="body" style={styles.subtitle}>
+              where is the{" "}
+            </AppText>
+            <View>
+              <AppText variant="body" style={styles.subtitleBold}>
+                squad going?
               </AppText>
-              <View>
-                <AppText variant="body" style={styles.subtitleBold}>
-                  squad going?
-                </AppText>
-                <View style={styles.squadUnderline} />
-              </View>
+              <View style={styles.squadUnderline} />
             </View>
           </View>
+        </View>
 
-          {/* Action Cards */}
-          <View style={styles.actionRow}>
-            <Link href="/create-trip" asChild>
-              <Pressable
+        {/* Action Cards */}
+        <View style={styles.actionRow}>
+          <Link href="/create-trip" asChild>
+            <Pressable
               style={styles.actionCard}
               accessibilityRole="button"
               accessibilityLabel="Create trip"
               accessibilityHint="Opens the create trip screen"
             >
-                <ButtonCreate width={140} height={140} />
-                <View>
-                  <AppText variant="body" style={styles.actionLabel}>
-                    Create trip
-                  </AppText>
-                </View>
-              </Pressable>
-            </Link>
-
-            <Link href="/join-trip" asChild>
-              <Pressable style={styles.actionCard}>
-                <ButtonJoin width={140} height={140} />
-                <View>
-                  <AppText variant="body" style={styles.actionLabel}>
-                    Join trip
-                  </AppText>
-                </View>
-              </Pressable>
-            </Link>
-          </View>
-
-          {/* Tabs */}
-          <View style={styles.tabRow}>
-            <Pressable
-                onPress={() => setActiveTab("your")}
-                style={styles.tabItem}
-            >
+              <ButtonCreate width={140} height={140} />
               <View>
-                <AppText
-                    variant="body"
-                    style={[
-                      styles.tabText,
-                      activeTab === "your" && styles.tabTextActive,
-                    ]}
-                >
-                  Your Trips
+                <AppText variant="body" style={styles.actionLabel}>
+                  Create trip
                 </AppText>
-                {activeTab === "your" && <View style={styles.tabUnderline} />}
               </View>
             </Pressable>
+          </Link>
 
           <Link href="/join-trip" asChild>
             <Pressable
@@ -259,13 +223,16 @@ export default function HomeScreen() {
               accessibilityHint="Opens the join trip screen"
             >
               <ButtonJoin width={140} height={140} />
-              <AppText variant="body" style={styles.actionLabel}>
-                Join trip
-              </AppText>
+              <View>
+                <AppText variant="body" style={styles.actionLabel}>
+                  Join trip
+                </AppText>
+              </View>
             </Pressable>
           </Link>
         </View>
 
+        {/* Tabs */}
         <View style={styles.tabRow}>
           <Pressable
             onPress={() => setActiveTab("your")}
@@ -310,9 +277,10 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
+        {/* Trip Cards or Empty State */}
         {trips.length > 0 ? (
           <View style={styles.tripList}>
-            {trips.map((trip) => (
+            {trips.map((trip: TripCardItem) => (
               <TripCard
                 key={trip.id}
                 title={trip.title}
@@ -328,37 +296,17 @@ export default function HomeScreen() {
               />
             ))}
           </View>
-
-          {/* Trip Cards or Empty State */}
-          {trips.length > 0 ? (
-              <View style={styles.tripList}>
-                {trips.map((trip: TripCardItem) => (
-                    <TripCard
-                        key={trip.id}
-                        title={trip.title}
-                        destination={trip.destination}
-                        startDate={trip.startDate}
-                        endDate={trip.endDate}
-                        status={trip.status}
-                        cardColor={trip.cardColor}
-                        members={trip.members}
-                        onPress={() => {
-                          // TODO: navigate to trip detail screen
-                        }}
-                    />
-                ))}
-              </View>
-          ) : (
-              <View style={styles.emptyState}>
-                <AppText variant="caption" style={styles.emptyText}>
-                  {activeTab === "your"
-                      ? "No upcoming trips yet. Create or join one!"
-                      : "No past trips yet. Your memories will live here."}
-                </AppText>
-              </View>
-          )}
-        </ScrollView>
-      </SafeAreaView>
+        ) : (
+          <View style={styles.emptyState}>
+            <AppText variant="caption" style={styles.emptyText}>
+              {activeTab === "your"
+                ? "No upcoming trips yet. Create or join one!"
+                : "No past trips yet. Your memories will live here."}
+            </AppText>
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

@@ -5,7 +5,7 @@ export default function ActivityVotingScreen() {
     <PlaceholderScreen
       title="Activity Voting"
       description="Placeholder screen for deciding which activities the group wants to include on the trip."
-      primaryLink={{ href: "/itinerary", label: "Open itinerary" }}
+      primaryLink={{ href: "/itinerary-planning", label: "Open itinerary" }}
     />
   );
 }

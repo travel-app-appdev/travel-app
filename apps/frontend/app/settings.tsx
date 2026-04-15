@@ -2,6 +2,9 @@ import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "@/src/context/AuthContext";
+import { fetchMyTrips, type Trip } from "@/src/api/trips";
+import { TripCard } from "@/src/components/common/TripCard";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import Back from "@/assets/icons/back.svg";
@@ -93,11 +96,11 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     status: getUiStatus(trip.state),
     cardColor: getCardColor(trip.trip_id),
     members: (trip.members ?? []).map(
-        (member: TripMemberFromApi, index: number) => ({
-          id: member.id,
-          initials: getInitials(member.name),
-          color: getMemberColor(index),
-        })
+      (member: TripMemberFromApi, index: number) => ({
+        id: member.id,
+        initials: getInitials(member.name),
+        color: getMemberColor(index),
+      })
     ),
   };
 }
@@ -167,140 +170,136 @@ export default function SettingsScreen() {
   }, [user]);
 
   const visibleCreated =
-      createdTab === "created" ? createdActive : createdArchive;
-  const visibleJoined =
-      joinedTab === "joined" ? joinedActive : joinedArchive;
+    createdTab === "created" ? createdActive : createdArchive;
+  const visibleJoined = joinedTab === "joined" ? joinedActive : joinedArchive;
 
   return (
-      <View style={styles.fullScreen}>
-        <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-          <ScrollView
-              style={styles.scroll}
-              contentContainerStyle={styles.container}
-              showsVerticalScrollIndicator={false}
-          >
-            {/* Header */}
-            <View style={styles.header}>
-              <Link href="/home" style={styles.backLink}>
-                <Back width={20} height={20} />
-              </Link>
-              <View style={styles.headerTitle}>
-                <Settings width={20} height={20} />
-                <AppText variant="body" style={styles.headerLabel}>
-                  Settings
+    <View style={styles.fullScreen}>
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Link href="/home" style={styles.backLink}>
+              <Back width={20} height={20} />
+            </Link>
+            <View style={styles.headerTitle}>
+              <Settings width={20} height={20} />
+              <AppText variant="body" style={styles.headerLabel}>
+                Settings
+              </AppText>
+            </View>
+          </View>
+
+          {/* Profile Card */}
+          <Link href="/profile" asChild>
+            <Pressable style={styles.profileCard}>
+              <View style={styles.profileLeft}>
+                <View style={styles.profileIconWrapper}>
+                  <Profile width={32} height={32} />
+                </View>
+                <View style={styles.profileInfo}>
+                  <AppText variant="body" style={styles.profileName}>
+                    {/* TODO: replace with real user name from auth */}
+                    Sophie Trudl
+                  </AppText>
+                  <AppText variant="caption" style={styles.profileEdit}>
+                    Edit profile
+                  </AppText>
+                </View>
+              </View>
+              <ArrowRight width={20} height={20} />
+            </Pressable>
+          </Link>
+
+          {/* Trips you created */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Pressable
+                onPress={() => setCreatedTab("created")}
+                style={styles.tabItem}
+              >
+                <AppText
+                  variant="body"
+                  style={[
+                    styles.sectionTitle,
+                    createdTab !== "created" && styles.sectionTitleMuted,
+                  ]}
+                >
+                  Trips you created
+                </AppText>
+                {createdTab === "created" && (
+                  <View style={styles.tabUnderline} />
+                )}
+              </Pressable>
+
+              <Pressable
+                onPress={() => setCreatedTab("createdArchive")}
+                style={styles.tabItem}
+              >
+                <AppText
+                  variant="caption"
+                  style={[
+                    styles.archiveLabel,
+                    createdTab === "createdArchive" &&
+                      styles.archiveLabelActive,
+                  ]}
+                >
+                  Archive
+                </AppText>
+                {createdTab === "createdArchive" && (
+                  <View style={styles.tabUnderline} />
+                )}
+              </Pressable>
+            </View>
+
+            {visibleCreated.length > 0 ? (
+              <View style={{ gap: spacing.md }}>
+                {visibleCreated.map((trip) => (
+                  <TripCard
+                    key={trip.id}
+                    title={trip.title}
+                    destination={trip.destination}
+                    startDate={trip.startDate}
+                    endDate={trip.endDate}
+                    status={trip.status}
+                    cardColor={trip.cardColor}
+                    members={trip.members}
+                  />
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptySection}>
+                <AppText variant="caption" style={styles.emptyText}>
+                  {createdTab === "created"
+                    ? "No trips created yet."
+                    : "No archived trips."}
                 </AppText>
               </View>
-            </View>
+            )}
+          </View>
 
-            {/* Profile Card */}
-            <Link href="/profile" asChild>
-              <Pressable style={styles.profileCard}>
-                <View style={styles.profileLeft}>
-                  <View style={styles.profileIconWrapper}>
-                    <Profile width={32} height={32} />
-                  </View>
-                  <View style={styles.profileInfo}>
-                    <AppText variant="body" style={styles.profileName}>
-                      {/* TODO: replace with real user name from auth */}
-                      Sophie Trudl
-                    </AppText>
-                    <AppText variant="caption" style={styles.profileEdit}>
-                      Edit profile
-                    </AppText>
-                  </View>
-                </View>
-                <ArrowRight width={20} height={20} />
+          {/* Trips you joined */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Pressable
+                onPress={() => setJoinedTab("joined")}
+                style={styles.tabItem}
+              >
+                <AppText
+                  variant="body"
+                  style={[
+                    styles.sectionTitle,
+                    joinedTab !== "joined" && styles.sectionTitleMuted,
+                  ]}
+                >
+                  Trips you joined
+                </AppText>
+                {joinedTab === "joined" && <View style={styles.tabUnderline} />}
               </Pressable>
-            </Link>
-
-            {/* Trips you created */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Pressable
-                    onPress={() => setCreatedTab("created")}
-                    style={styles.tabItem}
-                >
-                  <AppText
-                      variant="body"
-                      style={[
-                        styles.sectionTitle,
-                        createdTab !== "created" && styles.sectionTitleMuted,
-                      ]}
-                  >
-                    Trips you created
-
-                  </AppText>
-                  {createdTab === "created" && (
-                      <View style={styles.tabUnderline} />
-                  )}
-                </Pressable>
-
-                <Pressable
-                    onPress={() => setCreatedTab("createdArchive")}
-                    style={styles.tabItem}
-                >
-                  <AppText
-                      variant="caption"
-                      style={[
-                        styles.archiveLabel,
-                        createdTab === "createdArchive" &&
-                        styles.archiveLabelActive,
-                      ]}
-                  >
-                    Archive
-                  </AppText>
-                  {createdTab === "createdArchive" && (
-                      <View style={styles.tabUnderline} />
-                  )}
-                </Pressable>
-              </View>
-
-              {visibleCreated.length > 0 ? (
-                  <View style={{ gap: spacing.md }}>
-                    {visibleCreated.map((trip) => (
-                        <TripCard
-                            key={trip.id}
-                            title={trip.title}
-                            destination={trip.destination}
-                            startDate={trip.startDate}
-                            endDate={trip.endDate}
-                            status={trip.status}
-                            cardColor={trip.cardColor}
-                            members={trip.members}
-                        />
-                    ))}
-                  </View>
-              ) : (
-                  <View style={styles.emptySection}>
-                    <AppText variant="caption" style={styles.emptyText}>
-                      {createdTab === "created"
-                          ? "No trips created yet."
-                          : "No archived trips."}
-                    </AppText>
-                  </View>
-              )}
-            </View>
-
-            {/* Trips you joined */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Pressable
-                    onPress={() => setJoinedTab("joined")}
-                    style={styles.tabItem}
-                >
-                  <AppText
-                      variant="body"
-                      style={[
-                        styles.sectionTitle,
-                        joinedTab !== "joined" && styles.sectionTitleMuted,
-                      ]}
-                  >
-                    Trips you joined
-                  </AppText>
-                  {joinedTab === "joined" && (
-                      <View style={styles.tabUnderline} />
-                  )}
-                </Pressable>
 
               <Pressable
                 onPress={() => setJoinedTab("joinedArchive")}
@@ -318,54 +317,44 @@ export default function SettingsScreen() {
                     joinedTab === "joinedArchive" && styles.archiveLabelActive,
                   ]}
                 >
-                  <AppText
-                      variant="caption"
-                      style={[
-                        styles.archiveLabel,
-                        joinedTab === "joinedArchive" &&
-                        styles.archiveLabelActive,
-                      ]}
-                  >
-                    Archive
-                  </AppText>
-                  {joinedTab === "joinedArchive" && (
-                      <View style={styles.tabUnderline} />
-                  )}
-                </Pressable>
-              </View>
-
-              {visibleJoined.length > 0 ? (
-                  <View style={{ gap: spacing.md }}>
-                    {visibleJoined.map((trip) => (
-                        <TripCard
-                            key={trip.id}
-                            title={trip.title}
-                            destination={trip.destination}
-                            startDate={trip.startDate}
-                            endDate={trip.endDate}
-                            status={trip.status}
-                            cardColor={trip.cardColor}
-                            members={trip.members}
-                        />
-                    ))}
-                  </View>
-              ) : (
-                  <View style={styles.emptySection}>
-                    <AppText variant="caption" style={styles.emptyText}>
-                      {joinedTab === "joined"
-                          ? "No trips joined yet."
-                          : "No archived trips."}
-                    </AppText>
-                  </View>
-              )}
+                  Archive
+                </AppText>
+                {joinedTab === "joinedArchive" && (
+                  <View style={styles.tabUnderline} />
+                )}
+              </Pressable>
             </View>
-          </ScrollView>
-        </SafeAreaView>
-      </View>
+
+            {visibleJoined.length > 0 ? (
+              <View style={{ gap: spacing.md }}>
+                {visibleJoined.map((trip) => (
+                  <TripCard
+                    key={trip.id}
+                    title={trip.title}
+                    destination={trip.destination}
+                    startDate={trip.startDate}
+                    endDate={trip.endDate}
+                    status={trip.status}
+                    cardColor={trip.cardColor}
+                    members={trip.members}
+                  />
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptySection}>
+                <AppText variant="caption" style={styles.emptyText}>
+                  {joinedTab === "joined"
+                    ? "No trips joined yet."
+                    : "No archived trips."}
+                </AppText>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
-
-// keep your existing styles definition below
 
 const styles = StyleSheet.create({
   fullScreen: {
