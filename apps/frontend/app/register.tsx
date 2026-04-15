@@ -68,7 +68,15 @@ export default function RegisterScreen() {
 
     try {
       setIsSubmitting(true);
-      await registerUser(name.trim(), email.trim(), password);
+
+      const authResponse = await registerUser(
+          name.trim(),
+          email.trim(),
+          password
+      );
+
+      setUser(authResponse);
+
       router.replace("/home");
     } catch (error) {
       const message = getFirebaseAuthMessage(error);

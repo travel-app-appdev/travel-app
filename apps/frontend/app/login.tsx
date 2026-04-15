@@ -62,7 +62,10 @@ export default function LoginScreen() {
 
     try {
       setIsSubmitting(true);
-      await loginUser(email.trim(), password);
+
+      const authResponse = await loginUser(email.trim(), password);
+      setUser(authResponse);
+
       router.replace("/home");
     } catch (error) {
       const message =
