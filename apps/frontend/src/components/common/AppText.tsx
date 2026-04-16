@@ -1,3 +1,4 @@
+// components/common/AppText.tsx
 import { Text, TextProps, StyleSheet } from "react-native";
 import { colors, typography } from "@/src/theme";
 

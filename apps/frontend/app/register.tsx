@@ -1,3 +1,4 @@
+// app/register.tsx
 import { Link, router } from "expo-router";
 import { useRef, useState } from "react";
 import {

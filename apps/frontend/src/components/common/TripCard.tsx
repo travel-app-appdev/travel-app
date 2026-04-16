@@ -1,3 +1,4 @@
+// components/common/TripCard.tsx
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "./AppText";
 import { colors, spacing, radius, typography } from "@/src/theme";

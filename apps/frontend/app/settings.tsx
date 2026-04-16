@@ -1,3 +1,4 @@
+// app/settings.tsx
 import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";

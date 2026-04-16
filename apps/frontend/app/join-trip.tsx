@@ -1,3 +1,4 @@
+// app/join-trip.tsx
 import { Link } from "expo-router";
 import { useState } from "react";
 import {

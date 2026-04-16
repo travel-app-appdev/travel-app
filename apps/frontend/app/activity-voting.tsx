@@ -1,3 +1,4 @@
+// app/activity-voting.tsx
 import { PlaceholderScreen } from "@/src/components/common/placeholder-screen";
 
 export default function ActivityVotingScreen() {

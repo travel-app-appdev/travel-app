@@ -1,3 +1,4 @@
+// app/home.tsx
 import { Link, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";

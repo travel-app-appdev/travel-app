@@ -1,3 +1,4 @@
+// app/trip-settings.tsx
 import { Link } from "expo-router";
 import { useState } from "react";
 import {

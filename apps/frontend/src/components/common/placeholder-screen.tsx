@@ -1,3 +1,4 @@
+// components/common/placeholder-screen.tsx
 import { Link, type Href } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";

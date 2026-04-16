@@ -1,3 +1,4 @@
+// app/profile.tsx
 import { Link } from "expo-router";
 import { useState } from "react";
 import {

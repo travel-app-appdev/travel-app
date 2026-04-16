@@ -1,3 +1,4 @@
+// components/common/AppInput.tsx
 import { forwardRef } from "react";
 import {
   TextInput,
