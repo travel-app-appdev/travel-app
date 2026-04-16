@@ -1,8 +1,8 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import authRoutes from './routes/auth';
-import tripsRouter from './routes/trips';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import authRoutes from "./routes/auth";
+import tripsRouter from "./routes/trips";
 
 dotenv.config();
 
@@ -11,11 +11,12 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use("/trips", tripsRouter);
-app.use('/auth', authRoutes);
 
-app.get('/', (req, res) => {
-  res.json({ message: 'Travel API is running!' });
+app.use("/trips", tripsRouter);
+app.use("/auth", authRoutes);
+
+app.get("/", (req, res) => {
+  res.json({ message: "Travel API is running!" });
 });
 
 app.listen(PORT, () => {
