@@ -1,5 +1,9 @@
 import { Request, Response } from "express";
-import admin from "../config/firebase";
+import {
+    createTripForAuthenticatedUser,
+    createTripForUserWithoutAuth,
+    getTripsForUser,
+} from "../services/tripsService";
 
 export const getMyTrips = async (req: Request, res: Response): Promise<void> => {
     const userId = req.query.userId as string;
@@ -10,69 +14,7 @@ export const getMyTrips = async (req: Request, res: Response): Promise<void> => 
     }
 
     try {
-        const db = admin.firestore();
-
-        const memberSnapshot = await db
-            .collection("trip_members")
-            .where("user_id", "==", userId)
-            .where("invite_status", "==", "accepted")
-            .get();
-
-        if (memberSnapshot.empty) {
-            res.json([]);
-            return;
-        }
-
-        const memberships = memberSnapshot.docs.map((doc) => doc.data());
-        const tripIds = memberships.map((member) => member.trip_id);
-
-        const tripPromises = tripIds.map((tripId) =>
-            db.collection("trips").doc(tripId).get()
-        );
-
-        const tripDocs = await Promise.all(tripPromises);
-
-        const trips = await Promise.all(
-            tripDocs
-                .filter((doc) => doc.exists)
-                .map(async (tripDoc) => {
-                    const tripData = tripDoc.data();
-                    const membership = memberships.find((m) => m.trip_id === tripDoc.id);
-
-                    const tripMembersSnapshot = await db
-                        .collection("trip_members")
-                        .where("trip_id", "==", tripDoc.id)
-                        .where("invite_status", "==", "accepted")
-                        .get();
-
-                    const tripMembers = tripMembersSnapshot.docs.map((doc) => doc.data());
-
-                    const members = await Promise.all(
-                        tripMembers.map(async (member) => {
-                            const userDoc = await db.collection("users").doc(member.user_id).get();
-                            const userData = userDoc.data();
-
-                            return {
-                                id: member.user_id,
-                                name: userData?.name ?? "Unknown User",
-                                role: member.role,
-                            };
-                        })
-                    );
-
-                    return {
-                        trip_id: tripDoc.id,
-                        title: tripData?.title,
-                        destination: tripData?.destination,
-                        start_date: tripData?.start_date,
-                        end_date: tripData?.end_date,
-                        state: tripData?.state,
-                        role: membership?.role,
-                        members,
-                    };
-                })
-        );
-
+        const trips = await getTripsForUser(userId);
         res.json(trips);
     } catch (error) {
         console.error("Error loading trips:", error);
@@ -104,54 +46,25 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
     }
 
     try {
-        // 1) verify token and get authenticated user id
-        const decoded = await admin.auth().verifyIdToken(idToken);
-        const userId = decoded.uid;
-
-        const db = admin.firestore();
-
-        const tripRef = db.collection("trips").doc();
-        const memberRef = db.collection("trip_members").doc();
-
-        const batch = db.batch();
-
-        // use userId
-        batch.set(tripRef, {
-            admin_user_id: userId,
+        const trip = await createTripForAuthenticatedUser({
+            idToken,
             title,
             destination,
             start_date,
             end_date,
-            state: "Planning",
         });
 
-        batch.set(memberRef, {
-            user_id: userId,
-            trip_id: tripRef.id,
-            role: "admin",
-            invite_status: "accepted",
-        });
-
-        await batch.commit();
-
-        res.status(201).json({
-            trip_id: tripRef.id,
-            title,
-            destination,
-            start_date,
-            end_date,
-            state: "Planning",
-            role: "admin",
-        });
+        res.status(201).json(trip);
     } catch (error) {
         console.error("Error creating trip:", error);
         res.status(401).json({ error: "Invalid token or failed to create trip" });
     }
 };
 
-//testing integration
-
-export const createTripWithoutAuth = async (req: Request, res: Response): Promise<void> => {
+export const createTripWithoutAuth = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
     const { userId, title, destination, start_date, end_date } = req.body;
 
     if (!userId || !title || !destination || !start_date || !end_date) {
@@ -162,40 +75,15 @@ export const createTripWithoutAuth = async (req: Request, res: Response): Promis
     }
 
     try {
-        const db = admin.firestore();
-
-        const tripRef = db.collection("trips").doc();
-        const memberRef = db.collection("trip_members").doc();
-
-        const batch = db.batch();
-
-        batch.set(tripRef, {
-            admin_user_id: userId,
+        const trip = await createTripForUserWithoutAuth({
+            userId,
             title,
             destination,
             start_date,
             end_date,
-            state: "Planning",
         });
 
-        batch.set(memberRef, {
-            user_id: userId,
-            trip_id: tripRef.id,
-            role: "admin",
-            invite_status: "accepted",
-        });
-
-        await batch.commit();
-
-        res.status(201).json({
-            trip_id: tripRef.id,
-            title,
-            destination,
-            start_date,
-            end_date,
-            state: "Planning",
-            role: "admin",
-        });
+        res.status(201).json(trip);
     } catch (error) {
         console.error("Error creating trip without auth:", error);
         res.status(500).json({ error: "Failed to create trip" });

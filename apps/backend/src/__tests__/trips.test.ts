@@ -88,7 +88,7 @@ describe('GET /trips/my', () => {
         const res = await request(app).get('/trips/my?userId=test123');
 
         expect(res.status).toBe(200);
-        expect(res.body).toEqual([
+        expect(res.body).toMatchObject([
             {
                 trip_id: 'trip1',
                 title: 'Vienna Trip',
@@ -99,6 +99,8 @@ describe('GET /trips/my', () => {
                 role: 'admin',
             },
         ]);
+
+        expect(res.body[0].members).toEqual([]);
     });
 
     afterAll(done => {
