@@ -292,7 +292,13 @@ export default function HomeScreen() {
                 cardColor={trip.cardColor}
                 members={trip.members}
                 onPress={() => {
-                  // TODO: navigate to trip detail screen
+                  router.push({
+                    pathname: "/itinerary",
+                    params: {
+                      tripId: trip.id,
+                      state: trip.status,
+                    },
+                  });
                 }}
               />
             ))}
