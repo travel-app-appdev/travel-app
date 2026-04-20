@@ -1,5 +1,5 @@
 // app/create-trip.tsx
-import { Link, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
 import { createTrip } from "@/src/api/trips";
@@ -22,16 +22,17 @@ import DateTimePicker, {
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppButton } from "@/src/components/common/AppButton";
+import { BackLink } from "@/src/components/common/BackLink";
 import { colors, spacing, radius, typography } from "@/src/theme";
-import Back from "@/assets/icons/back.svg";
 import Plane from "@/assets/icons/plane.svg";
-import CityScape from "@/assets/icons/city_scape.svg";
+import CityScape from "@/assets/visuals/city_scape.svg";
 import CurlyYellow from "@/assets/visuals/curly-yellow.svg";
+import CurlyOrange from "@/assets/visuals/curly-orange.svg";
 import Location from "@/assets/icons/location.svg";
 import Copy from "@/assets/icons/copy.svg";
-import ShareLink from "@/assets/icons/share_link.svg";
 import Calendar from "@/assets/icons/calendar.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
+import KeyFrame from "@/assets/icons/key_frame.svg";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -44,7 +45,7 @@ function toDateOnlyString(date: Date) {
 }
 
 export default function CreateTripScreen() {
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [destination, setDestination] = useState("");
   const [tripName, setTripName] = useState("");
   const [startDate, setStartDate] = useState<Date>(new Date());
@@ -79,10 +80,7 @@ export default function CreateTripScreen() {
     if (isSubmitting) return;
 
     if (!user) {
-      Alert.alert(
-        "Not logged in",
-        "Please log in again and try creating a trip."
-      );
+      Alert.alert("Not logged in", "Please log in again and try creating a trip.");
       return;
     }
 
@@ -106,10 +104,7 @@ export default function CreateTripScreen() {
 
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert(
-          "Authentication error",
-          "No Firebase user found. Please log in again."
-        );
+        Alert.alert("Authentication error", "No Firebase user found. Please log in again.");
         return;
       }
 
@@ -123,7 +118,7 @@ export default function CreateTripScreen() {
         end_date: toDateOnlyString(endDate),
       });
 
-      router.replace("/home");
+      setStep(3);
     } catch (error) {
       console.error("Error creating trip:", error);
       const message =
@@ -134,6 +129,87 @@ export default function CreateTripScreen() {
     }
   };
 
+  // ─── Step 3 — Trip code screen ───────────────────────────────────────────
+  if (step === 3) {
+    return (
+      <View style={[styles.fullScreen, styles.bgStep1]}>
+        <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+          <View style={[styles.root, styles.bgStep1]}>
+
+            {/* CurlyOrange — only bottom decoration on this screen */}
+            <View
+              style={styles.curlyOrangeWrapper}
+              pointerEvents="none"
+              {...(Platform.OS !== "web" ? { accessible: false } : {})}
+            >
+              <CurlyOrange width={SCREEN_WIDTH * 1.1} height={SCREEN_WIDTH * 1.1} />
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.containerStep3}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Header — no back arrow on completion screen */}
+              <View style={styles.header}>
+                <View style={styles.headerTitle}>
+                  <Plane width={25} height={25} />
+                  <AppText variant="body" style={styles.headerLabel}>
+                    Create trip
+                  </AppText>
+                </View>
+              </View>
+
+              <AppText variant="title" style={styles.titleStep3}>
+                Add members to the trip
+              </AppText>
+
+              {/* Code field */}
+              <View style={styles.fieldGroup}>
+                <View style={styles.fieldLabelRow}>
+                  <KeyFrame width={20} height={20} />
+                  <AppText variant="body" style={styles.fieldLabel}>
+                    Code
+                  </AppText>
+                </View>
+
+                <Pressable style={styles.codeInput} onPress={handleCopyCode}>
+                  <AppText variant="body" style={styles.codeText}>
+                    {tripCode}
+                  </AppText>
+                  <View style={styles.copyActionArea}>
+                    <AppText variant="caption" style={styles.copiedText}>
+                      {copied ? "✓ Copied!" : "Tap to copy"}
+                    </AppText>
+                    <Copy width={20} height={20} />
+                  </View>
+                </Pressable>
+
+                <AppText variant="caption" style={styles.codeCaption}>
+                  Copy this code to share the trip.
+                </AppText>
+              </View>
+            </ScrollView>
+
+            {/* Back to Landing Page */}
+            <View style={styles.continueWrapper} pointerEvents="box-none">
+              <AppButton
+                title="Back to Landing Page"
+                onPress={() => router.replace("/home")}
+                style={styles.backToLandingButton}
+                textStyle={styles.backToLandingText}
+                accessibilityLabel="Back to landing page"
+                accessibilityHint="Goes back to the home screen"
+              />
+            </View>
+
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // ─── Step 1 & 2 ──────────────────────────────────────────────────────────
   return (
     <View
       style={[styles.fullScreen, step === 1 ? styles.bgStep1 : styles.bgStep2]}
@@ -155,9 +231,7 @@ export default function CreateTripScreen() {
                 >
                   {/* Header */}
                   <View style={styles.header}>
-                    <Link href="/home" style={styles.backLink}>
-                      <Back width={20} height={20} />
-                    </Link>
+                    <BackLink href="/home" />
                     <View style={styles.headerTitle}>
                       <Plane width={25} height={25} />
                       <AppText variant="body" style={styles.headerLabel}>
@@ -184,6 +258,7 @@ export default function CreateTripScreen() {
                       onChangeText={setDestination}
                       accessibilityLabel="Destination"
                       accessibilityHint="Enter the city or country for the trip"
+                      style={styles.inputBlackStroke}
                     />
                   </View>
                 </ScrollView>
@@ -202,7 +277,7 @@ export default function CreateTripScreen() {
                 />
               </View>
 
-              {/* CityScape pinned to bottom */}
+              {/* CityScape pinned to bottom — step 1 only */}
               <View
                 style={styles.cityScapeWrapper}
                 pointerEvents="none"
@@ -216,13 +291,13 @@ export default function CreateTripScreen() {
             </>
           ) : (
             <>
-              {/* CurlyYellow behind everything */}
+              {/* CurlyYellow behind everything — step 2 only */}
               <View
                 style={styles.curlyWrapper}
                 pointerEvents="none"
                 {...(Platform.OS !== "web" ? { accessible: false } : {})}
               >
-                <CurlyYellow width={448} height={442} />
+                <CurlyYellow width={SCREEN_WIDTH * 1.1} height={SCREEN_WIDTH * 1.1} />
               </View>
 
               <KeyboardAvoidingView
@@ -236,14 +311,7 @@ export default function CreateTripScreen() {
                 >
                   {/* Header */}
                   <View style={styles.header}>
-                    <Pressable
-                      onPress={() => setStep(1)}
-                      style={styles.backLink}
-                      accessibilityRole="button"
-                      accessibilityLabel="Go back to previous step"
-                    >
-                      <Back width={20} height={20} />
-                    </Pressable>
+                    <BackLink onPress={() => setStep(1)} />
 
                     <View style={styles.headerTitle}>
                       <Plane width={25} height={25} />
@@ -272,6 +340,7 @@ export default function CreateTripScreen() {
                       onChangeText={setTripName}
                       accessibilityLabel="Trip name"
                       accessibilityHint="Enter a name for the trip"
+                      style={styles.inputBlackStroke}
                     />
                   </View>
 
@@ -309,9 +378,7 @@ export default function CreateTripScreen() {
                           setShowStartPicker(false);
                           if (date) {
                             setStartDate(date);
-                            if (endDate < date) {
-                              setEndDate(date);
-                            }
+                            if (endDate < date) setEndDate(date);
                             setShowEndPicker(true);
                           }
                         }}
@@ -331,52 +398,20 @@ export default function CreateTripScreen() {
                       />
                     )}
                   </View>
-
-                  {/* Add Members */}
-                  <View style={styles.fieldGroup}>
-                    <View style={styles.membersRow}>
-                      <View style={styles.fieldLabelRow}>
-                        <ShareLink width={20} height={20} />
-                        <AppText variant="body" style={styles.fieldLabel}>
-                          Add members to trip
-                        </AppText>
-                      </View>
-                    </View>
-
-                    <AppText variant="caption" style={styles.codeCaption}>
-                      Copy this code to share the trip.
-                    </AppText>
-
-                    <Pressable style={styles.codeRow} onPress={handleCopyCode}>
-                      <AppText variant="body" style={styles.codeText}>
-                        {tripCode}
-                      </AppText>
-
-                      <View style={styles.copyActionArea}>
-                        <AppText variant="caption" style={styles.copiedText}>
-                          {copied ? "✓ Copied!" : "Tap to copy"}
-                        </AppText>
-                        <Copy width={20} height={20} />
-                      </View>
-                    </Pressable>
-                  </View>
                 </ScrollView>
               </KeyboardAvoidingView>
 
               {/* Create trip button */}
               <View style={styles.createWrapper}>
-                <Pressable
-                  style={[
-                    styles.createButton,
-                    isSubmitting && styles.createButtonDisabled,
-                  ]}
+                <AppButton
+                  title={isSubmitting ? "Creating..." : "Create trip"}
                   onPress={handleCreateTrip}
-                  disabled={isSubmitting}
-                >
-                  <AppText variant="body" style={styles.createButtonText}>
-                    {isSubmitting ? "Creating..." : "Create trip"}
-                  </AppText>
-                </Pressable>
+                  loading={isSubmitting}
+                  disabled={isSubmitting || !tripName.trim()}
+                  style={styles.createButton}
+                  textStyle={styles.createButtonText}
+                  accessibilityLabel={isSubmitting ? "Creating trip" : "Create trip"}
+                />
               </View>
             </>
           )}
@@ -418,19 +453,17 @@ const styles = StyleSheet.create({
     paddingBottom: SCREEN_HEIGHT * 0.18,
     gap: spacing.xl,
   },
+  containerStep3: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: SCREEN_HEIGHT * 0.28,
+    gap: spacing.xl,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-  },
-  backLink: {
-    position: "absolute",
-    left: 0,
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: "center",
-    padding: spacing.xs,
   },
   headerTitle: {
     flexDirection: "row",
@@ -457,6 +490,13 @@ const styles = StyleSheet.create({
     textAlign: "left",
     alignSelf: "stretch",
   },
+  titleStep3: {
+    fontSize: typography.size.displaySm,
+    lineHeight: typography.lineHeight.displayLg,
+    color: colors.textPrimary,
+    textAlign: "left",
+    alignSelf: "stretch",
+  },
   fieldGroup: {
     gap: spacing.sm,
   },
@@ -471,9 +511,13 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xl,
     lineHeight: typography.lineHeight.xl,
   },
+  inputBlackStroke: {
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+  },
   dateInput: {
     backgroundColor: colors.white,
-    borderRadius: 10,
+    borderRadius: radius.sm,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     flexDirection: "row",
@@ -488,25 +532,16 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.md,
     color: colors.textPrimary,
   },
-  membersRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  codeCaption: {
-    color: colors.nightBlack,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-    fontFamily: typography.fontFamily.body,
-  },
-  codeRow: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: radius.lg,
+  codeInput: {
+    backgroundColor: colors.white,
+    borderRadius: radius.sm,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
     minHeight: 48,
   },
   codeText: {
@@ -526,6 +561,12 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
   },
+  codeCaption: {
+    color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.body,
+  },
   continueWrapper: {
     position: "absolute",
     bottom: SCREEN_WIDTH * (221 / 393) + 47,
@@ -540,6 +581,13 @@ const styles = StyleSheet.create({
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
   },
+  backToLandingButton: {
+    backgroundColor: colors.sunsetOrange,
+  },
+  backToLandingText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
   cityScapeWrapper: {
     position: "absolute",
     bottom: 0,
@@ -550,33 +598,28 @@ const styles = StyleSheet.create({
   },
   curlyWrapper: {
     position: "absolute",
-    top: SCREEN_HEIGHT * 0.73,
-    left: -100,
-    width: 448,
-    height: 442,
+    bottom: -SCREEN_WIDTH * 0.3,
+    left: -SCREEN_WIDTH * 0.1,
     zIndex: 0,
-    transform: [{ rotate: "10.84deg" }],
   },
   createWrapper: {
     position: "absolute",
-    bottom: SCREEN_HEIGHT * 0.08,
+    bottom: SCREEN_WIDTH * (221 / 393) + 47,
     left: spacing.xl,
     right: spacing.xl,
     zIndex: 10,
   },
   createButton: {
     backgroundColor: colors.seaBlue,
-    minHeight: 56,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.lg,
-  },
-  createButtonDisabled: {
-    opacity: 0.7,
   },
   createButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
+  },
+  curlyOrangeWrapper: {
+    position: "absolute",
+    bottom: -SCREEN_WIDTH * 0.3,
+    left: -SCREEN_WIDTH * 0.1,
+    zIndex: 0,
   },
 });
