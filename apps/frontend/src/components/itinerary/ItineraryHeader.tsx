@@ -1,42 +1,102 @@
+// src/components/itinerary/ItineraryHeader.tsx
 import { StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { formatTripDateRange } from "@/src/utils/itinerary/formatTripToDateRange";
+import { Link } from "expo-router";
+import type { ItineraryState } from "@/src/types/itinerary";
+
+import Back from "@/assets/icons/back.svg";
+import MascotWink from "@/assets/mascots/mascot-wink.svg";
+import CalendarIcon from "@/assets/icons/calendar.svg";
+import HourglassIcon from "@/assets/icons/hourglass.svg";
 
 type Props = {
   title: string;
   destination: string;
   startDate: string;
   endDate: string;
+  introText: string;
+  daysLeftText?: string;
+  onBackPress: () => void;
+  state?: ItineraryState;
 };
+
+/** Maps itinerary state to the hero background color */
+function getHeroColor(state: ItineraryState): string {
+  switch (state) {
+    case "voting":
+      return colors.votingPurple;
+    case "final":
+      return colors.plantGreen;
+    case "planning":
+    default:
+      return colors.beachYellow;
+  }
+}
 
 export function ItineraryHeader({
   title,
   destination,
   startDate,
   endDate,
+  introText,
+  daysLeftText = "73 days",
+  onBackPress,
+  state = "planning",
 }: Props) {
+  const heroColor = getHeroColor(state);
+
   return (
     <View style={styles.wrapper}>
-      <View style={styles.hero}>
-        <AppText variant="title" style={styles.title}>
-          {title}
-        </AppText>
+      <View style={[styles.hero, { backgroundColor: heroColor }]}>
+        <View style={styles.topRow}>
+          <Link
+            href="/home"
+            accessibilityLabel="Go back to welcome screen"
+            accessibilityRole="link"
+          >
+            <Back width={20} height={20} />
+          </Link>
 
-        <AppText variant="subtitle" style={styles.destination}>
-          {destination}
-        </AppText>
+          <View style={styles.timerBox}>
+            <HourglassIcon width={18} height={18} />
+            <View>
+              <AppText variant="body" style={styles.timerValue}>
+                {daysLeftText}
+              </AppText>
+              <AppText variant="caption" style={styles.timerLabel}>
+                Timer
+              </AppText>
+            </View>
+          </View>
+        </View>
 
-        <View style={styles.dateBadge}>
-          <AppText variant="body" style={styles.dateText}>
-            {formatTripDateRange(startDate, endDate)}
-          </AppText>
+        <View style={styles.heroContent}>
+          <MascotWink width={64} height={64} />
+
+          <View style={styles.textBlock}>
+            <AppText variant="title" style={styles.title}>
+              {title}
+            </AppText>
+
+            <AppText variant="subtitle" style={styles.destination}>
+              {destination}
+            </AppText>
+          </View>
+
+          <View style={styles.dateBadge}>
+            <CalendarIcon width={18} height={18} />
+            <AppText variant="body" style={styles.dateText}>
+              {formatTripDateRange(startDate, endDate)}
+            </AppText>
+          </View>
         </View>
       </View>
 
-      <View style={styles.contentCard}>
+      <View style={styles.contentTopCard}>
         <AppText variant="subtitle" style={styles.intro}>
-          You can add your activities here for each day.
+          {introText}
         </AppText>
       </View>
     </View>
@@ -45,52 +105,73 @@ export function ItineraryHeader({
 
 const styles = StyleSheet.create({
   wrapper: {
-    gap: 0,
+    marginHorizontal: 0,
   },
   hero: {
-    backgroundColor: colors.beachYellow,
+    // backgroundColor set dynamically via style prop
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xxxl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
+  },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: spacing.lg,
+  },
+  timerBox: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
-  title: {
-    color: colors.textPrimary,
-    fontSize: typography.size.displayMd,
-    lineHeight: typography.lineHeight.displayMd,
+  timerValue: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
   },
-  destination: {
-    color: colors.textPrimary,
+  timerLabel: {
+    color: colors.nightBlack,
+  },
+  heroContent: {
+    gap: spacing.sm,
+  },
+  textBlock: {
+    gap: spacing.xs,
+  },
+  title: {
+    color: colors.nightBlack,
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
+  },
+  destination: {
+    color: colors.nightBlack,
     fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+  },
+  intro: {
+    color: colors.nightBlack,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
   },
   dateBadge: {
     alignSelf: "flex-end",
-    backgroundColor: colors.lightWhite,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginTop: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
   },
   dateText: {
-    color: colors.textPrimary,
+    color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
   },
-  contentCard: {
+  contentTopCard: {
     backgroundColor: colors.lightWhite,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
-    marginTop: -12,
-    paddingHorizontal: spacing.xl,
+    marginTop: -8,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  intro: {
-    fontSize: typography.size.lg,
-    lineHeight: typography.lineHeight.lg,
-    color: colors.textPrimary,
+    paddingBottom: spacing.md,
   },
 });

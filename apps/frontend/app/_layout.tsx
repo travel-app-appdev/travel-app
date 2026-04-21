@@ -62,6 +62,7 @@ export default function RootLayout() {
         />
         <Stack.Screen name="itinerary" options={{ title: "Itinerary" }} />
         <Stack.Screen name="past-trips" options={{ title: "Past Trips" }} />
+        <Stack.Screen name="add-activity" options={{ title: "Add Activity" }} />
       </Stack>
       <StatusBar style="dark" />
     </AuthProvider>

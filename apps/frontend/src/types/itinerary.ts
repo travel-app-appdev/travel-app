@@ -1,31 +1,34 @@
+// src/types/itinerary.ts
+
 export type ItineraryState = "planning" | "voting" | "final";
 
-export type TripDay = {
-  id: string;
-  isoDate: string; // e.g. 2026-08-14
-  dayNumber: number;
-  weekdayShort: string; // Tue
-  monthShort: string; // Aug
-};
-
 export type TimeSlot = {
-  id: string; // e.g. 06:00-08:00
-  start: string;
-  end: string;
-  label: string;
-};
-
-export type ItineraryActivity = {
   id: string;
-  title: string;
-  dayIsoDate: string;
-  slotId: string;
-  location?: string;
-  googleMapsUrl?: string;
-  participantsCount?: number;
+  label: string; // e.g. "06:00-08:00"
+  startHour: number;
 };
 
-export type PlanningMemberStatus = {
+export type TripDay = {
+  id: string; // ISO date string "2024-08-14"
+  dayNumber: number; // 14
+  weekdayShort: string; // "Tue"
+};
+
+export type Activity = {
+  id: string;
+  slotId: string; // matches TimeSlot.id
+  dayId: string; // ISO date string
+  name: string;
+  address: string;
+  googleMapsUrl?: string;
+  joinedCount?: number; // for final state
+};
+
+export type VotingActivity = Activity & {
+  voteCount?: number;
+};
+
+export type PlanningStatus = {
   userId: string;
   hasFinishedPlanning: boolean;
 };
@@ -34,9 +37,14 @@ export type TripItinerary = {
   tripId: string;
   title: string;
   destination: string;
-  startDate: string; // ISO date
-  endDate: string; // ISO date
+  startDate: string; // ISO date string
+  endDate: string; // ISO date string
   state: ItineraryState;
-  planningStatus: PlanningMemberStatus[];
-  activities: ItineraryActivity[];
+  planningStatus: PlanningStatus[];
+  activities: Activity[];
+};
+
+export type SlotItem = {
+  slot: TimeSlot;
+  activity?: Activity;
 };

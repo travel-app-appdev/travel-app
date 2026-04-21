@@ -1,3 +1,4 @@
+// src/components/itinerary/ItineraryDaySelector.tsx
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
@@ -7,12 +8,19 @@ type Props = {
   days: TripDay[];
   selectedDayId: string;
   onSelectDay: (dayId: string) => void;
+  /**
+   * Optional set of day IDs that are enabled (selectable).
+   * When provided, days NOT in this set are rendered as disabled/muted.
+   * When omitted, all days are selectable.
+   */
+  enabledDayIds?: Set<string>;
 };
 
 export function ItineraryDaySelector({
   days,
   selectedDayId,
   onSelectDay,
+  enabledDayIds,
 }: Props) {
   return (
     <ScrollView
@@ -22,15 +30,22 @@ export function ItineraryDaySelector({
     >
       {days.map((day) => {
         const isSelected = day.id === selectedDayId;
+        const isDisabled =
+          enabledDayIds !== undefined && !enabledDayIds.has(day.id);
 
         return (
           <Pressable
             key={day.id}
-            onPress={() => onSelectDay(day.id)}
-            style={[styles.dayChip, isSelected && styles.dayChipSelected]}
+            onPress={() => !isDisabled && onSelectDay(day.id)}
+            style={[
+              styles.dayChip,
+              isSelected && styles.dayChipSelected,
+              isDisabled && styles.dayChipDisabled,
+            ]}
             accessibilityRole="button"
             accessibilityLabel={`${day.dayNumber} ${day.weekdayShort}`}
-            accessibilityState={{ selected: isSelected }}
+            accessibilityState={{ selected: isSelected, disabled: isDisabled }}
+            disabled={isDisabled}
           >
             <View style={styles.dayChipInner}>
               <AppText
@@ -38,6 +53,7 @@ export function ItineraryDaySelector({
                 style={[
                   styles.dayNumber,
                   isSelected && styles.dayNumberSelected,
+                  isDisabled && styles.dayTextDisabled,
                 ]}
               >
                 {day.dayNumber}
@@ -45,7 +61,11 @@ export function ItineraryDaySelector({
 
               <AppText
                 variant="caption"
-                style={[styles.weekday, isSelected && styles.weekdaySelected]}
+                style={[
+                  styles.weekday,
+                  isSelected && styles.weekdaySelected,
+                  isDisabled && styles.dayTextDisabled,
+                ]}
               >
                 {day.weekdayShort}
               </AppText>
@@ -77,6 +97,11 @@ const styles = StyleSheet.create({
   dayChipSelected: {
     backgroundColor: colors.beachYellow,
   },
+  dayChipDisabled: {
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    opacity: 0.45,
+  },
   dayChipInner: {
     alignItems: "center",
     justifyContent: "center",
@@ -89,6 +114,9 @@ const styles = StyleSheet.create({
   },
   dayNumberSelected: {
     color: colors.textPrimary,
+  },
+  dayTextDisabled: {
+    color: colors.textMuted,
   },
   weekday: {
     color: colors.textPrimary,

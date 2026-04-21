@@ -12,6 +12,7 @@ import { fetchMyTrips, type Trip } from "@/src/api/trips";
 import Settings from "@/assets/icons/settings.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
+import { MOCK_TRIPS } from "@/src/data/mockTrips";
 
 type Tab = "your" | "past";
 
@@ -31,6 +32,8 @@ type TripCardItem = {
   destination: string;
   startDate: string;
   endDate: string;
+  rawStartDate: string;
+  rawEndDate: string;
   status: "planning" | "voting" | "final";
   cardColor: string;
   members: {
@@ -93,6 +96,8 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     destination: trip.destination,
     startDate: formatDate(trip.start_date),
     endDate: formatDate(trip.end_date),
+    rawStartDate: trip.start_date,
+    rawEndDate: trip.end_date,
     status: getUiStatus(trip.state),
     cardColor: getCardColor(trip.trip_id),
     members: (trip.members ?? []).map(
@@ -297,6 +302,10 @@ export default function HomeScreen() {
                     params: {
                       tripId: trip.id,
                       state: trip.status,
+                      title: trip.title,
+                      destination: trip.destination,
+                      startDate: trip.rawStartDate,
+                      endDate: trip.rawEndDate,
                     },
                   });
                 }}
