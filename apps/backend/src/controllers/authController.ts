@@ -1,3 +1,4 @@
+// src/controllers/authController.ts
 import { Request, Response } from "express";
 import { loginWithIdToken, registerUser } from "../services/authService";
 
