@@ -9,7 +9,7 @@ import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { fetchMyTrips, type Trip } from "@/src/api/trips";
-import Settings from "@/assets/icons/settings.svg";
+import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
 
@@ -33,6 +33,7 @@ type TripCardItem = {
   endDate: string;
   status: "planning" | "voting" | "final";
   cardColor: string;
+  role: "admin" | "member";
   members: {
     id: string;
     initials: string;
@@ -42,7 +43,6 @@ type TripCardItem = {
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
-
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -51,21 +51,17 @@ function formatDate(dateString: string): string {
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-
   if (parts.length === 0) return "";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 function getCardColor(tripId: string): string {
   const palette = [colors.plantGreen, colors.sunsetOrange, colors.seaBlue];
-
   let hash = 0;
   for (let i = 0; i < tripId.length; i++) {
     hash = tripId.charCodeAt(i) + ((hash << 5) - hash);
   }
-
   return palette[Math.abs(hash) % palette.length];
 }
 
@@ -82,7 +78,6 @@ function getMemberColor(index: number): string {
     colors.sunsetPink,
     colors.seaBlue,
   ];
-
   return palette[index % palette.length];
 }
 
@@ -95,6 +90,7 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     endDate: formatDate(trip.end_date),
     status: getUiStatus(trip.state),
     cardColor: getCardColor(trip.trip_id),
+    role: trip.role === "admin" ? "admin" : "member",
     members: (trip.members ?? []).map(
       (member: TripMemberFromApi, index: number) => ({
         id: member.id,
@@ -104,6 +100,12 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     ),
   };
 }
+
+// Itinerary route is the same for all states — the itinerary screen
+// itself handles rendering differently based on planning/voting/final
+// function getItineraryRoute(_status: "planning" | "voting" | "final") {
+//   return "/itinerary";
+// }
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -116,16 +118,12 @@ export default function HomeScreen() {
     const loadTrips = async () => {
       try {
         if (!user) {
-          console.log("No logged-in user in context, skipping trip load");
           setYourTrips([]);
           setPastTrips([]);
           return;
         }
 
-        const userId = user.uid;
-        console.log("Loading trips for user");
-
-        const backendTrips = await fetchMyTrips(userId);
+        const backendTrips = await fetchMyTrips(user.uid);
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -170,12 +168,15 @@ export default function HomeScreen() {
         {/* Header Row */}
         <View style={styles.headerRow}>
           <Pressable
-            style={styles.settingsButton}
-            onPress={() => router.push("/settings")}
+            style={styles.profileButton}
+            onPress={() => router.push("/profile")}
+            accessibilityRole="button"
+            accessibilityLabel="Go to profile"
+            accessibilityHint="Opens your profile screen"
           >
-            <Settings width={24} height={24} />
-            <AppText variant="caption" style={styles.settingsLabel}>
-              Settings
+            <Profile width={24} height={24} />
+            <AppText variant="caption" style={styles.profileLabel}>
+              Profile
             </AppText>
           </Pressable>
         </View>
@@ -291,8 +292,19 @@ export default function HomeScreen() {
                 status={trip.status}
                 cardColor={trip.cardColor}
                 members={trip.members}
+                role={trip.role}
                 onPress={() => {
-                  // TODO: navigate to trip detail screen
+                  // Tapping the card always goes to itinerary
+                  // The itinerary screen renders differently based on trip state
+                  router.push("/itinerary" as any);
+                }}
+                onIconPress={() => {
+                  // Icon tap: admin → trip settings, member → trip information
+                  if (trip.role === "admin") {
+                    router.push("/trip-settings");
+                  } else {
+                    router.push("/trip-information");
+                  }
                 }}
               />
             ))}
@@ -330,14 +342,14 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     alignItems: "flex-start",
   },
-  settingsButton: {
+  profileButton: {
     alignItems: "center",
     gap: spacing.xs,
     minWidth: 44,
     minHeight: 44,
     justifyContent: "center",
   },
-  settingsLabel: {
+  profileLabel: {
     color: colors.textPrimary,
     fontSize: typography.size.xs,
     lineHeight: typography.lineHeight.xs,
