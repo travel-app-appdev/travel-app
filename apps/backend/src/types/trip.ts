@@ -13,6 +13,7 @@ export type Trip = {
     state: string;
     role?: string;
     members?: TripMember[];
+    invite_code?: string;
 };
 
 export type TripDocument = {
@@ -52,4 +53,9 @@ export type CreateTripWithAuthInput = CreateTripInput & {
 
 export type CreateTripWithoutAuthInput = CreateTripInput & {
     userId: string;
+};
+
+export type JoinTripInput = {
+    idToken: string;
+    inviteCode: string;
 };
