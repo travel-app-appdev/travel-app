@@ -36,10 +36,6 @@ import KeyFrame from "@/assets/icons/key_frame.svg";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-function generateTripCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
-
 function toDateOnlyString(date: Date) {
   return date.toISOString().split("T")[0];
 }
@@ -52,7 +48,7 @@ export default function CreateTripScreen() {
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-  const [tripCode] = useState(generateTripCode());
+  const [tripCode, setTripCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -110,7 +106,7 @@ export default function CreateTripScreen() {
 
       const idToken = await currentUser.getIdToken();
 
-      await createTrip({
+      const result = await createTrip({
         idToken,
         title: tripName.trim(),
         destination: destination.trim(),
@@ -118,6 +114,9 @@ export default function CreateTripScreen() {
         end_date: toDateOnlyString(endDate),
       });
 
+      console.log("API result:", result);
+
+      setTripCode(result.invite_code ?? "");
       setStep(3);
     } catch (error) {
       console.error("Error creating trip:", error);
@@ -136,7 +135,6 @@ export default function CreateTripScreen() {
         <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
           <View style={[styles.root, styles.bgStep1]}>
 
-            {/* CurlyOrange — only bottom decoration on this screen */}
             <View
               style={styles.curlyOrangeWrapper}
               pointerEvents="none"
@@ -150,7 +148,6 @@ export default function CreateTripScreen() {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* Header — no back arrow on completion screen */}
               <View style={styles.header}>
                 <View style={styles.headerTitle}>
                   <Plane width={25} height={25} />
@@ -164,7 +161,6 @@ export default function CreateTripScreen() {
                 Add members to the trip
               </AppText>
 
-              {/* Code field */}
               <View style={styles.fieldGroup}>
                 <View style={styles.fieldLabelRow}>
                   <KeyFrame width={20} height={20} />
@@ -191,7 +187,6 @@ export default function CreateTripScreen() {
               </View>
             </ScrollView>
 
-            {/* Back to Landing Page */}
             <View style={styles.continueWrapper} pointerEvents="box-none">
               <AppButton
                 title="Back to Landing Page"
@@ -229,7 +224,6 @@ export default function CreateTripScreen() {
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  {/* Header */}
                   <View style={styles.header}>
                     <BackLink href="/home" />
                     <View style={styles.headerTitle}>
@@ -264,7 +258,6 @@ export default function CreateTripScreen() {
                 </ScrollView>
               </KeyboardAvoidingView>
 
-              {/* Continue button pinned above cityscape */}
               <View style={styles.continueWrapper} pointerEvents="box-none">
                 <AppButton
                   title="Continue"
@@ -277,7 +270,6 @@ export default function CreateTripScreen() {
                 />
               </View>
 
-              {/* CityScape pinned to bottom — step 1 only */}
               <View
                 style={styles.cityScapeWrapper}
                 pointerEvents="none"
@@ -291,7 +283,6 @@ export default function CreateTripScreen() {
             </>
           ) : (
             <>
-              {/* CurlyYellow behind everything — step 2 only */}
               <View
                 style={styles.curlyWrapper}
                 pointerEvents="none"
@@ -309,7 +300,6 @@ export default function CreateTripScreen() {
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  {/* Header */}
                   <View style={styles.header}>
                     <BackLink onPress={() => setStep(1)} />
 
@@ -325,7 +315,6 @@ export default function CreateTripScreen() {
                     Give your trip a name and choose a date
                   </AppText>
 
-                  {/* Trip Name */}
                   <View style={styles.fieldGroup}>
                     <View style={styles.fieldLabelRow}>
                       <TripTitle width={20} height={20} />
@@ -344,7 +333,6 @@ export default function CreateTripScreen() {
                     />
                   </View>
 
-                  {/* Trip Date */}
                   <View style={styles.fieldGroup}>
                     <View style={styles.fieldLabelRow}>
                       <Calendar width={20} height={20} />
@@ -401,7 +389,6 @@ export default function CreateTripScreen() {
                 </ScrollView>
               </KeyboardAvoidingView>
 
-              {/* Create trip button */}
               <View style={styles.createWrapper}>
                 <AppButton
                   title={isSubmitting ? "Creating..." : "Create trip"}
