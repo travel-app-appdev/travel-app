@@ -1,3 +1,4 @@
+// src/services/authService.ts
 import admin from "../config/firebase";
 import { createUserProfile, upsertUserLogin } from "../repositories/authRepository";
 import { AuthUser, RegisterUserInput } from "../types/auth";
