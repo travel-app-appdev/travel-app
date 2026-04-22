@@ -1,4 +1,3 @@
-// src/__tests__/register.test.ts
 import request from 'supertest';
 import app from '../index';
 

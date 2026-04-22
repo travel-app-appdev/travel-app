@@ -1,4 +1,3 @@
-// src/dtos/tripDtos.ts
 export type GetMyTripsQueryDto = {
     userId: string;
 };

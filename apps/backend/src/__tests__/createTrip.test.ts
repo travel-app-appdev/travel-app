@@ -1,4 +1,3 @@
-// src/__tests__/createTrip.test.ts
 import { createTrip } from "../controllers/tripsController";
 
 const mockBatchSet = jest.fn();

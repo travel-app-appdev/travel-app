@@ -1,4 +1,3 @@
-// src/controllers/tripsController.ts
 import { Request, Response } from "express";
 import {
     createTripForAuthenticatedUser,

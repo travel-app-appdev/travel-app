@@ -1,4 +1,3 @@
-// src/__tests__/createTrip.integration.test.ts
 import request from "supertest";
 import admin from "../config/firebase";
 import app from "../index";

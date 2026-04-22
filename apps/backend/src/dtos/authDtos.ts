@@ -1,4 +1,3 @@
-// src/dtos/authDtos.ts
 export type LoginRequestDto = {
     idToken: string;
 };

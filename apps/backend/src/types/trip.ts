@@ -1,4 +1,3 @@
-// src/types/trip.ts
 export type TripMember = {
     id: string;
     name: string;

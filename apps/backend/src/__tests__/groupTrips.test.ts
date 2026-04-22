@@ -1,4 +1,3 @@
-// src/__tests__/groupTrips.test.ts
 import { groupTripsByDate } from '../__helpers__/groupTrips';
 
 describe('groupTripsByDate', () => {
