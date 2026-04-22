@@ -1,12 +1,14 @@
+// src/controllers/tripsController.ts
 import { Request, Response } from "express";
 import {
     createTripForAuthenticatedUser,
     createTripForUserWithoutAuth,
     getTripsForUser,
+    joinTripWithInviteCode,
+    deleteTripForAdmin,
+    leaveTripForMember,
+    removeMemberForAdmin,
 } from "../services/tripsService";
-
-import { joinTripWithInviteCode } from "../services/tripsService";
-
 
 export const getMyTrips = async (req: Request, res: Response): Promise<void> => {
     const userId = req.query.userId as string;
@@ -111,6 +113,74 @@ export const joinTrip = async (req: Request, res: Response): Promise<void> => {
             res.status(409).json({ error: error.message });
         } else {
             res.status(401).json({ error: "Invalid token or failed to join trip" });
+        }
+    }
+};
+
+export const deleteTrip = async (req: Request, res: Response): Promise<void> => {
+    const { idToken } = req.body;
+    const tripId = req.params.tripId as string;
+
+    if (!idToken || !tripId) {
+        res.status(400).json({ error: "idToken and tripId are required" });
+        return;
+    }
+
+    try {
+        await deleteTripForAdmin({ idToken, tripId });
+        res.status(200).json({ message: "Trip deleted successfully" });
+    } catch (error: any) {
+        if (error.status === 403) {
+            res.status(403).json({ error: error.message });
+        } else {
+            res.status(401).json({ error: "Invalid token or failed to delete trip" });
+        }
+    }
+};
+
+export const leaveTrip = async (req: Request, res: Response): Promise<void> => {
+    const { idToken } = req.body;
+    const tripId = req.params.tripId as string;
+
+    if (!idToken || !tripId) {
+        res.status(400).json({ error: "idToken and tripId are required" });
+        return;
+    }
+
+    try {
+        await leaveTripForMember({ idToken, tripId });
+        res.status(200).json({ message: "Left trip successfully" });
+    } catch (error: any) {
+        if (error.status === 403) {
+            res.status(403).json({ error: error.message });
+        } else if (error.status === 404) {
+            res.status(404).json({ error: error.message });
+        } else {
+            res.status(401).json({ error: "Invalid token or failed to leave trip" });
+        }
+    }
+};
+
+export const removeMember = async (req: Request, res: Response): Promise<void> => {
+    const { idToken } = req.body;
+    const tripId = req.params.tripId as string;
+    const memberId = req.params.memberId as string;
+
+    if (!idToken || !tripId || !memberId) {
+        res.status(400).json({ error: "idToken, tripId and memberId are required" });
+        return;
+    }
+
+    try {
+        await removeMemberForAdmin({ idToken, tripId, memberId });
+        res.status(200).json({ message: "Member removed successfully" });
+    } catch (error: any) {
+        if (error.status === 403) {
+            res.status(403).json({ error: error.message });
+        } else if (error.status === 404) {
+            res.status(404).json({ error: error.message });
+        } else {
+            res.status(401).json({ error: "Invalid token or failed to remove member" });
         }
     }
 };

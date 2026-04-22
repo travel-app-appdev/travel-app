@@ -12,6 +12,7 @@ import { fetchMyTrips, type Trip } from "@/src/api/trips";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
+import { MOCK_TRIPS } from "@/src/data/mockTrips";
 
 type Tab = "your" | "past";
 
@@ -31,6 +32,8 @@ type TripCardItem = {
   destination: string;
   startDate: string;
   endDate: string;
+  rawStartDate: string;
+  rawEndDate: string;
   status: "planning" | "voting" | "final";
   cardColor: string;
   role: "admin" | "member";
@@ -38,6 +41,7 @@ type TripCardItem = {
     id: string;
     initials: string;
     color: string;
+    name: string;
   }[];
 };
 
@@ -88,24 +92,21 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     destination: trip.destination,
     startDate: formatDate(trip.start_date),
     endDate: formatDate(trip.end_date),
+    rawStartDate: trip.start_date,
+    rawEndDate: trip.end_date,
     status: getUiStatus(trip.state),
     cardColor: getCardColor(trip.trip_id),
     role: trip.role === "admin" ? "admin" : "member",
     members: (trip.members ?? []).map(
       (member: TripMemberFromApi, index: number) => ({
         id: member.id,
+        name: member.name,
         initials: getInitials(member.name),
         color: getMemberColor(index),
       })
     ),
   };
 }
-
-// Itinerary route is the same for all states — the itinerary screen
-// itself handles rendering differently based on planning/voting/final
-// function getItineraryRoute(_status: "planning" | "voting" | "final") {
-//   return "/itinerary";
-// }
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -285,6 +286,7 @@ export default function HomeScreen() {
             {trips.map((trip: TripCardItem) => (
               <TripCard
                 key={trip.id}
+                tripId={trip.id}
                 title={trip.title}
                 destination={trip.destination}
                 startDate={trip.startDate}
@@ -294,16 +296,27 @@ export default function HomeScreen() {
                 members={trip.members}
                 role={trip.role}
                 onPress={() => {
-                  // Tapping the card always goes to itinerary
-                  // The itinerary screen renders differently based on trip state
-                  router.push("/itinerary" as any);
+                  router.push({
+                    pathname: "/itinerary",
+                    params: {
+                      tripId: trip.id,
+                      state: trip.status,
+                      title: trip.title,
+                      destination: trip.destination,
+                      startDate: trip.rawStartDate,
+                      endDate: trip.rawEndDate,
+                    },
+                  });
                 }}
                 onIconPress={() => {
-                  // Icon tap: admin → trip settings, member → trip information
                   if (trip.role === "admin") {
-                    router.push("/trip-settings");
+                    router.push(
+                      `/trip-settings?tripId=${trip.id}&title=${encodeURIComponent(trip.title)}&destination=${encodeURIComponent(trip.destination)}&startDate=${encodeURIComponent(trip.rawStartDate)}&endDate=${encodeURIComponent(trip.rawEndDate)}&members=${encodeURIComponent(JSON.stringify(trip.members))}` as any
+                    );
                   } else {
-                    router.push("/trip-information");
+                    router.push(
+                      `/trip-information?tripId=${trip.id}&title=${encodeURIComponent(trip.title)}&destination=${encodeURIComponent(trip.destination)}&startDate=${encodeURIComponent(trip.rawStartDate)}&endDate=${encodeURIComponent(trip.rawEndDate)}&members=${encodeURIComponent(JSON.stringify(trip.members))}` as any
+                    );
                   }
                 }}
               />

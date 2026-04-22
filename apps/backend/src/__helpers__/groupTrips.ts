@@ -1,3 +1,5 @@
+// src/__helpers__/groupTrips.ts
+// This file contains a helper function to group trips by their dates.
 export type Trip = {
     trip_id: string;
     title: string;
