@@ -310,6 +310,7 @@ export default function HomeScreen() {
                       endDate: trip.rawEndDate,
                     },
                   });
+                }}
                 onIconPress={() => {
                   // Icon tap: admin → trip settings, member → trip information
                   if (trip.role === "admin") {
