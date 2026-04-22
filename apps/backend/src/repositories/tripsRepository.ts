@@ -1,3 +1,4 @@
+// src/repositories/tripsRepository.ts
 import admin from "../config/firebase";
 import {
     Trip,
@@ -39,6 +40,7 @@ export async function findTripById(tripId: string): Promise<Trip | null> {
         start_date: data.start_date,
         end_date: data.end_date,
         state: data.state,
+        invite_code: data.invite_code,
     };
 }
 
@@ -202,4 +204,39 @@ export async function createTripWithInviteCode(data: {
         role: "admin",
         invite_code: data.invite_code,
     };
+}
+
+export async function deleteTripById(tripId: string): Promise<void> {
+    const db = admin.firestore();
+    const batch = db.batch();
+
+    // Delete the trip document
+    const tripRef = db.collection("trips").doc(tripId);
+    batch.delete(tripRef);
+
+    // Delete all trip_members documents for this trip
+    const membersSnapshot = await db
+        .collection("trip_members")
+        .where("trip_id", "==", tripId)
+        .get();
+
+    membersSnapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+}
+
+export async function removeTripMember(tripId: string, userId: string): Promise<void> {
+    const db = admin.firestore();
+
+    const snapshot = await db
+        .collection("trip_members")
+        .where("trip_id", "==", tripId)
+        .where("user_id", "==", userId)
+        .get();
+
+    if (snapshot.empty) return;
+
+    await snapshot.docs[0].ref.delete();
 }
