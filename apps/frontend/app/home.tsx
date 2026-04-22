@@ -12,6 +12,7 @@ import { fetchMyTrips, type Trip } from "@/src/api/trips";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
+import { MOCK_TRIPS } from "@/src/data/mockTrips";
 
 type Tab = "your" | "past";
 
@@ -31,6 +32,8 @@ type TripCardItem = {
   destination: string;
   startDate: string;
   endDate: string;
+  rawStartDate: string;
+  rawEndDate: string;
   status: "planning" | "voting" | "final";
   cardColor: string;
   role: "admin" | "member";
@@ -88,6 +91,8 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     destination: trip.destination,
     startDate: formatDate(trip.start_date),
     endDate: formatDate(trip.end_date),
+    rawStartDate: trip.start_date,
+    rawEndDate: trip.end_date,
     status: getUiStatus(trip.state),
     cardColor: getCardColor(trip.trip_id),
     role: trip.role === "admin" ? "admin" : "member",
@@ -294,10 +299,17 @@ export default function HomeScreen() {
                 members={trip.members}
                 role={trip.role}
                 onPress={() => {
-                  // Tapping the card always goes to itinerary
-                  // The itinerary screen renders differently based on trip state
-                  router.push("/itinerary" as any);
-                }}
+                  router.push({
+                    pathname: "/itinerary",
+                    params: {
+                      tripId: trip.id,
+                      state: trip.status,
+                      title: trip.title,
+                      destination: trip.destination,
+                      startDate: trip.rawStartDate,
+                      endDate: trip.rawEndDate,
+                    },
+                  });
                 onIconPress={() => {
                   // Icon tap: admin → trip settings, member → trip information
                   if (trip.role === "admin") {
