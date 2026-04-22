@@ -137,3 +137,31 @@ export async function leaveTripForMember(input: {
 
     await removeTripMember(input.tripId, userId);
 }
+
+export async function removeMemberForAdmin(input: {
+    idToken: string;
+    tripId: string;
+    memberId: string;
+}): Promise<void> {
+    const decoded = await admin.auth().verifyIdToken(input.idToken);
+    const adminUserId = decoded.uid;
+
+    // Verify the requester is an admin of this trip
+    const adminMembership = await findMembership(input.tripId, adminUserId);
+    if (!adminMembership || adminMembership.role !== "admin") {
+        throw { status: 403, message: "Only the admin can remove members" };
+    }
+
+    // Prevent admin from removing themselves
+    if (input.memberId === adminUserId) {
+        throw { status: 403, message: "Admin cannot remove themselves. Delete the trip instead." };
+    }
+
+    // Verify the member to remove actually belongs to this trip
+    const memberMembership = await findMembership(input.tripId, input.memberId);
+    if (!memberMembership) {
+        throw { status: 404, message: "Member not found in this trip" };
+    }
+
+    await removeTripMember(input.tripId, input.memberId);
+}
