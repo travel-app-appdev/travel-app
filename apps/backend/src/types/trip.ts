@@ -1,3 +1,5 @@
+// 
+
 export type TripMember = {
     id: string;
     name: string;
