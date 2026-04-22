@@ -1,3 +1,4 @@
+// src/__tests__/trips.test.ts
 import request from 'supertest';
 import app from '../index';
 

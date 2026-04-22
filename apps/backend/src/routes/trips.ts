@@ -1,9 +1,13 @@
+// src/routes/trips.ts
 import { Router } from "express";
 import {
     getMyTrips,
     createTrip,
     createTripWithoutAuth,
-    joinTrip
+    joinTrip,
+    deleteTrip,
+    leaveTrip,
+    removeMember,
 } from "../controllers/tripsController";
 
 const router = Router();
@@ -12,5 +16,8 @@ router.get("/my", getMyTrips);
 router.post("/", createTrip);
 router.post("/test-create", createTripWithoutAuth);
 router.post("/join", joinTrip);
+router.delete("/:tripId", deleteTrip);
+router.post("/:tripId/leave", leaveTrip);
+router.delete("/:tripId/members/:memberId", removeMember);
 
 export default router;

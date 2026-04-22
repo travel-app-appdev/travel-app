@@ -1,5 +1,6 @@
 // app/trip-settings.tsx
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Alert,
   Pressable,
@@ -19,6 +20,8 @@ import { AppInput } from "@/src/components/common/AppInput";
 import { AppButton } from "@/src/components/common/AppButton";
 import { ActionCard, ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
+import { deleteTrip, removeMember } from "@/src/api/trips";
+import { auth } from "@/src/lib/firebase";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import Edit from "@/assets/icons/edit.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
@@ -34,39 +37,33 @@ import Timepoint from "@/assets/icons/timepoint.svg";
 import CheckMark from "@/assets/icons/check_mark.svg";
 import Trash from "@/assets/icons/trash.svg";
 
-const TRIP = {
-  name: "Japan Spring",
-  startDate: new Date("2026-01-01"),
-  endDate: new Date("2026-03-15"),
-  destination: "Tokyo, Japan",
-  members: ["Sophie", "Lukas", "Franz"],
-  phases: [
-    {
-      id: "planning",
-      label: "Planning",
-      color: colors.beachYellow,
-      active: true,
-      startDate: new Date("2026-01-01"),
-      endDate: new Date("2026-03-15"),
-    },
-    {
-      id: "voting",
-      label: "Voting",
-      color: colors.sunsetPink,
-      active: false,
-      startDate: new Date("2026-03-16"),
-      endDate: new Date("2026-03-18"),
-    },
-    {
-      id: "final",
-      label: "Final",
-      color: colors.neonGreen,
-      active: false,
-      startDate: new Date("2026-03-20"),
-      endDate: new Date("2026-03-20"),
-    },
-  ],
-};
+// Placeholder phases — to be wired up later
+const PLACEHOLDER_PHASES = [
+  {
+    id: "planning",
+    label: "Planning",
+    color: colors.beachYellow,
+    active: true,
+    startDate: new Date(),
+    endDate: new Date(),
+  },
+  {
+    id: "voting",
+    label: "Voting",
+    color: colors.sunsetPink,
+    active: false,
+    startDate: new Date(),
+    endDate: new Date(),
+  },
+  {
+    id: "final",
+    label: "Final",
+    color: colors.neonGreen,
+    active: false,
+    startDate: new Date(),
+    endDate: new Date(),
+  },
+];
 
 const PHASE_TEXT_COLORS: Record<string, string> = {
   planning: colors.nightBlack,
@@ -76,8 +73,14 @@ const PHASE_TEXT_COLORS: Record<string, string> = {
 
 type FieldKey = "name" | "date" | "destination" | "members";
 type PhaseKey = "planning" | "voting" | "final";
-
 type PhaseDates = Record<PhaseKey, { start: Date; end: Date }>;
+
+type MemberParam = {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+};
 
 function formatDateDisplay(date: Date) {
   const d = date.getDate().toString().padStart(2, "0");
@@ -96,39 +99,93 @@ function dayLabel(days: number) {
 }
 
 export default function TripSettingsScreen() {
+  const {
+    tripId,
+    title,
+    destination: destinationParam,
+    startDate,
+    endDate,
+    members: membersParam,
+  } = useLocalSearchParams<{
+    tripId: string;
+    title: string;
+    destination: string;
+    startDate: string;
+    endDate: string;
+    members: string;
+  }>();
+
+  const router = useRouter();
   const { height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenHeight < 700;
+
+  // Cleanup timeouts on unmount
+  const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const safeTimeout = (fn: () => void, delay: number) => {
+    const id = setTimeout(fn, delay);
+    timeoutRefs.current.push(id);
+    return id;
+  };
+  useEffect(() => {
+    return () => {
+      timeoutRefs.current.forEach(clearTimeout);
+    };
+  }, []);
+
+  // Parse members from JSON param
+  const parsedMembers: MemberParam[] = (() => {
+    try {
+      return membersParam ? JSON.parse(membersParam) : [];
+    } catch {
+      return [];
+    }
+  })();
 
   const [openField, setOpenField] = useState<FieldKey | null>(null);
   const [openPhase, setOpenPhase] = useState<PhaseKey | null>(null);
 
-  const [tripName, setTripName] = useState(TRIP.name);
-  const [tripNameInput, setTripNameInput] = useState(TRIP.name);
+  const [tripName, setTripName] = useState(title ?? "");
+  const [tripNameInput, setTripNameInput] = useState(title ?? "");
   const [tripNameUpdated, setTripNameUpdated] = useState(false);
 
-  const [tripStart, setTripStart] = useState(TRIP.startDate);
-  const [tripEnd, setTripEnd] = useState(TRIP.endDate);
+  const [tripStart, setTripStart] = useState(
+    startDate ? new Date(startDate) : new Date()
+  );
+  const [tripEnd, setTripEnd] = useState(
+    endDate ? new Date(endDate) : new Date()
+  );
   const [tripDateUpdated, setTripDateUpdated] = useState(false);
   const [showTripStartPicker, setShowTripStartPicker] = useState(false);
   const [showTripEndPicker, setShowTripEndPicker] = useState(false);
 
-  const [destination, setDestination] = useState(TRIP.destination);
-  const [destinationInput, setDestinationInput] = useState(TRIP.destination);
+  const [destination, setDestination] = useState(destinationParam ?? "");
+  const [destinationInput, setDestinationInput] = useState(destinationParam ?? "");
   const [destinationUpdated, setDestinationUpdated] = useState(false);
 
-  const [members, setMembers] = useState(TRIP.members);
+  const [members, setMembers] = useState<MemberParam[]>(parsedMembers);
   const [newMember, setNewMember] = useState("");
   const [membersUpdated, setMembersUpdated] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
   const [phaseDates, setPhaseDates] = useState<PhaseDates>({
-    planning: { start: TRIP.phases[0].startDate, end: TRIP.phases[0].endDate },
-    voting: { start: TRIP.phases[1].startDate, end: TRIP.phases[1].endDate },
-    final: { start: TRIP.phases[2].startDate, end: TRIP.phases[2].endDate },
+    planning: {
+      start: PLACEHOLDER_PHASES[0].startDate,
+      end: PLACEHOLDER_PHASES[0].endDate,
+    },
+    voting: {
+      start: PLACEHOLDER_PHASES[1].startDate,
+      end: PLACEHOLDER_PHASES[1].endDate,
+    },
+    final: {
+      start: PLACEHOLDER_PHASES[2].startDate,
+      end: PLACEHOLDER_PHASES[2].endDate,
+    },
   });
 
   const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
   const [showPhaseStartPicker, setShowPhaseStartPicker] = useState<PhaseKey | null>(null);
   const [showPhaseEndPicker, setShowPhaseEndPicker] = useState<PhaseKey | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const toggleField = (key: FieldKey) => {
     setOpenField((prev) => (prev === key ? null : key));
@@ -145,7 +202,7 @@ export default function TripSettingsScreen() {
   const handleUpdateName = () => {
     setTripName(tripNameInput);
     setTripNameUpdated(true);
-    setTimeout(() => {
+    safeTimeout(() => {
       setTripNameUpdated(false);
       setOpenField(null);
     }, 1500);
@@ -154,7 +211,7 @@ export default function TripSettingsScreen() {
   const handleUpdateDestination = () => {
     setDestination(destinationInput);
     setDestinationUpdated(true);
-    setTimeout(() => {
+    safeTimeout(() => {
       setDestinationUpdated(false);
       setOpenField(null);
     }, 1500);
@@ -162,7 +219,7 @@ export default function TripSettingsScreen() {
 
   const handleUpdateTripDate = () => {
     setTripDateUpdated(true);
-    setTimeout(() => {
+    safeTimeout(() => {
       setTripDateUpdated(false);
       setOpenField(null);
     }, 1500);
@@ -171,22 +228,48 @@ export default function TripSettingsScreen() {
   const handleAddMember = () => {
     const trimmed = newMember.trim();
     if (!trimmed) return;
-    setMembers((prev) => [...prev, trimmed]);
+    const newEntry: MemberParam = {
+      id: `local-${Date.now()}`,
+      name: trimmed,
+      initials: trimmed.slice(0, 2).toUpperCase(),
+      color: colors.sunsetOrange,
+    };
+    setMembers((prev) => [...prev, newEntry]);
     setNewMember("");
     setMembersUpdated(true);
-    setTimeout(() => {
+    safeTimeout(() => {
       setMembersUpdated(false);
     }, 1500);
   };
 
-  const handleRemoveMember = (name: string) => {
+  const handleRemoveMember = (id: string, name: string) => {
     Alert.alert("Remove member", `Are you sure you want to remove ${name}?`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Remove",
         style: "destructive",
-        onPress: () => {
-          setMembers((prev) => prev.filter((m) => m !== name));
+        onPress: async () => {
+          try {
+            setRemovingMemberId(id);
+
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+              Alert.alert("Not logged in", "Please log in again.");
+              return;
+            }
+
+            const idToken = await currentUser.getIdToken();
+            await removeMember({ idToken, tripId: tripId!, memberId: id });
+
+            // Only remove from local state after backend confirms
+            setMembers((prev) => prev.filter((m) => m.id !== id));
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "Failed to remove member";
+            Alert.alert("Remove failed", message);
+          } finally {
+            setRemovingMemberId(null);
+          }
         },
       },
     ]);
@@ -194,7 +277,7 @@ export default function TripSettingsScreen() {
 
   const handleUpdatePhaseDate = (phaseId: PhaseKey) => {
     setPhaseUpdated((prev) => ({ ...prev, [phaseId]: true }));
-    setTimeout(() => {
+    safeTimeout(() => {
       setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
       setOpenPhase(null);
     }, 1500);
@@ -209,8 +292,24 @@ export default function TripSettingsScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            // TODO: call delete trip API then navigate away
+          onPress: async () => {
+            try {
+              setIsDeleting(true);
+              const currentUser = auth.currentUser;
+              if (!currentUser) {
+                Alert.alert("Not logged in", "Please log in again.");
+                return;
+              }
+              const idToken = await currentUser.getIdToken();
+              await deleteTrip({ idToken, tripId: tripId! });
+              router.replace("/home");
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : "Failed to delete trip";
+              Alert.alert("Delete failed", message);
+            } finally {
+              setIsDeleting(false);
+            }
           },
         },
       ]
@@ -239,7 +338,6 @@ export default function TripSettingsScreen() {
           >
             <View style={styles.header}>
               <BackLink href="/home" />
-
               <View style={styles.headerTitle}>
                 <Edit width={22} height={22} />
                 <AppText variant="body" style={styles.headerLabel}>
@@ -476,7 +574,7 @@ export default function TripSettingsScreen() {
                     </AppText>
                   </View>
                   <AppText variant="caption" style={styles.infoValue}>
-                    {members.join(", ")}
+                    {members.map((m) => m.name).join(", ") || "—"}
                   </AppText>
                 </View>
                 {openField === "members" ? (
@@ -489,15 +587,21 @@ export default function TripSettingsScreen() {
               {openField === "members" && (
                 <View style={styles.expandedField}>
                   {members.map((member) => (
-                    <View key={member} style={styles.memberRow}>
+                    <View key={member.id} style={styles.memberRow}>
                       <AppText variant="body" style={styles.memberName}>
-                        {member}
+                        {member.name}
                       </AppText>
                       <Pressable
-                        onPress={() => handleRemoveMember(member)}
+                        onPress={() => handleRemoveMember(member.id, member.name)}
+                        disabled={removingMemberId === member.id}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         accessibilityRole="button"
-                        accessibilityLabel={`Remove ${member}`}
+                        accessibilityLabel={
+                          removingMemberId === member.id
+                            ? `Removing ${member.name}`
+                            : `Remove ${member.name}`
+                        }
+                        style={removingMemberId === member.id ? styles.removingIcon : undefined}
                       >
                         <RemovePerson width={22} height={22} />
                       </Pressable>
@@ -530,8 +634,8 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* Phases */}
-            {TRIP.phases.map((phase) => {
+            {/* Phases — placeholder until wired up */}
+            {PLACEHOLDER_PHASES.map((phase) => {
               const phaseId = phase.id as PhaseKey;
               const isOpen = openPhase === phaseId;
               const dates = phaseDates[phaseId];
@@ -659,11 +763,10 @@ export default function TripSettingsScreen() {
             })}
           </ScrollView>
 
-          {/* Delete trip */}
           <SafeAreaView edges={["bottom"]} style={styles.deleteSafeArea}>
             <View style={styles.deleteWrapper}>
               <ActionCard
-                label="Delete trip"
+                label={isDeleting ? "Deleting..." : "Delete trip"}
                 icon={<Trash width={20} height={20} />}
                 onPress={handleDeleteTrip}
                 accessibilityHint="Permanently deletes this trip"
@@ -796,6 +899,9 @@ const styles = StyleSheet.create({
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
     color: colors.textPrimary,
+  },
+  removingIcon: {
+    opacity: 0.3,
   },
   phaseRow: {
     flexDirection: "row",

@@ -41,6 +41,7 @@ type TripCardItem = {
     id: string;
     initials: string;
     color: string;
+    name: string;
   }[];
 };
 
@@ -99,18 +100,13 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     members: (trip.members ?? []).map(
       (member: TripMemberFromApi, index: number) => ({
         id: member.id,
+        name: member.name,
         initials: getInitials(member.name),
         color: getMemberColor(index),
       })
     ),
   };
 }
-
-// Itinerary route is the same for all states — the itinerary screen
-// itself handles rendering differently based on planning/voting/final
-// function getItineraryRoute(_status: "planning" | "voting" | "final") {
-//   return "/itinerary";
-// }
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -290,6 +286,7 @@ export default function HomeScreen() {
             {trips.map((trip: TripCardItem) => (
               <TripCard
                 key={trip.id}
+                tripId={trip.id}
                 title={trip.title}
                 destination={trip.destination}
                 startDate={trip.startDate}
@@ -312,11 +309,14 @@ export default function HomeScreen() {
                   });
                 }}
                 onIconPress={() => {
-                  // Icon tap: admin → trip settings, member → trip information
                   if (trip.role === "admin") {
-                    router.push("/trip-settings");
+                    router.push(
+                      `/trip-settings?tripId=${trip.id}&title=${encodeURIComponent(trip.title)}&destination=${encodeURIComponent(trip.destination)}&startDate=${encodeURIComponent(trip.rawStartDate)}&endDate=${encodeURIComponent(trip.rawEndDate)}&members=${encodeURIComponent(JSON.stringify(trip.members))}` as any
+                    );
                   } else {
-                    router.push("/trip-information");
+                    router.push(
+                      `/trip-information?tripId=${trip.id}&title=${encodeURIComponent(trip.title)}&destination=${encodeURIComponent(trip.destination)}&startDate=${encodeURIComponent(trip.rawStartDate)}&endDate=${encodeURIComponent(trip.rawEndDate)}&members=${encodeURIComponent(JSON.stringify(trip.members))}` as any
+                    );
                   }
                 }}
               />
