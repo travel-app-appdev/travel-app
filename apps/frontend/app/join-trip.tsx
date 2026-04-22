@@ -1,5 +1,4 @@
 // app/join-trip.tsx
-import { Link } from "expo-router";
 import { useState } from "react";
 import {
   ScrollView,
@@ -13,8 +12,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppButton } from "@/src/components/common/AppButton";
-import { colors, spacing, radius, typography } from "@/src/theme";
-import Back from "@/assets/icons/back.svg";
+import { BackLink } from "@/src/components/common/BackLink";
+import { colors, spacing, typography } from "@/src/theme";
 import LinkIcon from "@/assets/icons/link.svg";
 import KeyFrame from "@/assets/icons/key_frame.svg";
 import LeafUp from "@/assets/visuals/leaf_up.svg";
@@ -57,14 +56,7 @@ export default function JoinTripScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.header}>
-              <Link
-                href="/home"
-                style={styles.backLink}
-                accessibilityRole="link"
-                accessibilityLabel="Go back to home"
-              >
-                <Back width={20} height={20} />
-              </Link>
+              <BackLink href="/home" />
 
               <View style={styles.headerTitle}>
                 <LinkIcon width={20} height={20} />
@@ -157,14 +149,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
     zIndex: 1,
-  },
-  backLink: {
-    position: "absolute",
-    left: 0,
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: "center",
-    padding: spacing.xs,
   },
   headerTitle: {
     flexDirection: "row",

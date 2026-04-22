@@ -1,5 +1,5 @@
 // app/profile.tsx
-import { Link } from "expo-router";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Pressable,
@@ -8,13 +8,16 @@ import {
   View,
   KeyboardAvoidingView,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "@/src/context/AuthContext";
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppButton } from "@/src/components/common/AppButton";
+import { ActionCard, ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
+import { BackLink } from "@/src/components/common/BackLink";
 import { colors, spacing, radius, typography } from "@/src/theme";
-import Back from "@/assets/icons/back.svg";
 import Profile from "@/assets/icons/profile.svg";
 import IdCard from "@/assets/icons/id_card.svg";
 import Email from "@/assets/icons/email.svg";
@@ -24,8 +27,15 @@ import ArrowDown from "@/assets/icons/arrow_down.svg";
 import CheckMark from "@/assets/icons/check_mark.svg";
 import VisibilityOn from "@/assets/icons/visibility_on.svg";
 import VisibilityOff from "@/assets/icons/visibility_off.svg";
+import Exit from "@/assets/icons/exit.svg";
 
 export default function ProfileScreen() {
+  const { setUser } = useAuth();
+  const router = useRouter();
+  const { height: screenHeight } = useWindowDimensions();
+
+  const isSmallScreen = screenHeight < 700;
+
   const [name, setName] = useState("Susi Trudl");
   const [nameInput, setNameInput] = useState("Susi Trudl");
   const [nameOpen, setNameOpen] = useState(false);
@@ -69,28 +79,34 @@ export default function ProfileScreen() {
     }, 1500);
   };
 
+  const handleLogout = () => {
+    setUser(null);
+    router.replace("/");
+  };
+
   return (
     <View style={styles.fullScreen}>
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <KeyboardAvoidingView
-          style={styles.scroll}
+          style={styles.flex}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.container}
+            style={styles.flex}
+            contentContainerStyle={[
+              styles.container,
+              {
+                paddingBottom:
+                  ACTION_CARD_HEIGHT +
+                  (isSmallScreen ? spacing.lg : spacing.xxxl),
+              },
+            ]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* Header */}
             <View style={styles.header}>
-              <Link
-                href="/settings"
-                style={styles.backLink}
-                accessibilityRole="link"
-                accessibilityLabel="Go back to settings"
-              >
-                <Back width={20} height={20} />
-              </Link>
+              <BackLink href="/home" />
 
               <View style={styles.headerTitle}>
                 <Profile width={20} height={20} />
@@ -100,6 +116,7 @@ export default function ProfileScreen() {
               </View>
             </View>
 
+            {/* Name */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -142,11 +159,13 @@ export default function ProfileScreen() {
                     autoFocus
                     accessibilityLabel="Name"
                     accessibilityHint="Edit your name"
+                    style={styles.inputBlackStroke}
                   />
 
                   <AppButton
                     title="Update"
                     onPress={handleUpdateName}
+                    disabled={!nameInput.trim()}
                     style={styles.updateButton}
                     textStyle={styles.updateButtonText}
                     accessibilityLabel="Update name"
@@ -168,6 +187,7 @@ export default function ProfileScreen() {
               )}
             </View>
 
+            {/* Email */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -212,11 +232,13 @@ export default function ProfileScreen() {
                     autoFocus
                     accessibilityLabel="Email"
                     accessibilityHint="Edit your email"
+                    style={styles.inputBlackStroke}
                   />
 
                   <AppButton
                     title="Update"
                     onPress={handleUpdateEmail}
+                    disabled={!emailInput.trim() || !emailInput.includes("@")}
                     style={styles.updateButton}
                     textStyle={styles.updateButtonText}
                     accessibilityLabel="Update email"
@@ -238,6 +260,7 @@ export default function ProfileScreen() {
               )}
             </View>
 
+            {/* Password */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -326,6 +349,18 @@ export default function ProfileScreen() {
               )}
             </View>
           </ScrollView>
+
+          {/* Logout — pinned to bottom, always visible above safe area */}
+          <SafeAreaView edges={["bottom"]} style={styles.logoutSafeArea}>
+            <View style={styles.logoutWrapper}>
+              <ActionCard
+                label="Logout"
+                icon={<Exit width={20} height={20} />}
+                onPress={handleLogout}
+                accessibilityHint="Signs you out of the app"
+              />
+            </View>
+          </SafeAreaView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -340,13 +375,12 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  scroll: {
+  flex: {
     flex: 1,
   },
   container: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.xxxl,
     gap: spacing.xl,
   },
   header: {
@@ -354,14 +388,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-  },
-  backLink: {
-    position: "absolute",
-    left: 0,
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: "center",
-    padding: spacing.xs,
   },
   headerTitle: {
     flexDirection: "row",
@@ -399,7 +425,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   infoValue: {
-    color: colors.textMuted,
+    color: colors.nightBlack,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
     paddingLeft: 28,
@@ -407,11 +433,15 @@ const styles = StyleSheet.create({
   expandedField: {
     gap: spacing.md,
   },
+  inputBlackStroke: {
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+  },
   passwordInputWrapper: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.white,
-    borderRadius: 10,
+    borderRadius: radius.sm,
     borderWidth: 2,
     borderColor: colors.nightBlack,
   },
@@ -444,5 +474,13 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
+  },
+  logoutSafeArea: {
+    backgroundColor: colors.lightWhite,
+  },
+  logoutWrapper: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
   },
 });

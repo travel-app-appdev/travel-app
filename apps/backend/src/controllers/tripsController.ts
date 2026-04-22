@@ -5,6 +5,9 @@ import {
     getTripsForUser,
 } from "../services/tripsService";
 
+import { joinTripWithInviteCode } from "../services/tripsService";
+
+
 export const getMyTrips = async (req: Request, res: Response): Promise<void> => {
     const userId = req.query.userId as string;
 
@@ -87,5 +90,27 @@ export const createTripWithoutAuth = async (
     } catch (error) {
         console.error("Error creating trip without auth:", error);
         res.status(500).json({ error: "Failed to create trip" });
+    }
+};
+
+export const joinTrip = async (req: Request, res: Response): Promise<void> => {
+    const { idToken, inviteCode } = req.body;
+
+    if (!idToken || !inviteCode) {
+        res.status(400).json({ error: "idToken and inviteCode are required" });
+        return;
+    }
+
+    try {
+        const trip = await joinTripWithInviteCode({ idToken, inviteCode });
+        res.status(200).json(trip);
+    } catch (error: any) {
+        if (error.status === 404) {
+            res.status(404).json({ error: error.message });
+        } else if (error.status === 409) {
+            res.status(409).json({ error: error.message });
+        } else {
+            res.status(401).json({ error: "Invalid token or failed to join trip" });
+        }
     }
 };
