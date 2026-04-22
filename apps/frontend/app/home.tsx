@@ -12,7 +12,6 @@ import { fetchMyTrips, type Trip } from "@/src/api/trips";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
-import { MOCK_TRIPS } from "@/src/data/mockTrips";
 
 type Tab = "your" | "past";
 

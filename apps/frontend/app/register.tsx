@@ -71,9 +71,9 @@ export default function RegisterScreen() {
       setIsSubmitting(true);
 
       const authResponse = await registerUser(
-          name.trim(),
-          email.trim(),
-          password
+        name.trim(),
+        email.trim(),
+        password
       );
 
       setUser(authResponse);

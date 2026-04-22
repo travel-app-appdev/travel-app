@@ -310,7 +310,10 @@ export function TripCard({
               key={member.id}
               style={[
                 styles.avatar,
-                { backgroundColor: member.color, marginLeft: index === 0 ? 0 : -10 },
+                {
+                  backgroundColor: member.color,
+                  marginLeft: index === 0 ? 0 : -10,
+                },
               ]}
             >
               <AppText variant="caption" style={styles.avatarText}>
@@ -324,7 +327,9 @@ export function TripCard({
           onPress={onIconPress}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
-          accessibilityLabel={role === "admin" ? "Edit trip" : "Trip information"}
+          accessibilityLabel={
+            role === "admin" ? "Edit trip" : "Trip information"
+          }
           accessibilityHint={
             role === "admin"
               ? "Opens trip settings"

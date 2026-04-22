@@ -18,7 +18,7 @@ type ApiErrorResponse = {
 };
 
 export async function registerUser(
-    payload: RegisterPayload
+  payload: RegisterPayload
 ): Promise<AuthResponse> {
   const response = await fetch(`${API_URL}/auth/register`, {
     method: "POST",
@@ -37,9 +37,7 @@ export async function registerUser(
   return data as AuthResponse;
 }
 
-export async function loginWithToken(
-    idToken: string
-): Promise<AuthResponse> {
+export async function loginWithToken(idToken: string): Promise<AuthResponse> {
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: {
@@ -64,7 +62,7 @@ type UpdateProfilePayload = {
 };
 
 export async function updateProfile(
-    payload: UpdateProfilePayload
+  payload: UpdateProfilePayload
 ): Promise<AuthResponse> {
   const response = await fetch(`${API_URL}/auth/profile`, {
     method: "PATCH",
@@ -77,7 +75,9 @@ export async function updateProfile(
   const data: AuthResponse | ApiErrorResponse = await response.json();
 
   if (!response.ok) {
-    throw new Error((data as ApiErrorResponse).error || "Failed to update profile");
+    throw new Error(
+      (data as ApiErrorResponse).error || "Failed to update profile"
+    );
   }
 
   return data as AuthResponse;

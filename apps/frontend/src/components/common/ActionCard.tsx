@@ -13,7 +13,6 @@ type ActionCardProps = {
   accessibilityHint?: string;
 };
 
-
 export const ACTION_CARD_HEIGHT = 97;
 
 export function ActionCard({
