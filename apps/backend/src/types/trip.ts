@@ -59,3 +59,18 @@ export type JoinTripInput = {
     idToken: string;
     inviteCode: string;
 };
+
+export type TimeSlot = {
+    slot_type: string;
+    activityId: null;
+};
+
+export type ItineraryDay = {
+    date: string;
+    slots: TimeSlot[];
+};
+
+export type Itinerary = {
+    trip_id: string;
+    days: ItineraryDay[];
+};
