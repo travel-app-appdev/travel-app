@@ -6,7 +6,7 @@ on:
 jobs:
   test-frontend:
     name: Frontend Tests
-    runs-on: ubuntu-latestn
+    runs-on: ubuntu-latest
     defaults:
         run:
           working-directory: ./apps/frontend
@@ -28,7 +28,7 @@ jobs:
           
   test-backend:
     name: Backend Tests
-    runs-on: ubuntu-latestn
+    runs-on: ubuntu-latest
     defaults:
         run:
           working-directory: ./apps/backend
