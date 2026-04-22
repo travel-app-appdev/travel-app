@@ -12,6 +12,7 @@ import { fetchMyTrips, type Trip } from "@/src/api/trips";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
+import { MOCK_TRIPS } from "@/src/data/mockTrips";
 
 type Tab = "your" | "past";
 
@@ -295,7 +296,17 @@ export default function HomeScreen() {
                 members={trip.members}
                 role={trip.role}
                 onPress={() => {
-                  router.push("/itinerary" as any);
+                  router.push({
+                    pathname: "/itinerary",
+                    params: {
+                      tripId: trip.id,
+                      state: trip.status,
+                      title: trip.title,
+                      destination: trip.destination,
+                      startDate: trip.rawStartDate,
+                      endDate: trip.rawEndDate,
+                    },
+                  });
                 }}
                 onIconPress={() => {
                   if (trip.role === "admin") {

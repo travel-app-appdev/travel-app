@@ -84,7 +84,7 @@ export default function StartPage() {
             <View
               style={[
                 styles.starsWrapper,
-                { top: -26 * scale, right: 20 * scale },
+                { top: -26 * scale, right: -20 * scale },
               ]}
             >
               <Stars width={50 * scale} height={50 * scale} />
@@ -113,7 +113,7 @@ export default function StartPage() {
                 },
               ]}
             >
-              Traveler
+              Voties
             </AppText>
           </View>
         </View>
