@@ -7,6 +7,7 @@ import {
     joinTripWithInviteCode,
     deleteTripForAdmin,
     leaveTripForMember,
+    removeMemberForAdmin,
 } from "../services/tripsService";
 
 export const getMyTrips = async (req: Request, res: Response): Promise<void> => {
@@ -156,6 +157,30 @@ export const leaveTrip = async (req: Request, res: Response): Promise<void> => {
             res.status(404).json({ error: error.message });
         } else {
             res.status(401).json({ error: "Invalid token or failed to leave trip" });
+        }
+    }
+};
+
+export const removeMember = async (req: Request, res: Response): Promise<void> => {
+    const { idToken } = req.body;
+    const tripId = req.params.tripId as string;
+    const memberId = req.params.memberId as string;
+
+    if (!idToken || !tripId || !memberId) {
+        res.status(400).json({ error: "idToken, tripId and memberId are required" });
+        return;
+    }
+
+    try {
+        await removeMemberForAdmin({ idToken, tripId, memberId });
+        res.status(200).json({ message: "Member removed successfully" });
+    } catch (error: any) {
+        if (error.status === 403) {
+            res.status(403).json({ error: error.message });
+        } else if (error.status === 404) {
+            res.status(404).json({ error: error.message });
+        } else {
+            res.status(401).json({ error: "Invalid token or failed to remove member" });
         }
     }
 };
