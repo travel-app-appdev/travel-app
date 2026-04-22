@@ -1,41 +1,23 @@
-// components/common/AppInput.tsx
-import { forwardRef } from "react";
-import {
-  TextInput,
-  TextInputProps,
-  StyleSheet,
-  StyleProp,
-  ViewStyle,
-} from "react-native";
-import { colors, radius, spacing, typography } from "@/src/theme";
+import { TextInput, TextInputProps, StyleSheet } from 'react-native';
+import { colors, radius, spacing, typography } from '@/src/theme';
 
-type AppInputProps = TextInputProps & {
-  hasError?: boolean;
-  style?: StyleProp<ViewStyle>;
-};
+type AppInputProps = TextInputProps;
 
-export const AppInput = forwardRef<TextInput, AppInputProps>(
-  ({ style, hasError = false, ...props }, ref) => {
-    return (
-      <TextInput
-        ref={ref}
-        placeholderTextColor={colors.textMuted}
-        style={[styles.input, hasError && styles.inputError, style]}
-        accessibilityState={{ disabled: props.editable === false }}
-        {...props}
-      />
-    );
-  }
-);
-
-AppInput.displayName = "AppInput";
+export function AppInput(props: AppInputProps) {
+  return (
+    <TextInput
+      placeholderTextColor={colors.textMuted}
+      style={styles.input}
+      {...props}
+    />
+  );
+}
 
 const styles = StyleSheet.create({
   input: {
-    width: "100%",
-    minHeight: 48,
+    width: '100%',
     backgroundColor: colors.white,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     fontSize: typography.size.md,
@@ -43,8 +25,5 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  inputError: {
-    borderColor: colors.error,
   },
 });

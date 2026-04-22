@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-dist/
 
 # Environment variables
 .env
@@ -31,6 +30,3 @@ build/Release
 
 # Firebase
 **/serviceAccount.json
-
-# IDE
-.idea/

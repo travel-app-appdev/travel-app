@@ -1,4 +1,3 @@
-// theme/spacing.ts
 export const spacing = {
   xs: 4,
   sm: 8,
@@ -7,5 +6,4 @@ export const spacing = {
   xl: 24,
   xxl: 32,
   xxxl: 40,
-  xxxxl2: 48,
 };

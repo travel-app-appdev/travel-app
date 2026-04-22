@@ -1,4 +1,3 @@
-// theme/colors.ts
 export const colors = {
   neonGreen: "#98FB82",
   seaBlue: "#6966FF",
@@ -6,7 +5,6 @@ export const colors = {
   beachYellow: "#F7CE46",
   sunsetOrange: "#F77646",
   plantGreen: "#54B864",
-  continueOrange: "#F77646",
 
   lightWhite: "#FFFEF5",
   nightBlack: "#140D0A",
