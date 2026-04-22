@@ -1,34 +1,68 @@
-import { Pressable, StyleSheet, ViewStyle } from 'react-native';
-import { colors, radius, spacing } from '@/src/theme';
-import { AppText } from './AppText';
+// components/common/AppButton.tsx
+import { ReactNode } from "react";
+import {
+  Pressable,
+  StyleSheet,
+  ViewStyle,
+  View,
+  TextStyle,
+  StyleProp,
+} from "react-native";
+import { colors, radius, spacing, typography } from "@/src/theme";
+import { AppText } from "./AppText";
 
 type AppButtonProps = {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary';
-  style?: ViewStyle;
+  variant?: "primary" | "secondary";
+  style?: StyleProp<ViewStyle>;
+  icon?: ReactNode;
+  textStyle?: StyleProp<TextStyle>;
+  disabled?: boolean;
+  loading?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 };
 
 export function AppButton({
   title,
   onPress,
-  variant = 'primary',
+  variant = "primary",
   style,
+  icon,
+  textStyle,
+  disabled = false,
+  loading = false,
+  accessibilityLabel,
+  accessibilityHint,
 }: AppButtonProps) {
+  const isDisabled = disabled || loading;
+
   return (
     <Pressable
-      style={[
+      style={({ pressed }) => [
         styles.button,
-        variant === 'secondary' && styles.secondaryButton,
+        variant === "secondary" && styles.secondaryButton,
+        isDisabled && styles.disabledButton,
+        pressed && !isDisabled && styles.pressedButton,
         style,
       ]}
       onPress={onPress}
+      disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
     >
+      {icon ? <View style={styles.iconWrapper}>{icon}</View> : null}
+
       <AppText
         variant="body"
         style={[
           styles.text,
-          variant === 'secondary' && styles.secondaryText,
+          variant === "secondary" && styles.secondaryText,
+          isDisabled && styles.disabledText,
+          textStyle,
         ]}
       >
         {title}
@@ -39,21 +73,41 @@ export function AppButton({
 
 const styles = StyleSheet.create({
   button: {
-    width: '100%',
-    backgroundColor: colors.seaBlue,
-    paddingVertical: spacing.md,
+    width: "100%",
+    minHeight: 48,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
-    alignItems: 'center',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    backgroundColor: colors.seaBlue,
   },
   secondaryButton: {
     backgroundColor: colors.lightWhite,
     borderWidth: 2,
     borderColor: colors.seaBlue,
   },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  pressedButton: {
+    opacity: 0.85,
+  },
   text: {
-    color: colors.white,
+    color: colors.textSecondary,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
   },
   secondaryText: {
     color: colors.seaBlue,
+  },
+  disabledText: {
+    opacity: 0.95,
+  },
+  iconWrapper: {
+    marginRight: spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
