@@ -7,7 +7,6 @@ export const colors = {
   sunsetOrange: "#F77646",
   plantGreen: "#54B864",
   continueOrange: "#F77646",
-  votingPurple: "#C84BF5",
 
   lightWhite: "#FFFEF5",
   nightBlack: "#140D0A",

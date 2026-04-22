@@ -10,6 +10,7 @@ import Back from "@/assets/icons/back.svg";
 import MascotWink from "@/assets/mascots/mascot-wink.svg";
 import CalendarIcon from "@/assets/icons/calendar.svg";
 import HourglassIcon from "@/assets/icons/hourglass.svg";
+import LocationPin from "@/assets/icons/location-pin.svg";
 
 type Props = {
   title: string;
@@ -26,7 +27,7 @@ type Props = {
 function getHeroColor(state: ItineraryState): string {
   switch (state) {
     case "voting":
-      return colors.votingPurple;
+      return colors.sunsetPink;
     case "final":
       return colors.plantGreen;
     case "planning":
@@ -81,6 +82,7 @@ export function ItineraryHeader({
             </AppText>
 
             <AppText variant="subtitle" style={styles.destination}>
+              <LocationPin width={18} height={18} />
               {destination}
             </AppText>
           </View>
@@ -109,17 +111,18 @@ const styles = StyleSheet.create({
   },
   hero: {
     // backgroundColor set dynamically via style prop
-    borderTopLeftRadius: radius.xxl,
-    borderTopRightRadius: radius.xxl,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    borderTopLeftRadius: 50,
+    borderTopRightRadius: 50,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.xl,
   },
   topRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
   },
   timerBox: {
     flexDirection: "row",

@@ -14,6 +14,7 @@ import type {
   ItineraryState,
   Activity,
 } from "@/src/types/itinerary";
+import { AppText } from "@/src/components/common/AppText";
 import { ItineraryHeader } from "@/src/components/itinerary/ItineraryHeader";
 import { ItineraryDaySelector } from "@/src/components/itinerary/ItineraryDaySelector";
 import { PlanningSlotCard } from "@/src/components/itinerary/PlanningSlotCard";
@@ -191,6 +192,11 @@ export default function ItineraryScreen() {
     })
   );
 
+  const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
+  const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
   useEffect(() => {
     setItinerary((current) => ({
       ...buildItineraryFromParams({
@@ -204,6 +210,26 @@ export default function ItineraryScreen() {
       activities: current.activities,
     }));
   }, [tripId, title, destination, startDate, endDate, routeState]);
+
+  useEffect(() => {
+    return () => {
+      if (planningInfoTimeoutRef.current) {
+        clearTimeout(planningInfoTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function handlePlanningInfoPress() {
+    setShowPlanningInfoPopup(true);
+
+    if (planningInfoTimeoutRef.current) {
+      clearTimeout(planningInfoTimeoutRef.current);
+    }
+
+    planningInfoTimeoutRef.current = setTimeout(() => {
+      setShowPlanningInfoPopup(false);
+    }, 110000);
+  }
 
   const lastAppliedActivityIdRef = useRef<string | null>(null);
 
@@ -283,11 +309,6 @@ export default function ItineraryScreen() {
     return mapActivitiesToSlots(slots, itinerary.activities, selectedDayId);
   }, [slots, itinerary.activities, selectedDayId]);
 
-  const completedCount = itinerary.planningStatus.filter(
-    (m) => m.hasFinishedPlanning
-  ).length;
-  const totalCount = itinerary.planningStatus.length;
-
   const currentUserStatus = itinerary.planningStatus.find(
     (m) => m.userId === MOCK_CURRENT_USER_ID
   );
@@ -295,6 +316,11 @@ export default function ItineraryScreen() {
     currentUserStatus?.hasFinishedPlanning ?? false;
 
   function handleAddActivity(slotId: string) {
+    if (hasCurrentUserFinished) {
+      handlePlanningInfoPress();
+      return;
+    }
+
     router.push({
       pathname: "/add-activity",
       params: {
@@ -404,8 +430,18 @@ export default function ItineraryScreen() {
   // Render
   // -------------------------------------------------------------------------
 
+  const safeAreaBg =
+    activeState === "voting"
+      ? colors.sunsetPink
+      : activeState === "final"
+        ? colors.plantGreen
+        : colors.beachYellow;
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: safeAreaBg }]}
+      edges={["top", "left", "right"]}
+    >
       <StatusBar style="dark" />
 
       <View style={styles.screen}>
@@ -489,10 +525,21 @@ export default function ItineraryScreen() {
           </View>
         </ScrollView>
 
+        {showPlanningInfoPopup && (
+          <View style={styles.popupWrapper} pointerEvents="none">
+            <View style={styles.popup}>
+              <AppText variant="caption" style={styles.popupText}>
+                You can no longer add activities after submitting.
+              </AppText>
+            </View>
+          </View>
+        )}
+
         {activeState === "planning" && (
           <PlanningDoneBar
             checked={hasCurrentUserFinished}
             onPress={handleFinishPlanning}
+            onInfoPress={handlePlanningInfoPress}
           />
         )}
       </View>
@@ -503,7 +550,7 @@ export default function ItineraryScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.beachYellow,
   },
   screen: {
     flex: 1,
@@ -513,7 +560,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingTop: spacing.md,
+    paddingTop: 0,
     paddingBottom: 140,
   },
   contentPanel: {
@@ -525,6 +572,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     gap: spacing.md,
+  },
+  popupWrapper: {
+    position: "absolute",
+    bottom: 100,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+  },
+  popup: {
+    backgroundColor: colors.nightBlack,
+    borderRadius: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    maxWidth: 320,
+  },
+  popupText: {
+    color: colors.white,
+    textAlign: "center",
   },
   votingSection: {
     paddingTop: spacing.md,

@@ -1,53 +1,43 @@
-import { Pressable, StyleSheet, View, Alert } from "react-native";
+// src/components/itinerary/PlanningDoneBar.tsx
+import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
+
+import CheckIcon from "@/assets/icons/check_mark.svg";
+import InfoIcon from "@/assets/icons/info.svg";
 
 type Props = {
   checked: boolean;
   onPress: () => void;
+  onInfoPress: () => void;
 };
 
-export function PlanningDoneBar({ checked, onPress }: Props) {
+export function PlanningDoneBar({ checked, onPress, onInfoPress }: Props) {
   return (
-    <View style={styles.wrapper} pointerEvents="box-none">
+    <View style={styles.wrapper}>
       <View style={styles.bar}>
         <Pressable
+          style={[styles.doneButton, checked && styles.doneButtonChecked]}
           onPress={onPress}
-          style={({ pressed }) => [
-            styles.button,
-            checked && styles.buttonChecked,
-            pressed && styles.buttonPressed,
-          ]}
+          disabled={checked}
           accessibilityRole="button"
           accessibilityLabel={
-            checked ? "Planning completed" : "Mark planning as done"
+            checked ? "Planning already submitted" : "Submit planning"
           }
-          accessibilityState={{ checked, disabled: checked }}
-          disabled={checked}
         >
-          <View style={[styles.checkbox, checked && styles.checkboxChecked]} />
-          <AppText variant="body" style={styles.buttonText}>
-            Planning done
+          <CheckIcon width={18} height={18} />
+          <AppText variant="body" style={styles.doneText}>
+            {checked ? "Planning submitted" : "Done planning"}
           </AppText>
         </Pressable>
 
         <Pressable
-          onPress={() =>
-            Alert.alert(
-              "Planning info",
-              "You can no longer add activities after submitting."
-            )
-          }
-          style={({ pressed }) => [
-            styles.infoCircle,
-            pressed && styles.infoCirclePressed,
-          ]}
+          style={styles.infoButton}
+          onPress={onInfoPress}
           accessibilityRole="button"
           accessibilityLabel="Show planning submission info"
         >
-          <AppText variant="caption" style={styles.infoText}>
-            i
-          </AppText>
+          <InfoIcon width={20} height={20} />
         </Pressable>
       </View>
     </View>
@@ -57,73 +47,44 @@ export function PlanningDoneBar({ checked, onPress }: Props) {
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    left: spacing.md,
-    right: spacing.md,
-    bottom: spacing.lg,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.lg,
   },
   bar: {
-    backgroundColor: colors.lightWhite,
+    backgroundColor: colors.white,
     borderRadius: radius.xxl,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    padding: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     gap: spacing.sm,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
   },
-  button: {
-    minHeight: 48,
-    borderRadius: radius.pill,
+  doneButton: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: radius.xl,
     backgroundColor: colors.beachYellow,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm,
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
   },
-  buttonChecked: {
+  doneButtonChecked: {
     opacity: 0.7,
   },
-  buttonPressed: {
-    opacity: 0.85,
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.nightBlack,
-    backgroundColor: "transparent",
-  },
-  checkboxChecked: {
-    backgroundColor: colors.nightBlack,
-  },
-  buttonText: {
+  doneText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.md,
-    lineHeight: typography.lineHeight.md,
   },
-  infoCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.nightBlack,
+  infoButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-  },
-  infoCirclePressed: {
-    opacity: 0.85,
-  },
-  infoText: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
+    backgroundColor: colors.lightWhite,
   },
 });

@@ -5,6 +5,7 @@ import type { Activity, TimeSlot } from "@/src/types/itinerary";
 import LocationHeart from "@/assets/icons/location-heart.svg";
 import LocationPin from "@/assets/icons/location-pin.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
+import AddIcon from "@/assets/icons/add.svg";
 
 type Props = {
   slot: TimeSlot;
@@ -14,6 +15,7 @@ type Props = {
 
 export function PlanningSlotCard({ slot, activity, onAddActivity }: Props) {
   const hasActivity = Boolean(activity);
+  const mutedColor = colors.textMuted;
 
   return (
     <View style={styles.row}>
@@ -48,7 +50,12 @@ export function PlanningSlotCard({ slot, activity, onAddActivity }: Props) {
           </View>
         ) : (
           <View style={styles.emptyContent}>
-            <LocationHeart width={20} height={20} style={styles.emptyIcon} />
+            <LocationHeart
+              width={20}
+              height={20}
+              fill={mutedColor}
+              stroke={mutedColor}
+            />
             <AppText variant="subtitle" style={styles.emptyTitle}>
               Empty Activity
             </AppText>
@@ -64,9 +71,7 @@ export function PlanningSlotCard({ slot, activity, onAddActivity }: Props) {
           accessibilityLabel={`Add activity for ${slot.label}`}
           accessibilityHint="Opens activity creation for this time slot"
         >
-          <AppText variant="body" style={styles.ctaPlus}>
-            +
-          </AppText>
+          <AddIcon width={28} height={28} />
           <AppText variant="body" style={styles.ctaText}>
             Add activity
           </AppText>
@@ -100,14 +105,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    gap: spacing.xs,
   },
   emptyTitle: {
     color: colors.textMuted,
     fontSize: typography.size.xl,
     lineHeight: typography.lineHeight.xl,
-  },
-  emptyIcon: {
-    marginBottom: spacing.xs,
   },
   filledContent: {
     flex: 1,
@@ -151,12 +154,6 @@ const styles = StyleSheet.create({
   },
   ctaPressed: {
     opacity: 0.85,
-  },
-  ctaPlus: {
-    color: colors.textPrimary,
-    fontSize: 28,
-    lineHeight: 28,
-    fontFamily: typography.fontFamily.bodyBold,
   },
   ctaText: {
     color: colors.textPrimary,
