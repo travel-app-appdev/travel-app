@@ -117,3 +117,25 @@ export async function leaveTrip(payload: LeaveTripPayload): Promise<void> {
         throw new Error(data.error || "Failed to leave trip");
     }
 }
+
+type RemoveMemberPayload = {
+    idToken: string;
+    tripId: string;
+    memberId: string;
+};
+
+export async function removeMember(payload: RemoveMemberPayload): Promise<void> {
+    const response = await fetch(
+        `${API_URL}/trips/${payload.tripId}/members/${payload.memberId}`,
+        {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken: payload.idToken }),
+        }
+    );
+
+    if (!response.ok) {
+        const data: ApiErrorResponse = await response.json();
+        throw new Error(data.error || "Failed to remove member");
+    }
+}
