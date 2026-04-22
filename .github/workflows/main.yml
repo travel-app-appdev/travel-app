@@ -6,12 +6,12 @@ on:
 jobs:
   test-frontend:
     name: Frontend Tests
-      runs-on: ubuntu-latestn
-      defaults:
+    runs-on: ubuntu-latestn
+    defaults:
         run:
           working-directory: ./apps/frontend
 
-        steps:
+    steps:
           - name: Checkout repository
             uses: actions/checkout@v4
 
@@ -21,19 +21,19 @@ jobs:
               node-version: 'v24.14.0'
 
           - name: Clean Install
-          run: npm ci
+            run: npm ci
           
           - name: Run tests
-          run: npm test
+            run: npm test
           
-test-backend:
+  test-backend:
     name: Backend Tests
-      runs-on: ubuntu-latestn
-      defaults:
+    runs-on: ubuntu-latestn
+    defaults:
         run:
           working-directory: ./apps/backend
 
-        steps:
+    steps:
           - name: Checkout repository
             uses: actions/checkout@v4
 
@@ -43,9 +43,9 @@ test-backend:
               node-version: 'v24.14.0'
 
           - name: Clean Install
-          run: npm ci
+            run: npm ci
           
           - name: Run tests
-          run: npm test
+            run: npm test
 
         
