@@ -196,3 +196,77 @@ src/
 - `invite_code` is returned in the response when creating a trip — frontend should save it
 - Frontend uses the invite code to call POST /trips/join on behalf of the new member
 - All tests pass: 15/15
+
+## 22.04.2026 — Itinerary Timeslot Generation
+
+### What I did today:
+- Implemented automatic itinerary generation for trips
+- Each day between trip start and end date gets 8 timeslots (06:00–22:00)
+- Timeslots are saved to Firestore and can be retrieved via GET endpoint
+- Written unit tests for timeslot generation logic
+- Fixed a bug where old Node process was blocking the new server
+
+### What I added:
+
+**New files:**
+- `src/__helpers__/itineraryHelper.ts` — pure functions for generating timeslots
+  - `generateDaySlots()` — returns 8 slots for one day
+  - `generateItinerary()` — generates slots for all days between start and end date
+- `src/repositories/itineraryRepository.ts` — Firestore operations for itinerary
+  - `saveItinerary()` — saves all days and slots to Firestore
+  - `getItineraryByTripId()` — retrieves itinerary from Firestore
+- `src/services/itineraryService.ts` — business logic
+  - `generateAndSaveItinerary()` — finds trip, validates dates, generates and saves itinerary
+  - `getItinerary()` — retrieves itinerary or throws 404
+- `src/controllers/itineraryController.ts` — handles HTTP requests
+  - `generateItineraryController` — handles POST /itinerary/:tripId/generate
+  - `getItineraryController` — handles GET /trips/:id/itinerary
+- `src/routes/itinerary.ts` — registers itinerary routes
+- `src/__tests__/itinerary.test.ts` — unit tests for helper functions
+
+**Updated files:**
+- `src/types/trip.ts` — added TimeSlot, ItineraryDay, Itinerary types
+- `src/routes/trips.ts` — added GET /:id/itinerary route
+- `src/index.ts` — registered itinerary router under /itinerary
+
+### How itinerary generation works:
+1. Frontend sends POST /itinerary/:tripId/generate
+2. Backend finds the trip in Firestore to get start and end dates
+3. Backend generates 8 timeslots for each day between start and end
+4. All slots are saved to Firestore under the `itinerary` collection
+5. Backend returns the full itinerary to frontend
+6. Frontend can fetch it later via GET /trips/:id/itinerary
+
+### Timeslot format:
+Each day has 8 slots:
+- 06:00-08:00, 08:00-10:00, 10:00-12:00, 12:00-14:00
+- 14:00-16:00, 16:00-18:00, 18:00-20:00, 20:00-22:00
+- Each slot starts with `activityId: null` — filled in later during voting
+
+### Bugs we ran into and how we fixed them:
+
+**Bug 1: Cannot POST /itinerary/:tripId/generate**
+- Route was registered correctly but old Node.js process was still running
+  on port 3000 from a previous session and intercepting all requests
+- Fixed by running `taskkill /F /IM node.exe` to kill all Node processes
+  and restarting the server
+
+**Bug 2: TypeScript error — string | string[] not assignable to string**
+- `req.params` values can technically be arrays in Express types
+- Fixed by using `String(req.params.tripId)` to explicitly cast to string
+
+### API Endpoints added:
+| Method | Endpoint                        | Description                        |
+|--------|---------------------------------|------------------------------------|
+| POST   | /auth/login                     | Verify Google token, save user     |
+| POST   | /auth/register                  | Create new user with email/password|
+| GET    | /trips/my                       | Get all trips for a user           |
+| POST   | /trips/                         | Create trip (generates invite code)|
+| POST   | /trips/join                     | Join a trip via invite code        |
+| POST   | /itinerary/:tripId/generate     | Generate & save timeslots          |
+| GET    | /trips/:id/itinerary            | Get itinerary for a trip           |
+
+### Tests:
+- 23/23 tests passing
+- New tests cover: `generateDaySlots()` and `generateItinerary()` functions
+- Tests check: correct number of slots, correct slot times, correct trip_id, correct number of days
