@@ -82,7 +82,7 @@ export function ItineraryHeader({
             </AppText>
 
             <AppText variant="subtitle" style={styles.destination}>
-              <LocationPin width={18} height={18} />
+              <LocationPin width={18} height={18} style={styles.locationPin} />
               {destination}
             </AppText>
           </View>
@@ -121,8 +121,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs,
   },
   timerBox: {
     flexDirection: "row",
@@ -152,6 +153,10 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.body,
     fontSize: typography.size.xl,
     lineHeight: typography.lineHeight.xl,
+  },
+  locationPin: {
+    color: colors.nightBlack,
+    paddingRight: spacing.md,
   },
   intro: {
     color: colors.nightBlack,

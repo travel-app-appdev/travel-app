@@ -220,6 +220,14 @@ export default function ItineraryScreen() {
   }, []);
 
   function handlePlanningInfoPress() {
+    if (showPlanningInfoPopup) {
+      if (planningInfoTimeoutRef.current) {
+        clearTimeout(planningInfoTimeoutRef.current);
+      }
+      setShowPlanningInfoPopup(false);
+      return;
+    }
+
     setShowPlanningInfoPopup(true);
 
     if (planningInfoTimeoutRef.current) {
@@ -299,10 +307,6 @@ export default function ItineraryScreen() {
     }
   }, [tripDays, itinerary.startDate]);
 
-  // -------------------------------------------------------------------------
-  // Planning state
-  // -------------------------------------------------------------------------
-
   const slots = useMemo(() => generateTimeSlots(), []);
 
   const slotItems = useMemo(() => {
@@ -350,10 +354,6 @@ export default function ItineraryScreen() {
       planningStatus: updatedStatus,
     }));
   }
-
-  // -------------------------------------------------------------------------
-  // Voting state
-  // -------------------------------------------------------------------------
 
   const votingActivities = MOCK_VOTING_ACTIVITIES;
 
@@ -408,10 +408,6 @@ export default function ItineraryScreen() {
     }
   }, [activeState, tripDays, daysWithConflicts]);
 
-  // -------------------------------------------------------------------------
-  // Final state
-  // -------------------------------------------------------------------------
-
   const finalActivities = MOCK_FINAL_ACTIVITIES;
 
   const finalActivityMap = useMemo(() => {
@@ -425,10 +421,6 @@ export default function ItineraryScreen() {
   function handleJoinGroup(activityId: string) {
     Alert.alert("Joined group", `Joined activity ${activityId}`);
   }
-
-  // -------------------------------------------------------------------------
-  // Render
-  // -------------------------------------------------------------------------
 
   const safeAreaBg =
     activeState === "voting"
@@ -479,6 +471,7 @@ export default function ItineraryScreen() {
                     slot={slot}
                     activity={activity}
                     onAddActivity={handleAddActivity}
+                    disabled={hasCurrentUserFinished}
                   />
                 ))}
               </View>
@@ -525,6 +518,10 @@ export default function ItineraryScreen() {
           </View>
         </ScrollView>
 
+        {activeState === "planning" && (
+          <View pointerEvents="none" style={styles.footerBackground} />
+        )}
+
         {showPlanningInfoPopup && (
           <View style={styles.popupWrapper} pointerEvents="none">
             <View style={styles.popup}>
@@ -533,6 +530,10 @@ export default function ItineraryScreen() {
               </AppText>
             </View>
           </View>
+        )}
+
+        {activeState === "planning" && hasCurrentUserFinished && (
+          <View style={styles.lockOverlay} pointerEvents="auto" />
         )}
 
         {activeState === "planning" && (
@@ -573,13 +574,28 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     gap: spacing.md,
   },
+  footerBackground: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    height: 110,
+    shadowColor: colors.beachYellow,
+    shadowOpacity: 5,
+    shadowRadius: 10,
+    elevation: 4,
+  },
   popupWrapper: {
     position: "absolute",
-    bottom: 100,
+    bottom: 110,
     left: 0,
     right: 0,
     alignItems: "center",
     paddingHorizontal: spacing.lg,
+    zIndex: 20,
   },
   popup: {
     backgroundColor: colors.nightBlack,
@@ -591,6 +607,11 @@ const styles = StyleSheet.create({
   popupText: {
     color: colors.white,
     textAlign: "center",
+  },
+  lockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.25)", 
+    zIndex: 5,
   },
   votingSection: {
     paddingTop: spacing.md,

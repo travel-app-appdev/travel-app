@@ -11,11 +11,16 @@ type Props = {
   slot: TimeSlot;
   activity?: Activity;
   onAddActivity: (slotId: string) => void;
+  disabled?: boolean;
 };
 
-export function PlanningSlotCard({ slot, activity, onAddActivity }: Props) {
+export function PlanningSlotCard({
+  slot,
+  activity,
+  onAddActivity,
+  disabled = false,
+}: Props) {
   const hasActivity = Boolean(activity);
-  const mutedColor = colors.textMuted;
 
   return (
     <View style={styles.row}>
@@ -32,7 +37,11 @@ export function PlanningSlotCard({ slot, activity, onAddActivity }: Props) {
 
             {!!activity?.address && (
               <View style={styles.infoRow}>
-                <LocationPin width={18} height={18} />
+                <LocationPin
+                  width={18}
+                  height={18}
+                  style={styles.locationPin}
+                />
                 <AppText variant="body" style={styles.infoText}>
                   {activity.address}
                 </AppText>
@@ -50,10 +59,8 @@ export function PlanningSlotCard({ slot, activity, onAddActivity }: Props) {
           </View>
         ) : (
           <View style={styles.emptyContent}>
-            <LocationHeart
-              width={20}
-              height={20}
-            />
+            {/* FIX 2: pass color explicitly so the SVG icon renders greyed out */}
+            <LocationHeart width={20} height={20} color={colors.textMuted} />
             <AppText variant="subtitle" style={styles.emptyTitle}>
               Empty Activity
             </AppText>
@@ -63,11 +70,25 @@ export function PlanningSlotCard({ slot, activity, onAddActivity }: Props) {
 
       {!hasActivity && (
         <Pressable
-          onPress={() => onAddActivity(slot.id)}
-          style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+          onPress={() => {
+            if (disabled) return;
+            onAddActivity(slot.id);
+          }}
+          style={({ pressed }) => [
+            styles.cta,
+            pressed && styles.ctaPressed,
+            disabled && styles.ctaDisabled,
+          ]}
+          disabled={disabled}
           accessibilityRole="button"
-          accessibilityLabel={`Add activity for ${slot.label}`}
-          accessibilityHint="Opens activity creation for this time slot"
+          accessibilityLabel={
+            disabled ? "Planning locked" : `Add activity for ${slot.label}`
+          }
+          accessibilityHint={
+            disabled
+              ? "You already submitted your planning"
+              : "Opens activity creation for this time slot"
+          }
         >
           <AddIcon width={28} height={28} />
           <AppText variant="body" style={styles.ctaText}>
@@ -122,6 +143,10 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xl,
     lineHeight: typography.lineHeight.xl,
   },
+  locationPin: {
+    color: colors.seaBlue,
+    paddingRight: spacing.md,
+  },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -152,6 +177,9 @@ const styles = StyleSheet.create({
   },
   ctaPressed: {
     opacity: 0.85,
+  },
+  ctaDisabled: {
+    opacity: 0.5,
   },
   ctaText: {
     color: colors.textPrimary,
