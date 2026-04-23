@@ -21,8 +21,10 @@ app.get("/", (req, res) => {
   res.json({ message: "Travel API is running!" });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
 
 export default app;
