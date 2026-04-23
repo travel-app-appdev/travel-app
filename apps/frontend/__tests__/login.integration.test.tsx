@@ -5,6 +5,18 @@ import LoginScreen from "@/app/login";
 const mockReplace = jest.fn();
 const mockHandleLogin = jest.fn();
 
+const mockSetUser = jest.fn();
+
+jest.mock("@/src/context/AuthContext", () => ({
+  useAuth: () => ({
+    user: null,
+    setUser: mockSetUser,
+    isAuthenticated: false,
+    loading: false,
+    logout: jest.fn(),
+  }),
+}));
+
 jest.mock("expo-router", () => ({
   Link: ({ children }: any) => children,
   router: {
@@ -12,7 +24,7 @@ jest.mock("expo-router", () => ({
   },
 }));
 
-jest.mock("@/src/services/authService", () => ({
+jest.mock("@/src/services/authServices", () => ({
   handleLogin: (...args: any[]) => mockHandleLogin(...args),
 }));
 
