@@ -53,8 +53,6 @@ export function PlanningSlotCard({ slot, activity, onAddActivity }: Props) {
             <LocationHeart
               width={20}
               height={20}
-              fill={mutedColor}
-              stroke={mutedColor}
             />
             <AppText variant="subtitle" style={styles.emptyTitle}>
               Empty Activity
