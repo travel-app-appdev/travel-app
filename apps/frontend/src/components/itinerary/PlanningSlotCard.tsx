@@ -6,11 +6,13 @@ import LocationHeart from "@/assets/icons/location-heart.svg";
 import LocationPin from "@/assets/icons/location-pin.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import AddIcon from "@/assets/icons/add.svg";
+import EditIcon from "@/assets/icons/edit.svg";
 
 type Props = {
   slot: TimeSlot;
   activity?: Activity;
   onAddActivity: (slotId: string) => void;
+  onEditActivity: (activity: Activity) => void;
   disabled?: boolean;
 };
 
@@ -18,31 +20,50 @@ export function PlanningSlotCard({
   slot,
   activity,
   onAddActivity,
+  onEditActivity,
   disabled = false,
 }: Props) {
   const hasActivity = Boolean(activity);
 
+  function handlePress() {
+    if (disabled) return;
+
+    if (activity) {
+      onEditActivity(activity);
+      return;
+    }
+
+    onAddActivity(slot.id);
+  }
+
   return (
     <View style={styles.row}>
       <View style={styles.card}>
-        <AppText variant="body" style={styles.timeLabel}>
-          {slot.label}
-        </AppText>
-
         {hasActivity ? (
           <View style={styles.filledContent}>
-            <AppText variant="subtitle" style={styles.activityTitle}>
+            <View style={styles.timeRow}>
+              <LocationPin width={18} height={18} />
+              <AppText variant="body" style={styles.filledTimeLabel}>
+                {slot.label}
+              </AppText>
+            </View>
+
+            <AppText
+              variant="subtitle"
+              style={styles.activityTitle}
+              numberOfLines={2}
+            >
               {activity?.name}
             </AppText>
 
             {!!activity?.address && (
               <View style={styles.infoRow}>
-                <LocationPin
-                  width={18}
-                  height={18}
-                  style={styles.locationPin}
-                />
-                <AppText variant="body" style={styles.infoText}>
+                <LocationPin width={16} height={16} />
+                <AppText
+                  variant="body"
+                  style={styles.infoText}
+                  numberOfLines={1}
+                >
                   {activity.address}
                 </AppText>
               </View>
@@ -50,55 +71,75 @@ export function PlanningSlotCard({
 
             {!!activity?.googleMapsUrl && (
               <View style={styles.infoRow}>
-                <GoogleIcon width={18} height={18} />
-                <AppText variant="body" style={styles.linkText}>
+                <GoogleIcon width={16} height={16} />
+                <AppText
+                  variant="body"
+                  style={styles.linkText}
+                  numberOfLines={1}
+                >
                   Google-Link
                 </AppText>
               </View>
             )}
           </View>
         ) : (
-          <View style={styles.emptyContent}>
-            {/* FIX 2: pass color explicitly so the SVG icon renders greyed out */}
-            <LocationHeart width={20} height={20} color={colors.textMuted} />
-            <AppText variant="subtitle" style={styles.emptyTitle}>
-              Empty Activity
+          <>
+            <AppText variant="body" style={styles.timeLabel}>
+              {slot.label}
             </AppText>
-          </View>
+
+            <View style={styles.emptyContent}>
+              <View style={styles.emptyIconWrapper}>
+                <LocationHeart width={20} height={20} />
+              </View>
+              <AppText variant="subtitle" style={styles.emptyTitle}>
+                Empty Activity
+              </AppText>
+            </View>
+          </>
         )}
       </View>
 
-      {!hasActivity && (
-        <Pressable
-          onPress={() => {
-            if (disabled) return;
-            onAddActivity(slot.id);
-          }}
-          style={({ pressed }) => [
-            styles.cta,
-            pressed && styles.ctaPressed,
-            disabled && styles.ctaDisabled,
-          ]}
-          disabled={disabled}
-          accessibilityRole="button"
-          accessibilityLabel={
-            disabled ? "Planning locked" : `Add activity for ${slot.label}`
-          }
-          accessibilityHint={
-            disabled
-              ? "You already submitted your planning"
+      <Pressable
+        onPress={handlePress}
+        style={({ pressed }) => [
+          styles.cta,
+          hasActivity ? styles.editCta : styles.addCta,
+          pressed && styles.ctaPressed,
+          disabled && styles.ctaDisabled,
+        ]}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={
+          disabled
+            ? "Planning locked"
+            : hasActivity
+              ? `Edit activity for ${slot.label}`
+              : `Add activity for ${slot.label}`
+        }
+        accessibilityHint={
+          disabled
+            ? "You already submitted your planning"
+            : hasActivity
+              ? "Opens activity editing for this time slot"
               : "Opens activity creation for this time slot"
-          }
-        >
+        }
+      >
+        {hasActivity ? (
+          <EditIcon width={28} height={28} />
+        ) : (
           <AddIcon width={28} height={28} />
-          <AppText variant="body" style={styles.ctaText}>
-            Add activity
-          </AppText>
-        </Pressable>
-      )}
+        )}
+
+        <AppText variant="body" style={styles.ctaText}>
+          {hasActivity ? "Edit activity" : "Add activity"}
+        </AppText>
+      </Pressable>
     </View>
   );
 }
+
+const CARD_HEIGHT = 108;
 
 const styles = StyleSheet.create({
   row: {
@@ -108,23 +149,37 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    minHeight: 110,
+    height: CARD_HEIGHT,
     borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    padding: spacing.lg,
-    justifyContent: "space-between",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    overflow: "hidden",
   },
   timeLabel: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.bodyBold,
+  },
+  filledTimeLabel: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  timeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
   },
   emptyContent: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xs,
+  },
+  emptyIconWrapper: {
+    opacity: 0.35,
   },
   emptyTitle: {
     color: colors.textMuted,
@@ -134,18 +189,13 @@ const styles = StyleSheet.create({
   filledContent: {
     flex: 1,
     justifyContent: "center",
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    gap: 4,
   },
   activityTitle: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.xl,
-    lineHeight: typography.lineHeight.xl,
-  },
-  locationPin: {
-    color: colors.seaBlue,
-    paddingRight: spacing.md,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
   },
   infoRow: {
     flexDirection: "row",
@@ -163,17 +213,23 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
+    flex: 1,
   },
   cta: {
     width: 92,
-    minHeight: 110,
+    height: CARD_HEIGHT,
     borderRadius: radius.xl,
-    backgroundColor: colors.beachYellow,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.md,
     gap: spacing.xs,
+  },
+  addCta: {
+    backgroundColor: colors.beachYellow,
+  },
+  editCta: {
+    backgroundColor: colors.border,
   },
   ctaPressed: {
     opacity: 0.85,

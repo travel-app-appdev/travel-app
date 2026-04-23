@@ -95,6 +95,16 @@ const MOCK_FINAL_ACTIVITIES: Activity[] = [
 ];
 
 // ---------------------------------------------------------------------------
+function parseActivitiesJson(value?: string): Activity[] {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 function buildItineraryFromParams(params: {
   tripId?: string;
@@ -155,10 +165,12 @@ export default function ItineraryScreen() {
     destination,
     startDate,
     endDate,
+    activitiesJson,
     newActivityId,
     newActivityDayId,
     newActivitySlotId,
     newActivityName,
+    newActivityDescription,
     newActivityAddress,
     newActivityGoogleMapsUrl,
   } = useLocalSearchParams<{
@@ -168,10 +180,12 @@ export default function ItineraryScreen() {
     destination?: string;
     startDate?: string;
     endDate?: string;
+    activitiesJson?: string;
     newActivityId?: string;
     newActivityDayId?: string;
     newActivitySlotId?: string;
     newActivityName?: string;
+    newActivityDescription?: string;
     newActivityAddress?: string;
     newActivityGoogleMapsUrl?: string;
   }>();
@@ -181,16 +195,17 @@ export default function ItineraryScreen() {
       ? state
       : undefined;
 
-  const [itinerary, setItinerary] = useState<TripItinerary>(() =>
-    buildItineraryFromParams({
+  const [itinerary, setItinerary] = useState<TripItinerary>(() => ({
+    ...buildItineraryFromParams({
       tripId,
       title,
       destination,
       startDate,
       endDate,
       state: routeState,
-    })
-  );
+    }),
+    activities: parseActivitiesJson(activitiesJson),
+  }));
 
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
   const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -207,9 +222,20 @@ export default function ItineraryScreen() {
         endDate,
         state: routeState,
       }),
-      activities: current.activities,
+      activities:
+        parseActivitiesJson(activitiesJson).length > 0
+          ? parseActivitiesJson(activitiesJson)
+          : current.activities,
     }));
-  }, [tripId, title, destination, startDate, endDate, routeState]);
+  }, [
+    tripId,
+    title,
+    destination,
+    startDate,
+    endDate,
+    routeState,
+    activitiesJson,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -239,7 +265,7 @@ export default function ItineraryScreen() {
     }, 110000);
   }
 
-  const lastAppliedActivityIdRef = useRef<string | null>(null);
+  const lastAppliedActivitySignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (
@@ -251,40 +277,60 @@ export default function ItineraryScreen() {
       return;
     }
 
-    if (lastAppliedActivityIdRef.current === newActivityId) {
+    const incomingSignature = [
+      newActivityId,
+      newActivityDayId,
+      newActivitySlotId,
+      newActivityName,
+      newActivityDescription ?? "",
+      newActivityAddress ?? "",
+      newActivityGoogleMapsUrl ?? "",
+    ].join("|");
+
+    if (lastAppliedActivitySignatureRef.current === incomingSignature) {
       return;
     }
 
-    const activityAlreadyExists = itinerary.activities.some(
-      (activity) => activity.id === newActivityId
-    );
-
-    if (activityAlreadyExists) {
-      lastAppliedActivityIdRef.current = newActivityId;
-      return;
-    }
-
-    const newActivity: Activity = {
+    const incomingActivity: Activity = {
       id: newActivityId,
       dayId: newActivityDayId,
       slotId: newActivitySlotId,
       name: newActivityName,
       address: newActivityAddress ?? "",
       googleMapsUrl: newActivityGoogleMapsUrl ?? "",
+      ...(newActivityDescription
+        ? { description: newActivityDescription }
+        : {}),
     };
 
-    setItinerary((current) => ({
-      ...current,
-      activities: [...current.activities, newActivity],
-    }));
+    setItinerary((current) => {
+      const existingIndex = current.activities.findIndex(
+        (activity) => activity.id === incomingActivity.id
+      );
 
-    lastAppliedActivityIdRef.current = newActivityId;
+      if (existingIndex === -1) {
+        return {
+          ...current,
+          activities: [...current.activities, incomingActivity],
+        };
+      }
+
+      const updatedActivities = [...current.activities];
+      updatedActivities[existingIndex] = incomingActivity;
+
+      return {
+        ...current,
+        activities: updatedActivities,
+      };
+    });
+
+    lastAppliedActivitySignatureRef.current = incomingSignature;
   }, [
-    itinerary.activities,
     newActivityId,
     newActivityDayId,
     newActivitySlotId,
     newActivityName,
+    newActivityDescription,
     newActivityAddress,
     newActivityGoogleMapsUrl,
   ]);
@@ -336,6 +382,34 @@ export default function ItineraryScreen() {
         state: activeState,
         dayId: selectedDayId,
         slotId,
+        activitiesJson: JSON.stringify(itinerary.activities),
+      },
+    });
+  }
+
+  function handleEditActivity(activity: Activity) {
+    if (hasCurrentUserFinished) {
+      handlePlanningInfoPress();
+      return;
+    }
+
+    router.push({
+      pathname: "/add-activity",
+      params: {
+        tripId: itinerary.tripId,
+        title: itinerary.title,
+        destination: itinerary.destination,
+        startDate: itinerary.startDate,
+        endDate: itinerary.endDate,
+        state: activeState,
+        dayId: activity.dayId,
+        slotId: activity.slotId,
+        activityId: activity.id,
+        initialName: activity.name,
+        initialDescription: activity.description ?? "",
+        initialAddress: activity.address ?? "",
+        initialGoogleMapsUrl: activity.googleMapsUrl ?? "",
+        activitiesJson: JSON.stringify(itinerary.activities),
       },
     });
   }
@@ -471,6 +545,7 @@ export default function ItineraryScreen() {
                     slot={slot}
                     activity={activity}
                     onAddActivity={handleAddActivity}
+                    onEditActivity={handleEditActivity}
                     disabled={hasCurrentUserFinished}
                   />
                 ))}
@@ -610,7 +685,7 @@ const styles = StyleSheet.create({
   },
   lockOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.25)", 
+    backgroundColor: "rgba(0,0,0,0.25)",
     zIndex: 5,
   },
   votingSection: {

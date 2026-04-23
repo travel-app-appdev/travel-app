@@ -7,7 +7,9 @@ import { Link } from "expo-router";
 import type { ItineraryState } from "@/src/types/itinerary";
 
 import Back from "@/assets/icons/back.svg";
-import MascotWink from "@/assets/mascots/mascot-wink.svg";
+import MascotPlanning from "@/assets/mascots/mascot-planning.svg";
+import MascotVoting from "@/assets/mascots/mascot-voting.svg";
+import MascotFinal from "@/assets/mascots/mascot-final.svg";
 import CalendarIcon from "@/assets/icons/calendar.svg";
 import HourglassIcon from "@/assets/icons/hourglass.svg";
 import LocationPin from "@/assets/icons/location-pin.svg";
@@ -36,6 +38,18 @@ function getHeroColor(state: ItineraryState): string {
   }
 }
 
+function getMascotByState(state: ItineraryState) {
+  switch (state) {
+    case "voting":
+      return MascotVoting;
+    case "final":
+      return MascotFinal;
+    case "planning":
+    default:
+      return MascotPlanning;
+  }
+}
+
 export function ItineraryHeader({
   title,
   destination,
@@ -47,6 +61,7 @@ export function ItineraryHeader({
   state = "planning",
 }: Props) {
   const heroColor = getHeroColor(state);
+  const Mascot = getMascotByState(state);
 
   return (
     <View style={styles.wrapper}>
@@ -74,7 +89,7 @@ export function ItineraryHeader({
         </View>
 
         <View style={styles.heroContent}>
-          <MascotWink width={64} height={64} />
+          <Mascot width={64} height={64} />
 
           <View style={styles.textBlock}>
             <AppText variant="title" style={styles.title}>

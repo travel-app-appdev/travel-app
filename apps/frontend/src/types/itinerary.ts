@@ -22,6 +22,7 @@ export type Activity = {
   address: string;
   googleMapsUrl?: string;
   joinedCount?: number; // for final state
+  description?: string;
 };
 
 export type VotingActivity = Activity & {

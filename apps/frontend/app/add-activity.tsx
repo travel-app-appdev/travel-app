@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -24,6 +24,12 @@ export default function AddActivityScreen() {
     state,
     dayId,
     slotId,
+    activitiesJson,
+    activityId,
+    initialName,
+    initialDescription,
+    initialAddress,
+    initialGoogleMapsUrl,
   } = useLocalSearchParams<{
     tripId?: string;
     title?: string;
@@ -33,12 +39,20 @@ export default function AddActivityScreen() {
     state?: "planning" | "voting" | "final";
     dayId?: string;
     slotId?: string;
+    activitiesJson?: string;
+    activityId?: string;
+    initialName?: string;
+    initialDescription?: string;
+    initialAddress?: string;
+    initialGoogleMapsUrl?: string;
   }>();
 
-  const [activityName, setActivityName] = useState("");
-  const [description, setDescription] = useState("");
-  const [address, setAddress] = useState("");
-  const [googleLink, setGoogleLink] = useState("");
+  const isEditMode = useMemo(() => Boolean(activityId), [activityId]);
+
+  const [activityName, setActivityName] = useState(initialName ?? "");
+  const [description, setDescription] = useState(initialDescription ?? "");
+  const [address, setAddress] = useState(initialAddress ?? "");
+  const [googleLink, setGoogleLink] = useState(initialGoogleMapsUrl ?? "");
 
   function handleSaveActivity() {
     if (!activityName.trim()) {
@@ -46,7 +60,45 @@ export default function AddActivityScreen() {
       return;
     }
 
-    const newActivityId = `activity-${Date.now()}`;
+    let existingActivities: Array<{
+      id: string;
+      dayId: string;
+      slotId: string;
+      name: string;
+      description?: string;
+      address?: string;
+      googleMapsUrl?: string;
+    }> = [];
+
+    try {
+      existingActivities = activitiesJson ? JSON.parse(activitiesJson) : [];
+    } catch {
+      existingActivities = [];
+    }
+
+    const savedActivityId = activityId ?? `activity-${Date.now()}`;
+
+    const savedActivity = {
+      id: savedActivityId,
+      dayId: dayId ?? "",
+      slotId: slotId ?? "",
+      name: activityName.trim(),
+      description: description.trim(),
+      address: address.trim(),
+      googleMapsUrl: googleLink.trim(),
+    };
+
+    const existingIndex = existingActivities.findIndex(
+      (activity) => activity.id === savedActivityId
+    );
+
+    let updatedActivities = [...existingActivities];
+
+    if (existingIndex === -1) {
+      updatedActivities.push(savedActivity);
+    } else {
+      updatedActivities[existingIndex] = savedActivity;
+    }
 
     router.replace({
       pathname: "/itinerary",
@@ -57,12 +109,14 @@ export default function AddActivityScreen() {
         startDate,
         endDate,
         state,
-        newActivityId,
-        newActivityDayId: dayId,
-        newActivitySlotId: slotId,
-        newActivityName: activityName.trim(),
-        newActivityAddress: address.trim(),
-        newActivityGoogleMapsUrl: googleLink.trim(),
+        activitiesJson: JSON.stringify(updatedActivities),
+        newActivityId: savedActivity.id,
+        newActivityDayId: savedActivity.dayId,
+        newActivitySlotId: savedActivity.slotId,
+        newActivityName: savedActivity.name,
+        newActivityDescription: savedActivity.description,
+        newActivityAddress: savedActivity.address,
+        newActivityGoogleMapsUrl: savedActivity.googleMapsUrl,
       },
     });
   }
@@ -89,7 +143,7 @@ export default function AddActivityScreen() {
           </Pressable>
 
           <AppText variant="title" style={styles.title}>
-            Add activity
+            {isEditMode ? "Edit activity" : "Add activity"}
           </AppText>
 
           <View style={styles.form}>
@@ -156,10 +210,12 @@ export default function AddActivityScreen() {
                 pressed && styles.saveButtonPressed,
               ]}
               accessibilityRole="button"
-              accessibilityLabel="Save activity"
+              accessibilityLabel={
+                isEditMode ? "Save activity changes" : "Save activity"
+              }
             >
               <AppText variant="body" style={styles.saveButtonText}>
-                Add activity
+                {isEditMode ? "Save changes" : "Add activity"}
               </AppText>
             </Pressable>
           </View>
