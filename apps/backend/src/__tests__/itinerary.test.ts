@@ -1,3 +1,4 @@
+// apps/backend/src/__tests__/itinerary.test.ts
 import { generateDaySlots, generateItinerary } from "../__helpers__/itineraryHelper";
 
 describe("generateDaySlots()", () => {

@@ -1,3 +1,4 @@
+// apps/backend/src/routes/trips.ts
 import { Router } from "express";
 import {
     getMyTrips,

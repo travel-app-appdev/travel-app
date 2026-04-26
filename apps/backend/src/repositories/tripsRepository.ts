@@ -1,3 +1,4 @@
+// apps/backend/src/repositories/tripsRepository.ts
 import admin from "../config/firebase";
 import {
     Trip,

@@ -1,3 +1,4 @@
+// apps/frontend/src/services/authServices.ts
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/src/lib/firebase";
 import { loginWithToken, registerUser } from "@/src/api/auth";
