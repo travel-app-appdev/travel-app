@@ -136,47 +136,45 @@ export async function removeMember(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idToken: payload.idToken }),
     }
+  );
+
+  if (!response.ok) {
+    const data: ApiErrorResponse = await response.json();
+    throw new Error(data.error || "Failed to remove member");
+  }
 }
 
 type UpdateTripPayload = {
-    idToken: string;
-    tripId: string;
-    title?: string;
-    destination?: string;
-    start_date?: string;
-    end_date?: string;
+  idToken: string;
+  tripId: string;
+  title?: string;
+  destination?: string;
+  start_date?: string;
+  end_date?: string;
+  state?: "Planning" | "Voting" | "Final";
 };
 
 export async function updateTrip(payload: UpdateTripPayload): Promise<Trip> {
-    const url = `${API_URL}/trips/${payload.tripId}`;
-    console.log("PATCH URL:", url);
-    
-    const response = await fetch(url, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            idToken: payload.idToken,
-            title: payload.title,
-            destination: payload.destination,
-            start_date: payload.start_date,
-            end_date: payload.end_date,
-        }),
-    });
+  const response = await fetch(`${API_URL}/trips/${payload.tripId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      idToken: payload.idToken,
+      title: payload.title,
+      destination: payload.destination,
+      start_date: payload.start_date,
+      end_date: payload.end_date,
+      state: payload.state,
+    }),
+  });
 
-    const text = await response.text();
-    console.log("Response status:", response.status);
-    console.log("Response body:", text);
+  const data: Trip | ApiErrorResponse = await response.json();
 
-    if (!response.ok) {
-        let errorMessage = "Failed to update trip";
-        try {
-            const data = JSON.parse(text);
-            errorMessage = data.error || errorMessage;
-        } catch {
-            errorMessage = text;
-        }
-        throw new Error(errorMessage);
-    }
+  if (!response.ok) {
+    throw new Error(
+      (data as ApiErrorResponse).error || "Failed to update trip"
+    );
+  }
 
-    return JSON.parse(text) as Trip;
+  return data as Trip;
 }

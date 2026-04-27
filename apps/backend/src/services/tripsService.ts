@@ -11,7 +11,7 @@ import {
     createTripWithInviteCode,
     deleteTripById,
     removeTripMember,
-     markMemberPlanningDone,
+    markMemberPlanningDone,
     updateTripState,
     updateTripById,
 } from "../repositories/tripsRepository";
