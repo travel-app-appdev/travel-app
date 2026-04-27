@@ -1,4 +1,3 @@
-// src/types/trip.ts
 export type TripMember = {
     id: string;
     name: string;
@@ -32,6 +31,7 @@ export type TripMembershipDocument = {
     trip_id: string;
     role: string;
     invite_status: string;
+    planning_done?: boolean;
 };
 
 export type UserDocument = {

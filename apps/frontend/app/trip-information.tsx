@@ -30,7 +30,8 @@ import Hourglass1 from "@/assets/icons/hourglass_1.svg";
 import Timepoint from "@/assets/icons/timepoint.svg";
 import Exit from "@/assets/icons/exit.svg";
 
-// Placeholder phases — to be wired up later
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const PLACEHOLDER_PHASES = [
   {
     id: "planning",
@@ -64,12 +65,16 @@ const PHASE_TEXT_COLORS: Record<string, string> = {
   final: colors.nightBlack,
 };
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 type MemberParam = {
   id: string;
   name: string;
   initials: string;
   color: string;
 };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDateDisplay(dateString: string): string {
   if (!dateString) return "—";
@@ -93,9 +98,12 @@ function calcDays(start: Date, end: Date) {
   return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)) + 1);
 }
 
-function dayLabel(days: number) {
+function dayLabel(days: number, active: boolean): string {
+  if (active) return days === 1 ? "1 day left" : `${days} days left`;
   return days === 1 ? "1 day" : `${days} days`;
 }
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function TripInformationScreen() {
   const {
@@ -119,17 +127,11 @@ export default function TripInformationScreen() {
   const isSmallScreen = screenHeight < 700;
   const [isLeaving, setIsLeaving] = useState(false);
 
-  // Cleanup timeouts on unmount
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(() => {
-    const timeouts = timeoutRefs.current;
-
-    return () => {
-      timeouts.forEach(clearTimeout);
-    };
+    return () => timeoutRefs.current.forEach(clearTimeout);
   }, []);
 
-  // Parse members from JSON param
   const members: MemberParam[] = (() => {
     try {
       return membersParam ? JSON.parse(membersParam) : [];
@@ -167,6 +169,8 @@ export default function TripInformationScreen() {
     ]);
   };
 
+  // ─── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <View style={styles.fullScreen}>
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
@@ -186,6 +190,7 @@ export default function TripInformationScreen() {
             ]}
             showsVerticalScrollIndicator={false}
           >
+            {/* ── Header ───────────────────────────────────────────────────── */}
             <View style={styles.header}>
               <BackLink href="/home" />
               <View style={styles.headerTitle}>
@@ -196,7 +201,7 @@ export default function TripInformationScreen() {
               </View>
             </View>
 
-            {/* Trip Name */}
+            {/* ── Trip Name ─────────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow}>
                 <TripTitle width={20} height={20} />
@@ -209,7 +214,7 @@ export default function TripInformationScreen() {
               </AppText>
             </View>
 
-            {/* Trip Date */}
+            {/* ── Trip Date ─────────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow}>
                 <Calendar width={20} height={20} />
@@ -223,7 +228,7 @@ export default function TripInformationScreen() {
               </AppText>
             </View>
 
-            {/* Destination */}
+            {/* ── Destination ───────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow}>
                 <Location width={20} height={20} />
@@ -236,7 +241,7 @@ export default function TripInformationScreen() {
               </AppText>
             </View>
 
-            {/* Members */}
+            {/* ── Members ───────────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow}>
                 <AddPeople width={20} height={20} />
@@ -251,43 +256,45 @@ export default function TripInformationScreen() {
               </AppText>
             </View>
 
-            {/* Phases — placeholder until wired up */}
+            {/* ── Phases ───────────────────────────────────────────────────── */}
             {PLACEHOLDER_PHASES.map((phase) => {
               const days = calcDays(phase.startDate, phase.endDate);
               return (
                 <View key={phase.id} style={styles.fieldGroup}>
                   <View style={styles.phaseRow}>
                     <View style={styles.phaseLeft}>
-                      <View
-                        style={[
-                          styles.phaseBadge,
-                          { backgroundColor: phase.color },
-                        ]}
-                      >
+                      <View style={[styles.phaseBadge, { backgroundColor: phase.color }]}>
                         <AppText
                           variant="caption"
-                          style={[
-                            styles.phaseBadgeText,
-                            { color: PHASE_TEXT_COLORS[phase.id] },
-                          ]}
+                          style={[styles.phaseBadgeText, { color: PHASE_TEXT_COLORS[phase.id] }]}
                         >
                           {phase.label}
                         </AppText>
                       </View>
 
-                      <View style={styles.phaseTimerRow}>
-                        {phase.active ? (
-                          <Hourglass1 width={20} height={20} />
-                        ) : (
-                          <Hourglass0 width={20} height={20} />
-                        )}
-                        <AppText variant="body" style={styles.phaseDays}>
-                          {dayLabel(days)}
-                        </AppText>
-                        {/* <AppText variant="caption" style={styles.phaseTimerLabel}>
-                          Timer
-                        </AppText> */}
-                        {phase.active && <Timepoint width={8} height={8} />}
+                      <View style={styles.phaseTimerBlock}>
+                        <View style={styles.hourglassCol}>
+                          {phase.active
+                            ? <Hourglass1 width={20} height={20} />
+                            : <Hourglass0 width={20} height={20} />
+                          }
+                        </View>
+
+                        <View style={styles.phaseTextCol}>
+                          <View style={styles.daysRow}>
+                            <AppText variant="body" style={styles.phaseDays}>
+                              {dayLabel(days, phase.active)}
+                            </AppText>
+                            {phase.active && (
+                              <View style={styles.timepointWrapper}>
+                                <Timepoint width={7} height={7} />
+                              </View>
+                            )}
+                          </View>
+                          <AppText variant="caption" style={styles.timerLabel}>
+                            Timer
+                          </AppText>
+                        </View>
                       </View>
                     </View>
                   </View>
@@ -301,8 +308,10 @@ export default function TripInformationScreen() {
                 </View>
               );
             })}
+
           </ScrollView>
 
+          {/* ── Leave trip ────────────────────────────────────────────────── */}
           <SafeAreaView edges={["bottom"]} style={styles.leaveSafeArea}>
             <View style={styles.leaveWrapper}>
               <ActionCard
@@ -318,6 +327,8 @@ export default function TripInformationScreen() {
     </View>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   fullScreen: {
@@ -386,17 +397,30 @@ const styles = StyleSheet.create({
   phaseBadge: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
   },
   phaseBadgeText: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
   },
-  phaseTimerRow: {
+  phaseTimerBlock: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+  },
+  hourglassCol: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  phaseTextCol: {
+    flexDirection: "column",
+    justifyContent: "center",
+  },
+  daysRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 3,
   },
   phaseDays: {
     fontFamily: typography.fontFamily.bodyBold,
@@ -404,10 +428,13 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
     color: colors.textPrimary,
   },
-  phaseTimerLabel: {
-    color: colors.nightBlack,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
+  timepointWrapper: {
+    marginTop: 1,
+  },
+  timerLabel: {
+    color: colors.textMuted,
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
   },
   phaseDateLabel: {
     color: colors.nightBlack,

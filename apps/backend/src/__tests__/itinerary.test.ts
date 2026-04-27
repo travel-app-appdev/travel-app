@@ -1,4 +1,44 @@
+// apps/backend/src/__tests__/itinerary.test.ts
 import { generateDaySlots, generateItinerary } from "../__helpers__/itineraryHelper";
+import request from 'supertest';
+import app from '../index';
+
+jest.mock('../config/firebase', () => ({
+    __esModule: true,
+    default: {
+        auth: () => ({}),
+        firestore: () => ({
+            collection: jest.fn().mockImplementation(() => ({
+                doc: jest.fn().mockImplementation(() => ({
+                    get: jest.fn().mockResolvedValue({
+                        exists: true,
+                        id: 'trip-123',
+                        data: () => ({
+                            title: 'Test Trip',
+                            destination: 'Vienna',
+                            start_date: '2026-06-01',
+                            end_date: '2026-06-01',
+                            state: 'Final',
+                        }),
+                    }),
+                })),
+                where: jest.fn().mockReturnThis(),
+                get: jest.fn().mockResolvedValue({
+                    empty: false,
+                    docs: [{
+                        id: 'trip-123_2026-06-01',
+                        data: () => ({
+                            trip_id: 'trip-123',
+                            date: '2026-06-01',
+                            slots: [],
+                        }),
+                    }],
+                }),
+            })),
+        }),
+    },
+    db: {},
+}));
 
 describe("generateDaySlots()", () => {
 
@@ -52,6 +92,30 @@ describe("generateItinerary()", () => {
     it("should set correct trip_id", () => {
         const result = generateItinerary("trip-123", "2026-06-01", "2026-06-01");
         expect(result.trip_id).toBe("trip-123");
+    });
+
+});
+
+describe('GET /trips/:id/itinerary', () => {
+
+    it('should return 400 if trip state does not match', async () => {
+        const res = await request(app)
+            .get('/trips/trip-123/itinerary?state=planning');
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('Trip is not in planning state');
+    });
+
+    it('should return 200 if no state param provided', async () => {
+        const res = await request(app)
+            .get('/trips/trip-123/itinerary');
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('trip_id');
+    });
+
+    afterAll(done => {
+        done();
     });
 
 });

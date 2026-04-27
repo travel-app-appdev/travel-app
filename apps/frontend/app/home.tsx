@@ -36,6 +36,7 @@ type TripCardItem = {
   status: "planning" | "voting" | "final";
   cardColor: string;
   role: "admin" | "member";
+  inviteCode: string;
   members: {
     id: string;
     initials: string;
@@ -96,6 +97,7 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     status: getUiStatus(trip.state),
     cardColor: getCardColor(trip.trip_id),
     role: trip.role === "admin" ? "admin" : "member",
+    inviteCode: trip.invite_code ?? "",
     members: (trip.members ?? []).map(
       (member: TripMemberFromApi, index: number) => ({
         id: member.id,
@@ -310,7 +312,7 @@ export default function HomeScreen() {
                 onIconPress={() => {
                   if (trip.role === "admin") {
                     router.push(
-                      `/trip-settings?tripId=${trip.id}&title=${encodeURIComponent(trip.title)}&destination=${encodeURIComponent(trip.destination)}&startDate=${encodeURIComponent(trip.rawStartDate)}&endDate=${encodeURIComponent(trip.rawEndDate)}&members=${encodeURIComponent(JSON.stringify(trip.members))}` as any
+                      `/trip-settings?tripId=${trip.id}&title=${encodeURIComponent(trip.title)}&destination=${encodeURIComponent(trip.destination)}&startDate=${encodeURIComponent(trip.rawStartDate)}&endDate=${encodeURIComponent(trip.rawEndDate)}&members=${encodeURIComponent(JSON.stringify(trip.members))}&inviteCode=${encodeURIComponent(trip.inviteCode)}` as any
                     );
                   } else {
                     router.push(
