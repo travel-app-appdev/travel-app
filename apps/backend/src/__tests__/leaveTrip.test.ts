@@ -1,4 +1,3 @@
-// apps/backend/src/__tests__/leaveTrip.test.ts
 import { leaveTripForMember } from "../services/tripsService";
 
 // ─── Firebase mock ────────────────────────────────────────────────────────────

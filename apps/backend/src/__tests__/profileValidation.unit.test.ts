@@ -1,4 +1,3 @@
-// apps/backend/src/__tests__/profileValidation.unit.test.ts
 //
 // Unit tests for the updateProfile controller — validation rules and
 // error handling, fully mocked (no real Firebase, no HTTP layer).
