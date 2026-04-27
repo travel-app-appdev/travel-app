@@ -1,3 +1,4 @@
+// apps/frontend/__tests__/register.integration.test.tsx
 import React from "react";
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import RegisterScreen from "@/app/register";

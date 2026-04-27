@@ -1,3 +1,4 @@
+// apps/frontend/src/lib/authErrors.ts
 export function getFirebaseAuthMessage(error: unknown): string {
   const code =
     typeof error === "object" &&

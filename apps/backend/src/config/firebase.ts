@@ -1,3 +1,4 @@
+// apps/backend/src/config/firebase.ts
 import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
