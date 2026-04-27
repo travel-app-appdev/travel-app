@@ -43,6 +43,7 @@ export async function suggestActivity(
 export async function getCandidateActivities(
     tripId: string,
     slotId: string,
+    userId?: string,
 ): Promise<Activity[]> {
     const trip = await findTripById(tripId);
 
@@ -50,5 +51,9 @@ export async function getCandidateActivities(
         throw { status: 404, message: "Trip not found" };
     }
 
-    return getActivitiesBySlotId(slotId);
+    if (trip.state !== "Planning") {
+        throw { status: 400, message: "Trip is not in Planning state" };
+    }
+
+    return getActivitiesBySlotId(slotId, userId);
 }
