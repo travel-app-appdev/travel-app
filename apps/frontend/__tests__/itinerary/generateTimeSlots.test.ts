@@ -1,3 +1,4 @@
+// apps/frontend/__tests__/itinerary/generateTimeSlots.test.ts
 import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 
 describe("generateTimeSlots", () => {

@@ -1,3 +1,4 @@
+// apps/frontend/__tests__/authValidation.test.ts
 import { validateLogin, validateRegister } from "@/src/lib/authValidation";
 
 describe("validateLogin", () => {

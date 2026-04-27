@@ -1,3 +1,4 @@
+// apps/backend/src/index.ts
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -21,8 +22,11 @@ app.get("/", (_req, res) => {
   res.json({ message: "Travel API is running!" });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Only start HTTP listener when NOT under Jest
+if (process.env.JEST_WORKER_ID === undefined) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
 
 export default app;

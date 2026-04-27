@@ -1,3 +1,4 @@
+// apps/frontend/__tests__/login.integration.test.tsx
 import React from "react";
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import LoginScreen from "@/app/login";

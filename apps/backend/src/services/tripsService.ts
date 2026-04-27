@@ -1,3 +1,4 @@
+// apps/backend/src/services/tripsService.ts
 import admin from "../config/firebase";
 import {
     createTripWithAdminMembership,
@@ -13,12 +14,14 @@ import {
     removeTripMember,
      markMemberPlanningDone,
     updateTripState,
+    updateTripById,
 } from "../repositories/tripsRepository";
 import {
     CreateTripWithAuthInput,
     CreateTripWithoutAuthInput,
     JoinTripInput,
     Trip,
+    TripDocument,
 } from "../types/trip";
 
 
@@ -218,4 +221,34 @@ export async function finishPlanningForMember(
         completedMembers,
         totalMembers,
     };
+// New function to update trip details by admin
+
+export async function updateTripForAdmin(input: {
+    idToken: string;
+    tripId: string;
+    title?: string;
+    destination?: string;
+    start_date?: string;
+    end_date?: string;
+}): Promise<Trip> {
+    const decoded = await admin.auth().verifyIdToken(input.idToken);
+    const userId = decoded.uid;
+
+    const membership = await findMembership(input.tripId, userId);
+    if (!membership || membership.role !== "admin") {
+        throw { status: 403, message: "Only the admin can update this trip" };
+    }
+
+    const updates: Partial<Pick<TripDocument, "title" | "destination" | "start_date" | "end_date">> = {};
+    if (input.title !== undefined)       updates.title = input.title;
+    if (input.destination !== undefined) updates.destination = input.destination;
+    if (input.start_date !== undefined)  updates.start_date = input.start_date;
+    if (input.end_date !== undefined)    updates.end_date = input.end_date;
+
+    await updateTripById(input.tripId, updates);
+
+    const trip = await findTripById(input.tripId);
+    if (!trip) throw { status: 404, message: "Trip not found after update" };
+
+    return { ...trip, role: "admin" };
 }

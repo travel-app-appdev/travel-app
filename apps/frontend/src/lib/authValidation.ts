@@ -1,3 +1,4 @@
+// apps/frontend/src/lib/authValidation.ts
 export type AuthFieldErrors = {
   name?: string;
   email?: string;

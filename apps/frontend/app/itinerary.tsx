@@ -1,3 +1,4 @@
+// apps/frontend/app/itinerary.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";

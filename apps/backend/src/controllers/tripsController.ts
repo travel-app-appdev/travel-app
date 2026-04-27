@@ -1,3 +1,4 @@
+// apps/backend/src/controllers/tripsController.ts
 import { Request, Response } from "express";
 import {
     createTripForAuthenticatedUser,
@@ -8,6 +9,7 @@ import {
     leaveTripForMember,
     removeMemberForAdmin,
      finishPlanningForMember 
+    updateTripForAdmin,
 } from "../services/tripsService";
 
 export const getMyTrips = async (req: Request, res: Response): Promise<void> => {
@@ -206,6 +208,45 @@ export const finishPlanning = async (req: Request, res: Response): Promise<void>
             res.status(409).json({ error: error.message });
         } else {
             res.status(401).json({ error: "Invalid token or failed to finish planning" });
+// New controller for updating trip details by admin
+
+export const updateTrip = async (req: Request, res: Response): Promise<void> => {
+    const { idToken, title, destination, start_date, end_date } = req.body;
+    const tripId = req.params.tripId as string;
+
+    if (!idToken || !tripId) {
+        res.status(400).json({ error: "idToken and tripId are required" });
+        return;
+    }
+
+    if (!title && !destination && !start_date && !end_date) {
+        res.status(400).json({ error: "At least one field to update is required" });
+        return;
+    }
+
+    if (start_date && end_date) {
+        const start = new Date(start_date);
+        const end = new Date(end_date);
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            res.status(400).json({ error: "start_date and end_date must be valid dates" });
+            return;
+        }
+        if (end < start) {
+            res.status(400).json({ error: "end_date cannot be before start_date" });
+            return;
+        }
+    }
+
+    try {
+        const trip = await updateTripForAdmin({ idToken, tripId, title, destination, start_date, end_date });
+        res.status(200).json(trip);
+    } catch (error: any) {
+        if (error.status === 403) {
+            res.status(403).json({ error: error.message });
+        } else if (error.status === 404) {
+            res.status(404).json({ error: error.message });
+        } else {
+            res.status(401).json({ error: "Invalid token or failed to update trip" });
         }
     }
 };

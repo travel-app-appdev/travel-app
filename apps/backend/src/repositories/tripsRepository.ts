@@ -1,3 +1,4 @@
+// apps/backend/src/repositories/tripsRepository.ts
 import admin from "../config/firebase";
 import {
     Trip,
@@ -259,4 +260,13 @@ export async function markMemberPlanningDone(tripId: string, userId: string): Pr
 export async function updateTripState(tripId: string, state: string): Promise<void> {
     const db = admin.firestore();
     await db.collection("trips").doc(tripId).update({ state });
+
+// New function to update trip details by admin
+
+export async function updateTripById(
+    tripId: string,
+    data: Partial<Pick<TripDocument, "title" | "destination" | "start_date" | "end_date">>
+): Promise<void> {
+    const db = admin.firestore();
+    await db.collection("trips").doc(tripId).update(data);
 }
