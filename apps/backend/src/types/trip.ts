@@ -76,3 +76,26 @@ export type Itinerary = {
     trip_id: string;
     days: ItineraryDay[];
 };
+
+export type Activity = {
+    activity_id: string;
+    trip_id: string;
+    user_id: string;
+    title: string;
+    description?: string;
+    location_link?: string;
+    source_type: "manual";
+};
+
+export type TimeSlotActivity = {
+    slot_id: string;
+    activity_id: string;
+    status: "candidate";
+};
+
+export type CreateActivityInput = {
+    idToken: string;
+    title: string;
+    description?: string;
+    location_link?: string;
+};

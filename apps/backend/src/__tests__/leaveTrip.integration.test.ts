@@ -1,4 +1,3 @@
-// apps/backend/src/__tests__/leaveTrip.integration.test.ts
 //
 // Integration tests that verify the full HTTP layer end-to-end for
 // POST /trips/:tripId/leave.
