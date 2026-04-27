@@ -12,7 +12,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect, useRef } from "react";
 import { AppText } from "@/src/components/common/AppText";
-import { ActionCard, ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
+import {
+  ActionCard,
+  ACTION_CARD_HEIGHT,
+} from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
 import { leaveTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
@@ -138,36 +141,32 @@ export default function TripInformationScreen() {
   })();
 
   const handleLeaveTrip = () => {
-    Alert.alert(
-      "Leave trip",
-      "Are you sure you want to leave this trip?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Leave",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setIsLeaving(true);
-              const currentUser = auth.currentUser;
-              if (!currentUser) {
-                Alert.alert("Not logged in", "Please log in again.");
-                return;
-              }
-              const idToken = await currentUser.getIdToken();
-              await leaveTrip({ idToken, tripId: tripId! });
-              router.replace("/home");
-            } catch (error) {
-              const message =
-                error instanceof Error ? error.message : "Failed to leave trip";
-              Alert.alert("Leave failed", message);
-            } finally {
-              setIsLeaving(false);
+    Alert.alert("Leave trip", "Are you sure you want to leave this trip?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Leave",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setIsLeaving(true);
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+              Alert.alert("Not logged in", "Please log in again.");
+              return;
             }
-          },
+            const idToken = await currentUser.getIdToken();
+            await leaveTrip({ idToken, tripId: tripId! });
+            router.replace("/home");
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "Failed to leave trip";
+            Alert.alert("Leave failed", message);
+          } finally {
+            setIsLeaving(false);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────────
@@ -224,7 +223,8 @@ export default function TripInformationScreen() {
                 </AppText>
               </View>
               <AppText variant="caption" style={styles.infoValue}>
-                {formatDateDisplay(startDate ?? "")} – {formatDateDisplay(endDate ?? "")}
+                {formatDateDisplay(startDate ?? "")} –{" "}
+                {formatDateDisplay(endDate ?? "")}
               </AppText>
             </View>
 

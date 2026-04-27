@@ -1,7 +1,6 @@
-// src/components/itinerary/PlanningDoneBar.tsx
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
-import { colors, radius, spacing, typography } from "@/src/theme";
+import { colors, spacing, typography } from "@/src/theme";
 
 import CheckIcon from "@/assets/icons/check_mark.svg";
 import InfoIcon from "@/assets/icons/info.svg";
@@ -14,8 +13,8 @@ type Props = {
 
 export function PlanningDoneBar({ checked, onPress, onInfoPress }: Props) {
   return (
-    <View style={styles.wrapper}>
-      <View style={styles.bar}>
+    <View style={styles.wrapper} pointerEvents="box-none">
+      <View style={styles.footer}>
         <Pressable
           style={[styles.doneButton, checked && styles.doneButtonChecked]}
           onPress={onPress}
@@ -25,9 +24,14 @@ export function PlanningDoneBar({ checked, onPress, onInfoPress }: Props) {
             checked ? "Planning already submitted" : "Submit planning"
           }
         >
-          <CheckIcon width={18} height={18} />
+          <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+            {checked && (
+              <CheckIcon width={14} height={14} color={colors.nightBlack} />
+            )}
+          </View>
+
           <AppText variant="body" style={styles.doneText}>
-            {checked ? "Planning submitted" : "Done planning"}
+            {checked ? "Planning submitted" : "Planning done"}
           </AppText>
         </Pressable>
 
@@ -37,7 +41,7 @@ export function PlanningDoneBar({ checked, onPress, onInfoPress }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Show planning submission info"
         >
-          <InfoIcon width={20} height={20} />
+          <InfoIcon width={24} height={24} />
         </Pressable>
       </View>
     </View>
@@ -50,41 +54,60 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.lg,
+    zIndex: 10,
   },
-  bar: {
+  footer: {
+    width: "100%",
+    minHeight: 96,
     backgroundColor: colors.white,
-    borderRadius: radius.xxl,
-    padding: spacing.sm,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    justifyContent: "center",
+    gap: spacing.md,
   },
   doneButton: {
-    flex: 1,
-    minHeight: 52,
-    borderRadius: radius.xl,
+    minHeight: 56,
+    borderRadius: 999,
     backgroundColor: colors.beachYellow,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
   },
   doneButtonChecked: {
     opacity: 0.7,
   },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  checkboxChecked: {
+    backgroundColor: colors.beachYellow,
+    borderColor: colors.nightBlack,
+  },
   doneText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
+    fontSize: 18,
   },
   infoButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.lightWhite,
   },
 });

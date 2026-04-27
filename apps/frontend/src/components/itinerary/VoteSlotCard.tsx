@@ -6,7 +6,7 @@ import type { Activity } from "@/src/types/itinerary";
 
 import LocationIcon from "@/assets/icons/location.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
-import VoteIcon from "@/assets/icons/voting.svg"; 
+import VoteIcon from "@/assets/icons/voting.svg";
 
 type Props = {
   activity: Activity;

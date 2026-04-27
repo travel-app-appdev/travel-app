@@ -76,7 +76,10 @@ export default function CreateTripScreen() {
     if (isSubmitting) return;
 
     if (!user) {
-      Alert.alert("Not logged in", "Please log in again and try creating a trip.");
+      Alert.alert(
+        "Not logged in",
+        "Please log in again and try creating a trip."
+      );
       return;
     }
 
@@ -100,7 +103,10 @@ export default function CreateTripScreen() {
 
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert("Authentication error", "No Firebase user found. Please log in again.");
+        Alert.alert(
+          "Authentication error",
+          "No Firebase user found. Please log in again."
+        );
         return;
       }
 
@@ -134,13 +140,15 @@ export default function CreateTripScreen() {
       <View style={[styles.fullScreen, styles.bgStep1]}>
         <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
           <View style={[styles.root, styles.bgStep1]}>
-
             <View
               style={styles.curlyOrangeWrapper}
               pointerEvents="none"
               {...(Platform.OS !== "web" ? { accessible: false } : {})}
             >
-              <CurlyOrange width={SCREEN_WIDTH * 1.1} height={SCREEN_WIDTH * 1.1} />
+              <CurlyOrange
+                width={SCREEN_WIDTH * 1.1}
+                height={SCREEN_WIDTH * 1.1}
+              />
             </View>
 
             <ScrollView
@@ -197,7 +205,6 @@ export default function CreateTripScreen() {
                 accessibilityHint="Goes back to the home screen"
               />
             </View>
-
           </View>
         </SafeAreaView>
       </View>
@@ -288,7 +295,10 @@ export default function CreateTripScreen() {
                 pointerEvents="none"
                 {...(Platform.OS !== "web" ? { accessible: false } : {})}
               >
-                <CurlyYellow width={SCREEN_WIDTH * 1.1} height={SCREEN_WIDTH * 1.1} />
+                <CurlyYellow
+                  width={SCREEN_WIDTH * 1.1}
+                  height={SCREEN_WIDTH * 1.1}
+                />
               </View>
 
               <KeyboardAvoidingView
@@ -397,7 +407,9 @@ export default function CreateTripScreen() {
                   disabled={isSubmitting || !tripName.trim()}
                   style={styles.createButton}
                   textStyle={styles.createButtonText}
-                  accessibilityLabel={isSubmitting ? "Creating trip" : "Create trip"}
+                  accessibilityLabel={
+                    isSubmitting ? "Creating trip" : "Create trip"
+                  }
                 />
               </View>
             </>

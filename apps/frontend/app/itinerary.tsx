@@ -96,6 +96,16 @@ const MOCK_FINAL_ACTIVITIES: Activity[] = [
 ];
 
 // ---------------------------------------------------------------------------
+function parseActivitiesJson(value?: string): Activity[] {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 function buildItineraryFromParams(params: {
   tripId?: string;
@@ -156,10 +166,12 @@ export default function ItineraryScreen() {
     destination,
     startDate,
     endDate,
+    activitiesJson,
     newActivityId,
     newActivityDayId,
     newActivitySlotId,
     newActivityName,
+    newActivityDescription,
     newActivityAddress,
     newActivityGoogleMapsUrl,
   } = useLocalSearchParams<{
@@ -169,10 +181,12 @@ export default function ItineraryScreen() {
     destination?: string;
     startDate?: string;
     endDate?: string;
+    activitiesJson?: string;
     newActivityId?: string;
     newActivityDayId?: string;
     newActivitySlotId?: string;
     newActivityName?: string;
+    newActivityDescription?: string;
     newActivityAddress?: string;
     newActivityGoogleMapsUrl?: string;
   }>();
@@ -182,16 +196,17 @@ export default function ItineraryScreen() {
       ? state
       : undefined;
 
-  const [itinerary, setItinerary] = useState<TripItinerary>(() =>
-    buildItineraryFromParams({
+  const [itinerary, setItinerary] = useState<TripItinerary>(() => ({
+    ...buildItineraryFromParams({
       tripId,
       title,
       destination,
       startDate,
       endDate,
       state: routeState,
-    })
-  );
+    }),
+    activities: parseActivitiesJson(activitiesJson),
+  }));
 
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
   const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -208,9 +223,20 @@ export default function ItineraryScreen() {
         endDate,
         state: routeState,
       }),
-      activities: current.activities,
+      activities:
+        parseActivitiesJson(activitiesJson).length > 0
+          ? parseActivitiesJson(activitiesJson)
+          : current.activities,
     }));
-  }, [tripId, title, destination, startDate, endDate, routeState]);
+  }, [
+    tripId,
+    title,
+    destination,
+    startDate,
+    endDate,
+    routeState,
+    activitiesJson,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -221,6 +247,14 @@ export default function ItineraryScreen() {
   }, []);
 
   function handlePlanningInfoPress() {
+    if (showPlanningInfoPopup) {
+      if (planningInfoTimeoutRef.current) {
+        clearTimeout(planningInfoTimeoutRef.current);
+      }
+      setShowPlanningInfoPopup(false);
+      return;
+    }
+
     setShowPlanningInfoPopup(true);
 
     if (planningInfoTimeoutRef.current) {
@@ -232,7 +266,7 @@ export default function ItineraryScreen() {
     }, 110000);
   }
 
-  const lastAppliedActivityIdRef = useRef<string | null>(null);
+  const lastAppliedActivitySignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (
@@ -244,40 +278,60 @@ export default function ItineraryScreen() {
       return;
     }
 
-    if (lastAppliedActivityIdRef.current === newActivityId) {
+    const incomingSignature = [
+      newActivityId,
+      newActivityDayId,
+      newActivitySlotId,
+      newActivityName,
+      newActivityDescription ?? "",
+      newActivityAddress ?? "",
+      newActivityGoogleMapsUrl ?? "",
+    ].join("|");
+
+    if (lastAppliedActivitySignatureRef.current === incomingSignature) {
       return;
     }
 
-    const activityAlreadyExists = itinerary.activities.some(
-      (activity) => activity.id === newActivityId
-    );
-
-    if (activityAlreadyExists) {
-      lastAppliedActivityIdRef.current = newActivityId;
-      return;
-    }
-
-    const newActivity: Activity = {
+    const incomingActivity: Activity = {
       id: newActivityId,
       dayId: newActivityDayId,
       slotId: newActivitySlotId,
       name: newActivityName,
       address: newActivityAddress ?? "",
       googleMapsUrl: newActivityGoogleMapsUrl ?? "",
+      ...(newActivityDescription
+        ? { description: newActivityDescription }
+        : {}),
     };
 
-    setItinerary((current) => ({
-      ...current,
-      activities: [...current.activities, newActivity],
-    }));
+    setItinerary((current) => {
+      const existingIndex = current.activities.findIndex(
+        (activity) => activity.id === incomingActivity.id
+      );
 
-    lastAppliedActivityIdRef.current = newActivityId;
+      if (existingIndex === -1) {
+        return {
+          ...current,
+          activities: [...current.activities, incomingActivity],
+        };
+      }
+
+      const updatedActivities = [...current.activities];
+      updatedActivities[existingIndex] = incomingActivity;
+
+      return {
+        ...current,
+        activities: updatedActivities,
+      };
+    });
+
+    lastAppliedActivitySignatureRef.current = incomingSignature;
   }, [
-    itinerary.activities,
     newActivityId,
     newActivityDayId,
     newActivitySlotId,
     newActivityName,
+    newActivityDescription,
     newActivityAddress,
     newActivityGoogleMapsUrl,
   ]);
@@ -299,10 +353,6 @@ export default function ItineraryScreen() {
       setSelectedDayId(itinerary.startDate);
     }
   }, [tripDays, itinerary.startDate]);
-
-  // -------------------------------------------------------------------------
-  // Planning state
-  // -------------------------------------------------------------------------
 
   const slots = useMemo(() => generateTimeSlots(), []);
 
@@ -333,6 +383,34 @@ export default function ItineraryScreen() {
         state: activeState,
         dayId: selectedDayId,
         slotId,
+        activitiesJson: JSON.stringify(itinerary.activities),
+      },
+    });
+  }
+
+  function handleEditActivity(activity: Activity) {
+    if (hasCurrentUserFinished) {
+      handlePlanningInfoPress();
+      return;
+    }
+
+    router.push({
+      pathname: "/add-activity",
+      params: {
+        tripId: itinerary.tripId,
+        title: itinerary.title,
+        destination: itinerary.destination,
+        startDate: itinerary.startDate,
+        endDate: itinerary.endDate,
+        state: activeState,
+        dayId: activity.dayId,
+        slotId: activity.slotId,
+        activityId: activity.id,
+        initialName: activity.name,
+        initialDescription: activity.description ?? "",
+        initialAddress: activity.address ?? "",
+        initialGoogleMapsUrl: activity.googleMapsUrl ?? "",
+        activitiesJson: JSON.stringify(itinerary.activities),
       },
     });
   }
@@ -351,10 +429,6 @@ export default function ItineraryScreen() {
       planningStatus: updatedStatus,
     }));
   }
-
-  // -------------------------------------------------------------------------
-  // Voting state
-  // -------------------------------------------------------------------------
 
   const votingActivities = MOCK_VOTING_ACTIVITIES;
 
@@ -409,10 +483,6 @@ export default function ItineraryScreen() {
     }
   }, [activeState, tripDays, daysWithConflicts]);
 
-  // -------------------------------------------------------------------------
-  // Final state
-  // -------------------------------------------------------------------------
-
   const finalActivities = MOCK_FINAL_ACTIVITIES;
 
   const finalActivityMap = useMemo(() => {
@@ -426,10 +496,6 @@ export default function ItineraryScreen() {
   function handleJoinGroup(activityId: string) {
     Alert.alert("Joined group", `Joined activity ${activityId}`);
   }
-
-  // -------------------------------------------------------------------------
-  // Render
-  // -------------------------------------------------------------------------
 
   const safeAreaBg =
     activeState === "voting"
@@ -480,6 +546,8 @@ export default function ItineraryScreen() {
                     slot={slot}
                     activity={activity}
                     onAddActivity={handleAddActivity}
+                    onEditActivity={handleEditActivity}
+                    disabled={hasCurrentUserFinished}
                   />
                 ))}
               </View>
@@ -526,6 +594,10 @@ export default function ItineraryScreen() {
           </View>
         </ScrollView>
 
+        {activeState === "planning" && (
+          <View pointerEvents="none" style={styles.footerBackground} />
+        )}
+
         {showPlanningInfoPopup && (
           <View style={styles.popupWrapper} pointerEvents="none">
             <View style={styles.popup}>
@@ -534,6 +606,10 @@ export default function ItineraryScreen() {
               </AppText>
             </View>
           </View>
+        )}
+
+        {activeState === "planning" && hasCurrentUserFinished && (
+          <View style={styles.lockOverlay} pointerEvents="auto" />
         )}
 
         {activeState === "planning" && (
@@ -574,13 +650,28 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     gap: spacing.md,
   },
+  footerBackground: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    height: 110,
+    shadowColor: colors.beachYellow,
+    shadowOpacity: 5,
+    shadowRadius: 10,
+    elevation: 4,
+  },
   popupWrapper: {
     position: "absolute",
-    bottom: 100,
+    bottom: 110,
     left: 0,
     right: 0,
     alignItems: "center",
     paddingHorizontal: spacing.lg,
+    zIndex: 20,
   },
   popup: {
     backgroundColor: colors.nightBlack,
@@ -592,6 +683,11 @@ const styles = StyleSheet.create({
   popupText: {
     color: colors.white,
     textAlign: "center",
+  },
+  lockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    zIndex: 5,
   },
   votingSection: {
     paddingTop: spacing.md,
