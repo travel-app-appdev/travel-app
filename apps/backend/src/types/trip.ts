@@ -33,6 +33,7 @@ export type TripMembershipDocument = {
     trip_id: string;
     role: string;
     invite_status: string;
+    planning_done?: boolean;
 };
 
 export type UserDocument = {
