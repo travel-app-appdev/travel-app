@@ -95,8 +95,9 @@ function calcDays(start: Date, end: Date) {
   return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)) + 1);
 }
 
-function dayLabel(days: number) {
-  return days === 1 ? "1 day left" : `${days} days left`;
+function dayLabel(days: number, active: boolean): string {
+  if (active) return days === 1 ? "1 day left" : `${days} days left`;
+  return days === 1 ? "1 day" : `${days} days`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -123,13 +124,11 @@ export default function TripInformationScreen() {
   const isSmallScreen = screenHeight < 700;
   const [isLeaving, setIsLeaving] = useState(false);
 
-  // Cleanup timeouts on unmount
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(() => {
     return () => timeoutRefs.current.forEach(clearTimeout);
   }, []);
 
-  // Parse members from JSON param
   const members: MemberParam[] = (() => {
     try {
       return membersParam ? JSON.parse(membersParam) : [];
@@ -264,8 +263,6 @@ export default function TripInformationScreen() {
                 <View key={phase.id} style={styles.fieldGroup}>
                   <View style={styles.phaseRow}>
                     <View style={styles.phaseLeft}>
-
-                      {/* Coloured pill badge */}
                       <View style={[styles.phaseBadge, { backgroundColor: phase.color }]}>
                         <AppText
                           variant="caption"
@@ -275,14 +272,7 @@ export default function TripInformationScreen() {
                         </AppText>
                       </View>
 
-                      {/*
-                        Same layout as trip-settings:
-                        [ hourglassCol ] [ phaseTextCol          ]
-                                         [ "X days left"  [ • ] ]
-                                         [ "Timer"               ]
-                      */}
                       <View style={styles.phaseTimerBlock}>
-                        {/* Hourglass — vertically centred across both text rows */}
                         <View style={styles.hourglassCol}>
                           {phase.active
                             ? <Hourglass1 width={20} height={20} />
@@ -290,11 +280,10 @@ export default function TripInformationScreen() {
                           }
                         </View>
 
-                        {/* Text column: days + dot on top, Timer label below */}
                         <View style={styles.phaseTextCol}>
                           <View style={styles.daysRow}>
                             <AppText variant="body" style={styles.phaseDays}>
-                              {dayLabel(days)}
+                              {dayLabel(days, phase.active)}
                             </AppText>
                             {phase.active && (
                               <View style={styles.timepointWrapper}>
@@ -310,7 +299,6 @@ export default function TripInformationScreen() {
                     </View>
                   </View>
 
-                  {/* Date range subtitle */}
                   <AppText variant="caption" style={styles.phaseDateLabel}>
                     {formatDate(phase.startDate)}
                     {phase.startDate.getTime() !== phase.endDate.getTime()
@@ -358,8 +346,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     gap: spacing.xl,
   },
-
-  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -377,8 +363,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bodyBold,
     color: colors.textPrimary,
   },
-
-  // Field rows
   fieldGroup: {
     gap: spacing.sm,
   },
@@ -399,8 +383,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
     paddingLeft: 28,
   },
-
-  // Phase rows
   phaseRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -415,15 +397,13 @@ const styles = StyleSheet.create({
   phaseBadge: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: radius.md,        // matches trip-settings (~12)
+    borderRadius: radius.md,
   },
   phaseBadgeText: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
   },
-
-  // Phase timer block — same structure as trip-settings
   phaseTimerBlock: {
     flexDirection: "row",
     alignItems: "center",
@@ -462,8 +442,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
     paddingLeft: 4,
   },
-
-  // Leave trip
   leaveSafeArea: {
     backgroundColor: colors.lightWhite,
   },

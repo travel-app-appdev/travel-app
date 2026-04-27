@@ -112,8 +112,9 @@ function calcDays(start: Date, end: Date): number {
   return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)) + 1);
 }
 
-function dayLabel(days: number): string {
-  return days === 1 ? "1 day left" : `${days} days left`;
+function dayLabel(days: number, active: boolean): string {
+  if (active) return days === 1 ? "1 day left" : `${days} days left`;
+  return days === 1 ? "1 day" : `${days} days`;
 }
 
 function dateToTimeString(date: Date): string {
@@ -717,7 +718,7 @@ export default function TripSettingsScreen() {
                         <View style={styles.phaseTextCol}>
                           <View style={styles.daysRow}>
                             <AppText variant="body" style={styles.phaseDays}>
-                              {dayLabel(days)}
+                              {dayLabel(days, phase.active)}
                             </AppText>
                             {phase.active && (
                               <View style={styles.timepointWrapper}>
