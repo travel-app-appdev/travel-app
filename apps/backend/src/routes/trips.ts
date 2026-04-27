@@ -8,6 +8,7 @@ import {
     deleteTrip,
     leaveTrip,
     removeMember,
+    finishPlanning
     updateTrip,
 } from "../controllers/tripsController";
 import { getItineraryController } from "../controllers/itineraryController";
@@ -23,5 +24,6 @@ router.patch("/:tripId", updateTrip);
 router.delete("/:tripId", deleteTrip);
 router.post("/:tripId/leave", leaveTrip);
 router.delete("/:tripId/members/:memberId", removeMember);
+router.post("/:tripId/finish-planning", finishPlanning);
 
 export default router;

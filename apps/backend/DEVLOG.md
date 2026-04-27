@@ -257,37 +257,75 @@ Each day has 8 slots:
 - `req.params` values can technically be arrays in Express types
 - Fixed by using `String(req.params.tripId)` to explicitly cast to string
 
-## 27.04.2026 — State Filter for GET Itinerary Endpoint
+## 27.04.2026 — State Filter + Finish Planning Endpoint
 
 ### What I did today:
 - Added optional `?state=` query parameter to GET /trips/:id/itinerary
-- If state is provided, backend checks if trip is in that state before returning itinerary
-- If state does not match → returns 400 with clear error message
-- If no state param provided → returns itinerary regardless of state
-- Added unit tests for state mismatch and no state param cases
+- Implemented "Finish Planning" endpoint that records per-member completion
+  and automatically switches trip state from "Planning" to "Voting" when all members are done
+- Added unit tests for both features
 
-### How state filter works:
-1. Frontend calls GET /trips/:id/itinerary?state=planning
-2. Backend finds the trip and checks its state
-3. If trip state matches → returns itinerary
-4. If trip state does not match → returns 400 "Trip is not in planning state"
-5. If no state param → returns itinerary regardless of state
+### What I added:
+
+**State filter for GET itinerary:**
+- If `?state=planning` is provided → backend checks trip state before returning itinerary
+- If state does not match → returns 400 with clear error message
+- If no state param → returns itinerary regardless of state
+
+**Finish planning endpoint:**
+- New endpoint POST `/trips/:tripId/finish-planning`
+- Marks the calling member as `planning_done: true` in Firestore
+- Checks if ALL members have `planning_done: true`
+- If all done → automatically switches trip state from "Planning" to "Voting"
+- Returns completion status with `allDone`, `tripState`, `completedMembers`, `totalMembers`
+
+**New functions in `tripsRepository.ts`:**
+- `markMemberPlanningDone` — updates `planning_done: true` for a member
+- `updateTripState` — updates the `state` field of a trip in Firestore
+
+**New function in `tripsService.ts`:**
+- `finishPlanningForMember` — validates token, checks trip state, marks member done,
+  checks if all done, switches state to Voting if needed
+
+**Updated files:**
+- `src/types/trip.ts` — added `planning_done` field to `TripMembershipDocument`
+- `src/controllers/tripsController.ts` — added `finishPlanning` controller
+- `src/routes/trips.ts` — added POST /:tripId/finish-planning route
+- `src/__tests__/finishPlanning.test.ts` — unit tests for finish planning endpoint
+
+### How finish planning works:
+1. Member calls POST /trips/:tripId/finish-planning with their idToken
+2. Backend verifies token and checks trip is in "Planning" state
+3. Backend marks this member as `planning_done: true` in Firestore
+4. Backend checks if ALL members are done
+5. If all done → trip state switches to "Voting" automatically
+6. Response includes completion status
+
+### Example response:
+```json
+{
+    "allDone": true,
+    "tripState": "Voting",
+    "completedMembers": 3,
+    "totalMembers": 3
+}
+```
 
 ### API Endpoints added:
-| Method | Endpoint                            | Description                                  |
-|--------|-------------------------------------|----------------------------------------------|
-| POST   | /auth/login                         | Verify Firebase token, save user             |
-| POST   | /auth/register                      | Create new user with email/password          |
-| GET    | /trips/my                           | Get all trips for a user                     |
-| POST   | /trips/                             | Create trip (generates invite code)          |
-| POST   | /trips/join                         | Join a trip via invite code                  |
-| POST   | /itinerary/:tripId/generate         | Generate & save timeslots                    |
-| GET    | /trips/:id/itinerary                | Get itinerary for a trip                     |
-| GET    | /trips/:id/itinerary?state=planning | Get itinerary only if trip is in given state |
+| Method | Endpoint                              | Description                                  |
+|--------|---------------------------------------|----------------------------------------------|
+| POST   | /auth/login                           | Verify Firebase token, save user             |
+| POST   | /auth/register                        | Create new user with email/password          |
+| GET    | /trips/my                             | Get all trips for a user                     |
+| POST   | /trips/                               | Create trip (generates invite code)          |
+| POST   | /trips/join                           | Join a trip via invite code                  |
+| POST   | /trips/:tripId/finish-planning        | Mark member as done, switch to Voting if all done |
+| POST   | /itinerary/:tripId/generate           | Generate & save timeslots                    |
+| GET    | /trips/:id/itinerary                  | Get itinerary for a trip                     |
+| GET    | /trips/:id/itinerary?state=planning   | Get itinerary only if trip is in given state |
 
 ### Tests:
-- 24/24 tests passing
+- 26/26 tests passing
 - New tests cover:
-  - `generateDaySlots()` — correct number of slots, correct times, activityId null
-  - `generateItinerary()` — correct days, correct dates, correct trip_id
-  - `GET /trips/:id/itinerary?state=planning` — returns 400 if state mismatch, 200 if no state param
+  - `POST /trips/:tripId/finish-planning` — missing idToken → 400, success → 200
+  - `GET /trips/:id/itinerary?state=planning` — state mismatch → 400, no state param → 200
