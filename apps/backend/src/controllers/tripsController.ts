@@ -1,4 +1,3 @@
-// apps/backend/src/controllers/tripsController.ts
 import { Request, Response } from "express";
 import {
     createTripForAuthenticatedUser,
@@ -8,7 +7,7 @@ import {
     deleteTripForAdmin,
     leaveTripForMember,
     removeMemberForAdmin,
-     finishPlanningForMember 
+    finishPlanningForMember,
     updateTripForAdmin,
 } from "../services/tripsService";
 
@@ -67,6 +66,7 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
         res.status(401).json({ error: "Invalid token or failed to create trip" });
     }
 };
+
 
 export const createTripWithoutAuth = async (
     req: Request,
@@ -208,6 +208,10 @@ export const finishPlanning = async (req: Request, res: Response): Promise<void>
             res.status(409).json({ error: error.message });
         } else {
             res.status(401).json({ error: "Invalid token or failed to finish planning" });
+        }
+    }
+};
+
 // New controller for updating trip details by admin
 
 export const updateTrip = async (req: Request, res: Response): Promise<void> => {

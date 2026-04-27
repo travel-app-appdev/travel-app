@@ -260,6 +260,7 @@ export async function markMemberPlanningDone(tripId: string, userId: string): Pr
 export async function updateTripState(tripId: string, state: string): Promise<void> {
     const db = admin.firestore();
     await db.collection("trips").doc(tripId).update({ state });
+    }
 
 // New function to update trip details by admin
 

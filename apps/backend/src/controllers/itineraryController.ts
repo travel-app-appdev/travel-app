@@ -1,4 +1,3 @@
-// apps/backend/src/controllers/itineraryController.ts
 import { Request, Response } from "express";
 import { generateAndSaveItinerary, getItinerary } from "../services/itineraryService";
 

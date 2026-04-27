@@ -1,4 +1,3 @@
-// apps/backend/src/services/authService.ts
 import admin from "../config/firebase";
 import {
     createUserProfile,

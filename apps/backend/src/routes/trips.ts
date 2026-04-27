@@ -1,4 +1,3 @@
-// apps/backend/src/routes/trips.ts
 import { Router } from "express";
 import {
     getMyTrips,
@@ -8,7 +7,7 @@ import {
     deleteTrip,
     leaveTrip,
     removeMember,
-    finishPlanning
+    finishPlanning,
     updateTrip,
 } from "../controllers/tripsController";
 import { getItineraryController } from "../controllers/itineraryController";

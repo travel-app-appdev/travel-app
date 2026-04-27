@@ -1,4 +1,3 @@
-// apps/backend/src/repositories/itineraryRepository.ts
 import admin from "../config/firebase";
 import { Itinerary } from "../types/trip";
 

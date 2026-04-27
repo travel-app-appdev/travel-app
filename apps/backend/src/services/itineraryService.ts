@@ -1,4 +1,3 @@
-// apps/backend/src/services/itineraryService.ts
 import { generateItinerary } from "../__helpers__/itineraryHelper";
 import { saveItinerary, getItineraryByTripId } from "../repositories/itineraryRepository";
 import { findTripById } from "../repositories/tripsRepository";

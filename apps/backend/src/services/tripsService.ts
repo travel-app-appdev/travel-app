@@ -1,4 +1,3 @@
-// apps/backend/src/services/tripsService.ts
 import admin from "../config/firebase";
 import {
     createTripWithAdminMembership,
@@ -221,6 +220,7 @@ export async function finishPlanningForMember(
         completedMembers,
         totalMembers,
     };
+    } 
 // New function to update trip details by admin
 
 export async function updateTripForAdmin(input: {

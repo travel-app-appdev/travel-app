@@ -1,4 +1,3 @@
-// apps/backend/src/controllers/authController.ts
 import { Request, Response } from "express";
 import { loginWithIdToken, registerUser, updateUserProfile } from "../services/authService";
 

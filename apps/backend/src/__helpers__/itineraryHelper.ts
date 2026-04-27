@@ -1,4 +1,3 @@
-// apps/backend/src/__helpers__/itineraryHelper.ts
 export function generateDaySlots() {
     const slots = [
         "06:00-08:00",
