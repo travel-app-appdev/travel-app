@@ -27,7 +27,17 @@ export async function generateAndSaveItinerary(tripId: string): Promise<Itinerar
     return itinerary;
 }
 
-export async function getItinerary(tripId: string): Promise<Itinerary> {
+export async function getItinerary(tripId: string, state?: string): Promise<Itinerary> {
+    const trip = await findTripById(tripId);
+
+    if (!trip) {
+        throw { status: 404, message: "Trip not found" };
+    }
+
+    if (state && trip.state.toLowerCase() !== state.toLowerCase()) {
+        throw { status: 400, message: `Trip is not in ${state} state` };
+    }
+
     const itinerary = await getItineraryByTripId(tripId);
 
     if (!itinerary) {
