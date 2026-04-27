@@ -5,6 +5,8 @@ export type TripMember = {
   id: string;
   name: string;
   role: "admin" | "member";
+  planning_done?: boolean;
+  voting_done?: boolean;
 };
 
 export type Trip = {
@@ -177,4 +179,39 @@ export async function updateTrip(payload: UpdateTripPayload): Promise<Trip> {
   }
 
   return data as Trip;
+}
+
+export type FinishPlanningResponse = {
+  allDone: boolean;
+  tripState: "Planning" | "Voting";
+  completedMembers: number;
+  totalMembers: number;
+};
+
+type FinishPlanningPayload = {
+  idToken: string;
+  tripId: string;
+};
+
+export async function finishPlanning(
+  payload: FinishPlanningPayload
+): Promise<FinishPlanningResponse> {
+  const response = await fetch(
+    `${API_URL}/trips/${payload.tripId}/finish-planning`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: payload.idToken }),
+    }
+  );
+
+  const data: FinishPlanningResponse | ApiErrorResponse = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      (data as ApiErrorResponse).error || "Failed to finish planning"
+    );
+  }
+
+  return data as FinishPlanningResponse;
 }

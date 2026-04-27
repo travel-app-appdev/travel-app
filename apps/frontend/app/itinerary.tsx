@@ -24,9 +24,11 @@ import { PlanningDoneBar } from "@/src/components/itinerary/PlanningDoneBar";
 import { VotingSlotCard } from "@/src/components/itinerary/VoteSlotCard";
 import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
+import { finishPlanning } from "@/src/api/trips";
+import { auth } from "@/src/lib/firebase";
 
 const DEV_FORCE_STATE: ItineraryState | null = null;
-const MOCK_CURRENT_USER_ID = "user-1";
+const FALLBACK_CURRENT_USER_ID = "user-1";
 
 const MOCK_VOTING_ACTIVITIES: Activity[] = [
   {
@@ -102,6 +104,79 @@ function parseActivitiesJson(value?: string): Activity[] {
   }
 }
 
+type RouteMember = {
+  id?: string;
+  userId?: string;
+  planning_done?: boolean;
+  hasFinishedPlanning?: boolean;
+};
+
+function parsePlanningStatusJson(value?: string) {
+  if (!value) return undefined;
+
+  try {
+    const parsed = JSON.parse(value);
+
+    if (!Array.isArray(parsed)) return undefined;
+
+    return parsed
+      .map((member: RouteMember) => ({
+        userId: member.id ?? member.userId ?? "",
+        hasFinishedPlanning:
+          member.planning_done ?? member.hasFinishedPlanning ?? false,
+      }))
+      .filter((member) => member.userId);
+  } catch {
+    return undefined;
+  }
+}
+
+function getConflictingActivities(activities: Activity[]): Activity[] {
+  const groups = new Map<string, Activity[]>();
+
+  activities.forEach((activity) => {
+    const key = `${activity.dayId}|${activity.slotId}`;
+    groups.set(key, [...(groups.get(key) ?? []), activity]);
+  });
+
+  return Array.from(groups.values())
+    .filter((group) => group.length > 1)
+    .flat();
+}
+
+function toUiState(state: "Planning" | "Voting" | "Final"): ItineraryState {
+  switch (state) {
+    case "Voting":
+      return "voting";
+    case "Final":
+      return "final";
+    case "Planning":
+    default:
+      return "planning";
+  }
+}
+
+function markPlanningDoneForUser(
+  planningStatus: TripItinerary["planningStatus"],
+  userId: string
+): TripItinerary["planningStatus"] {
+  const hasExistingUser = planningStatus.some(
+    (member) => member.userId === userId
+  );
+
+  if (!hasExistingUser) {
+    return [...planningStatus, { userId, hasFinishedPlanning: true }];
+  }
+
+  return planningStatus.map((member) =>
+    member.userId === userId ? { ...member, hasFinishedPlanning: true } : member
+  );
+}
+
+function shouldSkipVoting(memberCount: number) {
+  return memberCount <= 1;
+}
+
 function buildItineraryFromParams(params: {
   tripId?: string;
   title?: string;
@@ -109,6 +184,7 @@ function buildItineraryFromParams(params: {
   startDate?: string;
   endDate?: string;
   state?: ItineraryState;
+  planningStatus?: TripItinerary["planningStatus"];
 }): TripItinerary {
   const fallbackDate = new Date().toISOString().split("T")[0];
   return {
@@ -118,7 +194,7 @@ function buildItineraryFromParams(params: {
     startDate: params.startDate ?? fallbackDate,
     endDate: params.endDate ?? fallbackDate,
     state: params.state ?? "planning",
-    planningStatus: [
+    planningStatus: params.planningStatus ?? [
       { userId: "user-1", hasFinishedPlanning: false },
       { userId: "user-2", hasFinishedPlanning: true },
       { userId: "user-3", hasFinishedPlanning: false },
@@ -163,6 +239,7 @@ export default function ItineraryScreen() {
     destination,
     startDate,
     endDate,
+    members,
     activitiesJson,
     newActivityId,
     newActivityDayId,
@@ -178,6 +255,7 @@ export default function ItineraryScreen() {
     destination?: string;
     startDate?: string;
     endDate?: string;
+    members?: string;
     activitiesJson?: string;
     newActivityId?: string;
     newActivityDayId?: string;
@@ -192,6 +270,10 @@ export default function ItineraryScreen() {
     state === "planning" || state === "voting" || state === "final"
       ? state
       : undefined;
+  const routePlanningStatus = useMemo(
+    () => parsePlanningStatusJson(members),
+    [members]
+  );
 
   const [itinerary, setItinerary] = useState<TripItinerary>(() => ({
     ...buildItineraryFromParams({
@@ -201,13 +283,16 @@ export default function ItineraryScreen() {
       startDate,
       endDate,
       state: routeState,
+      planningStatus: routePlanningStatus,
     }),
     activities: parseActivitiesJson(activitiesJson),
   }));
 
   const [apiActivities, setApiActivities] = useState<Activity[]>([]);
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
-  const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   const slots = useMemo(() => generateTimeSlots(), []);
 
@@ -218,6 +303,7 @@ export default function ItineraryScreen() {
     () => generateTripDays(itinerary.startDate, itinerary.endDate),
     [itinerary.startDate, itinerary.endDate]
   );
+  const [isSubmittingPlanning, setIsSubmittingPlanning] = useState(false);
 
   const [selectedDayId, setSelectedDayId] = useState<string>("");
 
@@ -238,13 +324,23 @@ export default function ItineraryScreen() {
         startDate,
         endDate,
         state: routeState,
+        planningStatus: routePlanningStatus,
       }),
       activities:
         parseActivitiesJson(activitiesJson).length > 0
           ? parseActivitiesJson(activitiesJson)
           : current.activities,
     }));
-  }, [tripId, title, destination, startDate, endDate, routeState, activitiesJson]);
+  }, [
+    tripId,
+    title,
+    destination,
+    startDate,
+    endDate,
+    routeState,
+    routePlanningStatus,
+    activitiesJson,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -356,11 +452,23 @@ export default function ItineraryScreen() {
     return mapActivitiesToSlots(slots, apiActivities, selectedDayId);
   }, [slots, apiActivities, selectedDayId]);
 
+  //const currentUserId = auth.currentUser?.uid ?? FALLBACK_CURRENT_USER_ID;
+  const planningStatusParam = useMemo(
+    () =>
+      JSON.stringify(
+        itinerary.planningStatus.map((member) => ({
+          userId: member.userId,
+          hasFinishedPlanning: member.hasFinishedPlanning,
+        }))
+      ),
+    [itinerary.planningStatus]
+  );
   const currentUserStatus = itinerary.planningStatus.find(
-    (m) => m.userId === MOCK_CURRENT_USER_ID
+    (m) => m.userId === currentUserId
   );
   const hasCurrentUserFinished =
     currentUserStatus?.hasFinishedPlanning ?? false;
+  const tripMemberCount = itinerary.planningStatus.length;
 
   function handleAddActivity(slotId: string) {
     if (hasCurrentUserFinished) {
@@ -377,6 +485,7 @@ export default function ItineraryScreen() {
         startDate: itinerary.startDate,
         endDate: itinerary.endDate,
         state: activeState,
+        members: planningStatusParam,
         dayId: selectedDayId,
         slotId: `${selectedDayId}_${slotId}`,
         activitiesJson: JSON.stringify(itinerary.activities),
@@ -399,6 +508,7 @@ export default function ItineraryScreen() {
         startDate: itinerary.startDate,
         endDate: itinerary.endDate,
         state: activeState,
+        members: planningStatusParam,
         dayId: activity.dayId,
         slotId: activity.slotId,
         activityId: activity.id,
@@ -411,22 +521,91 @@ export default function ItineraryScreen() {
     });
   }
 
-  function handleFinishPlanning() {
-    if (hasCurrentUserFinished) return;
+  async function handleFinishPlanning() {
+    if (hasCurrentUserFinished || isSubmittingPlanning) return;
 
-    const updatedStatus = itinerary.planningStatus.map((m) =>
-      m.userId === MOCK_CURRENT_USER_ID
-        ? { ...m, hasFinishedPlanning: true }
-        : m
-    );
+    const currentUser = auth.currentUser;
+    if (!currentUserId) return;
 
-    setItinerary((current) => ({
-      ...current,
-      planningStatus: updatedStatus,
-    }));
+    if (!currentUser || itinerary.tripId === "trip-fallback") {
+      const nextState = shouldSkipVoting(tripMemberCount)
+        ? "final"
+        : "planning";
+
+      setItinerary((current) => ({
+        ...current,
+        state: nextState,
+        planningStatus: markPlanningDoneForUser(
+          current.planningStatus,
+          currentUserId
+        ),
+      }));
+
+      if (nextState === "final") {
+        router.setParams({ state: "final" });
+      }
+
+      return;
+    }
+
+    setIsSubmittingPlanning(true);
+
+    try {
+      const idToken = await currentUser.getIdToken();
+      const result = await finishPlanning({
+        idToken,
+        tripId: itinerary.tripId,
+      });
+      const backendState = toUiState(result.tripState);
+      const nextState =
+        backendState === "voting" &&
+        shouldSkipVoting(result.totalMembers || tripMemberCount)
+          ? "final"
+          : backendState;
+
+      setItinerary((current) => ({
+        ...current,
+        state: nextState,
+        planningStatus: markPlanningDoneForUser(
+          current.planningStatus,
+          currentUserId
+        ),
+      }));
+
+      router.setParams({ state: nextState });
+    } catch {
+      const nextState = shouldSkipVoting(tripMemberCount)
+        ? "final"
+        : "planning";
+
+      setItinerary((current) => ({
+        ...current,
+        state: nextState,
+        planningStatus: markPlanningDoneForUser(
+          current.planningStatus,
+          currentUserId
+        ),
+      }));
+
+      if (nextState === "final") {
+        router.setParams({ state: "final" });
+      }
+    } finally {
+      setIsSubmittingPlanning(false);
+    }
   }
 
-  const votingActivities = MOCK_VOTING_ACTIVITIES;
+  const conflictingActivities = useMemo(
+    () => getConflictingActivities(itinerary.activities),
+    [itinerary.activities]
+  );
+
+  const votingActivities =
+    conflictingActivities.length > 0
+      ? conflictingActivities
+      : itinerary.activities.length > 0
+        ? []
+        : MOCK_VOTING_ACTIVITIES;
 
   const daysWithConflicts = useMemo(() => {
     const set = new Set<string>();
@@ -479,7 +658,10 @@ export default function ItineraryScreen() {
     }
   }, [activeState, tripDays, daysWithConflicts]);
 
-  const finalActivities = MOCK_FINAL_ACTIVITIES;
+  const finalActivities =
+    itinerary.activities.length > 0
+      ? itinerary.activities
+      : MOCK_FINAL_ACTIVITIES;
 
   const finalActivityMap = useMemo(() => {
     const map = new Map<string, Activity>();
@@ -611,6 +793,7 @@ export default function ItineraryScreen() {
         {activeState === "planning" && (
           <PlanningDoneBar
             checked={hasCurrentUserFinished}
+            disabled={isSubmittingPlanning}
             onPress={handleFinishPlanning}
             onInfoPress={handlePlanningInfoPress}
           />
