@@ -86,6 +86,43 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
         expect(res.body.error).toBe('idToken is required');
     });
 
+    it('should return 400 if trip is not in Planning state', async () => {
+        jest.spyOn(require('../repositories/tripsRepository'), 'findTripById')
+            .mockResolvedValueOnce({
+                trip_id: 'trip-123',
+                title: 'Test Trip',
+                destination: 'Vienna',
+                start_date: '2026-05-01',
+                end_date: '2026-05-03',
+                state: 'Voting',
+            });
+
+        const res = await request(app)
+            .post('/itinerary/trip-123/slots/06:00-08:00/activities')
+            .send({
+                idToken: 'valid-token',
+                title: 'Visit Palace',
+            });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('Trip is not in Planning state');
+    });
+
+    it('should return 404 if user is not a member', async () => {
+        jest.spyOn(require('../repositories/tripsRepository'), 'findMembership')
+            .mockResolvedValueOnce(null);
+
+        const res = await request(app)
+            .post('/itinerary/trip-123/slots/06:00-08:00/activities')
+            .send({
+                idToken: 'valid-token',
+                title: 'Visit Palace',
+            });
+
+        expect(res.status).toBe(404);
+        expect(res.body.error).toBe('User is not a member of this trip');
+    });
+
     it('should return 201 and activity data on success', async () => {
         const res = await request(app)
             .post('/itinerary/trip-123/slots/06:00-08:00/activities')
@@ -106,6 +143,7 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
     afterAll(done => {
         done();
     });
+
 });
 
 describe('GET /itinerary/:tripId/slots/:slotId/activities', () => {
@@ -121,4 +159,5 @@ describe('GET /itinerary/:tripId/slots/:slotId/activities', () => {
     afterAll(done => {
         done();
     });
+
 });
