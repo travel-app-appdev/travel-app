@@ -1,5 +1,5 @@
 import admin from "../config/firebase";
-import { Activity, TimeSlotActivity } from "../types/trip";
+import { Activity } from "../types/trip";
 
 export async function createActivity(data: {
     tripId: string;
@@ -44,7 +44,7 @@ export async function createActivity(data: {
     };
 }
 
-export async function getActivitiesBySlotId(slotId: string): Promise<Activity[]> {
+export async function getActivitiesBySlotId(slotId: string, userId?: string): Promise<Activity[]> {
     const db = admin.firestore();
 
     const tsaSnapshot = await db
@@ -74,5 +74,12 @@ export async function getActivitiesBySlotId(slotId: string): Promise<Activity[]>
         })
     );
 
-    return activities.filter((a): a is Activity => a !== null);
+    const filtered = activities.filter((a): a is Activity => a !== null);
+
+    // filter by userId if provided
+    if (userId) {
+        return filtered.filter((a) => a.user_id === userId);
+    }
+
+    return filtered;
 }
