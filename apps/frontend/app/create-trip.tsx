@@ -1,6 +1,6 @@
 // app/create-trip.tsx
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/src/context/AuthContext";
 import { createTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
@@ -33,6 +33,105 @@ import Copy from "@/assets/icons/copy.svg";
 import Calendar from "@/assets/icons/calendar.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
 import KeyFrame from "@/assets/icons/key_frame.svg";
+import ArrowUp from "@/assets/icons/arrow_up.svg";
+import ArrowDown from "@/assets/icons/arrow_down.svg";
+import Hourglass0 from "@/assets/icons/hourglass_0.svg";
+import Hourglass1 from "@/assets/icons/hourglass_1.svg";
+import Timepoint from "@/assets/icons/timepoint.svg";
+import CheckMark from "@/assets/icons/check_mark.svg";
+
+const PLACEHOLDER_PHASES = [
+  {
+    id: "planning",
+    label: "Planning",
+    color: colors.beachYellow,
+    active: true,
+    startDate: new Date(),
+    endDate: new Date(),
+  },
+  {
+    id: "voting",
+    label: "Voting",
+    color: colors.sunsetPink,
+    active: false,
+    startDate: new Date(),
+    endDate: new Date(),
+  },
+  {
+    id: "final",
+    label: "Final",
+    color: colors.neonGreen,
+    active: false,
+    startDate: new Date(),
+    endDate: new Date(),
+  },
+];
+
+type FieldKey = "name" | "date" | "destination" | "members";
+type PhaseKey = "planning" | "voting" | "final";
+type PhaseDates = Record<PhaseKey, { start: Date; end: Date }>;
+
+const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
+const [showPhaseStartPicker, setShowPhaseStartPicker] = useState<PhaseKey | null>(null);
+const [showPhaseEndPicker, setShowPhaseEndPicker] = useState<PhaseKey | null>(null);
+
+ const [phaseDates, setPhaseDates] = useState<PhaseDates>({
+    planning: {
+      start: PLACEHOLDER_PHASES[0].startDate,
+      end: PLACEHOLDER_PHASES[0].endDate,
+    },
+    voting: {
+      start: PLACEHOLDER_PHASES[1].startDate,
+      end: PLACEHOLDER_PHASES[1].endDate,
+    },
+    final: {
+      start: PLACEHOLDER_PHASES[2].startDate,
+      end: PLACEHOLDER_PHASES[2].endDate,
+    },
+  });
+
+const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const safeTimeout = (fn: () => void, delay: number) => {
+    const id = setTimeout(fn, delay);
+    timeoutRefs.current.push(id);
+    return id;
+  };
+
+  const togglePhase = (key: PhaseKey) => {
+    setOpenPhase((prev) => (prev === key ? null : key));
+  };
+
+const [openPhase, setOpenPhase] = useState<PhaseKey | null>(null);
+
+const PHASE_TEXT_COLORS: Record<string, string> = {
+  planning: colors.nightBlack,
+  voting: colors.nightBlack,
+  final: colors.nightBlack,
+};
+
+const handleUpdatePhaseDate = (phaseId: PhaseKey) => {
+    setPhaseUpdated((prev) => ({ ...prev, [phaseId]: true }));
+    safeTimeout(() => {
+      setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
+      setOpenPhase(null);
+    }, 1500);
+  };
+
+  function calcDays(start: Date, end: Date) {
+  const ms = end.getTime() - start.getTime();
+  return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)) + 1);
+}
+
+function dayLabel(days: number) {
+  return days === 1 ? "1 day" : `${days} days`;
+}
+
+function formatDateDisplay(date: Date) {
+  const d = date.getDate().toString().padStart(2, "0");
+  const m = (date.getMonth() + 1).toString().padStart(2, "0");
+  const y = date.getFullYear();
+  return `${d}.${m}.${y}`;
+}
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -128,8 +227,172 @@ export default function CreateTripScreen() {
     }
   };
 
-  // ─── Step 3 — Trip code screen ───────────────────────────────────────────
+  // ─── Step 3 — Trip Timer Setup ───────────────────────────────────────────
   if (step === 3) {
+    return (
+  <View style={[styles.fullScreen, styles.bgStep3]}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+      <View style={[styles.root, styles.bgStep3]}>
+
+      <ScrollView
+              contentContainerStyle={styles.containerStep3}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.header}>
+                <View style={styles.headerTitle}>
+                  <Plane width={25} height={25} />
+                  <AppText variant="body" style={styles.headerLabel}>
+                    Create trip
+                  </AppText>
+                </View>
+              </View>
+
+              <AppText variant="title" style={styles.titleStep3}>
+                Setup the timers
+              </AppText>
+              <AppText variant="body" style={styles.setupText}>
+                Set an end time for each state so the next one starts automatically.
+              </AppText>
+
+
+              {/* Phases — placeholder until wired up */}
+            {PLACEHOLDER_PHASES.map((phase) => {
+              const phaseId = phase.id as PhaseKey;
+              const isOpen = openPhase === phaseId;
+              const dates = phaseDates[phaseId];
+              const days = calcDays(dates.start, dates.end);
+
+              return (
+                <View key={phaseId} style={styles.fieldGroup}>
+                  <Pressable
+                    style={styles.phaseRow}
+                    onPress={() => togglePhase(phaseId)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Edit ${phase.label} phase`}
+                    accessibilityState={{ expanded: isOpen }}
+                  >
+                    <View style={styles.phaseLeft}>
+                      <View style={[styles.phaseBadge, { backgroundColor: phase.color }]}>
+                        <AppText
+                          variant="caption"
+                          style={[styles.phaseBadgeText, { color: PHASE_TEXT_COLORS[phase.id] }]}
+                        >
+                          {phase.label}
+                        </AppText>
+                      </View>
+
+                      <View style={styles.phaseTimerRow}>
+                        {phase.active ? (
+                          <Hourglass1 width={20} height={20} />
+                        ) : (
+                          <Hourglass0 width={20} height={20} />
+                        )}
+                        <AppText variant="body" style={styles.phaseDays}>
+                          {dayLabel(days)}
+                        </AppText>
+                        {phase.active && <Timepoint width={8} height={8} />}
+                      </View>
+                    </View>
+
+                    {isOpen ? (
+                      <ArrowUp width={20} height={20} />
+                    ) : (
+                      <ArrowDown width={20} height={20} />
+                    )}
+                  </Pressable>
+
+                  <AppText variant="caption" style={styles.phaseDateLabel}>
+                    {formatDateDisplay(dates.start)}
+                    {dates.start.getTime() !== dates.end.getTime()
+                      ? ` - ${formatDateDisplay(dates.end)}`
+                      : ""}
+                  </AppText>
+
+                  {isOpen && (
+                    <View style={styles.expandedField}>
+                      <Pressable
+                        style={styles.dateInput}
+                        onPress={() => {
+                          setShowPhaseStartPicker(phaseId);
+                          setShowPhaseEndPicker(null);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Select ${phase.label} phase dates`}
+                      >
+                        <AppText variant="body" style={styles.dateText}>
+                          {formatDateDisplay(dates.start)} – {formatDateDisplay(dates.end)}
+                        </AppText>
+                        <Calendar width={20} height={20} />
+                      </Pressable>
+
+                      {showPhaseStartPicker === phaseId && (
+                        <DateTimePicker
+                          value={dates.start}
+                          mode="date"
+                          display={Platform.OS === "ios" ? "spinner" : "default"}
+                          onChange={(_: DateTimePickerEvent, date?: Date) => {
+                            setShowPhaseStartPicker(null);
+                            if (date) {
+                              setPhaseDates((prev) => ({
+                                ...prev,
+                                [phaseId]: { ...prev[phaseId], start: date },
+                              }));
+                              setShowPhaseEndPicker(phaseId);
+                            }
+                          }}
+                        />
+                      )}
+
+                      {showPhaseEndPicker === phaseId && (
+                        <DateTimePicker
+                          value={dates.end}
+                          mode="date"
+                          minimumDate={dates.start}
+                          display={Platform.OS === "ios" ? "spinner" : "default"}
+                          onChange={(_: DateTimePickerEvent, date?: Date) => {
+                            setShowPhaseEndPicker(null);
+                            if (date) {
+                              setPhaseDates((prev) => ({
+                                ...prev,
+                                [phaseId]: { ...prev[phaseId], end: date },
+                              }));
+                            }
+                          }}
+                        />
+                      )}
+
+                      <AppButton
+                        title="Update"
+                        onPress={() => handleUpdatePhaseDate(phaseId)}
+                        style={styles.updateButton}
+                        textStyle={styles.updateButtonText}
+                        accessibilityLabel={`Update ${phase.label} phase dates`}
+                      />
+
+                      {phaseUpdated[phaseId] && (
+                        <View style={styles.successRow}>
+                          <CheckMark width={18} height={18} />
+                          <AppText variant="caption" style={styles.successText} accessibilityRole="alert">
+                            Timer is updated!
+                          </AppText>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+
+      </ScrollView>
+
+      </View>
+    </SafeAreaView>
+  </View>
+  )
+}
+  // ─── Step 4 — Trip code screen ───────────────────────────────────────────
+  if (step === 4) {
     return (
       <View style={[styles.fullScreen, styles.bgStep1]}>
         <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
@@ -425,6 +688,9 @@ const styles = StyleSheet.create({
   bgStep2: {
     backgroundColor: colors.sunsetOrange,
   },
+  bgStep3: {
+    backgroundColor: colors.lightWhite,
+  },
   scroll: {
     flex: 1,
   },
@@ -608,5 +874,101 @@ const styles = StyleSheet.create({
     bottom: -SCREEN_WIDTH * 0.3,
     left: -SCREEN_WIDTH * 0.1,
     zIndex: 0,
+  },
+  setupText: {
+    fontSize: 18,
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  phaseRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  phaseLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    flex: 1,
+  },
+  phaseBadge: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+  },
+  phaseBadgeText: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+  },
+  phaseTimerBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  hourglassCol: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  phaseTextCol: {
+    flexDirection: "column",
+    justifyContent: "center",
+  },
+  daysRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 3,
+  },
+  phaseDays: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    color: colors.textPrimary,
+  },
+  timepointWrapper: {
+    marginTop: 1,
+  },
+  timerLabel: {
+    color: colors.textMuted,
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+  },
+  phaseDateLabel: {
+    color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    paddingLeft: 4,
+  },
+  phaseEndLabel: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    color: colors.textPrimary,
+  },
+  phaseTimerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flexWrap: "wrap",
+  },
+  expandedField: {
+    gap: spacing.md,
+  },
+  updateButton: {
+    backgroundColor: colors.beachYellow,
+  },
+  updateButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  successRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  successText: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
   },
 });
