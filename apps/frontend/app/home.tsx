@@ -1,6 +1,6 @@
 // app/home.tsx
-import { Link, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { Link, useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,6 +19,8 @@ type TripMemberFromApi = {
   id: string;
   name: string;
   role: "admin" | "member";
+  planning_done?: boolean;
+  voting_done?: boolean;
 };
 
 type TripWithMembers = Trip & {
@@ -42,6 +44,8 @@ type TripCardItem = {
     initials: string;
     color: string;
     name: string;
+    planning_done?: boolean;
+    voting_done?: boolean;
   }[];
   planningStartedAt?: string;
   planningEndAt?: string;
@@ -73,7 +77,11 @@ function getCardColor(tripId: string): string {
   return palette[Math.abs(hash) % palette.length];
 }
 
-function getUiStatus(state: Trip["state"]): "planning" | "voting" | "final" {
+function getUiStatus(
+  state: Trip["state"],
+  memberCount: number
+): "planning" | "voting" | "final" {
+  if (state === "Voting" && memberCount <= 1) return "final";
   if (state === "Voting") return "voting";
   if (state === "Final") return "final";
   return "planning";
@@ -90,6 +98,17 @@ function getMemberColor(index: number): string {
 }
 
 function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
+  const members = (trip.members ?? []).map(
+    (member: TripMemberFromApi, index: number) => ({
+      id: member.id,
+      name: member.name,
+      planning_done: member.planning_done,
+      voting_done: member.voting_done,
+      initials: getInitials(member.name),
+      color: getMemberColor(index),
+    })
+  );
+
   return {
     id: trip.trip_id,
     title: trip.title,
@@ -98,7 +117,7 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     endDate: formatDate(trip.end_date),
     rawStartDate: trip.start_date,
     rawEndDate: trip.end_date,
-    status: getUiStatus(trip.state),
+    status: getUiStatus(trip.state, members.length),
     cardColor: getCardColor(trip.trip_id),
     role: trip.role === "admin" ? "admin" : "member",
     inviteCode: trip.invite_code ?? "",
@@ -124,46 +143,48 @@ export default function HomeScreen() {
   const [pastTrips, setPastTrips] = useState<TripCardItem[]>([]);
   const router = useRouter();
 
-  useEffect(() => {
-    const loadTrips = async () => {
-      try {
-        if (!user) {
-          setYourTrips([]);
-          setPastTrips([]);
-          return;
-        }
-
-        const backendTrips = await fetchMyTrips(user.uid);
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const upcoming: TripCardItem[] = [];
-        const past: TripCardItem[] = [];
-
-        (backendTrips as TripWithMembers[]).forEach((trip: TripWithMembers) => {
-          const mappedTrip = mapTripToCardTrip(trip);
-          const tripEndDate = new Date(trip.end_date);
-          tripEndDate.setHours(0, 0, 0, 0);
-
-          if (tripEndDate < today) {
-            past.push(mappedTrip);
-          } else {
-            upcoming.push(mappedTrip);
-          }
-        });
-
-        setYourTrips(upcoming);
-        setPastTrips(past);
-      } catch (error) {
-        console.error("Error loading trips:", error);
+  const loadTrips = useCallback(async () => {
+    try {
+      if (!user) {
         setYourTrips([]);
         setPastTrips([]);
+        return;
       }
-    };
 
-    loadTrips();
+      const backendTrips = await fetchMyTrips(user.uid);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const upcoming: TripCardItem[] = [];
+      const past: TripCardItem[] = [];
+
+      (backendTrips as TripWithMembers[]).forEach((trip: TripWithMembers) => {
+        const mappedTrip = mapTripToCardTrip(trip);
+        const tripEndDate = new Date(trip.end_date);
+        tripEndDate.setHours(0, 0, 0, 0);
+
+        if (tripEndDate < today) {
+          past.push(mappedTrip);
+        } else {
+          upcoming.push(mappedTrip);
+        }
+      });
+
+      setYourTrips(upcoming);
+      setPastTrips(past);
+    } catch (error) {
+      console.error("Error loading trips:", error);
+      setYourTrips([]);
+      setPastTrips([]);
+    }
   }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadTrips();
+    }, [loadTrips])
+  );
 
   const trips = activeTab === "your" ? yourTrips : pastTrips;
 
@@ -314,6 +335,7 @@ export default function HomeScreen() {
                       destination: trip.destination,
                       startDate: trip.rawStartDate,
                       endDate: trip.rawEndDate,
+                      members: JSON.stringify(trip.members),
                     },
                   });
                 }}

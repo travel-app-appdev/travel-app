@@ -22,8 +22,11 @@ import TextStyle from "@/assets/icons/text-style.svg";
 import Back from "@/assets/icons/back.svg";
 
 import { createActivity, updateActivity } from "@/src/services/activityService";
+import { useAuth } from "@/src/context/AuthContext";
 
 export default function AddActivityScreen() {
+  const { idToken } = useAuth();
+
   const {
     tripId,
     title,
@@ -31,6 +34,7 @@ export default function AddActivityScreen() {
     startDate,
     endDate,
     state,
+    members,
     dayId,
     slotId,
     activitiesJson,
@@ -46,6 +50,7 @@ export default function AddActivityScreen() {
     startDate?: string;
     endDate?: string;
     state?: "planning" | "voting" | "final";
+    members?: string;
     dayId?: string;
     slotId?: string;
     activitiesJson?: string;
@@ -63,6 +68,60 @@ export default function AddActivityScreen() {
   const [address, setAddress] = useState(initialAddress ?? "");
   const [googleLink, setGoogleLink] = useState(initialGoogleMapsUrl ?? "");
 
+  function parseExistingActivities() {
+    if (!activitiesJson) return [];
+
+    try {
+      const parsed = JSON.parse(activitiesJson);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function navigateBackWithActivity(savedActivityId: string) {
+    const nextActivity = {
+      id: savedActivityId,
+      dayId,
+      slotId,
+      name: activityName.trim(),
+      description: description.trim(),
+      address: address.trim(),
+      googleMapsUrl: googleLink.trim(),
+    };
+    const existingActivities = parseExistingActivities();
+    const existingIndex = existingActivities.findIndex(
+      (activity) => activity.id === savedActivityId
+    );
+    const nextActivities =
+      existingIndex === -1
+        ? [...existingActivities, nextActivity]
+        : existingActivities.map((activity, index) =>
+            index === existingIndex ? nextActivity : activity
+          );
+
+    router.replace({
+      pathname: "/itinerary",
+      params: {
+        tripId,
+        title,
+        destination,
+        startDate,
+        endDate,
+        state,
+        members,
+        activitiesJson: JSON.stringify(nextActivities),
+        newActivityId: nextActivity.id,
+        newActivityDayId: nextActivity.dayId,
+        newActivitySlotId: nextActivity.slotId,
+        newActivityName: nextActivity.name,
+        newActivityDescription: nextActivity.description,
+        newActivityAddress: nextActivity.address,
+        newActivityGoogleMapsUrl: nextActivity.googleMapsUrl,
+      },
+    });
+  }
+
   async function handleSaveActivity() {
     if (!activityName.trim()) {
       Alert.alert("Missing activity name", "Please enter an activity name.");
@@ -74,7 +133,14 @@ export default function AddActivityScreen() {
       return;
     }
 
+    if (!idToken) {
+      Alert.alert("Not logged in", "Please log in again.");
+      return;
+    }
+
     try {
+      let savedActivityId = activityId;
+
       if (isEditMode && activityId) {
         await updateActivity(activityId, {
           name: activityName.trim(),
@@ -82,8 +148,23 @@ export default function AddActivityScreen() {
           address: address.trim(),
           googleMapsUrl: googleLink.trim(),
         });
+        navigateBackWithActivity(activityId);
+
+        router.replace({
+          pathname: "/itinerary",
+          params: {
+            tripId,
+            title,
+            destination,
+            startDate,
+            endDate,
+            state,
+            activitiesJson,
+          },
+        });
       } else {
-        await createActivity({
+        const createdActivity = await createActivity({
+          idToken,
           tripId,
           dayId,
           slotId,
@@ -92,19 +173,28 @@ export default function AddActivityScreen() {
           address: address.trim(),
           googleMapsUrl: googleLink.trim(),
         });
-      }
 
-      router.replace({
-        pathname: "/itinerary",
-        params: {
-          tripId,
-          title,
-          destination,
-          startDate,
-          endDate,
-          state,
-        },
-      });
+        navigateBackWithActivity(createdActivity.activity_id);
+
+        router.replace({
+          pathname: "/itinerary",
+          params: {
+            tripId,
+            title,
+            destination,
+            startDate,
+            endDate,
+            state,
+            newActivityId: createdActivity.activity_id,
+            newActivityDayId: dayId,
+            newActivitySlotId: slotId,
+            newActivityName: createdActivity.name,
+            newActivityDescription: createdActivity.description ?? "",
+            newActivityAddress: createdActivity.address ?? "",
+            newActivityGoogleMapsUrl: createdActivity.googleMapsUrl ?? "",
+          },
+        });
+      }
     } catch (error) {
       Alert.alert(
         "Could not save activity",
@@ -134,6 +224,7 @@ export default function AddActivityScreen() {
                   startDate,
                   endDate,
                   state,
+                  members,
                   activitiesJson,
                 },
               })

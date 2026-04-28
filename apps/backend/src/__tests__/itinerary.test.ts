@@ -42,25 +42,30 @@ jest.mock('../config/firebase', () => ({
 describe("generateDaySlots()", () => {
 
     it("should return 8 slots", () => {
-        const slots = generateDaySlots();
+        const slots = generateDaySlots("2026-06-01");
         expect(slots).toHaveLength(8);
     });
 
     it("should start with 06:00-08:00", () => {
-        const slots = generateDaySlots();
+        const slots = generateDaySlots("2026-06-01");
         expect(slots[0].slot_type).toBe("06:00-08:00");
     });
 
     it("should end with 20:00-22:00", () => {
-        const slots = generateDaySlots();
+        const slots = generateDaySlots("2026-06-01");
         expect(slots[7].slot_type).toBe("20:00-22:00");
     });
 
     it("should have activityId null for all slots", () => {
-        const slots = generateDaySlots();
+        const slots = generateDaySlots("2026-06-01");
         slots.forEach((slot) => {
             expect(slot.activityId).toBeNull();
         });
+    });
+
+    it("should include date in slot_id", () => {
+        const slots = generateDaySlots("2026-06-01");
+        expect(slots[0].slot_id).toBe("2026-06-01_06:00-08:00");
     });
 
 });
