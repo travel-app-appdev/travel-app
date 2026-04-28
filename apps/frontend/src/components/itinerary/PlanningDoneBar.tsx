@@ -7,22 +7,31 @@ import InfoIcon from "@/assets/icons/info.svg";
 
 type Props = {
   checked: boolean;
+  disabled?: boolean;
   onPress: () => void;
   onInfoPress: () => void;
 };
 
-export function PlanningDoneBar({ checked, onPress, onInfoPress }: Props) {
+export function PlanningDoneBar({
+  checked,
+  disabled = false,
+  onPress,
+  onInfoPress,
+}: Props) {
+  const isDisabled = checked || disabled;
+
   return (
     <View style={styles.wrapper} pointerEvents="box-none">
       <View style={styles.footer}>
         <Pressable
           style={[styles.doneButton, checked && styles.doneButtonChecked]}
           onPress={onPress}
-          disabled={checked}
+          disabled={isDisabled}
           accessibilityRole="button"
           accessibilityLabel={
             checked ? "Planning already submitted" : "Submit planning"
           }
+          accessibilityState={{ disabled: isDisabled }}
         >
           <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
             {checked && (

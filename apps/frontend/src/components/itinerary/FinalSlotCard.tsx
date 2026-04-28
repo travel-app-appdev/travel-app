@@ -7,6 +7,7 @@ import type { Activity } from "@/src/types/itinerary";
 import LocationIcon from "@/assets/icons/location.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import PersonIcon from "@/assets/icons/join-group.svg";
+import JoinGroup from "@/assets/icons/join-group.svg";
 
 type Props = {
   slot: { id: string; label: string };
@@ -85,7 +86,7 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
       >
         {/* Circle with plus icon */}
         <View style={styles.joinIcon}>
-          <AppText style={styles.joinPlus}>⊕</AppText>
+          <JoinGroup width={36} height={36} />
         </View>
         <AppText variant="body" style={styles.ctaText}>
           Join{"\n"}group
