@@ -18,7 +18,7 @@ export async function handleRegister(
   const idToken = await credential.user.getIdToken();
   const backendUser = await loginWithToken(idToken);
 
-  return backendUser;
+  return { ...backendUser, idToken };
 }
 
 export async function handleLogin(email: string, password: string) {
@@ -26,5 +26,5 @@ export async function handleLogin(email: string, password: string) {
   const idToken = await credential.user.getIdToken();
   const backendUser = await loginWithToken(idToken);
 
-  return backendUser;
+  return { ...backendUser, idToken };
 }

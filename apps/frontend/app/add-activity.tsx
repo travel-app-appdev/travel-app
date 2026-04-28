@@ -22,8 +22,11 @@ import TextStyle from "@/assets/icons/text-style.svg";
 import Back from "@/assets/icons/back.svg";
 
 import { createActivity, updateActivity } from "@/src/services/activityService";
+import { useAuth } from "@/src/context/AuthContext";
 
 export default function AddActivityScreen() {
+  const { idToken } = useAuth();
+
   const {
     tripId,
     title,
@@ -63,7 +66,11 @@ export default function AddActivityScreen() {
   const [address, setAddress] = useState(initialAddress ?? "");
   const [googleLink, setGoogleLink] = useState(initialGoogleMapsUrl ?? "");
 
-  async function handleSaveActivity() {
+ async function handleSaveActivity() {
+    console.log("idToken:", idToken);
+    console.log("tripId:", tripId);
+    console.log("dayId:", dayId);
+    console.log("slotId:", slotId);
     if (!activityName.trim()) {
       Alert.alert("Missing activity name", "Please enter an activity name.");
       return;
@@ -71,6 +78,11 @@ export default function AddActivityScreen() {
 
     if (!tripId || !dayId || !slotId) {
       Alert.alert("Missing data", "Trip, day, or time slot is missing.");
+      return;
+    }
+
+    if (!idToken) {
+      Alert.alert("Not logged in", "Please log in again.");
       return;
     }
 
@@ -82,8 +94,22 @@ export default function AddActivityScreen() {
           address: address.trim(),
           googleMapsUrl: googleLink.trim(),
         });
+
+        router.replace({
+          pathname: "/itinerary",
+          params: {
+            tripId,
+            title,
+            destination,
+            startDate,
+            endDate,
+            state,
+            activitiesJson,
+          },
+        });
       } else {
-        await createActivity({
+        const savedActivity = await createActivity({
+          idToken,
           tripId,
           dayId,
           slotId,
@@ -92,19 +118,26 @@ export default function AddActivityScreen() {
           address: address.trim(),
           googleMapsUrl: googleLink.trim(),
         });
-      }
 
-      router.replace({
-        pathname: "/itinerary",
-        params: {
-          tripId,
-          title,
-          destination,
-          startDate,
-          endDate,
-          state,
-        },
-      });
+        router.replace({
+          pathname: "/itinerary",
+          params: {
+            tripId,
+            title,
+            destination,
+            startDate,
+            endDate,
+            state,
+            newActivityId: savedActivity.activity_id,
+            newActivityDayId: dayId,
+            newActivitySlotId: slotId,
+            newActivityName: savedActivity.name,
+            newActivityDescription: savedActivity.description ?? "",
+            newActivityAddress: savedActivity.address ?? "",
+            newActivityGoogleMapsUrl: savedActivity.googleMapsUrl ?? "",
+          },
+        });
+      }
     } catch (error) {
       Alert.alert(
         "Could not save activity",

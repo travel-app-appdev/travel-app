@@ -9,6 +9,7 @@ import { colors, spacing } from "@/src/theme";
 import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
 import { mapActivitiesToSlots } from "@/src/utils/itinerary/mapActivitiesToSlots";
+import { useAuth } from "@/src/context/AuthContext";
 
 import type {
   TripItinerary,
@@ -26,10 +27,6 @@ import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
 
 const DEV_FORCE_STATE: ItineraryState | null = null;
 const MOCK_CURRENT_USER_ID = "user-1";
-
-// ---------------------------------------------------------------------------
-// Mock data — replace with real API data later
-// ---------------------------------------------------------------------------
 
 const MOCK_VOTING_ACTIVITIES: Activity[] = [
   {
@@ -95,10 +92,8 @@ const MOCK_FINAL_ACTIVITIES: Activity[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
 function parseActivitiesJson(value?: string): Activity[] {
   if (!value) return [];
-
   try {
     const parsed = JSON.parse(value);
     return Array.isArray(parsed) ? parsed : [];
@@ -116,7 +111,6 @@ function buildItineraryFromParams(params: {
   state?: ItineraryState;
 }): TripItinerary {
   const fallbackDate = new Date().toISOString().split("T")[0];
-
   return {
     tripId: params.tripId ?? "trip-fallback",
     title: params.title ?? "Untitled Trip",
@@ -159,6 +153,9 @@ function getDaysLeftText(state: ItineraryState): string {
 }
 
 export default function ItineraryScreen() {
+  const { user } = useAuth();
+  const currentUserId = user?.uid ?? null;
+
   const {
     tripId,
     state,
@@ -208,10 +205,9 @@ export default function ItineraryScreen() {
     activities: parseActivitiesJson(activitiesJson),
   }));
 
+  const [apiActivities, setApiActivities] = useState<Activity[]>([]);
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
-  const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
+  const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setItinerary((current) => ({
@@ -228,15 +224,7 @@ export default function ItineraryScreen() {
           ? parseActivitiesJson(activitiesJson)
           : current.activities,
     }));
-  }, [
-    tripId,
-    title,
-    destination,
-    startDate,
-    endDate,
-    routeState,
-    activitiesJson,
-  ]);
+  }, [tripId, title, destination, startDate, endDate, routeState, activitiesJson]);
 
   useEffect(() => {
     return () => {
@@ -245,6 +233,56 @@ export default function ItineraryScreen() {
       }
     };
   }, []);
+
+  const slots = useMemo(() => generateTimeSlots(), []);
+
+  const activeState: ItineraryState =
+    DEV_FORCE_STATE ?? routeState ?? itinerary.state;
+
+  // Load activities from API
+  useEffect(() => {
+    async function loadActivities() {
+      if (!tripId) return;
+
+      try {
+        const allActivities: Activity[] = [];
+
+        for (const slot of slots) {
+          const baseUrl = `${process.env.EXPO_PUBLIC_API_URL}/itinerary/${tripId}/slots/${slot.id}/activities`;
+
+          // planning → only show current user's activities
+          // voting/final → show all activities
+          const url =
+            activeState === "planning" && currentUserId
+              ? `${baseUrl}?userId=${currentUserId}`
+              : baseUrl;
+
+          const response = await fetch(url);
+          const slotActivities = await response.json();
+
+          const mapped = slotActivities.map((a: any) => ({
+            id: a.activity_id,
+            dayId:
+              selectedDayId ||
+              startDate ||
+              new Date().toISOString().split("T")[0],
+            slotId: slot.id,
+            name: a.name,
+            address: a.address ?? "",
+            googleMapsUrl: a.googleMapsUrl ?? "",
+            description: a.description ?? "",
+          }));
+          allActivities.push(...mapped);
+        }
+
+        setApiActivities(allActivities);
+      } catch (error) {
+        console.log("Could not load activities:", error);
+      }
+    }
+
+    loadActivities();
+  }, [tripId, newActivityId, activeState, currentUserId]);
 
   function handlePlanningInfoPress() {
     if (showPlanningInfoPopup) {
@@ -292,39 +330,6 @@ export default function ItineraryScreen() {
       return;
     }
 
-    const incomingActivity: Activity = {
-      id: newActivityId,
-      dayId: newActivityDayId,
-      slotId: newActivitySlotId,
-      name: newActivityName,
-      address: newActivityAddress ?? "",
-      googleMapsUrl: newActivityGoogleMapsUrl ?? "",
-      ...(newActivityDescription
-        ? { description: newActivityDescription }
-        : {}),
-    };
-
-    setItinerary((current) => {
-      const existingIndex = current.activities.findIndex(
-        (activity) => activity.id === incomingActivity.id
-      );
-
-      if (existingIndex === -1) {
-        return {
-          ...current,
-          activities: [...current.activities, incomingActivity],
-        };
-      }
-
-      const updatedActivities = [...current.activities];
-      updatedActivities[existingIndex] = incomingActivity;
-
-      return {
-        ...current,
-        activities: updatedActivities,
-      };
-    });
-
     lastAppliedActivitySignatureRef.current = incomingSignature;
   }, [
     newActivityId,
@@ -335,9 +340,6 @@ export default function ItineraryScreen() {
     newActivityAddress,
     newActivityGoogleMapsUrl,
   ]);
-
-  const activeState: ItineraryState =
-    DEV_FORCE_STATE ?? routeState ?? itinerary.state;
 
   const tripDays = useMemo(
     () => generateTripDays(itinerary.startDate, itinerary.endDate),
@@ -354,11 +356,9 @@ export default function ItineraryScreen() {
     }
   }, [tripDays, itinerary.startDate]);
 
-  const slots = useMemo(() => generateTimeSlots(), []);
-
   const slotItems = useMemo(() => {
-    return mapActivitiesToSlots(slots, itinerary.activities, selectedDayId);
-  }, [slots, itinerary.activities, selectedDayId]);
+    return mapActivitiesToSlots(slots, apiActivities, selectedDayId);
+  }, [slots, apiActivities, selectedDayId]);
 
   const currentUserStatus = itinerary.planningStatus.find(
     (m) => m.userId === MOCK_CURRENT_USER_ID

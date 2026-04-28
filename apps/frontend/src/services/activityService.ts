@@ -1,6 +1,7 @@
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export type CreateActivityPayload = {
+  idToken: string;
   tripId: string;
   dayId: string;
   slotId: string;
@@ -17,31 +18,42 @@ export type UpdateActivityPayload = {
   googleMapsUrl?: string;
 };
 
-export async function getActivitiesByTrip(tripId: string) {
-  const response = await fetch(`${API_URL}/trips/${tripId}/activities`);
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || "Could not load activities");
-  }
-
-  return data;
-}
-
 export async function createActivity(payload: CreateActivityPayload) {
-  const response = await fetch(`${API_URL}/activities`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  const response = await fetch(
+    `${API_URL}/itinerary/${payload.tripId}/slots/${payload.slotId}/activities`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        idToken: payload.idToken,
+        name: payload.name,
+        description: payload.description,
+        address: payload.address,
+        googleMapsUrl: payload.googleMapsUrl,
+      }),
+    }
+  );
 
   const data = await response.json();
 
   if (!response.ok) {
     throw new Error(data.error || "Could not create activity");
+  }
+
+  return { ...data, dayId: payload.dayId };
+}
+
+export async function getActivitiesBySlot(tripId: string, slotId: string) {
+  const response = await fetch(
+    `${API_URL}/itinerary/${tripId}/slots/${slotId}/activities`
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Could not load activities");
   }
 
   return data;
