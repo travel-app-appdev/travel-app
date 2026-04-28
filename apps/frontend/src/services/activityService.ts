@@ -12,6 +12,7 @@ export type CreateActivityPayload = {
 };
 
 export type UpdateActivityPayload = {
+  idToken: string;
   name: string;
   description?: string;
   address?: string;
@@ -45,15 +46,94 @@ export async function createActivity(payload: CreateActivityPayload) {
   return { ...data, dayId: payload.dayId };
 }
 
-export async function getActivitiesBySlot(tripId: string, slotId: string) {
+export async function getActivitiesBySlot(
+  tripId: string,
+  slotId: string,
+  userId?: string
+) {
+  const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
   const response = await fetch(
-    `${API_URL}/itinerary/${tripId}/slots/${slotId}/activities`
+    `${API_URL}/itinerary/${tripId}/slots/${slotId}/activities${query}`
   );
 
   const data = await response.json();
 
   if (!response.ok) {
     throw new Error(data.error || "Could not load activities");
+  }
+
+  return data;
+}
+
+export async function voteForActivity(payload: {
+  idToken: string;
+  tripId: string;
+  slotId: string;
+  activityId: string;
+}) {
+  const response = await fetch(
+    `${API_URL}/itinerary/${payload.tripId}/slots/${payload.slotId}/votes`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        idToken: payload.idToken,
+        activityId: payload.activityId,
+      }),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Could not add vote");
+  }
+
+  return data;
+}
+
+export async function getFinalItineraryActivities(
+  tripId: string,
+  userId?: string
+) {
+  const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  const response = await fetch(`${API_URL}/itinerary/${tripId}/final${query}`);
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Could not load final itinerary");
+  }
+
+  return data;
+}
+
+export async function toggleActivityAttendance(payload: {
+  idToken: string;
+  tripId: string;
+  slotId: string;
+  activityId: string;
+}) {
+  const response = await fetch(
+    `${API_URL}/itinerary/${payload.tripId}/slots/${payload.slotId}/attendance`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        idToken: payload.idToken,
+        activityId: payload.activityId,
+      }),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Could not update attendance");
   }
 
   return data;

@@ -36,7 +36,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { setUser } = useAuth();
+  const { setUser, setIdToken } = useAuth();
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -77,6 +77,7 @@ export default function RegisterScreen() {
       );
 
       setUser(authResponse);
+      setIdToken(authResponse.idToken);
 
       router.replace("/home");
     } catch (error) {

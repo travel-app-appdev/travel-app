@@ -22,6 +22,9 @@ export type Activity = {
   address: string;
   googleMapsUrl?: string;
   joinedCount?: number; // for final state
+  hasCurrentUserJoined?: boolean;
+  voteCount?: number;
+  hasCurrentUserVote?: boolean;
   description?: string;
 };
 

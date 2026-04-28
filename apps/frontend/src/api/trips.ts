@@ -191,7 +191,7 @@ export async function updateTrip(payload: UpdateTripPayload): Promise<Trip> {
 
 export type FinishPlanningResponse = {
   allDone: boolean;
-  tripState: "Planning" | "Voting";
+  tripState: "Planning" | "Voting" | "Final";
   completedMembers: number;
   totalMembers: number;
 };

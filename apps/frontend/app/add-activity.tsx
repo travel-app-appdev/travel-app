@@ -23,6 +23,22 @@ import Back from "@/assets/icons/back.svg";
 
 import { createActivity, updateActivity } from "@/src/services/activityService";
 import { useAuth } from "@/src/context/AuthContext";
+import { auth } from "@/src/lib/firebase";
+
+function splitSlotId(value?: string) {
+  if (!value) return { dayId: undefined, slotId: undefined };
+
+  const [maybeDayId, ...slotParts] = value.split("_");
+
+  if (slotParts.length === 0) {
+    return { dayId: undefined, slotId: value };
+  }
+
+  return {
+    dayId: maybeDayId,
+    slotId: slotParts.join("_"),
+  };
+}
 
 export default function AddActivityScreen() {
   const { idToken } = useAuth();
@@ -80,10 +96,11 @@ export default function AddActivityScreen() {
   }
 
   function navigateBackWithActivity(savedActivityId: string) {
+    const normalizedSlot = splitSlotId(slotId);
     const nextActivity = {
       id: savedActivityId,
-      dayId,
-      slotId,
+      dayId: dayId ?? normalizedSlot.dayId,
+      slotId: normalizedSlot.slotId ?? slotId,
       name: activityName.trim(),
       description: description.trim(),
       address: address.trim(),
@@ -133,7 +150,9 @@ export default function AddActivityScreen() {
       return;
     }
 
-    if (!idToken) {
+    const token = idToken ?? (await auth.currentUser?.getIdToken());
+
+    if (!token) {
       Alert.alert("Not logged in", "Please log in again.");
       return;
     }
@@ -143,28 +162,16 @@ export default function AddActivityScreen() {
 
       if (isEditMode && activityId) {
         await updateActivity(activityId, {
+          idToken: token,
           name: activityName.trim(),
           description: description.trim(),
           address: address.trim(),
           googleMapsUrl: googleLink.trim(),
         });
         navigateBackWithActivity(activityId);
-
-        router.replace({
-          pathname: "/itinerary",
-          params: {
-            tripId,
-            title,
-            destination,
-            startDate,
-            endDate,
-            state,
-            activitiesJson,
-          },
-        });
       } else {
         const createdActivity = await createActivity({
-          idToken,
+          idToken: token,
           tripId,
           dayId,
           slotId,
@@ -175,25 +182,6 @@ export default function AddActivityScreen() {
         });
 
         navigateBackWithActivity(createdActivity.activity_id);
-
-        router.replace({
-          pathname: "/itinerary",
-          params: {
-            tripId,
-            title,
-            destination,
-            startDate,
-            endDate,
-            state,
-            newActivityId: createdActivity.activity_id,
-            newActivityDayId: dayId,
-            newActivitySlotId: slotId,
-            newActivityName: createdActivity.name,
-            newActivityDescription: createdActivity.description ?? "",
-            newActivityAddress: createdActivity.address ?? "",
-            newActivityGoogleMapsUrl: createdActivity.googleMapsUrl ?? "",
-          },
-        });
       }
     } catch (error) {
       Alert.alert(

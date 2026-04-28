@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/auth";
 import tripsRouter from "./routes/trips";
 import itineraryRouter from "./routes/itinerary";
+import activitiesRouter from "./routes/activities";
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/auth", authRoutes);
+app.use("/activities", activitiesRouter);
 app.use("/itinerary", itineraryRouter);
 app.use("/trips", tripsRouter);
 
