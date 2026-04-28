@@ -34,9 +34,10 @@ export async function suggestActivity(
         tripId,
         userId,
         slotId,
-        title: input.title,
+        name: input.name,
         description: input.description,
-        location_link: input.location_link,
+        address: input.address,
+        googleMapsUrl: input.googleMapsUrl,
     });
 }
 

@@ -4,24 +4,25 @@ import { suggestActivity, getCandidateActivities } from "../services/activitySer
 export const createActivity = async (req: Request, res: Response): Promise<void> => {
     const tripId = String(req.params.tripId);
     const slotId = String(req.params.slotId);
-    const { idToken, title, description, location_link } = req.body;
+    const { idToken, name, description, address, googleMapsUrl } = req.body;
 
     if (!idToken) {
         res.status(400).json({ error: "idToken is required" });
         return;
     }
 
-    if (!title) {
-        res.status(400).json({ error: "title is required" });
+    if (!name) {
+        res.status(400).json({ error: "name is required" });
         return;
     }
 
     try {
         const activity = await suggestActivity(tripId, slotId, {
             idToken,
-            title,
+            name,
             description,
-            location_link,
+            address,
+            googleMapsUrl,
         });
         res.status(201).json(activity);
     } catch (error: any) {
@@ -38,7 +39,7 @@ export const createActivity = async (req: Request, res: Response): Promise<void>
 export const getActivities = async (req: Request, res: Response): Promise<void> => {
     const tripId = String(req.params.tripId);
     const slotId = String(req.params.slotId);
-    const userId = req.query.userId as string | undefined; // ADD THIS
+    const userId = req.query.userId as string | undefined;
 
     try {
         const activities = await getCandidateActivities(tripId, slotId, userId);
