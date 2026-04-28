@@ -23,7 +23,10 @@ import { useAuth } from "@/src/context/AuthContext";
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppButton } from "@/src/components/common/AppButton";
-import { ActionCard, ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
+import {
+  ActionCard,
+  ACTION_CARD_HEIGHT,
+} from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import Profile from "@/assets/icons/profile.svg";
@@ -51,8 +54,10 @@ export default function ProfileScreen() {
     return id;
   };
   useEffect(() => {
+    const timeouts = timeoutRefs.current;
+
     return () => {
-      timeoutRefs.current.forEach(clearTimeout);
+      timeouts.forEach(clearTimeout);
     };
   }, []);
 
@@ -63,7 +68,7 @@ export default function ProfileScreen() {
   const [isUpdatingName, setIsUpdatingName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
-  const [email, setEmail] = useState(user?.email ?? "");
+  const [email] = useState(user?.email ?? "");
   const [emailInput, setEmailInput] = useState(user?.email ?? "");
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailUpdated, setEmailUpdated] = useState(false);

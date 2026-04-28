@@ -1,20 +1,6 @@
 import type { TripDay } from "@/src/types/itinerary";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTH_SHORT = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
 
 function toIsoDate(date: Date) {
   const year = date.getFullYear();
@@ -41,10 +27,8 @@ export function generateTripDays(
   while (current <= end) {
     days.push({
       id: toIsoDate(current),
-      isoDate: toIsoDate(current),
       dayNumber: current.getDate(),
       weekdayShort: WEEKDAY_SHORT[current.getDay()],
-      monthShort: MONTH_SHORT[current.getMonth()],
     });
 
     current.setDate(current.getDate() + 1);

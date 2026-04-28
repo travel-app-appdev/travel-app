@@ -1,5 +1,3 @@
-// 
-
 export type TripMember = {
     id: string;
     name: string;
@@ -33,6 +31,7 @@ export type TripMembershipDocument = {
     trip_id: string;
     role: string;
     invite_status: string;
+    planning_done?: boolean;
 };
 
 export type UserDocument = {
@@ -76,4 +75,29 @@ export type ItineraryDay = {
 export type Itinerary = {
     trip_id: string;
     days: ItineraryDay[];
+};
+
+export type Activity = {
+    activity_id: string;
+    trip_id: string;
+    user_id: string;
+    name: string;
+    description?: string;
+    address?: string;
+    googleMapsUrl?: string;
+    source_type: "manual";
+};
+
+export type TimeSlotActivity = {
+    slot_id: string;
+    activity_id: string;
+    status: "candidate";
+};
+
+export type CreateActivityInput = {
+    idToken: string;
+    name: string;
+    description?: string;
+    address?: string;
+    googleMapsUrl?: string;
 };

@@ -11,13 +11,18 @@ import {
     createTripWithInviteCode,
     deleteTripById,
     removeTripMember,
+    markMemberPlanningDone,
+    updateTripState,
+    updateTripById,
 } from "../repositories/tripsRepository";
 import {
     CreateTripWithAuthInput,
     CreateTripWithoutAuthInput,
     JoinTripInput,
     Trip,
+    TripDocument,
 } from "../types/trip";
+
 
 export async function getTripsForUser(userId: string): Promise<Trip[]> {
     const memberships = await findAcceptedMembershipsByUserId(userId);
@@ -163,4 +168,87 @@ export async function removeMemberForAdmin(input: {
     }
 
     await removeTripMember(input.tripId, input.memberId);
+}
+
+export async function finishPlanningForMember(
+    tripId: string,
+    idToken: string
+): Promise<{ allDone: boolean; tripState: string; completedMembers: number; totalMembers: number }> {
+    
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const userId = decoded.uid;
+
+    // check trip exists
+    const trip = await findTripById(tripId);
+    if (!trip) {
+        throw { status: 404, message: "Trip not found" };
+    }
+
+    // check trip is in Planning state
+    if (trip.state !== "Planning") {
+        throw { status: 400, message: "Trip is not in Planning state" };
+    }
+
+    // check user is a member
+    const membership = await findMembership(tripId, userId);
+    if (!membership) {
+        throw { status: 404, message: "User is not a member of this trip" };
+    }
+
+    // check if already done
+    if (membership.planning_done) {
+        throw { status: 409, message: "Member already finished planning" };
+    }
+
+    // mark member as done
+    await markMemberPlanningDone(tripId, userId);
+
+    // get all members and check if all are done
+    const allMembers = await findAcceptedMembersByTripId(tripId);
+    const completedMembers = allMembers.filter(m => m.planning_done || m.user_id === userId).length;
+    const totalMembers = allMembers.length;
+    const allDone = completedMembers === totalMembers;
+
+    // if all done → switch trip state to Voting
+    if (allDone) {
+        await updateTripState(tripId, "Voting");
+    }
+
+    return {
+        allDone,
+        tripState: allDone ? "Voting" : "Planning",
+        completedMembers,
+        totalMembers,
+    };
+    } 
+// New function to update trip details by admin
+
+export async function updateTripForAdmin(input: {
+    idToken: string;
+    tripId: string;
+    title?: string;
+    destination?: string;
+    start_date?: string;
+    end_date?: string;
+}): Promise<Trip> {
+    const decoded = await admin.auth().verifyIdToken(input.idToken);
+    const userId = decoded.uid;
+
+    const membership = await findMembership(input.tripId, userId);
+    if (!membership || membership.role !== "admin") {
+        throw { status: 403, message: "Only the admin can update this trip" };
+    }
+
+    const updates: Partial<Pick<TripDocument, "title" | "destination" | "start_date" | "end_date">> = {};
+    if (input.title !== undefined)       updates.title = input.title;
+    if (input.destination !== undefined) updates.destination = input.destination;
+    if (input.start_date !== undefined)  updates.start_date = input.start_date;
+    if (input.end_date !== undefined)    updates.end_date = input.end_date;
+
+    await updateTripById(input.tripId, updates);
+
+    const trip = await findTripById(input.tripId);
+    if (!trip) throw { status: 404, message: "Trip not found after update" };
+
+    return { ...trip, role: "admin" };
 }

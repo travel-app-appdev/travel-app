@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -14,7 +14,19 @@ import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 
+import LocationHeartIcon from "@/assets/icons/location-heart.svg";
+import EditIcon from "@/assets/icons/edit.svg";
+import LocationIcon from "@/assets/icons/location.svg";
+import GoogleIcon from "@/assets/icons/google.svg";
+import TextStyle from "@/assets/icons/text-style.svg";
+import Back from "@/assets/icons/back.svg";
+
+import { createActivity, updateActivity } from "@/src/services/activityService";
+import { useAuth } from "@/src/context/AuthContext";
+
 export default function AddActivityScreen() {
+  const { idToken } = useAuth();
+
   const {
     tripId,
     title,
@@ -22,8 +34,15 @@ export default function AddActivityScreen() {
     startDate,
     endDate,
     state,
+    members,
     dayId,
     slotId,
+    activitiesJson,
+    activityId,
+    initialName,
+    initialDescription,
+    initialAddress,
+    initialGoogleMapsUrl,
   } = useLocalSearchParams<{
     tripId?: string;
     title?: string;
@@ -31,22 +50,55 @@ export default function AddActivityScreen() {
     startDate?: string;
     endDate?: string;
     state?: "planning" | "voting" | "final";
+    members?: string;
     dayId?: string;
     slotId?: string;
+    activitiesJson?: string;
+    activityId?: string;
+    initialName?: string;
+    initialDescription?: string;
+    initialAddress?: string;
+    initialGoogleMapsUrl?: string;
   }>();
 
-  const [activityName, setActivityName] = useState("");
-  const [description, setDescription] = useState("");
-  const [address, setAddress] = useState("");
-  const [googleLink, setGoogleLink] = useState("");
+  const isEditMode = useMemo(() => Boolean(activityId), [activityId]);
 
-  function handleSaveActivity() {
-    if (!activityName.trim()) {
-      Alert.alert("Missing activity name", "Please enter an activity name.");
-      return;
+  const [activityName, setActivityName] = useState(initialName ?? "");
+  const [description, setDescription] = useState(initialDescription ?? "");
+  const [address, setAddress] = useState(initialAddress ?? "");
+  const [googleLink, setGoogleLink] = useState(initialGoogleMapsUrl ?? "");
+
+  function parseExistingActivities() {
+    if (!activitiesJson) return [];
+
+    try {
+      const parsed = JSON.parse(activitiesJson);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
     }
+  }
 
-    const newActivityId = `activity-${Date.now()}`;
+  function navigateBackWithActivity(savedActivityId: string) {
+    const nextActivity = {
+      id: savedActivityId,
+      dayId,
+      slotId,
+      name: activityName.trim(),
+      description: description.trim(),
+      address: address.trim(),
+      googleMapsUrl: googleLink.trim(),
+    };
+    const existingActivities = parseExistingActivities();
+    const existingIndex = existingActivities.findIndex(
+      (activity) => activity.id === savedActivityId
+    );
+    const nextActivities =
+      existingIndex === -1
+        ? [...existingActivities, nextActivity]
+        : existingActivities.map((activity, index) =>
+            index === existingIndex ? nextActivity : activity
+          );
 
     router.replace({
       pathname: "/itinerary",
@@ -57,14 +109,98 @@ export default function AddActivityScreen() {
         startDate,
         endDate,
         state,
-        newActivityId,
-        newActivityDayId: dayId,
-        newActivitySlotId: slotId,
-        newActivityName: activityName.trim(),
-        newActivityAddress: address.trim(),
-        newActivityGoogleMapsUrl: googleLink.trim(),
+        members,
+        activitiesJson: JSON.stringify(nextActivities),
+        newActivityId: nextActivity.id,
+        newActivityDayId: nextActivity.dayId,
+        newActivitySlotId: nextActivity.slotId,
+        newActivityName: nextActivity.name,
+        newActivityDescription: nextActivity.description,
+        newActivityAddress: nextActivity.address,
+        newActivityGoogleMapsUrl: nextActivity.googleMapsUrl,
       },
     });
+  }
+
+  async function handleSaveActivity() {
+    if (!activityName.trim()) {
+      Alert.alert("Missing activity name", "Please enter an activity name.");
+      return;
+    }
+
+    if (!tripId || !dayId || !slotId) {
+      Alert.alert("Missing data", "Trip, day, or time slot is missing.");
+      return;
+    }
+
+    if (!idToken) {
+      Alert.alert("Not logged in", "Please log in again.");
+      return;
+    }
+
+    try {
+      let savedActivityId = activityId;
+
+      if (isEditMode && activityId) {
+        await updateActivity(activityId, {
+          name: activityName.trim(),
+          description: description.trim(),
+          address: address.trim(),
+          googleMapsUrl: googleLink.trim(),
+        });
+        navigateBackWithActivity(activityId);
+
+        router.replace({
+          pathname: "/itinerary",
+          params: {
+            tripId,
+            title,
+            destination,
+            startDate,
+            endDate,
+            state,
+            activitiesJson,
+          },
+        });
+      } else {
+        const createdActivity = await createActivity({
+          idToken,
+          tripId,
+          dayId,
+          slotId,
+          name: activityName.trim(),
+          description: description.trim(),
+          address: address.trim(),
+          googleMapsUrl: googleLink.trim(),
+        });
+
+        navigateBackWithActivity(createdActivity.activity_id);
+
+        router.replace({
+          pathname: "/itinerary",
+          params: {
+            tripId,
+            title,
+            destination,
+            startDate,
+            endDate,
+            state,
+            newActivityId: createdActivity.activity_id,
+            newActivityDayId: dayId,
+            newActivitySlotId: slotId,
+            newActivityName: createdActivity.name,
+            newActivityDescription: createdActivity.description ?? "",
+            newActivityAddress: createdActivity.address ?? "",
+            newActivityGoogleMapsUrl: createdActivity.googleMapsUrl ?? "",
+          },
+        });
+      }
+    } catch (error) {
+      Alert.alert(
+        "Could not save activity",
+        error instanceof Error ? error.message : "Please try again."
+      );
+    }
   }
 
   return (
@@ -76,27 +212,50 @@ export default function AddActivityScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.hero}>
+        <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() =>
+              router.replace({
+                pathname: "/itinerary",
+                params: {
+                  tripId,
+                  title,
+                  destination,
+                  startDate,
+                  endDate,
+                  state,
+                  members,
+                  activitiesJson,
+                },
+              })
+            }
             style={styles.backButton}
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <AppText variant="body" style={styles.backText}>
-              {"<"}
-            </AppText>
+            <Back width={20} height={20} />
           </Pressable>
 
-          <AppText variant="title" style={styles.title}>
-            Add activity
-          </AppText>
+          <View style={styles.headerTitleRow}>
+            <LocationHeartIcon width={24} height={24} />
+            <AppText variant="body" style={styles.headerTitle}>
+              {isEditMode ? "Edit activity" : "Add activity"}
+            </AppText>
+          </View>
 
-          <View style={styles.form}>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        <View style={styles.form}>
+          <View style={styles.fields}>
             <View style={styles.fieldGroup}>
-              <AppText variant="subtitle" style={styles.label}>
-                Activity name
-              </AppText>
+              <View style={styles.labelRow}>
+                <TextStyle width={24} height={24} />
+                <AppText variant="body" style={styles.label}>
+                  Activity Name
+                </AppText>
+              </View>
+
               <TextInput
                 value={activityName}
                 onChangeText={setActivityName}
@@ -107,9 +266,13 @@ export default function AddActivityScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <AppText variant="subtitle" style={styles.label}>
-                Description
-              </AppText>
+              <View style={styles.labelRow}>
+                <EditIcon width={24} height={24} />
+                <AppText variant="body" style={styles.label}>
+                  Description
+                </AppText>
+              </View>
+
               <TextInput
                 value={description}
                 onChangeText={setDescription}
@@ -122,9 +285,13 @@ export default function AddActivityScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <AppText variant="subtitle" style={styles.label}>
-                Location
-              </AppText>
+              <View style={styles.labelRow}>
+                <LocationIcon width={24} height={24} />
+                <AppText variant="body" style={styles.label}>
+                  Location
+                </AppText>
+              </View>
+
               <TextInput
                 value={address}
                 onChangeText={setAddress}
@@ -135,9 +302,13 @@ export default function AddActivityScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <AppText variant="subtitle" style={styles.label}>
-                Google-Link
-              </AppText>
+              <View style={styles.labelRow}>
+                <GoogleIcon width={24} height={24} />
+                <AppText variant="body" style={styles.label}>
+                  Google-Link
+                </AppText>
+              </View>
+
               <TextInput
                 value={googleLink}
                 onChangeText={setGoogleLink}
@@ -148,21 +319,23 @@ export default function AddActivityScreen() {
                 keyboardType="url"
               />
             </View>
-
-            <Pressable
-              onPress={handleSaveActivity}
-              style={({ pressed }) => [
-                styles.saveButton,
-                pressed && styles.saveButtonPressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Save activity"
-            >
-              <AppText variant="body" style={styles.saveButtonText}>
-                Add activity
-              </AppText>
-            </Pressable>
           </View>
+
+          <Pressable
+            onPress={handleSaveActivity}
+            style={({ pressed }) => [
+              styles.saveButton,
+              pressed && styles.saveButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isEditMode ? "Save activity changes" : "Save activity"
+            }
+          >
+            <AppText variant="body" style={styles.saveButtonText}>
+              {isEditMode ? "Save changes" : "Add activity"}
+            </AppText>
+          </Pressable>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -172,70 +345,97 @@ export default function AddActivityScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.beachYellow,
   },
   scroll: {
     flex: 1,
+    backgroundColor: colors.beachYellow,
   },
   content: {
-    padding: spacing.md,
-  },
-  hero: {
+    flexGrow: 1,
     backgroundColor: colors.beachYellow,
-    minHeight: "100%",
+    paddingHorizontal: 0,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xl,
+  },
+  header: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xxxl,
+    marginBottom: spacing.xxl,
   },
   backButton: {
-    minWidth: 44,
-    minHeight: 44,
     justifyContent: "center",
-    marginBottom: spacing.md,
+    paddingLeft: spacing.md,
   },
-  backText: {
+  headerTitleRow: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  headerTitle: {
     color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
   },
-  title: {
-    color: colors.nightBlack,
-    marginBottom: spacing.xl,
+  headerSpacer: {
+    width: 44,
   },
   form: {
-    gap: spacing.lg,
+    flex: 1,
+    width: "100%",
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    justifyContent: "space-between",
+  },
+  fields: {
+    gap: spacing.xl,
   },
   fieldGroup: {
+    gap: spacing.md,
+  },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
+    paddingLeft: spacing.sm,
   },
   label: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
   },
   input: {
-    minHeight: 56,
+    minHeight: 54,
     borderWidth: 2,
     borderColor: colors.nightBlack,
     borderRadius: radius.md,
     backgroundColor: colors.lightWhite,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     color: colors.nightBlack,
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
     fontFamily: typography.fontFamily.body,
   },
   multilineInput: {
-    minHeight: 120,
+    minHeight: 104,
   },
   saveButton: {
-    marginTop: spacing.xl,
+    alignSelf: "center",
+    width: "85%",
     minHeight: 52,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.sunsetOrange,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.xl,
+    marginBottom: spacing.xl,
   },
   saveButtonPressed: {
     opacity: 0.85,
