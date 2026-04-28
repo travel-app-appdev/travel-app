@@ -1,4 +1,3 @@
-// src/api/trips.ts
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export type TripMember = {
@@ -17,6 +16,9 @@ export type Trip = {
   role: "admin" | "member";
   members?: TripMember[];
   invite_code?: string;
+  planning_started_at?: string;
+  planning_end_at?: string;
+  voting_end_at?: string;
 };
 
 type ApiErrorResponse = {
@@ -151,6 +153,8 @@ type UpdateTripPayload = {
   destination?: string;
   start_date?: string;
   end_date?: string;
+  planning_end_at?: string;
+  voting_end_at?: string;
   state?: "Planning" | "Voting" | "Final";
 };
 
@@ -164,6 +168,8 @@ export async function updateTrip(payload: UpdateTripPayload): Promise<Trip> {
       destination: payload.destination,
       start_date: payload.start_date,
       end_date: payload.end_date,
+      planning_end_at: payload.planning_end_at,
+      voting_end_at: payload.voting_end_at,
       state: payload.state,
     }),
   });

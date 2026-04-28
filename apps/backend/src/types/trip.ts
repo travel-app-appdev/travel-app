@@ -1,3 +1,5 @@
+export type TripState = "Planning" | "Voting" | "Final";
+
 export type TripMember = {
     id: string;
     name: string;
@@ -10,10 +12,13 @@ export type Trip = {
     destination: string;
     start_date: string;
     end_date: string;
-    state: string;
+    state: TripState;
     role?: string;
     members?: TripMember[];
     invite_code?: string;
+    planning_started_at?: string;
+    planning_end_at?: string;
+    voting_end_at?: string;
 };
 
 export type TripDocument = {
@@ -22,8 +27,11 @@ export type TripDocument = {
     destination: string;
     start_date: string;
     end_date: string;
-    state: string;
+    state: TripState;
     invite_code?: string;
+    planning_started_at?: any;
+    planning_end_at?: any;
+    voting_end_at?: any;
 };
 
 export type TripMembershipDocument = {
@@ -47,6 +55,8 @@ export type CreateTripInput = {
     destination: string;
     start_date: string;
     end_date: string;
+    planning_end_at: string;
+    voting_end_at: string;
 };
 
 export type CreateTripWithAuthInput = CreateTripInput & {

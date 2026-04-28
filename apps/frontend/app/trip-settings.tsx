@@ -1,4 +1,3 @@
-// app/trip-settings.tsx
 import { useState, useEffect, useRef } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -44,51 +43,23 @@ import KeyFrame from "@/assets/icons/key_frame.svg";
 import Copy from "@/assets/icons/copy.svg";
 import Timer from "@/assets/icons/timer.svg";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const PLACEHOLDER_PHASES = [
-  {
-    id: "planning",
-    label: "Planning",
-    color: colors.beachYellow,
-    active: true,
-    startDate: new Date(),
-    endDate: new Date(),
-  },
-  {
-    id: "voting",
-    label: "Voting",
-    color: colors.sunsetPink,
-    active: false,
-    startDate: new Date(),
-    endDate: new Date(),
-  },
-  {
-    id: "final",
-    label: "Final",
-    color: colors.neonGreen,
-    active: false,
-    startDate: new Date(),
-    endDate: new Date(),
-  },
-];
-
 const PHASE_TEXT_COLORS: Record<string, string> = {
   planning: colors.nightBlack,
   voting: colors.nightBlack,
   final: colors.nightBlack,
 };
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type FieldKey = "name" | "date" | "destination" | "members" | "code";
 type PhaseKey = "planning" | "voting" | "final";
 
-type PhaseDates = Record<PhaseKey, {
-  start: Date;
-  end: Date;
-  time: string;
-}>;
+type PhaseDates = Record<
+  PhaseKey,
+  {
+    start: Date;
+    end: Date;
+    time: string;
+  }
+>;
 
 type MemberParam = {
   id: string;
@@ -96,8 +67,6 @@ type MemberParam = {
   initials: string;
   color: string;
 };
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDateDisplay(date: Date): string {
   const d = date.getDate().toString().padStart(2, "0");
@@ -110,9 +79,26 @@ function toDateOnlyString(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
-function calcDays(start: Date, end: Date): number {
-  const ms = end.getTime() - start.getTime();
-  return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)) + 1);
+function calcCalendarDays(start: Date, end: Date): number {
+  const startOnly = new Date(start);
+  startOnly.setHours(0, 0, 0, 0);
+
+  const endOnly = new Date(end);
+  endOnly.setHours(0, 0, 0, 0);
+
+  const ms = endOnly.getTime() - startOnly.getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
+}
+
+function calcDaysLeft(end: Date): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const endOnly = new Date(end);
+  endOnly.setHours(0, 0, 0, 0);
+
+  const ms = endOnly.getTime() - today.getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
 }
 
 function dayLabel(days: number, active: boolean): string {
@@ -133,7 +119,29 @@ function timeStringToDate(timeStr: string): Date {
   return d;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+function combineDateAndTime(date: Date, timeStr: string): string {
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  const combined = new Date(date);
+  combined.setHours(hours, minutes, 0, 0);
+  return combined.toISOString();
+}
+
+function endOfDay(date: Date): Date {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
+  return next;
+}
+
+function parseIsoToDate(value?: string): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseIsoToTimeString(value?: string): string {
+  const parsed = parseIsoToDate(value);
+  return parsed ? dateToTimeString(parsed) : "00:00";
+}
 
 export default function TripSettingsScreen() {
   const raw = useLocalSearchParams<{
@@ -144,21 +152,27 @@ export default function TripSettingsScreen() {
     endDate: string;
     members: string;
     inviteCode: string;
+    state?: "Planning" | "Voting" | "Final";
+    planningStartedAt?: string;
+    planningEndAt?: string;
+    votingEndAt?: string;
   }>();
 
-  const tripId           = String(raw.tripId ?? "");
-  const title            = String(raw.title ?? "");
+  const tripId = String(raw.tripId ?? "");
+  const title = String(raw.title ?? "");
   const destinationParam = String(raw.destination ?? "");
-  const startDate        = String(raw.startDate ?? "");
-  const endDate          = String(raw.endDate ?? "");
-  const membersParam     = String(raw.members ?? "");
-  const inviteCodeParam  = String(raw.inviteCode ?? "");
-
+  const startDate = String(raw.startDate ?? "");
+  const endDate = String(raw.endDate ?? "");
+  const membersParam = String(raw.members ?? "");
+  const inviteCodeParam = String(raw.inviteCode ?? "");
+  const tripState = String(raw.state ?? "Planning");
+  const planningStartedAt = String(raw.planningStartedAt ?? "");
+  const planningEndAt = String(raw.planningEndAt ?? "");
+  const votingEndAt = String(raw.votingEndAt ?? "");
   const router = useRouter();
   const { height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenHeight < 700;
 
-  // ── Timeout cleanup ──────────────────────────────────────────────────────────
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const safeTimeout = (fn: () => void, delay: number) => {
     const id = setTimeout(fn, delay);
@@ -170,7 +184,6 @@ export default function TripSettingsScreen() {
     return () => timeoutRefs.current.forEach(clearTimeout);
   }, []);
 
-  // ── Parse members ────────────────────────────────────────────────────────────
   const parsedMembers: MemberParam[] = (() => {
     try {
       return membersParam ? JSON.parse(membersParam) : [];
@@ -179,7 +192,6 @@ export default function TripSettingsScreen() {
     }
   })();
 
-  // ── State ────────────────────────────────────────────────────────────────────
   const [openField, setOpenField] = useState<FieldKey | null>(null);
   const [openPhase, setOpenPhase] = useState<PhaseKey | null>(null);
 
@@ -188,8 +200,12 @@ export default function TripSettingsScreen() {
   const [tripNameUpdated, setTripNameUpdated] = useState(false);
   const [isUpdatingName, setIsUpdatingName] = useState(false);
 
-  const [tripStart, setTripStart] = useState(startDate ? new Date(startDate) : new Date());
-  const [tripEnd, setTripEnd] = useState(endDate ? new Date(endDate) : new Date());
+  const [tripStart, setTripStart] = useState(
+    startDate ? new Date(startDate) : new Date()
+  );
+  const [tripEnd, setTripEnd] = useState(
+    endDate ? new Date(endDate) : new Date()
+  );
   const [tripDateUpdated, setTripDateUpdated] = useState(false);
   const [isUpdatingDate, setIsUpdatingDate] = useState(false);
   const [showTripStartPicker, setShowTripStartPicker] = useState(false);
@@ -207,17 +223,87 @@ export default function TripSettingsScreen() {
 
   const [codeCopied, setCodeCopied] = useState(false);
 
+  const planningStartDate = parseIsoToDate(planningStartedAt);
+  const planningEndDate = parseIsoToDate(planningEndAt);
+  const votingEndDate = parseIsoToDate(votingEndAt);
+
+  // Voting starts exactly when planning ends
+  const votingStartDate = planningEndDate ?? tripStart;
+
+  // Final uses same date as voting_end_at
+  const finalDisplayDate = votingEndDate ?? tripEnd;
+
+  const phases = [
+    {
+      id: "planning" as const,
+      label: "Planning",
+      color: colors.beachYellow,
+      active: tripState === "Planning",
+    },
+    {
+      id: "voting" as const,
+      label: "Voting",
+      color: colors.sunsetPink,
+      active: tripState === "Voting",
+    },
+    {
+      id: "final" as const,
+      label: "Final",
+      color: colors.neonGreen,
+      active: tripState === "Final",
+    },
+  ];
+
   const [phaseDates, setPhaseDates] = useState<PhaseDates>({
-    planning: { start: PLACEHOLDER_PHASES[0].startDate, end: PLACEHOLDER_PHASES[0].endDate, time: "24:00" },
-    voting:   { start: PLACEHOLDER_PHASES[1].startDate, end: PLACEHOLDER_PHASES[1].endDate, time: "24:00" },
-    final:    { start: PLACEHOLDER_PHASES[2].startDate, end: PLACEHOLDER_PHASES[2].endDate, time: "24:00" },
+    planning: {
+      start: planningStartDate ?? tripStart,
+      end: planningEndDate ?? tripStart,
+      time: parseIsoToTimeString(planningEndAt),
+    },
+    voting: {
+      start: votingStartDate,
+      end: votingEndDate ?? tripStart,
+      time: parseIsoToTimeString(votingEndAt),
+    },
+    final: {
+      start: finalDisplayDate,
+      end: finalDisplayDate,
+      time: "00:00",
+    },
   });
+
+  useEffect(() => {
+    const nextPlanningStart = parseIsoToDate(planningStartedAt);
+    const nextPlanningEnd = parseIsoToDate(planningEndAt);
+    const nextVotingEnd = parseIsoToDate(votingEndAt);
+    const nextFinalDisplay = nextVotingEnd ?? tripEnd;
+
+    setPhaseDates({
+      planning: {
+        start: nextPlanningStart ?? tripStart,
+        end: nextPlanningEnd ?? tripStart,
+        time: parseIsoToTimeString(planningEndAt),
+      },
+      voting: {
+        start: nextPlanningEnd ?? tripStart,
+        end: nextVotingEnd ?? tripStart,
+        time: parseIsoToTimeString(votingEndAt),
+      },
+      final: {
+        start: nextFinalDisplay ?? tripEnd,
+        end: nextFinalDisplay ?? tripEnd,
+        time: "00:00",
+      },
+    });
+  }, [planningStartedAt, planningEndAt, votingEndAt, tripStart, tripEnd]);
+
   const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
-  const [showPhaseStartPicker, setShowPhaseStartPicker] = useState<PhaseKey | null>(null);
-  const [showPhaseTimePicker, setShowPhaseTimePicker] = useState<PhaseKey | null>(null);
+  const [showPhaseStartPicker, setShowPhaseStartPicker] =
+    useState<PhaseKey | null>(null);
+  const [showPhaseTimePicker, setShowPhaseTimePicker] =
+    useState<PhaseKey | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // ── Auth helper ──────────────────────────────────────────────────────────────
   const getIdToken = async (): Promise<string | null> => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -227,7 +313,6 @@ export default function TripSettingsScreen() {
     return currentUser.getIdToken();
   };
 
-  // ── Field toggles ────────────────────────────────────────────────────────────
   const toggleField = (key: FieldKey) => {
     setOpenField((prev) => (prev === key ? null : key));
     setTripNameUpdated(false);
@@ -240,20 +325,23 @@ export default function TripSettingsScreen() {
     setOpenPhase((prev) => (prev === key ? null : key));
   };
 
-  // ── Handlers ─────────────────────────────────────────────────────────────────
-
   const handleUpdateName = async () => {
     if (!tripNameInput.trim() || isUpdatingName) return;
     const idToken = await getIdToken();
     if (!idToken) return;
+
     try {
       setIsUpdatingName(true);
       await updateTrip({ idToken, tripId, title: tripNameInput.trim() });
       setTripName(tripNameInput.trim());
       setTripNameUpdated(true);
-      safeTimeout(() => { setTripNameUpdated(false); setOpenField(null); }, 1500);
+      safeTimeout(() => {
+        setTripNameUpdated(false);
+        setOpenField(null);
+      }, 1500);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to update name";
+      const message =
+        error instanceof Error ? error.message : "Failed to update name";
       Alert.alert("Update failed", message);
     } finally {
       setIsUpdatingName(false);
@@ -264,14 +352,23 @@ export default function TripSettingsScreen() {
     if (!destinationInput.trim() || isUpdatingDestination) return;
     const idToken = await getIdToken();
     if (!idToken) return;
+
     try {
       setIsUpdatingDestination(true);
-      await updateTrip({ idToken, tripId, destination: destinationInput.trim() });
+      await updateTrip({
+        idToken,
+        tripId,
+        destination: destinationInput.trim(),
+      });
       setDestination(destinationInput.trim());
       setDestinationUpdated(true);
-      safeTimeout(() => { setDestinationUpdated(false); setOpenField(null); }, 1500);
+      safeTimeout(() => {
+        setDestinationUpdated(false);
+        setOpenField(null);
+      }, 1500);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to update destination";
+      const message =
+        error instanceof Error ? error.message : "Failed to update destination";
       Alert.alert("Update failed", message);
     } finally {
       setIsUpdatingDestination(false);
@@ -282,7 +379,32 @@ export default function TripSettingsScreen() {
     if (isUpdatingDate) return;
     const idToken = await getIdToken();
     if (!idToken) return;
+
     try {
+      const tripEndBoundary = endOfDay(tripEnd);
+      const currentPlanningEnd = new Date(
+        combineDateAndTime(phaseDates.planning.end, phaseDates.planning.time)
+      );
+      const currentVotingEnd = new Date(
+        combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
+      );
+
+      if (currentPlanningEnd > tripEndBoundary) {
+        Alert.alert(
+          "Invalid trip end",
+          "Trip end cannot be before the planning end date."
+        );
+        return;
+      }
+
+      if (currentVotingEnd > tripEndBoundary) {
+        Alert.alert(
+          "Invalid trip end",
+          "Trip end cannot be before the voting end date."
+        );
+        return;
+      }
+
       setIsUpdatingDate(true);
       await updateTrip({
         idToken,
@@ -291,9 +413,13 @@ export default function TripSettingsScreen() {
         end_date: toDateOnlyString(tripEnd),
       });
       setTripDateUpdated(true);
-      safeTimeout(() => { setTripDateUpdated(false); setOpenField(null); }, 1500);
+      safeTimeout(() => {
+        setTripDateUpdated(false);
+        setOpenField(null);
+      }, 1500);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to update dates";
+      const message =
+        error instanceof Error ? error.message : "Failed to update dates";
       Alert.alert("Update failed", message);
     } finally {
       setIsUpdatingDate(false);
@@ -303,12 +429,14 @@ export default function TripSettingsScreen() {
   const handleAddMember = () => {
     const trimmed = newMember.trim();
     if (!trimmed) return;
+
     const newEntry: MemberParam = {
       id: `local-${Date.now()}`,
       name: trimmed,
       initials: trimmed.slice(0, 2).toUpperCase(),
       color: colors.sunsetOrange,
     };
+
     setMembers((prev) => [...prev, newEntry]);
     setNewMember("");
     setMembersUpdated(true);
@@ -316,31 +444,30 @@ export default function TripSettingsScreen() {
   };
 
   const handleRemoveMember = (id: string, name: string) => {
-    Alert.alert(
-      "Remove member",
-      `Are you sure you want to remove ${name}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setRemovingMemberId(id);
-              const idToken = await getIdToken();
-              if (!idToken) return;
-              await removeMember({ idToken, tripId, memberId: id });
-              setMembers((prev) => prev.filter((m) => m.id !== id));
-            } catch (error) {
-              const message = error instanceof Error ? error.message : "Failed to remove member";
-              Alert.alert("Remove failed", message);
-            } finally {
-              setRemovingMemberId(null);
-            }
-          },
+    Alert.alert("Remove member", `Are you sure you want to remove ${name}?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setRemovingMemberId(id);
+            const idToken = await getIdToken();
+            if (!idToken) return;
+            await removeMember({ idToken, tripId, memberId: id });
+            setMembers((prev) => prev.filter((m) => m.id !== id));
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "Failed to remove member";
+            Alert.alert("Remove failed", message);
+          } finally {
+            setRemovingMemberId(null);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleCopyCode = async () => {
@@ -349,12 +476,114 @@ export default function TripSettingsScreen() {
     safeTimeout(() => setCodeCopied(false), 2000);
   };
 
-  const handleUpdatePhaseDate = (phaseId: PhaseKey) => {
-    setPhaseUpdated((prev) => ({ ...prev, [phaseId]: true }));
-    safeTimeout(() => {
-      setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
-      setOpenPhase(null);
-    }, 1500);
+  const handleUpdatePhaseDate = async (phaseId: PhaseKey) => {
+    const idToken = await getIdToken();
+    if (!idToken) return;
+
+    try {
+      const phase = phaseDates[phaseId];
+      const nextEnd = new Date(combineDateAndTime(phase.end, phase.time));
+      const tripEndBoundary = endOfDay(tripEnd);
+
+      if (phaseId === "planning") {
+        const currentVotingEnd = new Date(
+          combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
+        );
+
+        if (nextEnd > tripEndBoundary) {
+          Alert.alert(
+            "Invalid planning end",
+            "Planning end cannot be after the trip end date."
+          );
+          return;
+        }
+
+        if (nextEnd > currentVotingEnd) {
+          Alert.alert(
+            "Invalid planning end",
+            "Planning end cannot be after voting end."
+          );
+          return;
+        }
+
+        const endAtIso = combineDateAndTime(phase.end, phase.time);
+
+        await updateTrip({
+          idToken,
+          tripId,
+          planning_end_at: endAtIso,
+        });
+
+        setPhaseDates((prev) => ({
+          ...prev,
+          planning: {
+            ...prev.planning,
+            end: phase.end,
+            time: phase.time,
+          },
+          voting: {
+            ...prev.voting,
+            start: phase.end,
+          },
+        }));
+      }
+
+      if (phaseId === "voting") {
+        const currentPlanningEnd = new Date(
+          combineDateAndTime(phaseDates.planning.end, phaseDates.planning.time)
+        );
+
+        if (nextEnd < currentPlanningEnd) {
+          Alert.alert(
+            "Invalid voting end",
+            "Voting end cannot be before planning end."
+          );
+          return;
+        }
+
+        if (nextEnd > tripEndBoundary) {
+          Alert.alert(
+            "Invalid voting end",
+            "Voting end cannot be after the trip end date."
+          );
+          return;
+        }
+
+        const endAtIso = combineDateAndTime(phase.end, phase.time);
+
+        await updateTrip({
+          idToken,
+          tripId,
+          voting_end_at: endAtIso,
+        });
+
+        const nextFinalDisplay = phase.end;
+
+        setPhaseDates((prev) => ({
+          ...prev,
+          voting: {
+            ...prev.voting,
+            end: phase.end,
+            time: phase.time,
+          },
+          final: {
+            ...prev.final,
+            start: nextFinalDisplay,
+            end: nextFinalDisplay,
+          },
+        }));
+      }
+
+      setPhaseUpdated((prev) => ({ ...prev, [phaseId]: true }));
+      safeTimeout(() => {
+        setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
+        setOpenPhase(null);
+      }, 1500);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update phase";
+      Alert.alert("Update failed", message);
+    }
   };
 
   const handleDeleteTrip = () => {
@@ -374,7 +603,10 @@ export default function TripSettingsScreen() {
               await deleteTrip({ idToken, tripId });
               router.replace("/home");
             } catch (error) {
-              const message = error instanceof Error ? error.message : "Failed to delete trip";
+              const message =
+                error instanceof Error
+                  ? error.message
+                  : "Failed to delete trip";
               Alert.alert("Delete failed", message);
             } finally {
               setIsDeleting(false);
@@ -384,8 +616,6 @@ export default function TripSettingsScreen() {
       ]
     );
   };
-
-  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <View style={styles.fullScreen}>
@@ -398,13 +628,15 @@ export default function TripSettingsScreen() {
             style={styles.flex}
             contentContainerStyle={[
               styles.container,
-              { paddingBottom: ACTION_CARD_HEIGHT + (isSmallScreen ? spacing.lg : spacing.xxxl) },
+              {
+                paddingBottom:
+                  ACTION_CARD_HEIGHT +
+                  (isSmallScreen ? spacing.lg : spacing.xxxl),
+              },
             ]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-
-            {/* ── Header ───────────────────────────────────────────────────── */}
             <View style={styles.header}>
               <BackLink href="/home" />
               <View style={styles.headerTitle}>
@@ -415,7 +647,6 @@ export default function TripSettingsScreen() {
               </View>
             </View>
 
-            {/* ── Trip Name ─────────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -427,18 +658,29 @@ export default function TripSettingsScreen() {
                 <View style={styles.infoLeft}>
                   <View style={styles.infoLabelRow}>
                     <TripTitle width={20} height={20} />
-                    <AppText variant="body" style={styles.fieldLabel}>Trip name</AppText>
+                    <AppText variant="body" style={styles.fieldLabel}>
+                      Trip name
+                    </AppText>
                   </View>
-                  <AppText variant="caption" style={styles.infoValue}>{tripName}</AppText>
+                  <AppText variant="caption" style={styles.infoValue}>
+                    {tripName}
+                  </AppText>
                 </View>
-                {openField === "name" ? <ArrowUp width={20} height={20} /> : <ArrowDown width={20} height={20} />}
+                {openField === "name" ? (
+                  <ArrowUp width={20} height={20} />
+                ) : (
+                  <ArrowDown width={20} height={20} />
+                )}
               </Pressable>
 
               {openField === "name" && (
                 <View style={styles.expandedField}>
                   <AppInput
                     value={tripNameInput}
-                    onChangeText={(t) => { setTripNameInput(t); setTripNameUpdated(false); }}
+                    onChangeText={(t) => {
+                      setTripNameInput(t);
+                      setTripNameUpdated(false);
+                    }}
                     placeholder="Enter trip name"
                     autoFocus
                     accessibilityLabel="Trip name"
@@ -469,7 +711,6 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* ── Trip Date ─────────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -481,21 +722,30 @@ export default function TripSettingsScreen() {
                 <View style={styles.infoLeft}>
                   <View style={styles.infoLabelRow}>
                     <Calendar width={20} height={20} />
-                    <AppText variant="body" style={styles.fieldLabel}>Trip date</AppText>
+                    <AppText variant="body" style={styles.fieldLabel}>
+                      Trip date
+                    </AppText>
                   </View>
                   <AppText variant="caption" style={styles.infoValue}>
                     {formatDateDisplay(tripStart)} –{" "}
                     {formatDateDisplay(tripEnd)}
                   </AppText>
                 </View>
-                {openField === "date" ? <ArrowUp width={20} height={20} /> : <ArrowDown width={20} height={20} />}
+                {openField === "date" ? (
+                  <ArrowUp width={20} height={20} />
+                ) : (
+                  <ArrowDown width={20} height={20} />
+                )}
               </Pressable>
 
               {openField === "date" && (
                 <View style={styles.expandedField}>
                   <Pressable
                     style={styles.dateInput}
-                    onPress={() => { setShowTripStartPicker(true); setShowTripEndPicker(false); }}
+                    onPress={() => {
+                      setShowTripStartPicker(true);
+                      setShowTripEndPicker(false);
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel="Select trip dates"
                   >
@@ -513,10 +763,14 @@ export default function TripSettingsScreen() {
                       display={Platform.OS === "ios" ? "spinner" : "default"}
                       onChange={(_: DateTimePickerEvent, date?: Date) => {
                         setShowTripStartPicker(false);
-                        if (date) { setTripStart(date); setShowTripEndPicker(true); }
+                        if (date) {
+                          setTripStart(date);
+                          setShowTripEndPicker(true);
+                        }
                       }}
                     />
                   )}
+
                   {showTripEndPicker && (
                     <DateTimePicker
                       value={tripEnd}
@@ -539,6 +793,7 @@ export default function TripSettingsScreen() {
                     textStyle={styles.updateButtonText}
                     accessibilityLabel="Update trip dates"
                   />
+
                   {tripDateUpdated && (
                     <View style={styles.successRow}>
                       <CheckMark width={18} height={18} />
@@ -555,7 +810,6 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* ── Destination ───────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -567,18 +821,29 @@ export default function TripSettingsScreen() {
                 <View style={styles.infoLeft}>
                   <View style={styles.infoLabelRow}>
                     <Location width={20} height={20} />
-                    <AppText variant="body" style={styles.fieldLabel}>Destination</AppText>
+                    <AppText variant="body" style={styles.fieldLabel}>
+                      Destination
+                    </AppText>
                   </View>
-                  <AppText variant="caption" style={styles.infoValue}>{destination}</AppText>
+                  <AppText variant="caption" style={styles.infoValue}>
+                    {destination}
+                  </AppText>
                 </View>
-                {openField === "destination" ? <ArrowUp width={20} height={20} /> : <ArrowDown width={20} height={20} />}
+                {openField === "destination" ? (
+                  <ArrowUp width={20} height={20} />
+                ) : (
+                  <ArrowDown width={20} height={20} />
+                )}
               </Pressable>
 
               {openField === "destination" && (
                 <View style={styles.expandedField}>
                   <AppInput
                     value={destinationInput}
-                    onChangeText={(t) => { setDestinationInput(t); setDestinationUpdated(false); }}
+                    onChangeText={(t) => {
+                      setDestinationInput(t);
+                      setDestinationUpdated(false);
+                    }}
                     placeholder="Enter destination"
                     autoFocus
                     accessibilityLabel="Destination"
@@ -609,7 +874,6 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* ── Members ───────────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -621,20 +885,28 @@ export default function TripSettingsScreen() {
                 <View style={styles.infoLeft}>
                   <View style={styles.infoLabelRow}>
                     <AddPeople width={20} height={20} />
-                    <AppText variant="body" style={styles.fieldLabel}>Members</AppText>
+                    <AppText variant="body" style={styles.fieldLabel}>
+                      Members
+                    </AppText>
                   </View>
                   <AppText variant="caption" style={styles.infoValue}>
                     {members.map((m) => m.name).join(", ") || "—"}
                   </AppText>
                 </View>
-                {openField === "members" ? <ArrowUp width={20} height={20} /> : <ArrowDown width={20} height={20} />}
+                {openField === "members" ? (
+                  <ArrowUp width={20} height={20} />
+                ) : (
+                  <ArrowDown width={20} height={20} />
+                )}
               </Pressable>
 
               {openField === "members" && (
                 <View style={styles.expandedField}>
                   {members.map((member) => (
                     <View key={member.id} style={styles.memberRow}>
-                      <AppText variant="body" style={styles.memberName}>{member.name}</AppText>
+                      <AppText variant="body" style={styles.memberName}>
+                        {member.name}
+                      </AppText>
                       <Pressable
                         onPress={() =>
                           handleRemoveMember(member.id, member.name)
@@ -642,8 +914,16 @@ export default function TripSettingsScreen() {
                         disabled={removingMemberId === member.id}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         accessibilityRole="button"
-                        accessibilityLabel={removingMemberId === member.id ? `Removing ${member.name}` : `Remove ${member.name}`}
-                        style={removingMemberId === member.id ? styles.removingIcon : undefined}
+                        accessibilityLabel={
+                          removingMemberId === member.id
+                            ? `Removing ${member.name}`
+                            : `Remove ${member.name}`
+                        }
+                        style={
+                          removingMemberId === member.id
+                            ? styles.removingIcon
+                            : undefined
+                        }
                       >
                         <RemovePerson width={22} height={22} />
                       </Pressable>
@@ -680,15 +960,19 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* ── Code ─────────────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoRow}>
                 <View style={styles.infoLeft}>
                   <View style={styles.infoLabelRow}>
                     <KeyFrame width={20} height={20} />
-                    <AppText variant="body" style={styles.fieldLabel}>Code</AppText>
+                    <AppText variant="body" style={styles.fieldLabel}>
+                      Code
+                    </AppText>
                   </View>
-                  <AppText variant="caption" style={[styles.infoValue, styles.codeValue]}>
+                  <AppText
+                    variant="caption"
+                    style={[styles.infoValue, styles.codeValue]}
+                  >
                     {inviteCodeParam || "—"}
                   </AppText>
                 </View>
@@ -702,17 +986,19 @@ export default function TripSettingsScreen() {
                 </Pressable>
               </View>
               {codeCopied && (
-                <AppText variant="caption" style={styles.copiedHint}>✓ Copied!</AppText>
+                <AppText variant="caption" style={styles.copiedHint}>
+                  ✓ Copied!
+                </AppText>
               )}
             </View>
 
-            {/* ── Phases ───────────────────────────────────────────────────── */}
-            {PLACEHOLDER_PHASES.map((phase) => {
+            {phases.map((phase) => {
               const phaseId = phase.id as PhaseKey;
               const isOpen = openPhase === phaseId;
               const dates = phaseDates[phaseId];
-              const days = calcDays(dates.start, dates.end);
-
+              const days = phase.active
+                ? calcDaysLeft(dates.end)
+                : calcCalendarDays(dates.start, dates.end);
               return (
                 <View key={phaseId} style={styles.fieldGroup}>
                   <Pressable
@@ -742,10 +1028,11 @@ export default function TripSettingsScreen() {
 
                       <View style={styles.phaseTimerBlock}>
                         <View style={styles.hourglassCol}>
-                          {phase.active
-                            ? <Hourglass1 width={20} height={20} />
-                            : <Hourglass0 width={20} height={20} />
-                          }
+                          {phase.active ? (
+                            <Hourglass1 width={20} height={20} />
+                          ) : (
+                            <Hourglass0 width={20} height={20} />
+                          )}
                         </View>
                         <View style={styles.phaseTextCol}>
                           <View style={styles.daysRow}>
@@ -765,7 +1052,11 @@ export default function TripSettingsScreen() {
                       </View>
                     </View>
 
-                    {isOpen ? <ArrowUp width={20} height={20} /> : <ArrowDown width={20} height={20} />}
+                    {isOpen ? (
+                      <ArrowUp width={20} height={20} />
+                    ) : (
+                      <ArrowDown width={20} height={20} />
+                    )}
                   </Pressable>
 
                   <AppText variant="caption" style={styles.phaseDateLabel}>
@@ -775,7 +1066,7 @@ export default function TripSettingsScreen() {
                       : ""}
                   </AppText>
 
-                  {isOpen && (
+                  {isOpen && phaseId !== "final" && (
                     <View style={styles.expandedField}>
                       <AppText variant="body" style={styles.phaseEndLabel}>
                         End date of {phase.label} state
@@ -784,7 +1075,10 @@ export default function TripSettingsScreen() {
                       <View style={styles.dateTimeRow}>
                         <Pressable
                           style={[styles.dateInput, styles.dateTimeHalf]}
-                          onPress={() => { setShowPhaseStartPicker(phaseId); setShowPhaseTimePicker(null); }}
+                          onPress={() => {
+                            setShowPhaseStartPicker(phaseId);
+                            setShowPhaseTimePicker(null);
+                          }}
                           accessibilityRole="button"
                           accessibilityLabel={`Select ${phase.label} end date`}
                         >
@@ -796,11 +1090,16 @@ export default function TripSettingsScreen() {
 
                         <Pressable
                           style={[styles.dateInput, styles.dateTimeHalf]}
-                          onPress={() => { setShowPhaseTimePicker(phaseId); setShowPhaseStartPicker(null); }}
+                          onPress={() => {
+                            setShowPhaseTimePicker(phaseId);
+                            setShowPhaseStartPicker(null);
+                          }}
                           accessibilityRole="button"
                           accessibilityLabel={`Select ${phase.label} end time`}
                         >
-                          <AppText variant="body" style={styles.dateText}>{dates.time}</AppText>
+                          <AppText variant="body" style={styles.dateText}>
+                            {dates.time}
+                          </AppText>
                           <Timer width={18} height={18} />
                         </Pressable>
                       </View>
@@ -809,12 +1108,20 @@ export default function TripSettingsScreen() {
                         <DateTimePicker
                           value={dates.end}
                           mode="date"
-                          display={
-                            Platform.OS === "ios" ? "spinner" : "default"
-                          }
+                          minimumDate={phaseId === "voting" ? phaseDates.planning.end : undefined}
+                          maximumDate={tripEnd}
+                          display={Platform.OS === "ios" ? "spinner" : "default"}
                           onChange={(_: DateTimePickerEvent, date?: Date) => {
                             setShowPhaseStartPicker(null);
-                            if (date) setPhaseDates((prev) => ({ ...prev, [phaseId]: { ...prev[phaseId], end: date } }));
+                            if (date) {
+                              setPhaseDates((prev) => ({
+                                ...prev,
+                                [phaseId]: {
+                                  ...prev[phaseId],
+                                  end: date,
+                                },
+                              }));
+                            }
                           }}
                         />
                       )}
@@ -824,10 +1131,20 @@ export default function TripSettingsScreen() {
                           value={timeStringToDate(dates.time)}
                           mode="time"
                           is24Hour
-                          display={Platform.OS === "ios" ? "spinner" : "default"}
+                          display={
+                            Platform.OS === "ios" ? "spinner" : "default"
+                          }
                           onChange={(_: DateTimePickerEvent, date?: Date) => {
                             setShowPhaseTimePicker(null);
-                            if (date) setPhaseDates((prev) => ({ ...prev, [phaseId]: { ...prev[phaseId], time: dateToTimeString(date) } }));
+                            if (date) {
+                              setPhaseDates((prev) => ({
+                                ...prev,
+                                [phaseId]: {
+                                  ...prev[phaseId],
+                                  time: dateToTimeString(date),
+                                },
+                              }));
+                            }
                           }}
                         />
                       )}
@@ -857,10 +1174,8 @@ export default function TripSettingsScreen() {
                 </View>
               );
             })}
-
           </ScrollView>
 
-          {/* ── Delete trip ───────────────────────────────────────────────── */}
           <SafeAreaView edges={["bottom"]} style={styles.deleteSafeArea}>
             <View style={styles.deleteWrapper}>
               <ActionCard
@@ -871,14 +1186,11 @@ export default function TripSettingsScreen() {
               />
             </View>
           </SafeAreaView>
-
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   fullScreen: { flex: 1, backgroundColor: colors.lightWhite },

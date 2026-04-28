@@ -29,25 +29,42 @@ export const getMyTrips = async (req: Request, res: Response): Promise<void> => 
 };
 
 export const createTrip = async (req: Request, res: Response): Promise<void> => {
-    const { idToken, title, destination, start_date, end_date } = req.body;
+    const { idToken, title, destination, start_date, end_date,
+        planning_end_at, voting_end_at, } = req.body;
 
-    if (!idToken || !title || !destination || !start_date || !end_date) {
+    if (!idToken || !title || !destination || !start_date || !end_date || !planning_end_at || !voting_end_at) {
         res.status(400).json({
-            error: "idToken, title, destination, start_date and end_date are required",
+            error: "idToken, title, destination, startdate, enddate, " +
+                "planningEndAt and votingEndAt are required",
         });
         return;
     }
 
     const start = new Date(start_date);
     const end = new Date(end_date);
+    const planningEnd = new Date(planning_end_at);
+    const votingEnd = new Date(voting_end_at);
 
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        res.status(400).json({ error: "start_date and end_date must be valid dates" });
+    if (
+        isNaN(start.getTime()) ||
+        isNaN(end.getTime()) ||
+        isNaN(planningEnd.getTime()) ||
+        isNaN(votingEnd.getTime())
+    ) {
+        res.status(400).json({ error: "startdate, enddate, planningEndAt and votingEndAt must be valid dates",
+        });
         return;
     }
 
     if (end < start) {
         res.status(400).json({ error: "end_date cannot be before start_date" });
+        return;
+    }
+
+    if (planningEnd >= votingEnd) {
+        res.status(400).json({
+            error: "planning_end_at must be before voting_end_at",
+        });
         return;
     }
 
@@ -58,6 +75,8 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
             destination,
             start_date,
             end_date,
+            planning_end_at,
+            voting_end_at,
         });
 
         res.status(201).json(trip);
@@ -72,11 +91,60 @@ export const createTripWithoutAuth = async (
     req: Request,
     res: Response
 ): Promise<void> => {
-    const { userId, title, destination, start_date, end_date } = req.body;
+    const {
+        userId,
+        title,
+        destination,
+        start_date,
+        end_date,
+        planning_end_at,
+        voting_end_at,
+    } = req.body;
 
-    if (!userId || !title || !destination || !start_date || !end_date) {
+    if (
+        !userId ||
+        !title ||
+        !destination ||
+        !start_date ||
+        !end_date ||
+        !planning_end_at ||
+        !voting_end_at
+    ) {
         res.status(400).json({
-            error: "userId, title, destination, start_date and end_date are required",
+            error:
+                "userId, title, destination, start_date, end_date, planning_end_at and voting_end_at are required",
+        });
+        return;
+    }
+
+    const start = new Date(start_date);
+    const end = new Date(end_date);
+    const planningEnd = new Date(planning_end_at);
+    const votingEnd = new Date(voting_end_at);
+
+    if (
+        isNaN(start.getTime()) ||
+        isNaN(end.getTime()) ||
+        isNaN(planningEnd.getTime()) ||
+        isNaN(votingEnd.getTime())
+    ) {
+        res.status(400).json({
+            error:
+                "start_date, end_date, planning_end_at and voting_end_at must be valid dates",
+        });
+        return;
+    }
+
+    if (end < start) {
+        res.status(400).json({
+            error: "end_date cannot be before start_date",
+        });
+        return;
+    }
+
+    if (planningEnd >= votingEnd) {
+        res.status(400).json({
+            error: "planning_end_at must be before voting_end_at",
         });
         return;
     }
@@ -88,6 +156,8 @@ export const createTripWithoutAuth = async (
             destination,
             start_date,
             end_date,
+            planning_end_at,
+            voting_end_at,
         });
 
         res.status(201).json(trip);
@@ -215,7 +285,8 @@ export const finishPlanning = async (req: Request, res: Response): Promise<void>
 // New controller for updating trip details by admin
 
 export const updateTrip = async (req: Request, res: Response): Promise<void> => {
-    const { idToken, title, destination, start_date, end_date } = req.body;
+    const { idToken, title, destination, start_date, end_date,
+        planning_end_at, voting_end_at  } = req.body;
     const tripId = req.params.tripId as string;
 
     if (!idToken || !tripId) {
@@ -223,7 +294,7 @@ export const updateTrip = async (req: Request, res: Response): Promise<void> => 
         return;
     }
 
-    if (!title && !destination && !start_date && !end_date) {
+    if (!title && !destination && !start_date && !end_date && !planning_end_at && !voting_end_at) {
         res.status(400).json({ error: "At least one field to update is required" });
         return;
     }
@@ -241,8 +312,23 @@ export const updateTrip = async (req: Request, res: Response): Promise<void> => 
         }
     }
 
+    // Validate planning and voting deadlines if provided
+    if (planning_end_at && voting_end_at) {
+        const planningEnd = new Date(planning_end_at);
+        const votingEnd = new Date(voting_end_at);
+        if (isNaN(planningEnd.getTime()) || isNaN(votingEnd.getTime())) {
+            res.status(400).json({ error: "planning_end_at and voting_end_at must be valid dates" });
+            return;
+        }
+        if (planningEnd >= votingEnd) {
+            res.status(400).json({ error: "planning_end_at must be before voting_end_at" });
+            return;
+        }
+    }
+
     try {
-        const trip = await updateTripForAdmin({ idToken, tripId, title, destination, start_date, end_date });
+        const trip = await updateTripForAdmin({ idToken, tripId, title, destination, start_date, end_date,
+        planning_end_at, voting_end_at });
         res.status(200).json(trip);
     } catch (error: any) {
         if (error.status === 403) {
