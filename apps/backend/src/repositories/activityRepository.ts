@@ -5,9 +5,10 @@ export async function createActivity(data: {
     tripId: string;
     userId: string;
     slotId: string;
-    title: string;
+    name: string;
     description?: string;
-    location_link?: string;
+    address?: string;
+    googleMapsUrl?: string;
 }): Promise<Activity> {
     const db = admin.firestore();
 
@@ -19,9 +20,10 @@ export async function createActivity(data: {
     batch.set(activityRef, {
         trip_id: data.tripId,
         user_id: data.userId,
-        title: data.title,
+        name: data.name,
         description: data.description ?? null,
-        location_link: data.location_link ?? null,
+        address: data.address ?? null,
+        googleMapsUrl: data.googleMapsUrl ?? null,
         source_type: "manual",
     });
 
@@ -37,9 +39,10 @@ export async function createActivity(data: {
         activity_id: activityRef.id,
         trip_id: data.tripId,
         user_id: data.userId,
-        title: data.title,
+        name: data.name,
         description: data.description,
-        location_link: data.location_link,
+        address: data.address,
+        googleMapsUrl: data.googleMapsUrl,
         source_type: "manual",
     };
 }
@@ -66,9 +69,10 @@ export async function getActivitiesBySlotId(slotId: string, userId?: string): Pr
                 activity_id: activityDoc.id,
                 trip_id: data.trip_id,
                 user_id: data.user_id,
-                title: data.title,
+                name: data.name,
                 description: data.description,
-                location_link: data.location_link,
+                address: data.address,
+                googleMapsUrl: data.googleMapsUrl,
                 source_type: data.source_type,
             } as Activity;
         })

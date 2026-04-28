@@ -81,9 +81,10 @@ export type Activity = {
     activity_id: string;
     trip_id: string;
     user_id: string;
-    title: string;
+    name: string;
     description?: string;
-    location_link?: string;
+    address?: string;
+    googleMapsUrl?: string;
     source_type: "manual";
 };
 
@@ -95,7 +96,8 @@ export type TimeSlotActivity = {
 
 export type CreateActivityInput = {
     idToken: string;
-    title: string;
+    name: string;
     description?: string;
-    location_link?: string;
+    address?: string;
+    googleMapsUrl?: string;
 };

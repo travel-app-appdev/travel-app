@@ -68,19 +68,19 @@ jest.mock('../config/firebase', () => ({
 
 describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
 
-    it('should return 400 if title is missing', async () => {
+    it('should return 400 if name is missing', async () => {
         const res = await request(app)
             .post('/itinerary/trip-123/slots/06:00-08:00/activities')
             .send({ idToken: 'valid-token' });
 
         expect(res.status).toBe(400);
-        expect(res.body.error).toBe('title is required');
+        expect(res.body.error).toBe('name is required');
     });
 
     it('should return 400 if idToken is missing', async () => {
         const res = await request(app)
             .post('/itinerary/trip-123/slots/06:00-08:00/activities')
-            .send({ title: 'Visit Palace' });
+            .send({ name: 'Visit Palace' });
 
         expect(res.status).toBe(400);
         expect(res.body.error).toBe('idToken is required');
@@ -101,7 +101,7 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
             .post('/itinerary/trip-123/slots/06:00-08:00/activities')
             .send({
                 idToken: 'valid-token',
-                title: 'Visit Palace',
+                name: 'Visit Palace',
             });
 
         expect(res.status).toBe(400);
@@ -116,7 +116,7 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
             .post('/itinerary/trip-123/slots/06:00-08:00/activities')
             .send({
                 idToken: 'valid-token',
-                title: 'Visit Palace',
+                name: 'Visit Palace',
             });
 
         expect(res.status).toBe(404);
@@ -128,13 +128,14 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
             .post('/itinerary/trip-123/slots/06:00-08:00/activities')
             .send({
                 idToken: 'valid-token',
-                title: 'Visit Schönbrunn Palace',
+                name: 'Visit Schönbrunn Palace',
                 description: 'Beautiful palace',
-                location_link: 'https://maps.google.com',
+                address: 'Schönbrunner Schloßstraße 47',
+                googleMapsUrl: 'https://maps.google.com',
             });
 
         expect(res.status).toBe(201);
-        expect(res.body).toHaveProperty('title');
+        expect(res.body).toHaveProperty('name');
         expect(res.body).toHaveProperty('trip_id');
         expect(res.body).toHaveProperty('user_id');
         expect(res.body.source_type).toBe('manual');
