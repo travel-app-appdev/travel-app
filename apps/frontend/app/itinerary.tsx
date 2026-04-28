@@ -209,6 +209,26 @@ export default function ItineraryScreen() {
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
   const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const slots = useMemo(() => generateTimeSlots(), []);
+
+  const activeState: ItineraryState =
+    DEV_FORCE_STATE ?? routeState ?? itinerary.state;
+
+  const tripDays = useMemo(
+    () => generateTripDays(itinerary.startDate, itinerary.endDate),
+    [itinerary.startDate, itinerary.endDate]
+  );
+
+  const [selectedDayId, setSelectedDayId] = useState<string>("");
+
+  useEffect(() => {
+    if (tripDays.length > 0) {
+      setSelectedDayId(tripDays[0].id);
+    } else {
+      setSelectedDayId(itinerary.startDate);
+    }
+  }, [tripDays, itinerary.startDate]);
+
   useEffect(() => {
     setItinerary((current) => ({
       ...buildItineraryFromParams({
@@ -234,24 +254,18 @@ export default function ItineraryScreen() {
     };
   }, []);
 
-  const slots = useMemo(() => generateTimeSlots(), []);
-
-  const activeState: ItineraryState =
-    DEV_FORCE_STATE ?? routeState ?? itinerary.state;
-
   // Load activities from API
   useEffect(() => {
     async function loadActivities() {
-      if (!tripId) return;
+      if (!tripId || !selectedDayId) return;
 
       try {
         const allActivities: Activity[] = [];
 
         for (const slot of slots) {
-          const baseUrl = `${process.env.EXPO_PUBLIC_API_URL}/itinerary/${tripId}/slots/${slot.id}/activities`;
+          const slotIdWithDate = `${selectedDayId}_${slot.id}`;
+          const baseUrl = `${process.env.EXPO_PUBLIC_API_URL}/itinerary/${tripId}/slots/${slotIdWithDate}/activities`;
 
-          // planning → only show current user's activities
-          // voting/final → show all activities
           const url =
             activeState === "planning" && currentUserId
               ? `${baseUrl}?userId=${currentUserId}`
@@ -262,10 +276,7 @@ export default function ItineraryScreen() {
 
           const mapped = slotActivities.map((a: any) => ({
             id: a.activity_id,
-            dayId:
-              selectedDayId ||
-              startDate ||
-              new Date().toISOString().split("T")[0],
+            dayId: selectedDayId,
             slotId: slot.id,
             name: a.name,
             address: a.address ?? "",
@@ -282,7 +293,7 @@ export default function ItineraryScreen() {
     }
 
     loadActivities();
-  }, [tripId, newActivityId, activeState, currentUserId]);
+  }, [tripId, newActivityId, activeState, currentUserId, selectedDayId]);
 
   function handlePlanningInfoPress() {
     if (showPlanningInfoPopup) {
@@ -341,21 +352,6 @@ export default function ItineraryScreen() {
     newActivityGoogleMapsUrl,
   ]);
 
-  const tripDays = useMemo(
-    () => generateTripDays(itinerary.startDate, itinerary.endDate),
-    [itinerary.startDate, itinerary.endDate]
-  );
-
-  const [selectedDayId, setSelectedDayId] = useState<string>("");
-
-  useEffect(() => {
-    if (tripDays.length > 0) {
-      setSelectedDayId(tripDays[0].id);
-    } else {
-      setSelectedDayId(itinerary.startDate);
-    }
-  }, [tripDays, itinerary.startDate]);
-
   const slotItems = useMemo(() => {
     return mapActivitiesToSlots(slots, apiActivities, selectedDayId);
   }, [slots, apiActivities, selectedDayId]);
@@ -382,7 +378,7 @@ export default function ItineraryScreen() {
         endDate: itinerary.endDate,
         state: activeState,
         dayId: selectedDayId,
-        slotId,
+        slotId: `${selectedDayId}_${slotId}`,
         activitiesJson: JSON.stringify(itinerary.activities),
       },
     });
