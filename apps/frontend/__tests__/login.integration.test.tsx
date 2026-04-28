@@ -1,11 +1,9 @@
-// apps/frontend/__tests__/login.integration.test.tsx
 import React from "react";
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import LoginScreen from "@/app/login";
 
 const mockReplace = jest.fn();
 const mockHandleLogin = jest.fn();
-
 const mockSetUser = jest.fn();
 
 jest.mock("@/src/context/AuthContext", () => ({
@@ -21,8 +19,15 @@ jest.mock("@/src/context/AuthContext", () => ({
 jest.mock("expo-router", () => ({
   Link: ({ children }: any) => children,
   router: {
-    replace: (...args: any[]) => mockReplace(...args),
+    replace: mockReplace,
+    push: jest.fn(),
+    back: jest.fn(),
   },
+  useRouter: () => ({
+    replace: mockReplace,
+    push: jest.fn(),
+    back: jest.fn(),
+  }),
 }));
 
 jest.mock("@/src/services/authServices", () => ({
@@ -71,8 +76,10 @@ describe("LoginScreen", () => {
     });
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith("/home");
+      expect(mockReplace).toHaveBeenCalled();
     });
+
+    expect(mockReplace).toHaveBeenCalledWith("/home");
   });
 
   it("shows service error message on failed login", async () => {
