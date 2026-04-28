@@ -367,6 +367,10 @@ export default function HomeScreen() {
                         startDate: trip.rawStartDate,
                         endDate: trip.rawEndDate,
                         members: JSON.stringify(trip.members),
+                        state: trip.rawState,
+                        planningStartedAt: trip.planningStartedAt ?? "",
+                        planningEndAt: trip.planningEndAt ?? "",
+                        votingEndAt: trip.votingEndAt ?? "",
                       },
                     });
                   }
