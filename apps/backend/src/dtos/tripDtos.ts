@@ -8,8 +8,8 @@ export type CreateTripRequestDto = {
     destination: string;
     start_date: string;
     end_date: string;
-    planningEndAt: string;
-    votingEndAt: string;
+    planning_end_at: string;
+    voting_end_at: string;
 };
 
 export type CreateTripWithoutAuthRequestDto = {
@@ -18,6 +18,6 @@ export type CreateTripWithoutAuthRequestDto = {
     destination: string;
     start_date: string;
     end_date: string;
-    planningEndAt: string;
-    votingEndAt: string;
+    planning_end_at: string;
+    voting_end_at: string;
 };

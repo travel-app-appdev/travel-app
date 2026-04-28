@@ -41,32 +41,11 @@ import CheckMark from "@/assets/icons/check_mark.svg";
 import Timer from "@/assets/icons/timer.svg";
 import Info from "@/assets/icons/info.svg";
 
-const PLACEHOLDER_PHASES = [
-  {
-    id: "planning",
-    label: "Planning",
-    color: colors.beachYellow,
-    active: true,
-    startDate: new Date(),
-    endDate: new Date(),
-  },
-  {
-    id: "voting",
-    label: "Voting",
-    color: colors.sunsetPink,
-    active: false,
-    startDate: new Date(),
-    endDate: new Date(),
-  },
-  {
-    id: "final",
-    label: "Final",
-    color: colors.neonGreen,
-    active: false,
-    startDate: new Date(),
-    endDate: new Date(),
-  },
-] as const;
+const PHASE_TEXT_COLORS: Record<string, string> = {
+  planning: colors.nightBlack,
+  voting: colors.nightBlack,
+  final: colors.nightBlack,
+};
 
 type PhaseKey = "planning" | "voting" | "final";
 
@@ -79,27 +58,42 @@ type PhaseDates = Record<
   }
 >;
 
-const PHASE_TEXT_COLORS: Record<PhaseKey, string> = {
-  planning: colors.nightBlack,
-  voting: colors.nightBlack,
-  final: colors.nightBlack,
-};
-
-function calcDays(start: Date, end: Date) {
-  const ms = end.getTime() - start.getTime();
-  return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)) + 1);
-}
-
-function dayLabel(days: number, active = false) {
-  if (active) return days === 1 ? "1 day left" : `${days} days left`;
-  return days === 1 ? "1 day" : `${days} days`;
-}
-
-function formatDateDisplay(date: Date) {
+function formatDateDisplay(date: Date): string {
   const d = date.getDate().toString().padStart(2, "0");
   const m = (date.getMonth() + 1).toString().padStart(2, "0");
   const y = date.getFullYear();
   return `${d}.${m}.${y}`;
+}
+
+function toDateOnlyString(date: Date): string {
+  return date.toISOString().split("T")[0];
+}
+
+function calcCalendarDays(start: Date, end: Date): number {
+  const startOnly = new Date(start);
+  startOnly.setHours(0, 0, 0, 0);
+
+  const endOnly = new Date(end);
+  endOnly.setHours(0, 0, 0, 0);
+
+  const ms = endOnly.getTime() - startOnly.getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
+}
+
+function calcDaysLeft(end: Date): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const endOnly = new Date(end);
+  endOnly.setHours(0, 0, 0, 0);
+
+  const ms = endOnly.getTime() - today.getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
+}
+
+function dayLabel(days: number, active: boolean): string {
+  if (active) return days === 1 ? "1 day left" : `${days} days left`;
+  return days === 1 ? "1 day" : `${days} days`;
 }
 
 function dateToTimeString(date: Date): string {
@@ -115,64 +109,99 @@ function timeStringToDate(timeStr: string): Date {
   return d;
 }
 
-function toDateOnlyString(date: Date) {
-  return date.toISOString().split("T")[0];
+function combineDateAndTime(date: Date, timeStr: string): string {
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  const combined = new Date(date);
+  combined.setHours(hours, minutes, 0, 0);
+  return combined.toISOString();
+}
+
+function endOfDay(date: Date): Date {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
+  return next;
 }
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function CreateTripScreen() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+
   const [destination, setDestination] = useState("");
   const [tripName, setTripName] = useState("");
-  const [startDate, setStartDate] = useState<Date>(new Date());
-  const [endDate, setEndDate] = useState<Date>(new Date());
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [tripStart, setTripStart] = useState<Date>(new Date());
+  const [tripEnd, setTripEnd] = useState<Date>(new Date());
+
+  const [showTripStartPicker, setShowTripStartPicker] = useState(false);
+  const [showTripEndPicker, setShowTripEndPicker] = useState(false);
+
   const [tripCode, setTripCode] = useState("");
   const [copied, setCopied] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+
+  const phases = [
+    {
+      id: "planning" as const,
+      label: "Planning",
+      color: colors.beachYellow,
+      active: true,
+    },
+    {
+      id: "voting" as const,
+      label: "Voting",
+      color: colors.sunsetPink,
+      active: false,
+    },
+    {
+      id: "final" as const,
+      label: "Final",
+      color: colors.neonGreen,
+      active: false,
+    },
+  ];
 
   const [phaseDates, setPhaseDates] = useState<PhaseDates>({
     planning: {
-      start: PLACEHOLDER_PHASES[0].startDate,
-      end: PLACEHOLDER_PHASES[0].endDate,
-      time: "24:00",
+      start: new Date(),
+      end: new Date(),
+      time: "12:00",
     },
     voting: {
-      start: PLACEHOLDER_PHASES[1].startDate,
-      end: PLACEHOLDER_PHASES[1].endDate,
-      time: "24:00",
+      start: new Date(),
+      end: new Date(),
+      time: "18:00",
     },
     final: {
-      start: PLACEHOLDER_PHASES[2].startDate,
-      end: PLACEHOLDER_PHASES[2].endDate,
-      time: "24:00",
+      start: new Date(),
+      end: new Date(),
+      time: "00:00",
     },
   });
+
   const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
-  const [showPhaseDatePicker, setShowPhaseDatePicker] =
+  const [openPhase, setOpenPhase] = useState<PhaseKey | null>(null);
+  const [showPhaseStartPicker, setShowPhaseStartPicker] =
     useState<PhaseKey | null>(null);
   const [showPhaseTimePicker, setShowPhaseTimePicker] =
     useState<PhaseKey | null>(null);
-  const [openPhase, setOpenPhase] = useState<PhaseKey | null>(null);
 
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
-
   const { user } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    return () => {
-      timeoutRefs.current.forEach(clearTimeout);
-    };
-  }, []);
+  const TIMER_PHASES = phases.filter(
+    (phase) => phase.id === "planning" || phase.id === "voting"
+  );
 
   const safeTimeout = (fn: () => void, delay: number) => {
     const id = setTimeout(fn, delay);
     timeoutRefs.current.push(id);
     return id;
   };
+
+  useEffect(() => {
+    return () => timeoutRefs.current.forEach(clearTimeout);
+  }, []);
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString("en-GB").replace(/\//g, ".");
@@ -181,21 +210,44 @@ export default function CreateTripScreen() {
     setOpenPhase((prev) => (prev === key ? null : key));
   };
 
-  const handleUpdatePhaseDate = (phaseId: PhaseKey) => {
-    setPhaseUpdated((prev) => ({ ...prev, [phaseId]: true }));
-    safeTimeout(() => {
-      setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
-      setOpenPhase(null);
-    }, 1500);
-  };
-
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(tripCode);
     setCopied(true);
     safeTimeout(() => setCopied(false), 2000);
   };
 
-  const handleContinue = () => {
+  const syncPhasesFromTripDates = (nextTripStart: Date, nextTripEnd: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Planning runs from "today" until the trip start date
+    const planningStart = today;
+    const planningEnd = nextTripStart < today ? today : nextTripStart; // just in case start is in the past
+
+    // Voting runs from trip start until trip end by default
+    const votingStart = planningEnd;
+    const votingEnd = nextTripEnd;
+
+    setPhaseDates({
+      planning: {
+        start: planningStart,
+        end: planningEnd,
+        // keep whatever default time you want for planning
+        time: phaseDates.planning.time || "12:00",
+      },
+      voting: {
+        start: votingStart,
+        end: votingEnd,
+        time: phaseDates.voting.time || "18:00",
+      },
+      final: {
+        start: votingEnd,
+        end: votingEnd,
+        time: "00:00",
+      },
+    });
+  };
+  const handleContinueFromDestination = () => {
     if (!destination.trim()) {
       Alert.alert("Missing destination", "Please enter a destination first.");
       return;
@@ -203,8 +255,129 @@ export default function CreateTripScreen() {
     setStep(2);
   };
 
+  const handleContinueToTimers = () => {
+    if (!tripName.trim()) {
+      Alert.alert("Missing trip name", "Please enter a trip name.");
+      return;
+    }
+
+    if (tripEnd < tripStart) {
+      Alert.alert("Invalid dates", "End date cannot be before start date.");
+      return;
+    }
+
+    syncPhasesFromTripDates(tripStart, tripEnd);
+    setStep(3);
+  };
+
+  const handleUpdatePhaseDate = (phaseId: PhaseKey) => {
+    try {
+      const phase = phaseDates[phaseId];
+      const nextEnd = new Date(combineDateAndTime(phase.end, phase.time));
+      const tripEndBoundary = endOfDay(tripEnd);
+
+      if (phaseId === "planning") {
+        const currentVotingEnd = new Date(
+          combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
+        );
+
+        if (nextEnd > tripEndBoundary) {
+          Alert.alert(
+            "Invalid planning end",
+            "Planning end cannot be after the trip end date."
+          );
+          return;
+        }
+
+        if (nextEnd >= currentVotingEnd) {
+          Alert.alert(
+            "Invalid planning end",
+            "Planning end must be before voting end."
+          );
+          return;
+        }
+
+        setPhaseDates((prev) => ({
+          ...prev,
+          planning: {
+            ...prev.planning,
+            end: phase.end,
+            time: phase.time,
+          },
+          voting: {
+            ...prev.voting,
+            start: phase.end,
+            end:
+              prev.voting.end < phase.end
+                ? new Date(phase.end)
+                : prev.voting.end,
+          },
+          final: {
+            ...prev.final,
+            start:
+              prev.voting.end < phase.end
+                ? new Date(phase.end)
+                : prev.final.start,
+            end:
+              prev.voting.end < phase.end
+                ? new Date(phase.end)
+                : prev.final.end,
+          },
+        }));
+      }
+
+      if (phaseId === "voting") {
+        const currentPlanningEnd = new Date(
+          combineDateAndTime(phaseDates.planning.end, phaseDates.planning.time)
+        );
+
+        if (nextEnd <= currentPlanningEnd) {
+          Alert.alert(
+            "Invalid voting end",
+            "Voting end must be after planning end."
+          );
+          return;
+        }
+
+        if (nextEnd > tripEndBoundary) {
+          Alert.alert(
+            "Invalid voting end",
+            "Voting end cannot be after the trip end date."
+          );
+          return;
+        }
+
+        const nextFinalDisplay = phase.end;
+
+        setPhaseDates((prev) => ({
+          ...prev,
+          voting: {
+            ...prev.voting,
+            end: phase.end,
+            time: phase.time,
+          },
+          final: {
+            ...prev.final,
+            start: nextFinalDisplay,
+            end: nextFinalDisplay,
+          },
+        }));
+      }
+
+      setPhaseUpdated((prev) => ({ ...prev, [phaseId]: true }));
+      safeTimeout(() => {
+        setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
+        setOpenPhase(null);
+      }, 1500);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update phase";
+      Alert.alert("Update failed", message);
+    }
+  };
+
   const handleCreateTrip = async () => {
-    if (isSubmitting) return;
+    if (isCreating) return;
 
     if (!user) {
       Alert.alert(
@@ -224,13 +397,45 @@ export default function CreateTripScreen() {
       return;
     }
 
-    if (endDate < startDate) {
+    if (tripEnd < tripStart) {
       Alert.alert("Invalid dates", "End date cannot be before start date.");
       return;
     }
 
     try {
-      setIsSubmitting(true);
+      const planningEnd = new Date(
+        combineDateAndTime(phaseDates.planning.end, phaseDates.planning.time)
+      );
+      const votingEnd = new Date(
+        combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
+      );
+      const tripEndBoundary = endOfDay(tripEnd);
+
+      if (planningEnd > tripEndBoundary) {
+        Alert.alert(
+          "Invalid planning end",
+          "Planning end cannot be after the trip end date."
+        );
+        return;
+      }
+
+      if (planningEnd >= votingEnd) {
+        Alert.alert(
+          "Invalid voting end",
+          "Voting end must be after planning end."
+        );
+        return;
+      }
+
+      if (votingEnd > tripEndBoundary) {
+        Alert.alert(
+          "Invalid voting end",
+          "Voting end cannot be after the trip end date."
+        );
+        return;
+      }
+
+      setIsCreating(true);
 
       const currentUser = auth.currentUser;
       if (!currentUser) {
@@ -247,27 +452,29 @@ export default function CreateTripScreen() {
         idToken,
         title: tripName.trim(),
         destination: destination.trim(),
-        start_date: toDateOnlyString(startDate),
-        end_date: toDateOnlyString(endDate),
+        start_date: toDateOnlyString(tripStart),
+        end_date: toDateOnlyString(tripEnd),
+        planning_end_at: combineDateAndTime(
+          phaseDates.planning.end,
+          phaseDates.planning.time
+        ),
+        voting_end_at: combineDateAndTime(
+          phaseDates.voting.end,
+          phaseDates.voting.time
+        ),
       });
 
       setTripCode(result.invite_code ?? "");
-      setStep(3);
+      setStep(4);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to create trip";
       Alert.alert("Create trip failed", message);
     } finally {
-      setIsSubmitting(false);
+      setIsCreating(false);
     }
   };
 
-  // Only show Planning + Voting as timers
-  const TIMER_PHASES = PLACEHOLDER_PHASES.filter(
-    (phase) => phase.id === "planning" || phase.id === "voting"
-  );
-
-  // ─── Step 3 — Trip Timer Setup ───────────────────────────────────────────
   if (step === 3) {
     return (
       <View style={[styles.fullScreen, styles.bgStep3]}>
@@ -282,6 +489,7 @@ export default function CreateTripScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.header}>
+                <BackLink onPress={() => setStep(2)} />
                 <View style={styles.headerTitle}>
                   <Plane width={25} height={25} />
                   <AppText variant="body" style={styles.headerLabel}>
@@ -303,7 +511,9 @@ export default function CreateTripScreen() {
                 const phaseId = phase.id as PhaseKey;
                 const isOpen = openPhase === phaseId;
                 const dates = phaseDates[phaseId];
-                const days = calcDays(dates.start, dates.end);
+                const days = phase.active
+                  ? calcDaysLeft(dates.end)
+                  : calcCalendarDays(dates.start, dates.end);
 
                 return (
                   <View key={phaseId} style={styles.fieldGroup}>
@@ -325,7 +535,7 @@ export default function CreateTripScreen() {
                             variant="caption"
                             style={[
                               styles.phaseBadgeText,
-                              { color: PHASE_TEXT_COLORS[phaseId] },
+                              { color: PHASE_TEXT_COLORS[phase.id] },
                             ]}
                           >
                             {phase.label}
@@ -340,7 +550,6 @@ export default function CreateTripScreen() {
                               <Hourglass0 width={20} height={20} />
                             )}
                           </View>
-
                           <View style={styles.phaseTextCol}>
                             <View style={styles.daysRow}>
                               <AppText variant="body" style={styles.phaseDays}>
@@ -352,7 +561,6 @@ export default function CreateTripScreen() {
                                 </View>
                               )}
                             </View>
-
                             <AppText
                               variant="caption"
                               style={styles.timerLabel}
@@ -370,7 +578,14 @@ export default function CreateTripScreen() {
                       )}
                     </Pressable>
 
-                    {isOpen && (
+                    <AppText variant="caption" style={styles.phaseDateLabel}>
+                      {formatDateDisplay(dates.start)}
+                      {dates.start.getTime() !== dates.end.getTime()
+                        ? ` - ${formatDateDisplay(dates.end)}`
+                        : ""}
+                    </AppText>
+
+                    {isOpen && phaseId !== "final" && (
                       <View style={styles.expandedField}>
                         <AppText variant="body" style={styles.phaseEndLabel}>
                           End date of {phase.label} state
@@ -380,7 +595,7 @@ export default function CreateTripScreen() {
                           <Pressable
                             style={[styles.dateInput, styles.dateTimeHalf]}
                             onPress={() => {
-                              setShowPhaseDatePicker(phaseId);
+                              setShowPhaseStartPicker(phaseId);
                               setShowPhaseTimePicker(null);
                             }}
                             accessibilityRole="button"
@@ -396,7 +611,7 @@ export default function CreateTripScreen() {
                             style={[styles.dateInput, styles.dateTimeHalf]}
                             onPress={() => {
                               setShowPhaseTimePicker(phaseId);
-                              setShowPhaseDatePicker(null);
+                              setShowPhaseStartPicker(null);
                             }}
                             accessibilityRole="button"
                             accessibilityLabel={`Select ${phase.label} end time`}
@@ -408,15 +623,21 @@ export default function CreateTripScreen() {
                           </Pressable>
                         </View>
 
-                        {showPhaseDatePicker === phaseId && (
+                        {showPhaseStartPicker === phaseId && (
                           <DateTimePicker
                             value={dates.end}
                             mode="date"
+                            minimumDate={
+                              phaseId === "voting"
+                                ? phaseDates.planning.end
+                                : undefined
+                            }
+                            maximumDate={tripEnd}
                             display={
                               Platform.OS === "ios" ? "spinner" : "default"
                             }
                             onChange={(_: DateTimePickerEvent, date?: Date) => {
-                              setShowPhaseDatePicker(null);
+                              setShowPhaseStartPicker(null);
                               if (date) {
                                 setPhaseDates((prev) => ({
                                   ...prev,
@@ -489,11 +710,13 @@ export default function CreateTripScreen() {
 
             <View style={styles.step3Footer}>
               <AppButton
-                title="Next"
-                onPress={() => setStep(4)}
+                title={isCreating ? "Creating..." : "Create trip"}
+                onPress={handleCreateTrip}
+                loading={isCreating}
+                disabled={isCreating}
                 style={styles.nextButton}
                 textStyle={styles.nextButtonText}
-                accessibilityLabel="Continue to trip code"
+                accessibilityLabel="Create trip"
               />
             </View>
           </View>
@@ -502,7 +725,6 @@ export default function CreateTripScreen() {
     );
   }
 
-  // ─── Step 4 — Trip code screen ───────────────────────────────────────────
   if (step === 4) {
     return (
       <View style={[styles.fullScreen, styles.bgStep1]}>
@@ -579,7 +801,6 @@ export default function CreateTripScreen() {
     );
   }
 
-  // ─── Step 1 & 2 ──────────────────────────────────────────────────────────
   return (
     <View
       style={[styles.fullScreen, step === 1 ? styles.bgStep1 : styles.bgStep2]}
@@ -636,7 +857,7 @@ export default function CreateTripScreen() {
               <View style={styles.continueWrapper} pointerEvents="box-none">
                 <AppButton
                   title="Continue"
-                  onPress={handleContinue}
+                  onPress={handleContinueFromDestination}
                   disabled={!destination.trim()}
                   style={styles.continueButton}
                   textStyle={styles.continueButtonText}
@@ -721,44 +942,44 @@ export default function CreateTripScreen() {
                     <Pressable
                       style={styles.dateInput}
                       onPress={() => {
-                        setShowStartPicker(true);
-                        setShowEndPicker(false);
+                        setShowTripStartPicker(true);
+                        setShowTripEndPicker(false);
                       }}
                       accessibilityRole="button"
                       accessibilityLabel="Select trip dates"
                       accessibilityHint="Opens the date picker"
                     >
                       <AppText variant="body" style={styles.dateText}>
-                        {formatDate(startDate)} - {formatDate(endDate)}
+                        {formatDate(tripStart)} - {formatDate(tripEnd)}
                       </AppText>
                       <Calendar width={20} height={20} />
                     </Pressable>
 
-                    {showStartPicker && (
+                    {showTripStartPicker && (
                       <DateTimePicker
-                        value={startDate}
+                        value={tripStart}
                         mode="date"
                         display={Platform.OS === "ios" ? "spinner" : "default"}
                         onChange={(_: DateTimePickerEvent, date?: Date) => {
-                          setShowStartPicker(false);
+                          setShowTripStartPicker(false);
                           if (date) {
-                            setStartDate(date);
-                            if (endDate < date) setEndDate(date);
-                            setShowEndPicker(true);
+                            setTripStart(date);
+                            if (tripEnd < date) setTripEnd(date);
+                            setShowTripEndPicker(true);
                           }
                         }}
                       />
                     )}
 
-                    {showEndPicker && (
+                    {showTripEndPicker && (
                       <DateTimePicker
-                        value={endDate}
+                        value={tripEnd}
                         mode="date"
-                        minimumDate={startDate}
+                        minimumDate={tripStart}
                         display={Platform.OS === "ios" ? "spinner" : "default"}
                         onChange={(_: DateTimePickerEvent, date?: Date) => {
-                          setShowEndPicker(false);
-                          if (date) setEndDate(date);
+                          setShowTripEndPicker(false);
+                          if (date) setTripEnd(date);
                         }}
                       />
                     )}
@@ -768,15 +989,12 @@ export default function CreateTripScreen() {
 
               <View style={styles.createWrapper}>
                 <AppButton
-                  title={isSubmitting ? "Creating..." : "Create trip"}
-                  onPress={handleCreateTrip}
-                  loading={isSubmitting}
-                  disabled={isSubmitting || !tripName.trim()}
+                  title="Continue"
+                  onPress={handleContinueToTimers}
+                  disabled={!tripName.trim()}
                   style={styles.createButton}
                   textStyle={styles.createButtonText}
-                  accessibilityLabel={
-                    isSubmitting ? "Creating trip" : "Create trip"
-                  }
+                  accessibilityLabel="Continue to timer setup"
                 />
               </View>
             </>
@@ -1055,6 +1273,12 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: typography.size.xs,
     lineHeight: typography.lineHeight.xs,
+  },
+  phaseDateLabel: {
+    color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    paddingLeft: 4,
   },
   phaseEndLabel: {
     fontFamily: typography.fontFamily.bodyBold,

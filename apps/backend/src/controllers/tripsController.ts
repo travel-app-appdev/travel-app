@@ -34,8 +34,8 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
 
     if (!idToken || !title || !destination || !start_date || !end_date || !planning_end_at || !voting_end_at) {
         res.status(400).json({
-            error: "idToken, title, destination, startdate, enddate, " +
-                "planningEndAt and votingEndAt are required",
+            error:
+                "idToken, title, destination, start_date, end_date, planning_end_at and voting_end_at are required",
         });
         return;
     }

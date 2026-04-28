@@ -47,6 +47,8 @@ type CreateTripPayload = {
   destination: string;
   start_date: string;
   end_date: string;
+  planning_end_at: string;
+  voting_end_at: string;
 };
 
 export async function createTrip(payload: CreateTripPayload): Promise<Trip> {
