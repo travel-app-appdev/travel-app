@@ -30,42 +30,22 @@ import Hourglass1 from "@/assets/icons/hourglass_1.svg";
 import Timepoint from "@/assets/icons/timepoint.svg";
 import Exit from "@/assets/icons/exit.svg";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const PLACEHOLDER_PHASES = [
-  {
-    id: "planning",
-    label: "Planning",
-    color: colors.beachYellow,
-    active: true,
-    startDate: new Date(),
-    endDate: new Date(),
-  },
-  {
-    id: "voting",
-    label: "Voting",
-    color: colors.sunsetPink,
-    active: false,
-    startDate: new Date(),
-    endDate: new Date(),
-  },
-  {
-    id: "final",
-    label: "Final",
-    color: colors.neonGreen,
-    active: false,
-    startDate: new Date(),
-    endDate: new Date(),
-  },
-];
-
 const PHASE_TEXT_COLORS: Record<string, string> = {
   planning: colors.nightBlack,
   voting: colors.nightBlack,
   final: colors.nightBlack,
 };
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+type PhaseKey = "planning" | "voting" | "final";
+
+type PhaseDates = Record<
+  PhaseKey,
+  {
+    start: Date;
+    end: Date;
+    time: string;
+  }
+>;
 
 type MemberParam = {
   id: string;
@@ -74,28 +54,40 @@ type MemberParam = {
   color: string;
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+function formatDateDisplay(date: Date): string {
+  const d = date.getDate().toString().padStart(2, "0");
+  const m = (date.getMonth() + 1).toString().padStart(2, "0");
+  const y = date.getFullYear();
+  return `${d}.${m}.${y}`;
+}
 
-function formatDateDisplay(dateString: string): string {
+function formatDateDisplayFromString(dateString: string): string {
   if (!dateString) return "—";
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return dateString;
-  const d = date.getDate().toString().padStart(2, "0");
-  const m = (date.getMonth() + 1).toString().padStart(2, "0");
-  const y = date.getFullYear();
-  return `${d}.${m}.${y}`;
+  return formatDateDisplay(date);
 }
 
-function formatDate(date: Date): string {
-  const d = date.getDate().toString().padStart(2, "0");
-  const m = (date.getMonth() + 1).toString().padStart(2, "0");
-  const y = date.getFullYear();
-  return `${d}.${m}.${y}`;
+function calcCalendarDays(start: Date, end: Date): number {
+  const startOnly = new Date(start);
+  startOnly.setHours(0, 0, 0, 0);
+
+  const endOnly = new Date(end);
+  endOnly.setHours(0, 0, 0, 0);
+
+  const ms = endOnly.getTime() - startOnly.getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
 }
 
-function calcDays(start: Date, end: Date) {
-  const ms = end.getTime() - start.getTime();
-  return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)) + 1);
+function calcDaysLeft(end: Date): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const endOnly = new Date(end);
+  endOnly.setHours(0, 0, 0, 0);
+
+  const ms = endOnly.getTime() - today.getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
 }
 
 function dayLabel(days: number, active: boolean): string {
@@ -103,24 +95,47 @@ function dayLabel(days: number, active: boolean): string {
   return days === 1 ? "1 day" : `${days} days`;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+function dateToTimeString(date: Date): string {
+  const h = date.getHours().toString().padStart(2, "0");
+  const m = date.getMinutes().toString().padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+function parseIsoToDate(value?: string): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseIsoToTimeString(value?: string): string {
+  const parsed = parseIsoToDate(value);
+  return parsed ? dateToTimeString(parsed) : "00:00";
+}
 
 export default function TripInformationScreen() {
-  const {
-    tripId,
-    title,
-    destination,
-    startDate,
-    endDate,
-    members: membersParam,
-  } = useLocalSearchParams<{
+  const raw = useLocalSearchParams<{
     tripId: string;
     title: string;
     destination: string;
     startDate: string;
     endDate: string;
     members: string;
+    state?: "Planning" | "Voting" | "Final";
+    planningStartedAt?: string;
+    planningEndAt?: string;
+    votingEndAt?: string;
   }>();
+
+  const tripId = String(raw.tripId ?? "");
+  const title = String(raw.title ?? "");
+  const destination = String(raw.destination ?? "");
+  const startDate = String(raw.startDate ?? "");
+  const endDate = String(raw.endDate ?? "");
+  const membersParam = String(raw.members ?? "");
+  const tripState = String(raw.state ?? "Planning");
+  const planningStartedAt = String(raw.planningStartedAt ?? "");
+  const planningEndAt = String(raw.planningEndAt ?? "");
+  const votingEndAt = String(raw.votingEndAt ?? "");
 
   const router = useRouter();
   const { height: screenHeight } = useWindowDimensions();
@@ -140,6 +155,80 @@ export default function TripInformationScreen() {
     }
   })();
 
+  const tripStart = startDate ? new Date(startDate) : new Date();
+  const tripEnd = endDate ? new Date(endDate) : new Date();
+
+  const planningStartDate = parseIsoToDate(planningStartedAt);
+  const planningEndDate = parseIsoToDate(planningEndAt);
+  const votingEndDate = parseIsoToDate(votingEndAt);
+
+  const votingStartDate = planningEndDate ?? tripStart;
+  const finalDisplayDate = votingEndDate ?? tripEnd;
+
+  const phases = [
+    {
+      id: "planning" as const,
+      label: "Planning",
+      color: colors.beachYellow,
+      active: tripState === "Planning",
+    },
+    {
+      id: "voting" as const,
+      label: "Voting",
+      color: colors.sunsetPink,
+      active: tripState === "Voting",
+    },
+    {
+      id: "final" as const,
+      label: "Final",
+      color: colors.neonGreen,
+      active: tripState === "Final",
+    },
+  ];
+
+  const [phaseDates, setPhaseDates] = useState<PhaseDates>({
+    planning: {
+      start: planningStartDate ?? tripStart,
+      end: planningEndDate ?? tripStart,
+      time: parseIsoToTimeString(planningEndAt),
+    },
+    voting: {
+      start: votingStartDate,
+      end: votingEndDate ?? tripStart,
+      time: parseIsoToTimeString(votingEndAt),
+    },
+    final: {
+      start: finalDisplayDate,
+      end: finalDisplayDate,
+      time: "00:00",
+    },
+  });
+
+  useEffect(() => {
+    const nextPlanningStart = parseIsoToDate(planningStartedAt);
+    const nextPlanningEnd = parseIsoToDate(planningEndAt);
+    const nextVotingEnd = parseIsoToDate(votingEndAt);
+    const nextFinalDisplay = nextVotingEnd ?? tripEnd;
+
+    setPhaseDates({
+      planning: {
+        start: nextPlanningStart ?? tripStart,
+        end: nextPlanningEnd ?? tripStart,
+        time: parseIsoToTimeString(planningEndAt),
+      },
+      voting: {
+        start: nextPlanningEnd ?? tripStart,
+        end: nextVotingEnd ?? tripStart,
+        time: parseIsoToTimeString(votingEndAt),
+      },
+      final: {
+        start: nextFinalDisplay ?? tripEnd,
+        end: nextFinalDisplay ?? tripEnd,
+        time: "00:00",
+      },
+    });
+  }, [planningStartedAt, planningEndAt, votingEndAt, tripStart, tripEnd]);
+
   const handleLeaveTrip = () => {
     Alert.alert("Leave trip", "Are you sure you want to leave this trip?", [
       { text: "Cancel", style: "cancel" },
@@ -155,7 +244,7 @@ export default function TripInformationScreen() {
               return;
             }
             const idToken = await currentUser.getIdToken();
-            await leaveTrip({ idToken, tripId: tripId! });
+            await leaveTrip({ idToken, tripId });
             router.replace("/home");
           } catch (error) {
             const message =
@@ -168,8 +257,6 @@ export default function TripInformationScreen() {
       },
     ]);
   };
-
-  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <View style={styles.fullScreen}>
@@ -190,7 +277,6 @@ export default function TripInformationScreen() {
             ]}
             showsVerticalScrollIndicator={false}
           >
-            {/* ── Header ───────────────────────────────────────────────────── */}
             <View style={styles.header}>
               <BackLink href="/home" />
               <View style={styles.headerTitle}>
@@ -201,7 +287,6 @@ export default function TripInformationScreen() {
               </View>
             </View>
 
-            {/* ── Trip Name ─────────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow}>
                 <TripTitle width={20} height={20} />
@@ -210,11 +295,10 @@ export default function TripInformationScreen() {
                 </AppText>
               </View>
               <AppText variant="caption" style={styles.infoValue}>
-                {title ?? "—"}
+                {title || "—"}
               </AppText>
             </View>
 
-            {/* ── Trip Date ─────────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow}>
                 <Calendar width={20} height={20} />
@@ -223,12 +307,11 @@ export default function TripInformationScreen() {
                 </AppText>
               </View>
               <AppText variant="caption" style={styles.infoValue}>
-                {formatDateDisplay(startDate ?? "")} –{" "}
-                {formatDateDisplay(endDate ?? "")}
+                {formatDateDisplayFromString(startDate)} –{" "}
+                {formatDateDisplayFromString(endDate)}
               </AppText>
             </View>
 
-            {/* ── Destination ───────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow}>
                 <Location width={20} height={20} />
@@ -237,11 +320,10 @@ export default function TripInformationScreen() {
                 </AppText>
               </View>
               <AppText variant="caption" style={styles.infoValue}>
-                {destination ?? "—"}
+                {destination || "—"}
               </AppText>
             </View>
 
-            {/* ── Members ───────────────────────────────────────────────────── */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow}>
                 <AddPeople width={20} height={20} />
@@ -256,17 +338,28 @@ export default function TripInformationScreen() {
               </AppText>
             </View>
 
-            {/* ── Phases ───────────────────────────────────────────────────── */}
-            {PLACEHOLDER_PHASES.map((phase) => {
-              const days = calcDays(phase.startDate, phase.endDate);
+            {phases.map((phase) => {
+              const dates = phaseDates[phase.id];
+              const days = phase.active
+                ? calcDaysLeft(dates.end)
+                : calcCalendarDays(dates.start, dates.end);
+
               return (
                 <View key={phase.id} style={styles.fieldGroup}>
                   <View style={styles.phaseRow}>
                     <View style={styles.phaseLeft}>
-                      <View style={[styles.phaseBadge, { backgroundColor: phase.color }]}>
+                      <View
+                        style={[
+                          styles.phaseBadge,
+                          { backgroundColor: phase.color },
+                        ]}
+                      >
                         <AppText
                           variant="caption"
-                          style={[styles.phaseBadgeText, { color: PHASE_TEXT_COLORS[phase.id] }]}
+                          style={[
+                            styles.phaseBadgeText,
+                            { color: PHASE_TEXT_COLORS[phase.id] },
+                          ]}
                         >
                           {phase.label}
                         </AppText>
@@ -274,10 +367,11 @@ export default function TripInformationScreen() {
 
                       <View style={styles.phaseTimerBlock}>
                         <View style={styles.hourglassCol}>
-                          {phase.active
-                            ? <Hourglass1 width={20} height={20} />
-                            : <Hourglass0 width={20} height={20} />
-                          }
+                          {phase.active ? (
+                            <Hourglass1 width={20} height={20} />
+                          ) : (
+                            <Hourglass0 width={20} height={20} />
+                          )}
                         </View>
 
                         <View style={styles.phaseTextCol}>
@@ -300,18 +394,16 @@ export default function TripInformationScreen() {
                   </View>
 
                   <AppText variant="caption" style={styles.phaseDateLabel}>
-                    {formatDate(phase.startDate)}
-                    {phase.startDate.getTime() !== phase.endDate.getTime()
-                      ? ` - ${formatDate(phase.endDate)}`
+                    {formatDateDisplay(dates.start)}
+                    {dates.start.getTime() !== dates.end.getTime()
+                      ? ` - ${formatDateDisplay(dates.end)}`
                       : ""}
                   </AppText>
                 </View>
               );
             })}
-
           </ScrollView>
 
-          {/* ── Leave trip ────────────────────────────────────────────────── */}
           <SafeAreaView edges={["bottom"]} style={styles.leaveSafeArea}>
             <View style={styles.leaveWrapper}>
               <ActionCard
@@ -327,8 +419,6 @@ export default function TripInformationScreen() {
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   fullScreen: {

@@ -4,32 +4,51 @@ const mockBatchSet = jest.fn();
 const mockBatchCommit = jest.fn().mockResolvedValue(undefined);
 const mockVerifyIdToken = jest.fn().mockResolvedValue({ uid: "test123" });
 
-jest.mock("../config/firebase", () => ({
-    __esModule: true,
-    default: {
-        auth: () => ({
-            verifyIdToken: mockVerifyIdToken,
-        }),
-        firestore: () => ({
-            collection: (name: string) => ({
-                doc: jest.fn(() => ({
-                    id: name === "trips" ? "trip123" : "member123",
-                })),
-            }),
-            batch: () => ({
-                set: mockBatchSet,
-                commit: mockBatchCommit,
-            }),
-        }),
-    },
-}));
-
 const mockResponse = () => {
     const res: any = {};
     res.status = jest.fn().mockReturnValue(res);
     res.json = jest.fn().mockReturnValue(res);
     return res;
 };
+
+jest.mock("../config/firebase", () => {
+    const mockServerTimestamp = jest.fn(() => ({ _methodName: "serverTimestamp" }));
+    const mockTimestampNow = jest.fn(() => ({
+        toDate: () => new Date("2026-05-01T12:00:00.000Z"),
+        seconds: Math.floor(new Date("2026-05-01T12:00:00.000Z").getTime() / 1000),
+        nanoseconds: 0,
+    }));
+
+    const firestoreFn: any = () => ({
+        collection: (name: string) => ({
+            doc: jest.fn(() => ({
+                id: name === "trips" ? "trip123" : "member123",
+            })),
+        }),
+        batch: () => ({
+            set: mockBatchSet,
+            commit: mockBatchCommit,
+        }),
+    });
+
+    firestoreFn.Timestamp = {
+        now: mockTimestampNow,
+    };
+
+    firestoreFn.FieldValue = {
+        serverTimestamp: mockServerTimestamp,
+    };
+
+    return {
+        __esModule: true,
+        default: {
+            auth: () => ({
+                verifyIdToken: mockVerifyIdToken,
+            }),
+            firestore: firestoreFn,
+        },
+    };
+});
 
 describe("createTrip controller", () => {
     beforeEach(() => {
@@ -46,7 +65,7 @@ describe("createTrip controller", () => {
 
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith({
-            error: "idToken, title, destination, start_date and end_date are required",
+            error: "idToken, title, destination, start_date, end_date, planning_end_at and voting_end_at are required",
         });
     });
 
@@ -58,6 +77,8 @@ describe("createTrip controller", () => {
                 destination: "Paris",
                 start_date: "2026-05-10",
                 end_date: "2026-05-01",
+                planning_end_at: "2026-05-08T12:00:00.000Z",
+                voting_end_at: "2026-05-09T12:00:00.000Z",
             },
         };
         const res = mockResponse();
@@ -78,6 +99,8 @@ describe("createTrip controller", () => {
                 destination: "Paris",
                 start_date: "2026-05-10",
                 end_date: "2026-05-15",
+                planning_end_at: "2026-05-12T12:00:00.000Z",
+                voting_end_at: "2026-05-13T12:00:00.000Z",
             },
         };
         const res = mockResponse();
@@ -92,9 +115,12 @@ describe("createTrip controller", () => {
             destination: "Paris",
             start_date: "2026-05-10",
             end_date: "2026-05-15",
+            planning_end_at: "2026-05-12T12:00:00.000Z",
+            voting_end_at: "2026-05-13T12:00:00.000Z",
+            planning_started_at: "2026-05-01T12:00:00.000Z",  // This comes from your mock Timestamp.now()
             state: "Planning",
             role: "admin",
-            invite_code: expect.any(String), 
+            invite_code: expect.any(String),
         });
     });
 
@@ -108,6 +134,8 @@ describe("createTrip controller", () => {
                 destination: "Paris",
                 start_date: "2026-05-10",
                 end_date: "2026-05-15",
+                planning_end_at: "2026-05-12T12:00:00.000Z",
+                voting_end_at: "2026-05-13T12:00:00.000Z",
             },
         };
         const res = mockResponse();
@@ -128,6 +156,8 @@ describe("createTrip controller", () => {
                 destination: "Paris",
                 start_date: "2026-05-10",
                 end_date: "2026-05-15",
+                planning_end_at: "2026-05-12T12:00:00.000Z",
+                voting_end_at: "2026-05-13T12:00:00.000Z",
             },
         };
         const res = mockResponse();
@@ -135,32 +165,33 @@ describe("createTrip controller", () => {
         await createTrip(req, res);
 
         expect(mockVerifyIdToken).toHaveBeenCalledWith("fake-token");
-
         expect(mockBatchSet).toHaveBeenCalledTimes(2);
 
         expect(mockBatchSet).toHaveBeenNthCalledWith(
             1,
             expect.objectContaining({ id: "trip123" }),
-            {
+            expect.objectContaining({
                 admin_user_id: "test123",
                 title: "Paris Trip",
                 destination: "Paris",
                 start_date: "2026-05-10",
                 end_date: "2026-05-15",
+                planning_end_at: "2026-05-12T12:00:00.000Z",
+                voting_end_at: "2026-05-13T12:00:00.000Z",
                 state: "Planning",
-                 invite_code: expect.any(String),
-            }
+                invite_code: expect.any(String),
+            })
         );
 
         expect(mockBatchSet).toHaveBeenNthCalledWith(
             2,
             expect.objectContaining({ id: "member123" }),
-            {
+            expect.objectContaining({
                 user_id: "test123",
                 trip_id: "trip123",
                 role: "admin",
                 invite_status: "accepted",
-            }
+            })
         );
 
         expect(mockBatchCommit).toHaveBeenCalledTimes(1);
