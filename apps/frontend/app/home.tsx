@@ -47,6 +47,10 @@ type TripCardItem = {
     planning_done?: boolean;
     voting_done?: boolean;
   }[];
+  planningStartedAt?: string;
+  planningEndAt?: string;
+  votingEndAt?: string;
+  rawState: Trip["state"];
 };
 
 function formatDate(dateString: string): string {
@@ -117,7 +121,18 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     cardColor: getCardColor(trip.trip_id),
     role: trip.role === "admin" ? "admin" : "member",
     inviteCode: trip.invite_code ?? "",
-    members,
+    members: (trip.members ?? []).map(
+      (member: TripMemberFromApi, index: number) => ({
+        id: member.id,
+        name: member.name,
+        initials: getInitials(member.name),
+        color: getMemberColor(index),
+      })
+    ),
+    planningStartedAt: trip.planning_started_at,
+    planningEndAt: trip.planning_end_at,
+    votingEndAt: trip.voting_end_at,
+    rawState: trip.state,
   };
 }
 
@@ -326,13 +341,34 @@ export default function HomeScreen() {
                 }}
                 onIconPress={() => {
                   if (trip.role === "admin") {
-                    router.push(
-                      `/trip-settings?tripId=${trip.id}&title=${encodeURIComponent(trip.title)}&destination=${encodeURIComponent(trip.destination)}&startDate=${encodeURIComponent(trip.rawStartDate)}&endDate=${encodeURIComponent(trip.rawEndDate)}&members=${encodeURIComponent(JSON.stringify(trip.members))}&inviteCode=${encodeURIComponent(trip.inviteCode)}` as any
-                    );
+                    router.push({
+                      pathname: "/trip-settings",
+                      params: {
+                        tripId: trip.id,
+                        title: trip.title,
+                        destination: trip.destination,
+                        startDate: trip.rawStartDate,
+                        endDate: trip.rawEndDate,
+                        members: JSON.stringify(trip.members),
+                        inviteCode: trip.inviteCode,
+                        state: trip.rawState,
+                        planningStartedAt: trip.planningStartedAt ?? "",
+                        planningEndAt: trip.planningEndAt ?? "",
+                        votingEndAt: trip.votingEndAt ?? "",
+                      },
+                    });
                   } else {
-                    router.push(
-                      `/trip-information?tripId=${trip.id}&title=${encodeURIComponent(trip.title)}&destination=${encodeURIComponent(trip.destination)}&startDate=${encodeURIComponent(trip.rawStartDate)}&endDate=${encodeURIComponent(trip.rawEndDate)}&members=${encodeURIComponent(JSON.stringify(trip.members))}` as any
-                    );
+                    router.push({
+                      pathname: "/trip-information",
+                      params: {
+                        tripId: trip.id,
+                        title: trip.title,
+                        destination: trip.destination,
+                        startDate: trip.rawStartDate,
+                        endDate: trip.rawEndDate,
+                        members: JSON.stringify(trip.members),
+                      },
+                    });
                   }
                 }}
               />
