@@ -139,6 +139,7 @@ export default function AddActivityScreen() {
     }
 
     try {
+      let savedActivityId = activityId;
 
       if (isEditMode && activityId) {
         await updateActivity(activityId, {

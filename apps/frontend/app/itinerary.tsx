@@ -290,6 +290,7 @@ export default function ItineraryScreen() {
 
   const [apiActivities, setApiActivities] = useState<Activity[]>([]);
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
+  const [isSubmittingPlanning, setIsSubmittingPlanning] = useState(false);
   const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -303,7 +304,6 @@ export default function ItineraryScreen() {
     () => generateTripDays(itinerary.startDate, itinerary.endDate),
     [itinerary.startDate, itinerary.endDate]
   );
-  const [isSubmittingPlanning, setIsSubmittingPlanning] = useState(false);
 
   const [selectedDayId, setSelectedDayId] = useState<string>("");
 
