@@ -1,4 +1,4 @@
-export function generateDaySlots() {
+export function generateDaySlots(date: string) {
     const slots = [
         "06:00-08:00",
         "08:00-10:00",
@@ -11,6 +11,7 @@ export function generateDaySlots() {
     ];
 
     return slots.map((slot_type) => ({
+        slot_id: `${date}_${slot_type}`,
         slot_type,
         activityId: null,
     }));
@@ -27,9 +28,10 @@ export function generateItinerary(
 
     const current = new Date(start);
     while (current <= end) {
+        const date = current.toISOString().split("T")[0];
         days.push({
-            date: current.toISOString().split("T")[0],
-            slots: generateDaySlots(),
+            date,
+            slots: generateDaySlots(date), // pass date
         });
         current.setDate(current.getDate() + 1);
     }
