@@ -6,8 +6,9 @@ import type { Activity } from "@/src/types/itinerary";
 
 import LocationIcon from "@/assets/icons/location.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
-import PersonIcon from "@/assets/icons/join-group.svg";
+import MembersIcon from "@/assets/icons/members.svg";
 import JoinGroup from "@/assets/icons/join-group.svg";
+import CheckIcon from "@/assets/icons/check_mark.svg";
 
 type Props = {
   slot: { id: string; label: string };
@@ -70,7 +71,7 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
 
         {/* Joined count */}
         <View style={styles.joinedRow}>
-          <PersonIcon width={14} height={14} />
+          <MembersIcon width={14} height={14} />
           <AppText variant="caption" style={styles.joinedCount}>
             {activity.joinedCount ?? 0}
           </AppText>
@@ -86,10 +87,14 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
       >
         {/* Circle with plus icon */}
         <View style={styles.joinIcon}>
-          <JoinGroup width={36} height={36} />
+          {activity.hasCurrentUserJoined ? (
+            <CheckIcon width={36} height={36} color={colors.nightBlack} />
+          ) : (
+            <JoinGroup width={36} height={36} />
+          )}
         </View>
         <AppText variant="body" style={styles.ctaText}>
-          Join{"\n"}group
+          {activity.hasCurrentUserJoined ? "Joined\ngroup" : "Join\ngroup"}
         </AppText>
       </Pressable>
     </View>

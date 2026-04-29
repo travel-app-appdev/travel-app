@@ -121,14 +121,7 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     cardColor: getCardColor(trip.trip_id),
     role: trip.role === "admin" ? "admin" : "member",
     inviteCode: trip.invite_code ?? "",
-    members: (trip.members ?? []).map(
-      (member: TripMemberFromApi, index: number) => ({
-        id: member.id,
-        name: member.name,
-        initials: getInitials(member.name),
-        color: getMemberColor(index),
-      })
-    ),
+    members,
     planningStartedAt: trip.planning_started_at,
     planningEndAt: trip.planning_end_at,
     votingEndAt: trip.voting_end_at,

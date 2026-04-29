@@ -7,13 +7,15 @@ import type { Activity } from "@/src/types/itinerary";
 import LocationIcon from "@/assets/icons/location.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import VoteIcon from "@/assets/icons/voting.svg";
+import CheckIcon from "@/assets/icons/check_mark.svg";
 
 type Props = {
   activity: Activity;
   onAddVote: (activityId: string) => void;
+  selected?: boolean;
 };
 
-export function VotingSlotCard({ activity, onAddVote }: Props) {
+export function VotingSlotCard({ activity, onAddVote, selected = false }: Props) {
   return (
     <View style={styles.row}>
       <View style={styles.card}>
@@ -52,13 +54,22 @@ export function VotingSlotCard({ activity, onAddVote }: Props) {
       {/* Vote CTA */}
       <Pressable
         onPress={() => onAddVote(activity.id)}
-        style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+        style={({ pressed }) => [
+          styles.cta,
+          selected && styles.ctaSelected,
+          pressed && styles.ctaPressed,
+        ]}
         accessibilityRole="button"
         accessibilityLabel={`Vote for ${activity.name}`}
+        accessibilityState={{ selected }}
       >
-        <VoteIcon width={28} height={28} color={colors.nightBlack} />
+        {selected ? (
+          <CheckIcon width={28} height={28} color={colors.nightBlack} />
+        ) : (
+          <VoteIcon width={28} height={28} color={colors.nightBlack} />
+        )}
         <AppText variant="body" style={styles.ctaText}>
-          Add{"\n"}vote
+          {selected ? "Added\nvote" : "Add\nvote"}
         </AppText>
       </Pressable>
     </View>
@@ -128,6 +139,9 @@ const styles = StyleSheet.create({
   },
   ctaPressed: {
     opacity: 0.85,
+  },
+  ctaSelected: {
+    backgroundColor: colors.sunsetPink,
   },
   ctaText: {
     color: colors.nightBlack,

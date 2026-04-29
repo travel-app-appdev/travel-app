@@ -4,6 +4,8 @@ export type TripMember = {
     id: string;
     name: string;
     role: string;
+    planning_done?: boolean;
+    voting_done?: boolean;
 };
 
 export type Trip = {
@@ -91,17 +93,23 @@ export type Activity = {
     activity_id: string;
     trip_id: string;
     user_id: string;
+    slot_id?: string;
     name: string;
     description?: string;
     address?: string;
     googleMapsUrl?: string;
+    created_at?: string;
+    voteCount?: number;
+    hasCurrentUserVote?: boolean;
+    joinedCount?: number;
+    hasCurrentUserJoined?: boolean;
     source_type: "manual";
 };
 
 export type TimeSlotActivity = {
     slot_id: string;
     activity_id: string;
-    status: "candidate";
+    status: "candidate" | "selected";
 };
 
 export type CreateActivityInput = {

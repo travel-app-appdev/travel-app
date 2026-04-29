@@ -23,6 +23,10 @@ import {
     TripDocument,
     TripState,
 } from "../types/trip";
+import {
+    createFinalItineraryForTrip,
+    getVotingCompletionStatus,
+} from "../repositories/activityRepository";
 
 
 export async function getTripsForUser(userId: string): Promise<Trip[]> {
@@ -47,6 +51,7 @@ export async function getTripsForUser(userId: string): Promise<Trip[]> {
                         id: member.user_id,
                         name: user?.name ?? "Unknown User",
                         role: member.role,
+                        planning_done: member.planning_done ?? false,
                     };
                 })
             );
@@ -215,13 +220,11 @@ export async function finishPlanningForMember(
         throw { status: 404, message: "User is not a member of this trip" };
     }
 
-    // check if already done
-    if (membership.planning_done) {
-        throw { status: 409, message: "Member already finished planning" };
+    // Make this endpoint idempotent. If the user already finished planning,
+    // still recompute the trip transition so an old Planning trip can recover.
+    if (!membership.planning_done) {
+        await markMemberPlanningDone(tripId, userId);
     }
-
-    // mark member as done
-    await markMemberPlanningDone(tripId, userId);
 
     // get all members and check if all are done
     const allMembers = await findAcceptedMembersByTripId(tripId);
@@ -230,13 +233,22 @@ export async function finishPlanningForMember(
     const allDone = completedMembers === totalMembers;
 
     // if all done → switch trip state to Voting
+    let nextState = "Planning";
+
     if (allDone) {
-        await updateTripState(tripId, "Voting");
+        if (totalMembers <= 1) {
+            await createFinalItineraryForTrip(tripId);
+            await updateTripState(tripId, "Final");
+            nextState = "Final";
+        } else {
+            await updateTripState(tripId, "Voting");
+            nextState = "Voting";
+        }
     }
 
     return {
         allDone,
-        tripState: allDone ? "Voting" : "Planning",
+        tripState: nextState,
         completedMembers,
         totalMembers,
     };
@@ -369,14 +381,49 @@ export async function advanceTripStateIfNeeded(tripId: string): Promise<Trip> {
     }
 
     if (trip.state === "Planning") {
-        return transitionPlanningToNextState(tripId);
+        return trip;
     }
 
-    if (trip.state === "Voting") {
-        return transitionVotingToFinalIfNeeded(tripId);
+    if (trip.state === "Voting" || trip.state === "Final") {
+        const repairedTrip = await repairAdvancedTripWithoutFinishedPlanning(tripId, trip);
+        if (repairedTrip.state === "Planning") {
+            return repairedTrip;
+        }
+
+        if (repairedTrip.state === "Voting") {
+            return transitionVotingToFinalIfNeeded(tripId);
+        }
+
+        return repairedTrip;
     }
 
     return trip;
+}
+
+async function repairAdvancedTripWithoutFinishedPlanning(
+    tripId: string,
+    trip: Trip
+): Promise<Trip> {
+    const members = await findAcceptedMembersByTripId(tripId);
+
+    if (members.length === 0) {
+        return trip;
+    }
+
+    const allMembersFinished = members.every((member) => member.planning_done);
+
+    if (allMembersFinished) {
+        return trip;
+    }
+
+    await updateTripState(tripId, "Planning");
+
+    const repairedTrip = await findTripById(tripId);
+    if (!repairedTrip) {
+        throw { status: 404, message: "Trip not found after state repair" };
+    }
+
+    return repairedTrip;
 }
 
 export async function transitionPlanningToNextState(tripId: string): Promise<Trip> {
@@ -390,25 +437,7 @@ export async function transitionPlanningToNextState(tripId: string): Promise<Tri
         return trip;
     }
 
-    const planningEnd = parseIsoDate(trip.planning_end_at);
-
-    if (!planningEnd) {
-        return trip;
-    }
-
-    if (!isPast(planningEnd)) {
-        return trip;
-    }
-
-    await updateTripState(tripId, "Voting");
-
-    const updatedTrip = await findTripById(tripId);
-
-    if (!updatedTrip) {
-        throw { status: 404, message: "Trip not found after Planning transition" };
-    }
-
-    return updatedTrip;
+    return trip;
 }
 
 // State transitions 'Planning Voting Final' logic
@@ -435,16 +464,17 @@ export async function transitionVotingToFinalIfNeeded(tripId: string): Promise<T
         return trip;
     }
 
-    const votingEnd = parseIsoDate(trip.voting_end_at);
+    const members = await findAcceptedMembersByTripId(tripId);
+    const completion = await getVotingCompletionStatus(
+        tripId,
+        members.map((member) => member.user_id)
+    );
 
-    if (!votingEnd) {
+    if (!completion.isComplete) {
         return trip;
     }
 
-    if (!isPast(votingEnd)) {
-        return trip;
-    }
-
+    await createFinalItineraryForTrip(tripId);
     await updateTripState(tripId, "Final");
 
     const updatedTrip = await findTripById(tripId);
