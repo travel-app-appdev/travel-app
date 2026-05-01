@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 18.9.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_USE_FIREBASE_EMULATOR": "false",
+        "EXPO_PUBLIC_API_URL": "https://cc231023-11019.node.ustp.cloud"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_USE_FIREBASE_EMULATOR": "false",
+        "EXPO_PUBLIC_API_URL": "https://cc231023-11019.node.ustp.cloud"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
