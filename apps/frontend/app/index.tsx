@@ -1,4 +1,3 @@
-// app/index.tsx
 import { Link, router } from "expo-router";
 import { useEffect } from "react";
 import {
@@ -11,6 +10,8 @@ import { AppButton } from "@/src/components/common/AppButton";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { useGoogleLogin } from "@/src/lib/googleAuth";
+import { loginWithToken } from "@/src/api/auth";
+import { useAuth } from "@/src/context/AuthContext";
 import VoteyLogo from "@/assets/logos/votey-logo1.svg";
 import CurlyGreen from "@/assets/visuals/curly-green.svg";
 import PalmLeaf from "@/assets/visuals/palm-leaf.svg";
@@ -19,7 +20,9 @@ import Google from "@/assets/icons/google.svg";
 import Stars from "@/assets/visuals/stars.svg";
 
 export default function StartPage() {
-  const { response, signInWithGoogleToken } = useGoogleLogin();
+  const { response, signInWithGoogleToken, promptAsync, request } =
+    useGoogleLogin();
+  const { setUser, setIdToken } = useAuth();
   const { width, height } = useWindowDimensions();
 
   const sw = width / 390;
@@ -29,14 +32,23 @@ export default function StartPage() {
   useEffect(() => {
     async function handleGoogleResponse() {
       if (response?.type === "success") {
-        const idToken = response.authentication?.idToken;
-        if (!idToken) return;
-        await signInWithGoogleToken(idToken);
+        const googleIdToken =
+          response.authentication?.idToken ?? response.params?.id_token;
+
+        if (!googleIdToken) return;
+
+        const { firebaseIdToken } = await signInWithGoogleToken(googleIdToken);
+        const backendUser = await loginWithToken(firebaseIdToken);
+
+        setUser(backendUser);
+        setIdToken(firebaseIdToken);
+
         router.replace("/home");
       }
     }
+
     handleGoogleResponse();
-  }, [response, signInWithGoogleToken]);
+  }, [response, signInWithGoogleToken, setUser, setIdToken]);
 
   return (
     <View style={styles.container}>
@@ -154,11 +166,12 @@ export default function StartPage() {
 
           <AppButton
             title="Continue with Google"
-            onPress={() => {}}
+            onPress={() => promptAsync()}
             variant="secondary"
             icon={<Google width={20} height={20} />}
             textStyle={styles.secondaryButtonText}
             accessibilityLabel="Continue with Google"
+            disabled={!request}
           />
         </View>
       </ScrollView>
