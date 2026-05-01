@@ -43,10 +43,10 @@ src/
 - .env is NEVER pushed to GitHub
 - Ask Milena for serviceAccount.json if you need to run the backend locally
 
-## 25.03.2026 — Authentication (Google Sign-In)
+## 25.03.2026 — Authentication (Email/Password Login)
 
 ### What I did today:
-- Implemented Google Sign-In authentication flow on the backend
+- Implemented email/password login flow on the backend
 - Created `authController.ts` — verifies Firebase ID token sent from frontend,
   creates or updates user document in Firestore on login
 - Created `routes/auth.ts` — registers POST /auth/login route
@@ -58,26 +58,28 @@ src/
 ├── config/
 │   └── firebase.ts           # Firebase connection
 ├── controllers/
-│   └── authController.ts     # Google login logic
+│   └── authController.ts     # Login logic
 ├── middleware/                # Auth, validation (coming soon)
 ├── routes/
 │   └── auth.ts               # POST /auth/login
 └── index.ts                  # Server entry point
 
 ### How authentication works:
-1. Frontend sends Google ID token to POST /auth/login
-2. Backend verifies token using Firebase Admin SDK
-3. User is created or updated in Firestore (merge: true)
-4. Backend returns uid, email and name to frontend
+1. Frontend uses Firebase SDK to sign in with email/password
+2. Firebase returns an idToken to the frontend
+3. Frontend sends idToken to POST /auth/login
+4. Backend verifies token using Firebase Admin SDK
+5. User is created or updated in Firestore
+6. Backend returns uid, email and name to frontend
 
 ### API Endpoints added:
 | Method | Endpoint     | Description                        |
 |--------|--------------|------------------------------------|
-| POST   | /auth/login  | Verify Google token, save user     |
+| POST   | /auth/login  | Verify Firebase token, save user   |
 
 ### Important notes:
-- Frontend still needs to implement Google Sign-In button 
-- Route is currently /auth/login — needs to be aligned with frontend
+- Google Sign-In is NOT implemented — only email/password via Firebase SDK
+- Frontend handles the actual sign-in, backend only verifies the token
 - Postman can be used to test the endpoint locally without the frontend
 
 ## 06.04.2026 — Registration (Email & Password)
@@ -117,10 +119,10 @@ src/
 4. Backend returns uid, email and name to frontend
 
 ### API Endpoints added:
-| Method | Endpoint        | Description                        |
-|--------|-----------------|------------------------------------|
-| POST   | /auth/login     | Verify Google token, save user     |
-| POST   | /auth/register  | Create new user with email/password|
+| Method | Endpoint        | Description                         |
+|--------|-----------------|-------------------------------------|
+| POST   | /auth/login     | Verify Firebase token, save user    |
+| POST   | /auth/register  | Create new user with email/password |
 
 ### Important notes:
 - Registered users appear in Firebase Console under Authentication → Users
@@ -178,13 +180,13 @@ src/
 - Fixed by updating the path in `firebase.ts` to point to `src/config/serviceAccount.json`
 
 ### API Endpoints added:
-| Method | Endpoint        | Description                              |
-|--------|-----------------|------------------------------------------|
-| POST   | /auth/login     | Verify Google token, save user           |
-| POST   | /auth/register  | Create new user with email/password      |
-| GET    | /trips/my       | Get all trips for a user                 |
-| POST   | /trips/         | Create a new trip (generates invite code)|
-| POST   | /trips/join     | Join a trip via invite code              |
+| Method | Endpoint        | Description                               |
+|--------|-----------------|-------------------------------------------|
+| POST   | /auth/login     | Verify Firebase token, save user          |
+| POST   | /auth/register  | Create new user with email/password       |
+| GET    | /trips/my       | Get all trips for a user                  |
+| POST   | /trips/         | Create a new trip (generates invite code) |
+| POST   | /trips/join     | Join a trip via invite code               |
 
 ### Deployment:
 - Backend is now live at: https://cc231001-11012.node.ustp.cloud
@@ -196,3 +198,134 @@ src/
 - `invite_code` is returned in the response when creating a trip — frontend should save it
 - Frontend uses the invite code to call POST /trips/join on behalf of the new member
 - All tests pass: 15/15
+
+## 22.04.2026 — Itinerary Timeslot Generation
+
+### What I did today:
+- Implemented automatic itinerary generation for trips
+- Each day between trip start and end date gets 8 timeslots (06:00–22:00)
+- Timeslots are saved to Firestore and can be retrieved via GET endpoint
+- Written unit tests for timeslot generation logic
+- Fixed a bug where old Node process was blocking the new server
+
+### What I added:
+
+**New files:**
+- `src/__helpers__/itineraryHelper.ts` — pure functions for generating timeslots
+  - `generateDaySlots()` — returns 8 slots for one day
+  - `generateItinerary()` — generates slots for all days between start and end date
+- `src/repositories/itineraryRepository.ts` — Firestore operations for itinerary
+  - `saveItinerary()` — saves all days and slots to Firestore
+  - `getItineraryByTripId()` — retrieves itinerary from Firestore
+- `src/services/itineraryService.ts` — business logic
+  - `generateAndSaveItinerary()` — finds trip, validates dates, generates and saves itinerary
+  - `getItinerary()` — retrieves itinerary, optionally filters by trip state
+- `src/controllers/itineraryController.ts` — handles HTTP requests
+  - `generateItineraryController` — handles POST /itinerary/:tripId/generate
+  - `getItineraryController` — handles GET /trips/:id/itinerary with optional ?state filter
+- `src/routes/itinerary.ts` — registers itinerary routes
+- `src/__tests__/itinerary.test.ts` — unit and endpoint tests
+
+**Updated files:**
+- `src/types/trip.ts` — added TimeSlot, ItineraryDay, Itinerary types
+- `src/routes/trips.ts` — added GET /:id/itinerary route
+- `src/index.ts` — registered itinerary router under /itinerary
+
+### How itinerary generation works:
+1. Frontend sends POST /itinerary/:tripId/generate
+2. Backend finds the trip in Firestore to get start and end dates
+3. Backend generates 8 timeslots for each day between start and end
+4. All slots are saved to Firestore under the `itinerary` collection
+5. Backend returns the full itinerary to frontend
+6. Frontend can fetch it later via GET /trips/:id/itinerary
+
+### Timeslot format:
+Each day has 8 slots:
+- 06:00-08:00, 08:00-10:00, 10:00-12:00, 12:00-14:00
+- 14:00-16:00, 16:00-18:00, 18:00-20:00, 20:00-22:00
+- Each slot starts with `activityId: null` — filled in later during voting
+
+### Bugs we ran into and how we fixed them:
+
+**Bug 1: Cannot POST /itinerary/:tripId/generate**
+- Route was registered correctly but old Node.js process was still running
+  on port 3000 from a previous session and intercepting all requests
+- Fixed by running `taskkill /F /IM node.exe` to kill all Node processes
+  and restarting the server
+
+**Bug 2: TypeScript error — string | string[] not assignable to string**
+- `req.params` values can technically be arrays in Express types
+- Fixed by using `String(req.params.tripId)` to explicitly cast to string
+
+## 27.04.2026 — State Filter + Finish Planning Endpoint
+
+### What I did today:
+- Added optional `?state=` query parameter to GET /trips/:id/itinerary
+- Implemented "Finish Planning" endpoint that records per-member completion
+  and automatically switches trip state from "Planning" to "Voting" when all members are done
+- Added unit tests for both features
+
+### What I added:
+
+**State filter for GET itinerary:**
+- If `?state=planning` is provided → backend checks trip state before returning itinerary
+- If state does not match → returns 400 with clear error message
+- If no state param → returns itinerary regardless of state
+
+**Finish planning endpoint:**
+- New endpoint POST `/trips/:tripId/finish-planning`
+- Marks the calling member as `planning_done: true` in Firestore
+- Checks if ALL members have `planning_done: true`
+- If all done → automatically switches trip state from "Planning" to "Voting"
+- Returns completion status with `allDone`, `tripState`, `completedMembers`, `totalMembers`
+
+**New functions in `tripsRepository.ts`:**
+- `markMemberPlanningDone` — updates `planning_done: true` for a member
+- `updateTripState` — updates the `state` field of a trip in Firestore
+
+**New function in `tripsService.ts`:**
+- `finishPlanningForMember` — validates token, checks trip state, marks member done,
+  checks if all done, switches state to Voting if needed
+
+**Updated files:**
+- `src/types/trip.ts` — added `planning_done` field to `TripMembershipDocument`
+- `src/controllers/tripsController.ts` — added `finishPlanning` controller
+- `src/routes/trips.ts` — added POST /:tripId/finish-planning route
+- `src/__tests__/finishPlanning.test.ts` — unit tests for finish planning endpoint
+
+### How finish planning works:
+1. Member calls POST /trips/:tripId/finish-planning with their idToken
+2. Backend verifies token and checks trip is in "Planning" state
+3. Backend marks this member as `planning_done: true` in Firestore
+4. Backend checks if ALL members are done
+5. If all done → trip state switches to "Voting" automatically
+6. Response includes completion status
+
+### Example response:
+```json
+{
+    "allDone": true,
+    "tripState": "Voting",
+    "completedMembers": 3,
+    "totalMembers": 3
+}
+```
+
+### API Endpoints added:
+| Method | Endpoint                              | Description                                  |
+|--------|---------------------------------------|----------------------------------------------|
+| POST   | /auth/login                           | Verify Firebase token, save user             |
+| POST   | /auth/register                        | Create new user with email/password          |
+| GET    | /trips/my                             | Get all trips for a user                     |
+| POST   | /trips/                               | Create trip (generates invite code)          |
+| POST   | /trips/join                           | Join a trip via invite code                  |
+| POST   | /trips/:tripId/finish-planning        | Mark member as done, switch to Voting if all done |
+| POST   | /itinerary/:tripId/generate           | Generate & save timeslots                    |
+| GET    | /trips/:id/itinerary                  | Get itinerary for a trip                     |
+| GET    | /trips/:id/itinerary?state=planning   | Get itinerary only if trip is in given state |
+
+### Tests:
+- 26/26 tests passing
+- New tests cover:
+  - `POST /trips/:tripId/finish-planning` — missing idToken → 400, success → 200
+  - `GET /trips/:id/itinerary?state=planning` — state mismatch → 400, no state param → 200

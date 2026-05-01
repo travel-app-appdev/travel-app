@@ -1,3 +1,4 @@
+// src/api/auth.ts
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 type RegisterPayload = {
@@ -17,7 +18,7 @@ type ApiErrorResponse = {
 };
 
 export async function registerUser(
-    payload: RegisterPayload
+  payload: RegisterPayload
 ): Promise<AuthResponse> {
   const response = await fetch(`${API_URL}/auth/register`, {
     method: "POST",
@@ -36,9 +37,7 @@ export async function registerUser(
   return data as AuthResponse;
 }
 
-export async function loginWithToken(
-    idToken: string
-): Promise<AuthResponse> {
+export async function loginWithToken(idToken: string): Promise<AuthResponse> {
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: {
@@ -51,6 +50,34 @@ export async function loginWithToken(
 
   if (!response.ok) {
     throw new Error((data as ApiErrorResponse).error || "Login failed");
+  }
+
+  return data as AuthResponse;
+}
+
+type UpdateProfilePayload = {
+  idToken: string;
+  name?: string;
+  email?: string;
+};
+
+export async function updateProfile(
+  payload: UpdateProfilePayload
+): Promise<AuthResponse> {
+  const response = await fetch(`${API_URL}/auth/profile`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data: AuthResponse | ApiErrorResponse = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      (data as ApiErrorResponse).error || "Failed to update profile"
+    );
   }
 
   return data as AuthResponse;

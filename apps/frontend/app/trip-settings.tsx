@@ -1,5 +1,5 @@
-// app/trip-settings.tsx
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Alert,
   Pressable,
@@ -14,11 +14,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
+import * as Clipboard from "expo-clipboard";
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppButton } from "@/src/components/common/AppButton";
-import { ActionCard, ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
+import {
+  ActionCard,
+  ACTION_CARD_HEIGHT,
+} from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
+import { deleteTrip, removeMember, updateTrip } from "@/src/api/trips";
+import { auth } from "@/src/lib/firebase";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import Edit from "@/assets/icons/edit.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
@@ -33,40 +39,9 @@ import Hourglass1 from "@/assets/icons/hourglass_1.svg";
 import Timepoint from "@/assets/icons/timepoint.svg";
 import CheckMark from "@/assets/icons/check_mark.svg";
 import Trash from "@/assets/icons/trash.svg";
-
-const TRIP = {
-  name: "Japan Spring",
-  startDate: new Date("2026-01-01"),
-  endDate: new Date("2026-03-15"),
-  destination: "Tokyo, Japan",
-  members: ["Sophie", "Lukas", "Franz"],
-  phases: [
-    {
-      id: "planning",
-      label: "Planning",
-      color: colors.beachYellow,
-      active: true,
-      startDate: new Date("2026-01-01"),
-      endDate: new Date("2026-03-15"),
-    },
-    {
-      id: "voting",
-      label: "Voting",
-      color: colors.sunsetPink,
-      active: false,
-      startDate: new Date("2026-03-16"),
-      endDate: new Date("2026-03-18"),
-    },
-    {
-      id: "final",
-      label: "Final",
-      color: colors.neonGreen,
-      active: false,
-      startDate: new Date("2026-03-20"),
-      endDate: new Date("2026-03-20"),
-    },
-  ],
-};
+import KeyFrame from "@/assets/icons/key_frame.svg";
+import Copy from "@/assets/icons/copy.svg";
+import Timer from "@/assets/icons/timer.svg";
 
 const PHASE_TEXT_COLORS: Record<string, string> = {
   planning: colors.nightBlack,
@@ -74,61 +49,269 @@ const PHASE_TEXT_COLORS: Record<string, string> = {
   final: colors.nightBlack,
 };
 
-type FieldKey = "name" | "date" | "destination" | "members";
+type FieldKey = "name" | "date" | "destination" | "members" | "code";
 type PhaseKey = "planning" | "voting" | "final";
 
-type PhaseDates = Record<PhaseKey, { start: Date; end: Date }>;
+type PhaseDates = Record<
+  PhaseKey,
+  {
+    start: Date;
+    end: Date;
+    time: string;
+  }
+>;
 
-function formatDateDisplay(date: Date) {
+type MemberParam = {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+};
+
+function formatDateDisplay(date: Date): string {
   const d = date.getDate().toString().padStart(2, "0");
   const m = (date.getMonth() + 1).toString().padStart(2, "0");
   const y = date.getFullYear();
   return `${d}.${m}.${y}`;
 }
 
-function calcDays(start: Date, end: Date) {
-  const ms = end.getTime() - start.getTime();
-  return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)) + 1);
+function toDateOnlyString(date: Date): string {
+  return date.toISOString().split("T")[0];
 }
 
-function dayLabel(days: number) {
+function calcCalendarDays(start: Date, end: Date): number {
+  const startOnly = new Date(start);
+  startOnly.setHours(0, 0, 0, 0);
+
+  const endOnly = new Date(end);
+  endOnly.setHours(0, 0, 0, 0);
+
+  const ms = endOnly.getTime() - startOnly.getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
+}
+
+function calcDaysLeft(end: Date): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const endOnly = new Date(end);
+  endOnly.setHours(0, 0, 0, 0);
+
+  const ms = endOnly.getTime() - today.getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
+}
+
+function dayLabel(days: number, active: boolean): string {
+  if (active) return days === 1 ? "1 day left" : `${days} days left`;
   return days === 1 ? "1 day" : `${days} days`;
 }
 
+function dateToTimeString(date: Date): string {
+  const h = date.getHours().toString().padStart(2, "0");
+  const m = date.getMinutes().toString().padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+function timeStringToDate(timeStr: string): Date {
+  const [h, m] = timeStr.split(":").map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+function combineDateAndTime(date: Date, timeStr: string): string {
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  const combined = new Date(date);
+  combined.setHours(hours, minutes, 0, 0);
+  return combined.toISOString();
+}
+
+function endOfDay(date: Date): Date {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
+  return next;
+}
+
+function parseIsoToDate(value?: string): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseIsoToTimeString(value?: string): string {
+  const parsed = parseIsoToDate(value);
+  return parsed ? dateToTimeString(parsed) : "00:00";
+}
+
 export default function TripSettingsScreen() {
+  const raw = useLocalSearchParams<{
+    tripId: string;
+    title: string;
+    destination: string;
+    startDate: string;
+    endDate: string;
+    members: string;
+    inviteCode: string;
+    state?: "Planning" | "Voting" | "Final";
+    planningStartedAt?: string;
+    planningEndAt?: string;
+    votingEndAt?: string;
+  }>();
+
+  const tripId = String(raw.tripId ?? "");
+  const title = String(raw.title ?? "");
+  const destinationParam = String(raw.destination ?? "");
+  const startDate = String(raw.startDate ?? "");
+  const endDate = String(raw.endDate ?? "");
+  const membersParam = String(raw.members ?? "");
+  const inviteCodeParam = String(raw.inviteCode ?? "");
+  const tripState = String(raw.state ?? "Planning");
+  const planningStartedAt = String(raw.planningStartedAt ?? "");
+  const planningEndAt = String(raw.planningEndAt ?? "");
+  const votingEndAt = String(raw.votingEndAt ?? "");
+  const router = useRouter();
   const { height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenHeight < 700;
+
+  const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const safeTimeout = (fn: () => void, delay: number) => {
+    const id = setTimeout(fn, delay);
+    timeoutRefs.current.push(id);
+    return id;
+  };
+
+  useEffect(() => {
+    return () => timeoutRefs.current.forEach(clearTimeout);
+  }, []);
+
+  const parsedMembers: MemberParam[] = (() => {
+    try {
+      return membersParam ? JSON.parse(membersParam) : [];
+    } catch {
+      return [];
+    }
+  })();
 
   const [openField, setOpenField] = useState<FieldKey | null>(null);
   const [openPhase, setOpenPhase] = useState<PhaseKey | null>(null);
 
-  const [tripName, setTripName] = useState(TRIP.name);
-  const [tripNameInput, setTripNameInput] = useState(TRIP.name);
+  const [tripName, setTripName] = useState(title);
+  const [tripNameInput, setTripNameInput] = useState(title);
   const [tripNameUpdated, setTripNameUpdated] = useState(false);
+  const [isUpdatingName, setIsUpdatingName] = useState(false);
 
-  const [tripStart, setTripStart] = useState(TRIP.startDate);
-  const [tripEnd, setTripEnd] = useState(TRIP.endDate);
+  const [tripStart, setTripStart] = useState(
+    startDate ? new Date(startDate) : new Date()
+  );
+  const [tripEnd, setTripEnd] = useState(
+    endDate ? new Date(endDate) : new Date()
+  );
   const [tripDateUpdated, setTripDateUpdated] = useState(false);
+  const [isUpdatingDate, setIsUpdatingDate] = useState(false);
   const [showTripStartPicker, setShowTripStartPicker] = useState(false);
   const [showTripEndPicker, setShowTripEndPicker] = useState(false);
 
-  const [destination, setDestination] = useState(TRIP.destination);
-  const [destinationInput, setDestinationInput] = useState(TRIP.destination);
+  const [destination, setDestination] = useState(destinationParam);
+  const [destinationInput, setDestinationInput] = useState(destinationParam);
   const [destinationUpdated, setDestinationUpdated] = useState(false);
+  const [isUpdatingDestination, setIsUpdatingDestination] = useState(false);
 
-  const [members, setMembers] = useState(TRIP.members);
+  const [members, setMembers] = useState<MemberParam[]>(parsedMembers);
   const [newMember, setNewMember] = useState("");
   const [membersUpdated, setMembersUpdated] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+
+  const [codeCopied, setCodeCopied] = useState(false);
+
+  const planningStartDate = parseIsoToDate(planningStartedAt);
+  const planningEndDate = parseIsoToDate(planningEndAt);
+  const votingEndDate = parseIsoToDate(votingEndAt);
+
+  // Voting starts exactly when planning ends
+  const votingStartDate = planningEndDate ?? tripStart;
+
+  // Final uses same date as voting_end_at
+  const finalDisplayDate = votingEndDate ?? tripEnd;
+
+  const phases = [
+    {
+      id: "planning" as const,
+      label: "Planning",
+      color: colors.beachYellow,
+      active: tripState === "Planning",
+    },
+    {
+      id: "voting" as const,
+      label: "Voting",
+      color: colors.sunsetPink,
+      active: tripState === "Voting",
+    },
+    {
+      id: "final" as const,
+      label: "Final",
+      color: colors.neonGreen,
+      active: tripState === "Final",
+    },
+  ];
 
   const [phaseDates, setPhaseDates] = useState<PhaseDates>({
-    planning: { start: TRIP.phases[0].startDate, end: TRIP.phases[0].endDate },
-    voting: { start: TRIP.phases[1].startDate, end: TRIP.phases[1].endDate },
-    final: { start: TRIP.phases[2].startDate, end: TRIP.phases[2].endDate },
+    planning: {
+      start: planningStartDate ?? tripStart,
+      end: planningEndDate ?? tripStart,
+      time: parseIsoToTimeString(planningEndAt),
+    },
+    voting: {
+      start: votingStartDate,
+      end: votingEndDate ?? tripStart,
+      time: parseIsoToTimeString(votingEndAt),
+    },
+    final: {
+      start: finalDisplayDate,
+      end: finalDisplayDate,
+      time: "00:00",
+    },
   });
 
+  useEffect(() => {
+    const nextPlanningStart = parseIsoToDate(planningStartedAt);
+    const nextPlanningEnd = parseIsoToDate(planningEndAt);
+    const nextVotingEnd = parseIsoToDate(votingEndAt);
+    const nextFinalDisplay = nextVotingEnd ?? tripEnd;
+
+    setPhaseDates({
+      planning: {
+        start: nextPlanningStart ?? tripStart,
+        end: nextPlanningEnd ?? tripStart,
+        time: parseIsoToTimeString(planningEndAt),
+      },
+      voting: {
+        start: nextPlanningEnd ?? tripStart,
+        end: nextVotingEnd ?? tripStart,
+        time: parseIsoToTimeString(votingEndAt),
+      },
+      final: {
+        start: nextFinalDisplay ?? tripEnd,
+        end: nextFinalDisplay ?? tripEnd,
+        time: "00:00",
+      },
+    });
+  }, [planningStartedAt, planningEndAt, votingEndAt, tripStart, tripEnd]);
+
   const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
-  const [showPhaseStartPicker, setShowPhaseStartPicker] = useState<PhaseKey | null>(null);
-  const [showPhaseEndPicker, setShowPhaseEndPicker] = useState<PhaseKey | null>(null);
+  const [showPhaseStartPicker, setShowPhaseStartPicker] =
+    useState<PhaseKey | null>(null);
+  const [showPhaseTimePicker, setShowPhaseTimePicker] =
+    useState<PhaseKey | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const getIdToken = async (): Promise<string | null> => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      Alert.alert("Not logged in", "Please log in again.");
+      return null;
+    }
+    return currentUser.getIdToken();
+  };
 
   const toggleField = (key: FieldKey) => {
     setOpenField((prev) => (prev === key ? null : key));
@@ -142,62 +325,265 @@ export default function TripSettingsScreen() {
     setOpenPhase((prev) => (prev === key ? null : key));
   };
 
-  const handleUpdateName = () => {
-    setTripName(tripNameInput);
-    setTripNameUpdated(true);
-    setTimeout(() => {
-      setTripNameUpdated(false);
-      setOpenField(null);
-    }, 1500);
+  const handleUpdateName = async () => {
+    if (!tripNameInput.trim() || isUpdatingName) return;
+    const idToken = await getIdToken();
+    if (!idToken) return;
+
+    try {
+      setIsUpdatingName(true);
+      await updateTrip({ idToken, tripId, title: tripNameInput.trim() });
+      setTripName(tripNameInput.trim());
+      setTripNameUpdated(true);
+      safeTimeout(() => {
+        setTripNameUpdated(false);
+        setOpenField(null);
+      }, 1500);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update name";
+      Alert.alert("Update failed", message);
+    } finally {
+      setIsUpdatingName(false);
+    }
   };
 
-  const handleUpdateDestination = () => {
-    setDestination(destinationInput);
-    setDestinationUpdated(true);
-    setTimeout(() => {
-      setDestinationUpdated(false);
-      setOpenField(null);
-    }, 1500);
+  const handleUpdateDestination = async () => {
+    if (!destinationInput.trim() || isUpdatingDestination) return;
+    const idToken = await getIdToken();
+    if (!idToken) return;
+
+    try {
+      setIsUpdatingDestination(true);
+      await updateTrip({
+        idToken,
+        tripId,
+        destination: destinationInput.trim(),
+      });
+      setDestination(destinationInput.trim());
+      setDestinationUpdated(true);
+      safeTimeout(() => {
+        setDestinationUpdated(false);
+        setOpenField(null);
+      }, 1500);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update destination";
+      Alert.alert("Update failed", message);
+    } finally {
+      setIsUpdatingDestination(false);
+    }
   };
 
-  const handleUpdateTripDate = () => {
-    setTripDateUpdated(true);
-    setTimeout(() => {
-      setTripDateUpdated(false);
-      setOpenField(null);
-    }, 1500);
+  const handleUpdateTripDate = async () => {
+    if (isUpdatingDate) return;
+    const idToken = await getIdToken();
+    if (!idToken) return;
+
+    try {
+      const tripEndBoundary = endOfDay(tripEnd);
+      const currentPlanningEnd = new Date(
+        combineDateAndTime(phaseDates.planning.end, phaseDates.planning.time)
+      );
+      const currentVotingEnd = new Date(
+        combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
+      );
+
+      if (currentPlanningEnd > tripEndBoundary) {
+        Alert.alert(
+          "Invalid trip end",
+          "Trip end cannot be before the planning end date."
+        );
+        return;
+      }
+
+      if (currentVotingEnd > tripEndBoundary) {
+        Alert.alert(
+          "Invalid trip end",
+          "Trip end cannot be before the voting end date."
+        );
+        return;
+      }
+
+      setIsUpdatingDate(true);
+      await updateTrip({
+        idToken,
+        tripId,
+        start_date: toDateOnlyString(tripStart),
+        end_date: toDateOnlyString(tripEnd),
+      });
+      setTripDateUpdated(true);
+      safeTimeout(() => {
+        setTripDateUpdated(false);
+        setOpenField(null);
+      }, 1500);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update dates";
+      Alert.alert("Update failed", message);
+    } finally {
+      setIsUpdatingDate(false);
+    }
   };
 
   const handleAddMember = () => {
     const trimmed = newMember.trim();
     if (!trimmed) return;
-    setMembers((prev) => [...prev, trimmed]);
+
+    const newEntry: MemberParam = {
+      id: `local-${Date.now()}`,
+      name: trimmed,
+      initials: trimmed.slice(0, 2).toUpperCase(),
+      color: colors.sunsetOrange,
+    };
+
+    setMembers((prev) => [...prev, newEntry]);
     setNewMember("");
     setMembersUpdated(true);
-    setTimeout(() => {
-      setMembersUpdated(false);
-    }, 1500);
+    safeTimeout(() => setMembersUpdated(false), 1500);
   };
 
-  const handleRemoveMember = (name: string) => {
+  const handleRemoveMember = (id: string, name: string) => {
     Alert.alert("Remove member", `Are you sure you want to remove ${name}?`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Remove",
         style: "destructive",
-        onPress: () => {
-          setMembers((prev) => prev.filter((m) => m !== name));
+        onPress: async () => {
+          try {
+            setRemovingMemberId(id);
+            const idToken = await getIdToken();
+            if (!idToken) return;
+            await removeMember({ idToken, tripId, memberId: id });
+            setMembers((prev) => prev.filter((m) => m.id !== id));
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "Failed to remove member";
+            Alert.alert("Remove failed", message);
+          } finally {
+            setRemovingMemberId(null);
+          }
         },
       },
     ]);
   };
 
-  const handleUpdatePhaseDate = (phaseId: PhaseKey) => {
-    setPhaseUpdated((prev) => ({ ...prev, [phaseId]: true }));
-    setTimeout(() => {
-      setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
-      setOpenPhase(null);
-    }, 1500);
+  const handleCopyCode = async () => {
+    await Clipboard.setStringAsync(inviteCodeParam);
+    setCodeCopied(true);
+    safeTimeout(() => setCodeCopied(false), 2000);
+  };
+
+  const handleUpdatePhaseDate = async (phaseId: PhaseKey) => {
+    const idToken = await getIdToken();
+    if (!idToken) return;
+
+    try {
+      const phase = phaseDates[phaseId];
+      const nextEnd = new Date(combineDateAndTime(phase.end, phase.time));
+      const tripEndBoundary = endOfDay(tripEnd);
+
+      if (phaseId === "planning") {
+        const currentVotingEnd = new Date(
+          combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
+        );
+
+        if (nextEnd > tripEndBoundary) {
+          Alert.alert(
+            "Invalid planning end",
+            "Planning end cannot be after the trip end date."
+          );
+          return;
+        }
+
+        if (nextEnd > currentVotingEnd) {
+          Alert.alert(
+            "Invalid planning end",
+            "Planning end cannot be after voting end."
+          );
+          return;
+        }
+
+        const endAtIso = combineDateAndTime(phase.end, phase.time);
+
+        await updateTrip({
+          idToken,
+          tripId,
+          planning_end_at: endAtIso,
+        });
+
+        setPhaseDates((prev) => ({
+          ...prev,
+          planning: {
+            ...prev.planning,
+            end: phase.end,
+            time: phase.time,
+          },
+          voting: {
+            ...prev.voting,
+            start: phase.end,
+          },
+        }));
+      }
+
+      if (phaseId === "voting") {
+        const currentPlanningEnd = new Date(
+          combineDateAndTime(phaseDates.planning.end, phaseDates.planning.time)
+        );
+
+        if (nextEnd < currentPlanningEnd) {
+          Alert.alert(
+            "Invalid voting end",
+            "Voting end cannot be before planning end."
+          );
+          return;
+        }
+
+        if (nextEnd > tripEndBoundary) {
+          Alert.alert(
+            "Invalid voting end",
+            "Voting end cannot be after the trip end date."
+          );
+          return;
+        }
+
+        const endAtIso = combineDateAndTime(phase.end, phase.time);
+
+        await updateTrip({
+          idToken,
+          tripId,
+          voting_end_at: endAtIso,
+        });
+
+        const nextFinalDisplay = phase.end;
+
+        setPhaseDates((prev) => ({
+          ...prev,
+          voting: {
+            ...prev.voting,
+            end: phase.end,
+            time: phase.time,
+          },
+          final: {
+            ...prev.final,
+            start: nextFinalDisplay,
+            end: nextFinalDisplay,
+          },
+        }));
+      }
+
+      setPhaseUpdated((prev) => ({ ...prev, [phaseId]: true }));
+      safeTimeout(() => {
+        setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
+        setOpenPhase(null);
+      }, 1500);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update phase";
+      Alert.alert("Update failed", message);
+    }
   };
 
   const handleDeleteTrip = () => {
@@ -209,8 +595,22 @@ export default function TripSettingsScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            // TODO: call delete trip API then navigate away
+          onPress: async () => {
+            try {
+              setIsDeleting(true);
+              const idToken = await getIdToken();
+              if (!idToken) return;
+              await deleteTrip({ idToken, tripId });
+              router.replace("/home");
+            } catch (error) {
+              const message =
+                error instanceof Error
+                  ? error.message
+                  : "Failed to delete trip";
+              Alert.alert("Delete failed", message);
+            } finally {
+              setIsDeleting(false);
+            }
           },
         },
       ]
@@ -239,7 +639,6 @@ export default function TripSettingsScreen() {
           >
             <View style={styles.header}>
               <BackLink href="/home" />
-
               <View style={styles.headerTitle}>
                 <Edit width={22} height={22} />
                 <AppText variant="body" style={styles.headerLabel}>
@@ -248,7 +647,6 @@ export default function TripSettingsScreen() {
               </View>
             </View>
 
-            {/* Trip Name */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -289,9 +687,10 @@ export default function TripSettingsScreen() {
                     style={styles.inputBlackStroke}
                   />
                   <AppButton
-                    title="Update"
+                    title={isUpdatingName ? "Updating..." : "Update"}
                     onPress={handleUpdateName}
-                    disabled={!tripNameInput.trim()}
+                    loading={isUpdatingName}
+                    disabled={!tripNameInput.trim() || isUpdatingName}
                     style={styles.updateButton}
                     textStyle={styles.updateButtonText}
                     accessibilityLabel="Update trip name"
@@ -299,7 +698,11 @@ export default function TripSettingsScreen() {
                   {tripNameUpdated && (
                     <View style={styles.successRow}>
                       <CheckMark width={18} height={18} />
-                      <AppText variant="caption" style={styles.successText} accessibilityRole="alert">
+                      <AppText
+                        variant="caption"
+                        style={styles.successText}
+                        accessibilityRole="alert"
+                      >
                         Name is updated!
                       </AppText>
                     </View>
@@ -308,7 +711,6 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* Trip Date */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -325,7 +727,8 @@ export default function TripSettingsScreen() {
                     </AppText>
                   </View>
                   <AppText variant="caption" style={styles.infoValue}>
-                    {formatDateDisplay(tripStart)} – {formatDateDisplay(tripEnd)}
+                    {formatDateDisplay(tripStart)} –{" "}
+                    {formatDateDisplay(tripEnd)}
                   </AppText>
                 </View>
                 {openField === "date" ? (
@@ -347,7 +750,8 @@ export default function TripSettingsScreen() {
                     accessibilityLabel="Select trip dates"
                   >
                     <AppText variant="body" style={styles.dateText}>
-                      {formatDateDisplay(tripStart)} – {formatDateDisplay(tripEnd)}
+                      {formatDateDisplay(tripStart)} –{" "}
+                      {formatDateDisplay(tripEnd)}
                     </AppText>
                     <Calendar width={20} height={20} />
                   </Pressable>
@@ -381,16 +785,23 @@ export default function TripSettingsScreen() {
                   )}
 
                   <AppButton
-                    title="Update"
+                    title={isUpdatingDate ? "Updating..." : "Update"}
                     onPress={handleUpdateTripDate}
+                    loading={isUpdatingDate}
+                    disabled={isUpdatingDate}
                     style={styles.updateButton}
                     textStyle={styles.updateButtonText}
                     accessibilityLabel="Update trip dates"
                   />
+
                   {tripDateUpdated && (
                     <View style={styles.successRow}>
                       <CheckMark width={18} height={18} />
-                      <AppText variant="caption" style={styles.successText} accessibilityRole="alert">
+                      <AppText
+                        variant="caption"
+                        style={styles.successText}
+                        accessibilityRole="alert"
+                      >
                         Date is updated!
                       </AppText>
                     </View>
@@ -399,7 +810,6 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* Destination */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -440,9 +850,10 @@ export default function TripSettingsScreen() {
                     style={styles.inputBlackStroke}
                   />
                   <AppButton
-                    title="Update"
+                    title={isUpdatingDestination ? "Updating..." : "Update"}
                     onPress={handleUpdateDestination}
-                    disabled={!destinationInput.trim()}
+                    loading={isUpdatingDestination}
+                    disabled={!destinationInput.trim() || isUpdatingDestination}
                     style={styles.updateButton}
                     textStyle={styles.updateButtonText}
                     accessibilityLabel="Update destination"
@@ -450,7 +861,11 @@ export default function TripSettingsScreen() {
                   {destinationUpdated && (
                     <View style={styles.successRow}>
                       <CheckMark width={18} height={18} />
-                      <AppText variant="caption" style={styles.successText} accessibilityRole="alert">
+                      <AppText
+                        variant="caption"
+                        style={styles.successText}
+                        accessibilityRole="alert"
+                      >
                         Destination is updated!
                       </AppText>
                     </View>
@@ -459,7 +874,6 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* Members */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -476,7 +890,7 @@ export default function TripSettingsScreen() {
                     </AppText>
                   </View>
                   <AppText variant="caption" style={styles.infoValue}>
-                    {members.join(", ")}
+                    {members.map((m) => m.name).join(", ") || "—"}
                   </AppText>
                 </View>
                 {openField === "members" ? (
@@ -489,15 +903,27 @@ export default function TripSettingsScreen() {
               {openField === "members" && (
                 <View style={styles.expandedField}>
                   {members.map((member) => (
-                    <View key={member} style={styles.memberRow}>
+                    <View key={member.id} style={styles.memberRow}>
                       <AppText variant="body" style={styles.memberName}>
-                        {member}
+                        {member.name}
                       </AppText>
                       <Pressable
-                        onPress={() => handleRemoveMember(member)}
+                        onPress={() =>
+                          handleRemoveMember(member.id, member.name)
+                        }
+                        disabled={removingMemberId === member.id}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         accessibilityRole="button"
-                        accessibilityLabel={`Remove ${member}`}
+                        accessibilityLabel={
+                          removingMemberId === member.id
+                            ? `Removing ${member.name}`
+                            : `Remove ${member.name}`
+                        }
+                        style={
+                          removingMemberId === member.id
+                            ? styles.removingIcon
+                            : undefined
+                        }
                       >
                         <RemovePerson width={22} height={22} />
                       </Pressable>
@@ -521,7 +947,11 @@ export default function TripSettingsScreen() {
                   {membersUpdated && (
                     <View style={styles.successRow}>
                       <CheckMark width={18} height={18} />
-                      <AppText variant="caption" style={styles.successText} accessibilityRole="alert">
+                      <AppText
+                        variant="caption"
+                        style={styles.successText}
+                        accessibilityRole="alert"
+                      >
                         Member added!
                       </AppText>
                     </View>
@@ -530,13 +960,45 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* Phases */}
-            {TRIP.phases.map((phase) => {
+            <View style={styles.fieldGroup}>
+              <View style={styles.infoRow}>
+                <View style={styles.infoLeft}>
+                  <View style={styles.infoLabelRow}>
+                    <KeyFrame width={20} height={20} />
+                    <AppText variant="body" style={styles.fieldLabel}>
+                      Code
+                    </AppText>
+                  </View>
+                  <AppText
+                    variant="caption"
+                    style={[styles.infoValue, styles.codeValue]}
+                  >
+                    {inviteCodeParam || "—"}
+                  </AppText>
+                </View>
+                <Pressable
+                  onPress={handleCopyCode}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={codeCopied ? "Copied!" : "Copy code"}
+                >
+                  <Copy width={22} height={22} />
+                </Pressable>
+              </View>
+              {codeCopied && (
+                <AppText variant="caption" style={styles.copiedHint}>
+                  ✓ Copied!
+                </AppText>
+              )}
+            </View>
+
+            {phases.map((phase) => {
               const phaseId = phase.id as PhaseKey;
               const isOpen = openPhase === phaseId;
               const dates = phaseDates[phaseId];
-              const days = calcDays(dates.start, dates.end);
-
+              const days = phase.active
+                ? calcDaysLeft(dates.end)
+                : calcCalendarDays(dates.start, dates.end);
               return (
                 <View key={phaseId} style={styles.fieldGroup}>
                   <Pressable
@@ -547,25 +1009,46 @@ export default function TripSettingsScreen() {
                     accessibilityState={{ expanded: isOpen }}
                   >
                     <View style={styles.phaseLeft}>
-                      <View style={[styles.phaseBadge, { backgroundColor: phase.color }]}>
+                      <View
+                        style={[
+                          styles.phaseBadge,
+                          { backgroundColor: phase.color },
+                        ]}
+                      >
                         <AppText
                           variant="caption"
-                          style={[styles.phaseBadgeText, { color: PHASE_TEXT_COLORS[phase.id] }]}
+                          style={[
+                            styles.phaseBadgeText,
+                            { color: PHASE_TEXT_COLORS[phase.id] },
+                          ]}
                         >
                           {phase.label}
                         </AppText>
                       </View>
 
-                      <View style={styles.phaseTimerRow}>
-                        {phase.active ? (
-                          <Hourglass1 width={20} height={20} />
-                        ) : (
-                          <Hourglass0 width={20} height={20} />
-                        )}
-                        <AppText variant="body" style={styles.phaseDays}>
-                          {dayLabel(days)}
-                        </AppText>
-                        {phase.active && <Timepoint width={8} height={8} />}
+                      <View style={styles.phaseTimerBlock}>
+                        <View style={styles.hourglassCol}>
+                          {phase.active ? (
+                            <Hourglass1 width={20} height={20} />
+                          ) : (
+                            <Hourglass0 width={20} height={20} />
+                          )}
+                        </View>
+                        <View style={styles.phaseTextCol}>
+                          <View style={styles.daysRow}>
+                            <AppText variant="body" style={styles.phaseDays}>
+                              {dayLabel(days, phase.active)}
+                            </AppText>
+                            {phase.active && (
+                              <View style={styles.timepointWrapper}>
+                                <Timepoint width={7} height={7} />
+                              </View>
+                            )}
+                          </View>
+                          <AppText variant="caption" style={styles.timerLabel}>
+                            Timer
+                          </AppText>
+                        </View>
                       </View>
                     </View>
 
@@ -583,53 +1066,83 @@ export default function TripSettingsScreen() {
                       : ""}
                   </AppText>
 
-                  {isOpen && (
+                  {isOpen && phaseId !== "final" && (
                     <View style={styles.expandedField}>
-                      <Pressable
-                        style={styles.dateInput}
-                        onPress={() => {
-                          setShowPhaseStartPicker(phaseId);
-                          setShowPhaseEndPicker(null);
-                        }}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Select ${phase.label} phase dates`}
-                      >
-                        <AppText variant="body" style={styles.dateText}>
-                          {formatDateDisplay(dates.start)} – {formatDateDisplay(dates.end)}
-                        </AppText>
-                        <Calendar width={20} height={20} />
-                      </Pressable>
+                      <AppText variant="body" style={styles.phaseEndLabel}>
+                        End date of {phase.label} state
+                      </AppText>
+
+                      <View style={styles.dateTimeRow}>
+                        <Pressable
+                          style={[styles.dateInput, styles.dateTimeHalf]}
+                          onPress={() => {
+                            setShowPhaseStartPicker(phaseId);
+                            setShowPhaseTimePicker(null);
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Select ${phase.label} end date`}
+                        >
+                          <AppText variant="body" style={styles.dateText}>
+                            {formatDateDisplay(dates.end)}
+                          </AppText>
+                          <Calendar width={18} height={18} />
+                        </Pressable>
+
+                        <Pressable
+                          style={[styles.dateInput, styles.dateTimeHalf]}
+                          onPress={() => {
+                            setShowPhaseTimePicker(phaseId);
+                            setShowPhaseStartPicker(null);
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Select ${phase.label} end time`}
+                        >
+                          <AppText variant="body" style={styles.dateText}>
+                            {dates.time}
+                          </AppText>
+                          <Timer width={18} height={18} />
+                        </Pressable>
+                      </View>
 
                       {showPhaseStartPicker === phaseId && (
                         <DateTimePicker
-                          value={dates.start}
+                          value={dates.end}
                           mode="date"
+                          minimumDate={phaseId === "voting" ? phaseDates.planning.end : undefined}
+                          maximumDate={tripEnd}
                           display={Platform.OS === "ios" ? "spinner" : "default"}
                           onChange={(_: DateTimePickerEvent, date?: Date) => {
                             setShowPhaseStartPicker(null);
                             if (date) {
                               setPhaseDates((prev) => ({
                                 ...prev,
-                                [phaseId]: { ...prev[phaseId], start: date },
+                                [phaseId]: {
+                                  ...prev[phaseId],
+                                  end: date,
+                                },
                               }));
-                              setShowPhaseEndPicker(phaseId);
                             }
                           }}
                         />
                       )}
 
-                      {showPhaseEndPicker === phaseId && (
+                      {showPhaseTimePicker === phaseId && (
                         <DateTimePicker
-                          value={dates.end}
-                          mode="date"
-                          minimumDate={dates.start}
-                          display={Platform.OS === "ios" ? "spinner" : "default"}
+                          value={timeStringToDate(dates.time)}
+                          mode="time"
+                          is24Hour
+                          display={
+                            Platform.OS === "ios" ? "spinner" : "default"
+                          }
                           onChange={(_: DateTimePickerEvent, date?: Date) => {
-                            setShowPhaseEndPicker(null);
+                            setShowPhaseTimePicker(null);
                             if (date) {
                               setPhaseDates((prev) => ({
                                 ...prev,
-                                [phaseId]: { ...prev[phaseId], end: date },
+                                [phaseId]: {
+                                  ...prev[phaseId],
+                                  time: dateToTimeString(date),
+                                },
                               }));
                             }
                           }}
@@ -641,13 +1154,17 @@ export default function TripSettingsScreen() {
                         onPress={() => handleUpdatePhaseDate(phaseId)}
                         style={styles.updateButton}
                         textStyle={styles.updateButtonText}
-                        accessibilityLabel={`Update ${phase.label} phase dates`}
+                        accessibilityLabel={`Update ${phase.label} phase`}
                       />
 
                       {phaseUpdated[phaseId] && (
                         <View style={styles.successRow}>
                           <CheckMark width={18} height={18} />
-                          <AppText variant="caption" style={styles.successText} accessibilityRole="alert">
+                          <AppText
+                            variant="caption"
+                            style={styles.successText}
+                            accessibilityRole="alert"
+                          >
                             Timer is updated!
                           </AppText>
                         </View>
@@ -659,11 +1176,10 @@ export default function TripSettingsScreen() {
             })}
           </ScrollView>
 
-          {/* Delete trip */}
           <SafeAreaView edges={["bottom"]} style={styles.deleteSafeArea}>
             <View style={styles.deleteWrapper}>
               <ActionCard
-                label="Delete trip"
+                label={isDeleting ? "Deleting..." : "Delete trip"}
                 icon={<Trash width={20} height={20} />}
                 onPress={handleDeleteTrip}
                 accessibilityHint="Permanently deletes this trip"
@@ -677,16 +1193,9 @@ export default function TripSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  fullScreen: {
-    flex: 1,
-    backgroundColor: colors.lightWhite,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  flex: {
-    flex: 1,
-  },
+  fullScreen: { flex: 1, backgroundColor: colors.lightWhite },
+  safeArea: { flex: 1 },
+  flex: { flex: 1 },
   container: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
@@ -709,19 +1218,14 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bodyBold,
     color: colors.textPrimary,
   },
-  fieldGroup: {
-    gap: spacing.sm,
-  },
+  fieldGroup: { gap: spacing.sm },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: spacing.xs,
   },
-  infoLeft: {
-    gap: spacing.xs,
-    flex: 1,
-  },
+  infoLeft: { gap: spacing.xs, flex: 1 },
   infoLabelRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -739,13 +1243,22 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
     paddingLeft: 28,
   },
-  expandedField: {
-    gap: spacing.md,
+  codeValue: {
+    fontFamily: typography.fontFamily.bodyBold,
+    letterSpacing: 2,
   },
+  copiedHint: {
+    color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    paddingLeft: 28,
+  },
+  expandedField: { gap: spacing.md },
   inputBlackStroke: {
     borderWidth: 2,
     borderColor: colors.nightBlack,
   },
+  dateTimeRow: { flexDirection: "row", gap: spacing.md },
+  dateTimeHalf: { flex: 1 },
   dateInput: {
     backgroundColor: colors.white,
     borderRadius: radius.sm,
@@ -763,9 +1276,7 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.md,
     color: colors.textPrimary,
   },
-  updateButton: {
-    backgroundColor: colors.beachYellow,
-  },
+  updateButton: { backgroundColor: colors.beachYellow },
   updateButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
@@ -797,6 +1308,7 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.md,
     color: colors.textPrimary,
   },
+  removingIcon: { opacity: 0.3 },
   phaseRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -811,18 +1323,30 @@ const styles = StyleSheet.create({
   phaseBadge: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
   },
   phaseBadgeText: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
   },
-  phaseTimerRow: {
+  phaseTimerBlock: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    flexWrap: "wrap",
+  },
+  hourglassCol: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  phaseTextCol: {
+    flexDirection: "column",
+    justifyContent: "center",
+  },
+  daysRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 3,
   },
   phaseDays: {
     fontFamily: typography.fontFamily.bodyBold,
@@ -830,15 +1354,26 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
     color: colors.textPrimary,
   },
+  timepointWrapper: {
+    marginTop: 1,
+  },
+  timerLabel: {
+    color: colors.textMuted,
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+  },
   phaseDateLabel: {
     color: colors.nightBlack,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
     paddingLeft: 4,
   },
-  deleteSafeArea: {
-    backgroundColor: colors.lightWhite,
+  phaseEndLabel: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    color: colors.textPrimary,
   },
+  deleteSafeArea: { backgroundColor: colors.lightWhite },
   deleteWrapper: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,

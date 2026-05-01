@@ -1,3 +1,4 @@
+// apps/frontend/__tests__/authError.test.ts
 import { getFirebaseAuthMessage } from "@/src/lib/authErrors";
 
 describe("getFirebaseAuthMessage", () => {

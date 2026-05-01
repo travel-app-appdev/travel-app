@@ -1,7 +1,8 @@
 // app/profile.tsx
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,11 +12,21 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+} from "firebase/auth";
+import { auth } from "@/src/lib/firebase";
+import { updateProfile } from "@/src/api/auth";
 import { useAuth } from "@/src/context/AuthContext";
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppButton } from "@/src/components/common/AppButton";
-import { ActionCard, ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
+import {
+  ActionCard,
+  ACTION_CARD_HEIGHT,
+} from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import Profile from "@/assets/icons/profile.svg";
@@ -30,53 +41,172 @@ import VisibilityOff from "@/assets/icons/visibility_off.svg";
 import Exit from "@/assets/icons/exit.svg";
 
 export default function ProfileScreen() {
-  const { setUser } = useAuth();
+  const { user, setUser } = useAuth();
   const router = useRouter();
   const { height: screenHeight } = useWindowDimensions();
-
   const isSmallScreen = screenHeight < 700;
 
-  const [name, setName] = useState("Susi Trudl");
-  const [nameInput, setNameInput] = useState("Susi Trudl");
+  // Cleanup timeouts on unmount to prevent state updates on unmounted component
+  const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const safeTimeout = (fn: () => void, delay: number) => {
+    const id = setTimeout(fn, delay);
+    timeoutRefs.current.push(id);
+    return id;
+  };
+  useEffect(() => {
+    const timeouts = timeoutRefs.current;
+
+    return () => {
+      timeouts.forEach(clearTimeout);
+    };
+  }, []);
+
+  const [name, setName] = useState(user?.name ?? "");
+  const [nameInput, setNameInput] = useState(user?.name ?? "");
   const [nameOpen, setNameOpen] = useState(false);
   const [nameUpdated, setNameUpdated] = useState(false);
+  const [isUpdatingName, setIsUpdatingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
 
-  const [email, setEmail] = useState("susi.trudl.1234@gmail.com");
-  const [emailInput, setEmailInput] = useState("susi.trudl.1234@gmail.com");
+  const [email] = useState(user?.email ?? "");
+  const [emailInput, setEmailInput] = useState(user?.email ?? "");
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailUpdated, setEmailUpdated] = useState(false);
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
+  const [currentPasswordInput, setCurrentPasswordInput] = useState("");
+  const [currentPasswordVisible, setCurrentPasswordVisible] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  const handleUpdateName = () => {
-    setName(nameInput);
-    setNameUpdated(true);
-    setTimeout(() => {
-      setNameUpdated(false);
-      setNameOpen(false);
-    }, 1500);
+  const handleUpdateName = async () => {
+    if (isUpdatingName) return;
+
+    try {
+      setIsUpdatingName(true);
+      setNameError(null);
+
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        Alert.alert("Not logged in", "Please log in again.");
+        return;
+      }
+
+      const idToken = await currentUser.getIdToken();
+      const updatedUser = await updateProfile({ idToken, name: nameInput });
+
+      setName(updatedUser.name ?? nameInput);
+      setUser(user ? { ...user, name: updatedUser.name } : null);
+      setNameUpdated(true);
+      safeTimeout(() => {
+        setNameUpdated(false);
+        setNameOpen(false);
+      }, 1500);
+    } catch (error: any) {
+      setNameError(error.message || "Failed to update name.");
+    } finally {
+      setIsUpdatingName(false);
+    }
   };
 
-  const handleUpdateEmail = () => {
-    setEmail(emailInput);
-    setEmailUpdated(true);
-    setTimeout(() => {
-      setEmailUpdated(false);
-      setEmailOpen(false);
-    }, 1500);
+  const handleUpdateEmail = async () => {
+    if (isUpdatingEmail) return;
+
+    try {
+      setIsUpdatingEmail(true);
+      setEmailError(null);
+
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        Alert.alert("Not logged in", "Please log in again.");
+        return;
+      }
+
+      const idToken = await currentUser.getIdToken();
+      await updateProfile({ idToken, email: emailInput });
+
+      setEmailUpdated(true);
+      safeTimeout(() => {
+        Alert.alert(
+          "Email updated",
+          "Your email has been changed. Please log in again with your new email address.",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                setUser(null);
+                router.replace("/");
+              },
+            },
+          ]
+        );
+      }, 1000);
+    } catch (error: any) {
+      if (error.message?.includes("already in use")) {
+        setEmailError("This email is already in use.");
+      } else {
+        setEmailError(error.message || "Failed to update email.");
+      }
+    } finally {
+      setIsUpdatingEmail(false);
+    }
   };
 
-  const handleUpdatePassword = () => {
-    setPasswordUpdated(true);
-    setTimeout(() => {
-      setPasswordUpdated(false);
-      setPasswordInput("");
-      setPasswordOpen(false);
-      setPasswordVisible(false);
-    }, 1500);
+  const handleUpdatePassword = async () => {
+    if (isUpdatingPassword) return;
+
+    if (passwordInput.length < 6) {
+      setPasswordError("New password must be at least 6 characters.");
+      return;
+    }
+
+    try {
+      setIsUpdatingPassword(true);
+      setPasswordError(null);
+
+      const currentUser = auth.currentUser;
+      if (!currentUser || !currentUser.email) {
+        Alert.alert("Not logged in", "Please log in again.");
+        return;
+      }
+
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPasswordInput
+      );
+      await reauthenticateWithCredential(currentUser, credential);
+      await updatePassword(currentUser, passwordInput);
+
+      setPasswordUpdated(true);
+      safeTimeout(() => {
+        setPasswordUpdated(false);
+        setPasswordInput("");
+        setCurrentPasswordInput("");
+        setPasswordOpen(false);
+        setPasswordVisible(false);
+        setCurrentPasswordVisible(false);
+      }, 1500);
+    } catch (error: any) {
+      if (
+        error.code === "auth/wrong-password" ||
+        error.code === "auth/invalid-credential"
+      ) {
+        setPasswordError("Current password is incorrect.");
+      } else if (error.code === "auth/weak-password") {
+        setPasswordError("New password must be at least 6 characters.");
+      } else if (error.code === "auth/too-many-requests") {
+        setPasswordError("Too many attempts. Please try again later.");
+      } else {
+        setPasswordError(error.message || "Failed to update password.");
+      }
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   const handleLogout = () => {
@@ -107,7 +237,6 @@ export default function ProfileScreen() {
             {/* Header */}
             <View style={styles.header}>
               <BackLink href="/home" />
-
               <View style={styles.headerTitle}>
                 <Profile width={20} height={20} />
                 <AppText variant="body" style={styles.headerLabel}>
@@ -123,6 +252,7 @@ export default function ProfileScreen() {
                 onPress={() => {
                   setNameOpen(!nameOpen);
                   setNameUpdated(false);
+                  setNameError(null);
                   setNameInput(name);
                 }}
                 accessibilityRole="button"
@@ -137,7 +267,7 @@ export default function ProfileScreen() {
                     </AppText>
                   </View>
                   <AppText variant="caption" style={styles.infoValue}>
-                    {name}
+                    {name || "—"}
                   </AppText>
                 </View>
                 {nameOpen ? (
@@ -154,6 +284,7 @@ export default function ProfileScreen() {
                     onChangeText={(text) => {
                       setNameInput(text);
                       setNameUpdated(false);
+                      setNameError(null);
                     }}
                     placeholder="Enter your name"
                     autoFocus
@@ -161,16 +292,23 @@ export default function ProfileScreen() {
                     accessibilityHint="Edit your name"
                     style={styles.inputBlackStroke}
                   />
-
+                  {nameError && (
+                    <AppText
+                      variant="caption"
+                      style={styles.errorText}
+                      accessibilityRole="alert"
+                    >
+                      {nameError}
+                    </AppText>
+                  )}
                   <AppButton
-                    title="Update"
+                    title={isUpdatingName ? "Updating..." : "Update"}
                     onPress={handleUpdateName}
-                    disabled={!nameInput.trim()}
+                    disabled={!nameInput.trim() || isUpdatingName}
                     style={styles.updateButton}
                     textStyle={styles.updateButtonText}
                     accessibilityLabel="Update name"
                   />
-
                   {nameUpdated && (
                     <View style={styles.successRow}>
                       <CheckMark width={18} height={18} />
@@ -194,6 +332,7 @@ export default function ProfileScreen() {
                 onPress={() => {
                   setEmailOpen(!emailOpen);
                   setEmailUpdated(false);
+                  setEmailError(null);
                   setEmailInput(email);
                 }}
                 accessibilityRole="button"
@@ -208,7 +347,7 @@ export default function ProfileScreen() {
                     </AppText>
                   </View>
                   <AppText variant="caption" style={styles.infoValue}>
-                    {email}
+                    {email || "—"}
                   </AppText>
                 </View>
                 {emailOpen ? (
@@ -225,6 +364,7 @@ export default function ProfileScreen() {
                     onChangeText={(text) => {
                       setEmailInput(text);
                       setEmailUpdated(false);
+                      setEmailError(null);
                     }}
                     placeholder="Enter your email"
                     keyboardType="email-address"
@@ -234,16 +374,27 @@ export default function ProfileScreen() {
                     accessibilityHint="Edit your email"
                     style={styles.inputBlackStroke}
                   />
-
+                  {emailError && (
+                    <AppText
+                      variant="caption"
+                      style={styles.errorText}
+                      accessibilityRole="alert"
+                    >
+                      {emailError}
+                    </AppText>
+                  )}
                   <AppButton
-                    title="Update"
+                    title={isUpdatingEmail ? "Updating..." : "Update"}
                     onPress={handleUpdateEmail}
-                    disabled={!emailInput.trim() || !emailInput.includes("@")}
+                    disabled={
+                      !emailInput.trim() ||
+                      !emailInput.includes("@") ||
+                      isUpdatingEmail
+                    }
                     style={styles.updateButton}
                     textStyle={styles.updateButtonText}
                     accessibilityLabel="Update email"
                   />
-
                   {emailUpdated && (
                     <View style={styles.successRow}>
                       <CheckMark width={18} height={18} />
@@ -268,6 +419,8 @@ export default function ProfileScreen() {
                   setPasswordOpen(!passwordOpen);
                   setPasswordUpdated(false);
                   setPasswordInput("");
+                  setCurrentPasswordInput("");
+                  setPasswordError(null);
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Edit password"
@@ -293,27 +446,67 @@ export default function ProfileScreen() {
 
               {passwordOpen && (
                 <View style={styles.expandedField}>
+                  <AppText variant="caption" style={styles.passwordFieldLabel}>
+                    Current password
+                  </AppText>
+                  <View style={styles.passwordInputWrapper}>
+                    <AppInput
+                      style={styles.passwordInput}
+                      value={currentPasswordInput}
+                      onChangeText={(text) => {
+                        setCurrentPasswordInput(text);
+                        setPasswordError(null);
+                      }}
+                      placeholder="Enter current password"
+                      secureTextEntry={!currentPasswordVisible}
+                      autoFocus
+                      accessibilityLabel="Current password"
+                      accessibilityHint="Enter your current password to verify identity"
+                    />
+                    <Pressable
+                      style={styles.visibilityIcon}
+                      onPress={() =>
+                        setCurrentPasswordVisible(!currentPasswordVisible)
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        currentPasswordVisible
+                          ? "Hide current password"
+                          : "Show current password"
+                      }
+                    >
+                      {currentPasswordVisible ? (
+                        <VisibilityOff width={24} height={24} />
+                      ) : (
+                        <VisibilityOn width={24} height={24} />
+                      )}
+                    </Pressable>
+                  </View>
+
+                  <AppText variant="caption" style={styles.passwordFieldLabel}>
+                    New password
+                  </AppText>
                   <View style={styles.passwordInputWrapper}>
                     <AppInput
                       style={styles.passwordInput}
                       value={passwordInput}
                       onChangeText={(text) => {
                         setPasswordInput(text);
-                        setPasswordUpdated(false);
+                        setPasswordError(null);
                       }}
                       placeholder="Enter new password"
                       secureTextEntry={!passwordVisible}
-                      autoFocus
-                      accessibilityLabel="Password"
-                      accessibilityHint="Enter a new password"
+                      accessibilityLabel="New password"
+                      accessibilityHint="Enter your new password"
                     />
-
                     <Pressable
                       style={styles.visibilityIcon}
                       onPress={() => setPasswordVisible(!passwordVisible)}
                       accessibilityRole="button"
                       accessibilityLabel={
-                        passwordVisible ? "Hide password" : "Show password"
+                        passwordVisible
+                          ? "Hide new password"
+                          : "Show new password"
                       }
                     >
                       {passwordVisible ? (
@@ -324,10 +517,24 @@ export default function ProfileScreen() {
                     </Pressable>
                   </View>
 
+                  {passwordError && (
+                    <AppText
+                      variant="caption"
+                      style={styles.errorText}
+                      accessibilityRole="alert"
+                    >
+                      {passwordError}
+                    </AppText>
+                  )}
+
                   <AppButton
-                    title="Update"
+                    title={isUpdatingPassword ? "Updating..." : "Update"}
                     onPress={handleUpdatePassword}
-                    disabled={!passwordInput.trim()}
+                    disabled={
+                      !passwordInput.trim() ||
+                      !currentPasswordInput.trim() ||
+                      isUpdatingPassword
+                    }
                     style={styles.updateButton}
                     textStyle={styles.updateButtonText}
                     accessibilityLabel="Update password"
@@ -437,6 +644,13 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.nightBlack,
   },
+  passwordFieldLabel: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    marginBottom: -spacing.xs,
+  },
   passwordInputWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -463,6 +677,11 @@ const styles = StyleSheet.create({
   updateButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
   },
   successRow: {
     flexDirection: "row",

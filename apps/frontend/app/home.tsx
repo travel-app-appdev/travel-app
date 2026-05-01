@@ -1,6 +1,6 @@
 // app/home.tsx
-import { Link, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { Link, useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,6 +19,8 @@ type TripMemberFromApi = {
   id: string;
   name: string;
   role: "admin" | "member";
+  planning_done?: boolean;
+  voting_done?: boolean;
 };
 
 type TripWithMembers = Trip & {
@@ -31,14 +33,24 @@ type TripCardItem = {
   destination: string;
   startDate: string;
   endDate: string;
+  rawStartDate: string;
+  rawEndDate: string;
   status: "planning" | "voting" | "final";
   cardColor: string;
   role: "admin" | "member";
+  inviteCode: string;
   members: {
     id: string;
     initials: string;
     color: string;
+    name: string;
+    planning_done?: boolean;
+    voting_done?: boolean;
   }[];
+  planningStartedAt?: string;
+  planningEndAt?: string;
+  votingEndAt?: string;
+  rawState: Trip["state"];
 };
 
 function formatDate(dateString: string): string {
@@ -65,7 +77,11 @@ function getCardColor(tripId: string): string {
   return palette[Math.abs(hash) % palette.length];
 }
 
-function getUiStatus(state: Trip["state"]): "planning" | "voting" | "final" {
+function getUiStatus(
+  state: Trip["state"],
+  memberCount: number
+): "planning" | "voting" | "final" {
+  if (state === "Voting" && memberCount <= 1) return "final";
   if (state === "Voting") return "voting";
   if (state === "Final") return "final";
   return "planning";
@@ -82,30 +98,36 @@ function getMemberColor(index: number): string {
 }
 
 function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
+  const members = (trip.members ?? []).map(
+    (member: TripMemberFromApi, index: number) => ({
+      id: member.id,
+      name: member.name,
+      planning_done: member.planning_done,
+      voting_done: member.voting_done,
+      initials: getInitials(member.name),
+      color: getMemberColor(index),
+    })
+  );
+
   return {
     id: trip.trip_id,
     title: trip.title,
     destination: trip.destination,
     startDate: formatDate(trip.start_date),
     endDate: formatDate(trip.end_date),
-    status: getUiStatus(trip.state),
+    rawStartDate: trip.start_date,
+    rawEndDate: trip.end_date,
+    status: getUiStatus(trip.state, members.length),
     cardColor: getCardColor(trip.trip_id),
     role: trip.role === "admin" ? "admin" : "member",
-    members: (trip.members ?? []).map(
-      (member: TripMemberFromApi, index: number) => ({
-        id: member.id,
-        initials: getInitials(member.name),
-        color: getMemberColor(index),
-      })
-    ),
+    inviteCode: trip.invite_code ?? "",
+    members,
+    planningStartedAt: trip.planning_started_at,
+    planningEndAt: trip.planning_end_at,
+    votingEndAt: trip.voting_end_at,
+    rawState: trip.state,
   };
 }
-
-// Itinerary route is the same for all states — the itinerary screen
-// itself handles rendering differently based on planning/voting/final
-// function getItineraryRoute(_status: "planning" | "voting" | "final") {
-//   return "/itinerary";
-// }
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -114,46 +136,48 @@ export default function HomeScreen() {
   const [pastTrips, setPastTrips] = useState<TripCardItem[]>([]);
   const router = useRouter();
 
-  useEffect(() => {
-    const loadTrips = async () => {
-      try {
-        if (!user) {
-          setYourTrips([]);
-          setPastTrips([]);
-          return;
-        }
-
-        const backendTrips = await fetchMyTrips(user.uid);
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const upcoming: TripCardItem[] = [];
-        const past: TripCardItem[] = [];
-
-        (backendTrips as TripWithMembers[]).forEach((trip: TripWithMembers) => {
-          const mappedTrip = mapTripToCardTrip(trip);
-          const tripEndDate = new Date(trip.end_date);
-          tripEndDate.setHours(0, 0, 0, 0);
-
-          if (tripEndDate < today) {
-            past.push(mappedTrip);
-          } else {
-            upcoming.push(mappedTrip);
-          }
-        });
-
-        setYourTrips(upcoming);
-        setPastTrips(past);
-      } catch (error) {
-        console.error("Error loading trips:", error);
+  const loadTrips = useCallback(async () => {
+    try {
+      if (!user) {
         setYourTrips([]);
         setPastTrips([]);
+        return;
       }
-    };
 
-    loadTrips();
+      const backendTrips = await fetchMyTrips(user.uid);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const upcoming: TripCardItem[] = [];
+      const past: TripCardItem[] = [];
+
+      (backendTrips as TripWithMembers[]).forEach((trip: TripWithMembers) => {
+        const mappedTrip = mapTripToCardTrip(trip);
+        const tripEndDate = new Date(trip.end_date);
+        tripEndDate.setHours(0, 0, 0, 0);
+
+        if (tripEndDate < today) {
+          past.push(mappedTrip);
+        } else {
+          upcoming.push(mappedTrip);
+        }
+      });
+
+      setYourTrips(upcoming);
+      setPastTrips(past);
+    } catch (error) {
+      console.error("Error loading trips:", error);
+      setYourTrips([]);
+      setPastTrips([]);
+    }
   }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadTrips();
+    }, [loadTrips])
+  );
 
   const trips = activeTab === "your" ? yourTrips : pastTrips;
 
@@ -285,6 +309,7 @@ export default function HomeScreen() {
             {trips.map((trip: TripCardItem) => (
               <TripCard
                 key={trip.id}
+                tripId={trip.id}
                 title={trip.title}
                 destination={trip.destination}
                 startDate={trip.startDate}
@@ -294,16 +319,53 @@ export default function HomeScreen() {
                 members={trip.members}
                 role={trip.role}
                 onPress={() => {
-                  // Tapping the card always goes to itinerary
-                  // The itinerary screen renders differently based on trip state
-                  router.push("/itinerary" as any);
+                  router.push({
+                    pathname: "/itinerary",
+                    params: {
+                      tripId: trip.id,
+                      state: trip.status,
+                      title: trip.title,
+                      destination: trip.destination,
+                      startDate: trip.rawStartDate,
+                      endDate: trip.rawEndDate,
+                      members: JSON.stringify(trip.members),
+                    },
+                  });
                 }}
                 onIconPress={() => {
-                  // Icon tap: admin → trip settings, member → trip information
                   if (trip.role === "admin") {
-                    router.push("/trip-settings");
+                    router.push({
+                      pathname: "/trip-settings",
+                      params: {
+                        tripId: trip.id,
+                        title: trip.title,
+                        destination: trip.destination,
+                        startDate: trip.rawStartDate,
+                        endDate: trip.rawEndDate,
+                        members: JSON.stringify(trip.members),
+                        inviteCode: trip.inviteCode,
+                        state: trip.rawState,
+                        planningStartedAt: trip.planningStartedAt ?? "",
+                        planningEndAt: trip.planningEndAt ?? "",
+                        votingEndAt: trip.votingEndAt ?? "",
+                      },
+                    });
                   } else {
-                    router.push("/trip-information");
+                    router.push({
+                      pathname: "/trip-information",
+                      params: {
+                        tripId: trip.id,
+                        title: trip.title,
+                        destination: trip.destination,
+                        startDate: trip.rawStartDate,
+                        endDate: trip.rawEndDate,
+                        members: JSON.stringify(trip.members),
+                        state: trip.rawState,
+                        planningStartedAt: trip.planningStartedAt ?? "",
+                        planningEndAt: trip.planningEndAt ?? "",
+                        votingEndAt: trip.votingEndAt ?? "",
+                      },
+                    });
                   }
                 }}
               />

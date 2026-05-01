@@ -1,7 +1,11 @@
+export type TripState = "Planning" | "Voting" | "Final";
+
 export type TripMember = {
     id: string;
     name: string;
     role: string;
+    planning_done?: boolean;
+    voting_done?: boolean;
 };
 
 export type Trip = {
@@ -10,10 +14,13 @@ export type Trip = {
     destination: string;
     start_date: string;
     end_date: string;
-    state: string;
+    state: TripState;
     role?: string;
     members?: TripMember[];
     invite_code?: string;
+    planning_started_at?: string;
+    planning_end_at?: string;
+    voting_end_at?: string;
 };
 
 export type TripDocument = {
@@ -22,7 +29,11 @@ export type TripDocument = {
     destination: string;
     start_date: string;
     end_date: string;
-    state: string;
+    state: TripState;
+    invite_code?: string;
+    planning_started_at?: any;
+    planning_end_at?: any;
+    voting_end_at?: any;
 };
 
 export type TripMembershipDocument = {
@@ -30,6 +41,7 @@ export type TripMembershipDocument = {
     trip_id: string;
     role: string;
     invite_status: string;
+    planning_done?: boolean;
 };
 
 export type UserDocument = {
@@ -45,6 +57,8 @@ export type CreateTripInput = {
     destination: string;
     start_date: string;
     end_date: string;
+    planning_end_at: string;
+    voting_end_at: string;
 };
 
 export type CreateTripWithAuthInput = CreateTripInput & {
@@ -58,4 +72,50 @@ export type CreateTripWithoutAuthInput = CreateTripInput & {
 export type JoinTripInput = {
     idToken: string;
     inviteCode: string;
+};
+
+export type TimeSlot = {
+    slot_type: string;
+    activityId: null;
+};
+
+export type ItineraryDay = {
+    date: string;
+    slots: TimeSlot[];
+};
+
+export type Itinerary = {
+    trip_id: string;
+    days: ItineraryDay[];
+};
+
+export type Activity = {
+    activity_id: string;
+    trip_id: string;
+    user_id: string;
+    slot_id?: string;
+    name: string;
+    description?: string;
+    address?: string;
+    googleMapsUrl?: string;
+    created_at?: string;
+    voteCount?: number;
+    hasCurrentUserVote?: boolean;
+    joinedCount?: number;
+    hasCurrentUserJoined?: boolean;
+    source_type: "manual";
+};
+
+export type TimeSlotActivity = {
+    slot_id: string;
+    activity_id: string;
+    status: "candidate" | "selected";
+};
+
+export type CreateActivityInput = {
+    idToken: string;
+    name: string;
+    description?: string;
+    address?: string;
+    googleMapsUrl?: string;
 };

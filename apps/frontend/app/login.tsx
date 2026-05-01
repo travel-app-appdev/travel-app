@@ -32,7 +32,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { setUser } = useAuth();
+  const { setUser, setIdToken } = useAuth();
 
   const passwordRef = useRef<TextInput>(null);
   const { width, height } = useWindowDimensions();
@@ -66,6 +66,8 @@ export default function LoginScreen() {
 
       const authResponse = await loginUser(email.trim(), password);
       setUser(authResponse);
+      setIdToken(authResponse.idToken); 
+      router.replace("/home");
 
       router.replace("/home");
     } catch (error) {

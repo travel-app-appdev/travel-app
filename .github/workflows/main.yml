@@ -1,3 +1,4 @@
+# .github/workflows/main.yml
 name: Run Tests
 on:
   push:
@@ -6,17 +7,17 @@ on:
 jobs:
   test-frontend:
     name: Frontend Tests
-    runs-on: ubuntu-latestn
+    runs-on: ubuntu-latest
     defaults:
         run:
           working-directory: ./apps/frontend
 
     steps:
           - name: Checkout repository
-            uses: actions/checkout@v4
+            uses: actions/checkout@v6
 
           - name: Setup Node.js
-            uses: actions/setup-node@v4
+            uses: actions/setup-node@v6
             with:
               node-version: 'v24.14.0'
 
@@ -28,17 +29,17 @@ jobs:
           
   test-backend:
     name: Backend Tests
-    runs-on: ubuntu-latestn
+    runs-on: ubuntu-latest
     defaults:
         run:
           working-directory: ./apps/backend
 
     steps:
           - name: Checkout repository
-            uses: actions/checkout@v4
+            uses: actions/checkout@v6
 
           - name: Setup Node.js
-            uses: actions/setup-node@v4
+            uses: actions/setup-node@v6
             with:
               node-version: 'v24.14.0'
 
@@ -46,6 +47,10 @@ jobs:
             run: npm ci
           
           - name: Run tests
+            env:
+              PORT: 3000
+              FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+              FIRESTORE_EMULATOR_HOST: ${{ secrets.FIRESTORE_EMULATOR_HOST }}
             run: npm test
 
         

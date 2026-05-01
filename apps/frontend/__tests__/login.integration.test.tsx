@@ -4,15 +4,33 @@ import LoginScreen from "@/app/login";
 
 const mockReplace = jest.fn();
 const mockHandleLogin = jest.fn();
+const mockSetUser = jest.fn();
+
+jest.mock("@/src/context/AuthContext", () => ({
+  useAuth: () => ({
+    user: null,
+    setUser: mockSetUser,
+    isAuthenticated: false,
+    loading: false,
+    logout: jest.fn(),
+  }),
+}));
 
 jest.mock("expo-router", () => ({
   Link: ({ children }: any) => children,
   router: {
-    replace: (...args: any[]) => mockReplace(...args),
+    replace: mockReplace,
+    push: jest.fn(),
+    back: jest.fn(),
   },
+  useRouter: () => ({
+    replace: mockReplace,
+    push: jest.fn(),
+    back: jest.fn(),
+  }),
 }));
 
-jest.mock("@/src/services/authService", () => ({
+jest.mock("@/src/services/authServices", () => ({
   handleLogin: (...args: any[]) => mockHandleLogin(...args),
 }));
 
@@ -58,8 +76,10 @@ describe("LoginScreen", () => {
     });
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith("/home");
+      expect(mockReplace).toHaveBeenCalled();
     });
+
+    expect(mockReplace).toHaveBeenCalledWith("/home");
   });
 
   it("shows service error message on failed login", async () => {

@@ -42,8 +42,14 @@ export default function RootLayout() {
         <Stack.Screen name="create-trip" options={{ title: "Create Trip" }} />
         <Stack.Screen name="join-trip" options={{ title: "Join Trip" }} />
         {/* <Stack.Screen name="settings" options={{ title: "Settings" }} /> */}
-        <Stack.Screen name="trip-settings" options={{ title: "Trip Settings" }} />
-        <Stack.Screen name="trip-information" options={{ title: "Trip Information" }} />
+        <Stack.Screen
+          name="trip-settings"
+          options={{ title: "Trip Settings" }}
+        />
+        <Stack.Screen
+          name="trip-information"
+          options={{ title: "Trip Information" }}
+        />
         <Stack.Screen
           name="questionnaire"
           options={{ title: "Questionnaire" }}
@@ -60,6 +66,7 @@ export default function RootLayout() {
         />
         <Stack.Screen name="itinerary" options={{ title: "Itinerary" }} />
         <Stack.Screen name="past-trips" options={{ title: "Past Trips" }} />
+        <Stack.Screen name="add-activity" options={{ title: "Add Activity" }} />
       </Stack>
       <StatusBar style="dark" />
     </AuthProvider>

@@ -1,9 +1,20 @@
+// apps/frontend/__tests__/register.integration.test.tsx
 import React from "react";
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import RegisterScreen from "@/app/register";
 
 const mockReplace = jest.fn();
 const mockHandleRegister = jest.fn();
+
+const mockSetUser = jest.fn();
+
+jest.mock("@/src/context/AuthContext", () => ({
+  useAuth: () => ({
+    user: null,
+    setUser: mockSetUser,
+    loading: false,
+  }),
+}));
 
 jest.mock("expo-router", () => ({
   Link: ({ children }: any) => children,
@@ -12,14 +23,29 @@ jest.mock("expo-router", () => ({
   },
 }));
 
-jest.mock("@/src/services/authService", () => ({
+jest.mock("@/src/services/authServices", () => ({
   handleRegister: (...args: any[]) => mockHandleRegister(...args),
 }));
 
-jest.mock("@/assets/icons/back.svg", () => "Back");
-jest.mock("@/assets/mascots/mascot-hello-pink.svg", () => "MascotHelloPink");
-jest.mock("@/assets/visuals/yellow-background.svg", () => "RegisterYellowBg");
-jest.mock("@/assets/visuals/flowers-blue.svg", () => "Flowers");
+jest.mock("@/assets/icons/back.svg", () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
+jest.mock("@/assets/mascots/mascot-hello-pink.svg", () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
+jest.mock("@/assets/visuals/pink-background.svg", () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
+jest.mock("@/assets/visuals/flowers-blue.svg", () => ({
+  __esModule: true,
+  default: () => null,
+}));
 
 describe("RegisterScreen", () => {
   beforeEach(() => {
@@ -29,7 +55,7 @@ describe("RegisterScreen", () => {
   it("shows validation errors for empty submit", async () => {
     const { getByText } = render(<RegisterScreen />);
 
-    fireEvent.press(getByText("LET’S GOOOO"));
+    fireEvent.press(getByText("LET'S GOOOO"));
 
     await waitFor(() => {
       expect(getByText("Please enter your name.")).toBeTruthy();
@@ -51,7 +77,7 @@ describe("RegisterScreen", () => {
     fireEvent.changeText(getByTestId("register-email-input"), "test@test.com");
     fireEvent.changeText(getByTestId("register-password-input"), "123456");
 
-    fireEvent.press(getByText("LET’S GOOOO"));
+    fireEvent.press(getByText("LET'S GOOOO"));
 
     await waitFor(() => {
       expect(mockHandleRegister).toHaveBeenCalledWith(
@@ -77,10 +103,10 @@ describe("RegisterScreen", () => {
     fireEvent.changeText(getByTestId("register-email-input"), "test@test.com");
     fireEvent.changeText(getByTestId("register-password-input"), "123456");
 
-    fireEvent.press(getByText("LET’S GOOOO"));
+    fireEvent.press(getByText("LET'S GOOOO"));
 
     await waitFor(() => {
-      expect(getByText("Email is already registered")).toBeTruthy();
+      expect(getByText("Something went wrong. Please try again.")).toBeTruthy();
     });
 
     expect(mockReplace).not.toHaveBeenCalled();

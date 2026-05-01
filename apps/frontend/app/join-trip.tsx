@@ -1,6 +1,8 @@
 // app/join-trip.tsx
 import { useState } from "react";
+import { useRouter } from "expo-router";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   View,
@@ -13,6 +15,8 @@ import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppButton } from "@/src/components/common/AppButton";
 import { BackLink } from "@/src/components/common/BackLink";
+import { joinTrip } from "@/src/api/trips";
+import { auth } from "@/src/lib/firebase";
 import { colors, spacing, typography } from "@/src/theme";
 import LinkIcon from "@/assets/icons/link.svg";
 import KeyFrame from "@/assets/icons/key_frame.svg";
@@ -23,6 +27,28 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function JoinTripScreen() {
   const [code, setCode] = useState("");
+  const [isJoining, setIsJoining] = useState(false);
+  const router = useRouter();
+
+  const handleJoin = async () => {
+    try {
+      setIsJoining(true);
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        Alert.alert("Not logged in", "Please log in again.");
+        return;
+      }
+      const idToken = await currentUser.getIdToken();
+      await joinTrip({ idToken, inviteCode: code.trim() });
+      router.replace("/home");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to join trip";
+      Alert.alert("Join failed", message);
+    } finally {
+      setIsJoining(false);
+    }
+  };
 
   return (
     <View style={styles.fullScreen}>
@@ -57,7 +83,6 @@ export default function JoinTripScreen() {
           >
             <View style={styles.header}>
               <BackLink href="/home" />
-
               <View style={styles.headerTitle}>
                 <LinkIcon width={20} height={20} />
                 <AppText variant="body" style={styles.headerLabel}>
@@ -93,11 +118,10 @@ export default function JoinTripScreen() {
             </View>
 
             <AppButton
-              title="Join trip"
-              onPress={() => {
-                // TODO: validate and join trip
-              }}
-              disabled={!code.trim()}
+              title={isJoining ? "Joining..." : "Join trip"}
+              onPress={handleJoin}
+              loading={isJoining}
+              disabled={!code.trim() || isJoining}
               style={styles.joinButton}
               textStyle={styles.joinButtonText}
               accessibilityLabel="Join trip"

@@ -1,5 +1,5 @@
 // app/trip-information.tsx
-import { Link } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ScrollView,
   StyleSheet,
@@ -10,10 +10,16 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useState, useEffect, useRef } from "react";
 import { AppText } from "@/src/components/common/AppText";
-import { ActionCard, ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
+import {
+  ActionCard,
+  ACTION_CARD_HEIGHT,
+} from "@/src/components/common/ActionCard";
+import { BackLink } from "@/src/components/common/BackLink";
+import { leaveTrip } from "@/src/api/trips";
+import { auth } from "@/src/lib/firebase";
 import { colors, spacing, radius, typography } from "@/src/theme";
-import Back from "@/assets/icons/back.svg";
 import InfoIcon from "@/assets/icons/info.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
 import Calendar from "@/assets/icons/calendar.svg";
@@ -24,73 +30,232 @@ import Hourglass1 from "@/assets/icons/hourglass_1.svg";
 import Timepoint from "@/assets/icons/timepoint.svg";
 import Exit from "@/assets/icons/exit.svg";
 
-// TODO: replace with real trip data passed via route params
-const TRIP = {
-  name: "Japan Spring",
-  startDate: "01.01.2026",
-  endDate: "15.03.2026",
-  destination: "Tokio, Japan",
-  members: ["Sophie", "Lukas", "Franz"],
-  phases: [
-    {
-      id: "planning",
-      label: "Planning",
-      color: colors.beachYellow,
-      active: true,
-      days: 73,
-      startDate: "01.01.2026",
-      endDate: "15.03.2026",
-    },
-    {
-      id: "voting",
-      label: "Voting",
-      color: colors.sunsetPink,
-      active: false,
-      days: 3,
-      startDate: "16.03.2026",
-      endDate: "18.03.2026",
-    },
-    {
-      id: "final",
-      label: "Final",
-      color: colors.neonGreen,
-      active: false,
-      days: 1,
-      startDate: "20.03.2026",
-      endDate: "20.03.2026",
-    },
-  ],
-};
-
 const PHASE_TEXT_COLORS: Record<string, string> = {
   planning: colors.nightBlack,
   voting: colors.nightBlack,
   final: colors.nightBlack,
 };
 
-function dayLabel(days: number) {
+type PhaseKey = "planning" | "voting" | "final";
+
+type PhaseDates = Record<
+  PhaseKey,
+  {
+    start: Date;
+    end: Date;
+    time: string;
+  }
+>;
+
+type MemberParam = {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+};
+
+function formatDateDisplay(date: Date): string {
+  const d = date.getDate().toString().padStart(2, "0");
+  const m = (date.getMonth() + 1).toString().padStart(2, "0");
+  const y = date.getFullYear();
+  return `${d}.${m}.${y}`;
+}
+
+function formatDateDisplayFromString(dateString: string): string {
+  if (!dateString) return "—";
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString;
+  return formatDateDisplay(date);
+}
+
+function calcCalendarDays(start: Date, end: Date): number {
+  const startOnly = new Date(start);
+  startOnly.setHours(0, 0, 0, 0);
+
+  const endOnly = new Date(end);
+  endOnly.setHours(0, 0, 0, 0);
+
+  const ms = endOnly.getTime() - startOnly.getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
+}
+
+function calcDaysLeft(end: Date): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const endOnly = new Date(end);
+  endOnly.setHours(0, 0, 0, 0);
+
+  const ms = endOnly.getTime() - today.getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
+}
+
+function dayLabel(days: number, active: boolean): string {
+  if (active) return days === 1 ? "1 day left" : `${days} days left`;
   return days === 1 ? "1 day" : `${days} days`;
 }
 
+function dateToTimeString(date: Date): string {
+  const h = date.getHours().toString().padStart(2, "0");
+  const m = date.getMinutes().toString().padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+function parseIsoToDate(value?: string): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseIsoToTimeString(value?: string): string {
+  const parsed = parseIsoToDate(value);
+  return parsed ? dateToTimeString(parsed) : "00:00";
+}
+
 export default function TripInformationScreen() {
+  const raw = useLocalSearchParams<{
+    tripId: string;
+    title: string;
+    destination: string;
+    startDate: string;
+    endDate: string;
+    members: string;
+    state?: "Planning" | "Voting" | "Final";
+    planningStartedAt?: string;
+    planningEndAt?: string;
+    votingEndAt?: string;
+  }>();
+
+  const tripId = String(raw.tripId ?? "");
+  const title = String(raw.title ?? "");
+  const destination = String(raw.destination ?? "");
+  const startDate = String(raw.startDate ?? "");
+  const endDate = String(raw.endDate ?? "");
+  const membersParam = String(raw.members ?? "");
+  const tripState = String(raw.state ?? "Planning");
+  const planningStartedAt = String(raw.planningStartedAt ?? "");
+  const planningEndAt = String(raw.planningEndAt ?? "");
+  const votingEndAt = String(raw.votingEndAt ?? "");
+
+  const router = useRouter();
   const { height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenHeight < 700;
+  const [isLeaving, setIsLeaving] = useState(false);
+
+  const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => {
+    return () => timeoutRefs.current.forEach(clearTimeout);
+  }, []);
+
+  const members: MemberParam[] = (() => {
+    try {
+      return membersParam ? JSON.parse(membersParam) : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  const tripStart = startDate ? new Date(startDate) : new Date();
+  const tripEnd = endDate ? new Date(endDate) : new Date();
+
+  const planningStartDate = parseIsoToDate(planningStartedAt);
+  const planningEndDate = parseIsoToDate(planningEndAt);
+  const votingEndDate = parseIsoToDate(votingEndAt);
+
+  const votingStartDate = planningEndDate ?? tripStart;
+  const finalDisplayDate = votingEndDate ?? tripEnd;
+
+  const phases = [
+    {
+      id: "planning" as const,
+      label: "Planning",
+      color: colors.beachYellow,
+      active: tripState === "Planning",
+    },
+    {
+      id: "voting" as const,
+      label: "Voting",
+      color: colors.sunsetPink,
+      active: tripState === "Voting",
+    },
+    {
+      id: "final" as const,
+      label: "Final",
+      color: colors.neonGreen,
+      active: tripState === "Final",
+    },
+  ];
+
+  const [phaseDates, setPhaseDates] = useState<PhaseDates>({
+    planning: {
+      start: planningStartDate ?? tripStart,
+      end: planningEndDate ?? tripStart,
+      time: parseIsoToTimeString(planningEndAt),
+    },
+    voting: {
+      start: votingStartDate,
+      end: votingEndDate ?? tripStart,
+      time: parseIsoToTimeString(votingEndAt),
+    },
+    final: {
+      start: finalDisplayDate,
+      end: finalDisplayDate,
+      time: "00:00",
+    },
+  });
+
+  useEffect(() => {
+    const nextPlanningStart = parseIsoToDate(planningStartedAt);
+    const nextPlanningEnd = parseIsoToDate(planningEndAt);
+    const nextVotingEnd = parseIsoToDate(votingEndAt);
+    const nextFinalDisplay = nextVotingEnd ?? tripEnd;
+
+    setPhaseDates({
+      planning: {
+        start: nextPlanningStart ?? tripStart,
+        end: nextPlanningEnd ?? tripStart,
+        time: parseIsoToTimeString(planningEndAt),
+      },
+      voting: {
+        start: nextPlanningEnd ?? tripStart,
+        end: nextVotingEnd ?? tripStart,
+        time: parseIsoToTimeString(votingEndAt),
+      },
+      final: {
+        start: nextFinalDisplay ?? tripEnd,
+        end: nextFinalDisplay ?? tripEnd,
+        time: "00:00",
+      },
+    });
+  }, [planningStartedAt, planningEndAt, votingEndAt, tripStart, tripEnd]);
 
   const handleLeaveTrip = () => {
-    Alert.alert(
-      "Leave trip",
-      "Are you sure you want to leave this trip?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Leave",
-          style: "destructive",
-          onPress: () => {
-            // TODO: call leave trip API then navigate away
-          },
+    Alert.alert("Leave trip", "Are you sure you want to leave this trip?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Leave",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setIsLeaving(true);
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+              Alert.alert("Not logged in", "Please log in again.");
+              return;
+            }
+            const idToken = await currentUser.getIdToken();
+            await leaveTrip({ idToken, tripId });
+            router.replace("/home");
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "Failed to leave trip";
+            Alert.alert("Leave failed", message);
+          } finally {
+            setIsLeaving(false);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
@@ -100,7 +265,6 @@ export default function TripInformationScreen() {
           style={styles.flex}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          {/* Scrollable content */}
           <ScrollView
             style={styles.flex}
             contentContainerStyle={[
@@ -113,17 +277,8 @@ export default function TripInformationScreen() {
             ]}
             showsVerticalScrollIndicator={false}
           >
-            {/* Header */}
             <View style={styles.header}>
-              <Link
-                href="/home"
-                style={styles.backLink}
-                accessibilityRole="link"
-                accessibilityLabel="Go back to home"
-              >
-                <Back width={20} height={20} />
-              </Link>
-
+              <BackLink href="/home" />
               <View style={styles.headerTitle}>
                 <InfoIcon width={20} height={20} />
                 <AppText variant="body" style={styles.headerLabel}>
@@ -132,7 +287,6 @@ export default function TripInformationScreen() {
               </View>
             </View>
 
-            {/* Trip Name */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow}>
                 <TripTitle width={20} height={20} />
@@ -141,11 +295,10 @@ export default function TripInformationScreen() {
                 </AppText>
               </View>
               <AppText variant="caption" style={styles.infoValue}>
-                {TRIP.name}
+                {title || "—"}
               </AppText>
             </View>
 
-            {/* Trip Date */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow}>
                 <Calendar width={20} height={20} />
@@ -154,11 +307,11 @@ export default function TripInformationScreen() {
                 </AppText>
               </View>
               <AppText variant="caption" style={styles.infoValue}>
-                {TRIP.startDate} – {TRIP.endDate}
+                {formatDateDisplayFromString(startDate)} –{" "}
+                {formatDateDisplayFromString(endDate)}
               </AppText>
             </View>
 
-            {/* Destination */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow}>
                 <Location width={20} height={20} />
@@ -167,11 +320,10 @@ export default function TripInformationScreen() {
                 </AppText>
               </View>
               <AppText variant="caption" style={styles.infoValue}>
-                {TRIP.destination}
+                {destination || "—"}
               </AppText>
             </View>
 
-            {/* Members */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow}>
                 <AddPeople width={20} height={20} />
@@ -180,64 +332,82 @@ export default function TripInformationScreen() {
                 </AppText>
               </View>
               <AppText variant="caption" style={styles.infoValue}>
-                {TRIP.members.join(", ")}
+                {members.length > 0
+                  ? members.map((m) => m.name).join(", ")
+                  : "—"}
               </AppText>
             </View>
 
-            {/* Phases — read only */}
-            {TRIP.phases.map((phase) => (
-              <View key={phase.id} style={styles.fieldGroup}>
-                <View style={styles.phaseRow}>
-                  <View style={styles.phaseLeft}>
-                    <View
-                      style={[
-                        styles.phaseBadge,
-                        { backgroundColor: phase.color },
-                      ]}
-                    >
-                      <AppText
-                        variant="caption"
+            {phases.map((phase) => {
+              const dates = phaseDates[phase.id];
+              const days = phase.active
+                ? calcDaysLeft(dates.end)
+                : calcCalendarDays(dates.start, dates.end);
+
+              return (
+                <View key={phase.id} style={styles.fieldGroup}>
+                  <View style={styles.phaseRow}>
+                    <View style={styles.phaseLeft}>
+                      <View
                         style={[
-                          styles.phaseBadgeText,
-                          { color: PHASE_TEXT_COLORS[phase.id] },
+                          styles.phaseBadge,
+                          { backgroundColor: phase.color },
                         ]}
                       >
-                        {phase.label}
-                      </AppText>
-                    </View>
+                        <AppText
+                          variant="caption"
+                          style={[
+                            styles.phaseBadgeText,
+                            { color: PHASE_TEXT_COLORS[phase.id] },
+                          ]}
+                        >
+                          {phase.label}
+                        </AppText>
+                      </View>
 
-                    <View style={styles.phaseTimerRow}>
-                      {phase.active ? (
-                        <Hourglass1 width={20} height={20} />
-                      ) : (
-                        <Hourglass0 width={20} height={20} />
-                      )}
-                      <AppText variant="body" style={styles.phaseDays}>
-                        {dayLabel(phase.days)}
-                      </AppText>
-                      <AppText variant="caption" style={styles.phaseTimerLabel}>
-                        Timer
-                      </AppText>
-                      {phase.active && <Timepoint width={8} height={8} />}
+                      <View style={styles.phaseTimerBlock}>
+                        <View style={styles.hourglassCol}>
+                          {phase.active ? (
+                            <Hourglass1 width={20} height={20} />
+                          ) : (
+                            <Hourglass0 width={20} height={20} />
+                          )}
+                        </View>
+
+                        <View style={styles.phaseTextCol}>
+                          <View style={styles.daysRow}>
+                            <AppText variant="body" style={styles.phaseDays}>
+                              {dayLabel(days, phase.active)}
+                            </AppText>
+                            {phase.active && (
+                              <View style={styles.timepointWrapper}>
+                                <Timepoint width={7} height={7} />
+                              </View>
+                            )}
+                          </View>
+                          <AppText variant="caption" style={styles.timerLabel}>
+                            Timer
+                          </AppText>
+                        </View>
+                      </View>
                     </View>
                   </View>
-                </View>
 
-                <AppText variant="caption" style={styles.phaseDateLabel}>
-                  {phase.startDate}
-                  {phase.startDate !== phase.endDate
-                    ? ` - ${phase.endDate}`
-                    : ""}
-                </AppText>
-              </View>
-            ))}
+                  <AppText variant="caption" style={styles.phaseDateLabel}>
+                    {formatDateDisplay(dates.start)}
+                    {dates.start.getTime() !== dates.end.getTime()
+                      ? ` - ${formatDateDisplay(dates.end)}`
+                      : ""}
+                  </AppText>
+                </View>
+              );
+            })}
           </ScrollView>
 
-          {/* Leave trip — pinned to bottom, always visible above safe area */}
           <SafeAreaView edges={["bottom"]} style={styles.leaveSafeArea}>
             <View style={styles.leaveWrapper}>
               <ActionCard
-                label="Leave trip"
+                label={isLeaving ? "Leaving..." : "Leave trip"}
                 icon={<Exit width={20} height={20} />}
                 onPress={handleLeaveTrip}
                 accessibilityHint="Leaves this trip"
@@ -272,16 +442,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
   },
-  backLink: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    minWidth: 44,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: spacing.xs,
-  },
   headerTitle: {
     flexDirection: "row",
     alignItems: "center",
@@ -313,7 +473,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
     paddingLeft: 28,
   },
-  // Phases
   phaseRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -328,17 +487,30 @@ const styles = StyleSheet.create({
   phaseBadge: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
   },
   phaseBadgeText: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
   },
-  phaseTimerRow: {
+  phaseTimerBlock: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+  },
+  hourglassCol: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  phaseTextCol: {
+    flexDirection: "column",
+    justifyContent: "center",
+  },
+  daysRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 3,
   },
   phaseDays: {
     fontFamily: typography.fontFamily.bodyBold,
@@ -346,10 +518,13 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
     color: colors.textPrimary,
   },
-  phaseTimerLabel: {
-    color: colors.nightBlack,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
+  timepointWrapper: {
+    marginTop: 1,
+  },
+  timerLabel: {
+    color: colors.textMuted,
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
   },
   phaseDateLabel: {
     color: colors.nightBlack,
@@ -357,7 +532,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
     paddingLeft: 4,
   },
-  // Leave card pinned footer
   leaveSafeArea: {
     backgroundColor: colors.lightWhite,
   },
