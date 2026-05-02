@@ -54,19 +54,13 @@ export default function StartPage() {
     <View style={styles.container}>
       {/* Decorative background visuals — scaled to screen */}
       <View
-        style={[styles.palmTreeWrapper, { top: -245 * sh, right: -560 * sw }]}
-        pointerEvents="none"
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
+        style={[styles.palmTreeWrapper, { top: -245 * sh, right: -560 * sw, pointerEvents: "none" }]}
       >
         <PalmTree width={1000 * sw} height={1000 * sh} />
       </View>
 
       <View
-        style={[styles.palmLeafWrapper, { top: 50 * sh, left: -240 * sw }]}
-        pointerEvents="none"
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
+        style={[styles.palmLeafWrapper, { top: 50 * sh, left: -240 * sw, pointerEvents: "none" }]}
       >
         <PalmLeaf width={350 * sw} height={350 * sw} />
       </View>
@@ -74,11 +68,8 @@ export default function StartPage() {
       <View
         style={[
           styles.curlyGreenWrapper,
-          { bottom: -220 * sh, left: -215 * sw },
+          { bottom: -220 * sh, left: -215 * sw, pointerEvents: "none" },
         ]}
-        pointerEvents="none"
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
       >
         <CurlyGreen width={500 * sw} height={500 * sw} />
       </View>

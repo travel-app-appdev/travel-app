@@ -247,6 +247,7 @@ export default function CreateTripScreen() {
       },
     });
   };
+
   const handleContinueFromDestination = () => {
     if (!destination.trim()) {
       Alert.alert("Missing destination", "Please enter a destination first.");
@@ -731,8 +732,7 @@ export default function CreateTripScreen() {
         <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
           <View style={[styles.root, styles.bgStep1]}>
             <View
-              style={styles.curlyOrangeWrapper}
-              pointerEvents="none"
+              style={[styles.curlyOrangeWrapper, { pointerEvents: "none" }]}
               {...(Platform.OS !== "web" ? { accessible: false } : {})}
             >
               <CurlyOrange
@@ -785,7 +785,7 @@ export default function CreateTripScreen() {
               </View>
             </ScrollView>
 
-            <View style={styles.continueWrapper} pointerEvents="box-none">
+            <View style={[styles.continueWrapper, { pointerEvents: "box-none" }]}>
               <AppButton
                 title="Back to Landing Page"
                 onPress={() => router.replace("/home")}
@@ -854,7 +854,7 @@ export default function CreateTripScreen() {
                 </ScrollView>
               </KeyboardAvoidingView>
 
-              <View style={styles.continueWrapper} pointerEvents="box-none">
+              <View style={[styles.continueWrapper, { pointerEvents: "box-none" }]}>
                 <AppButton
                   title="Continue"
                   onPress={handleContinueFromDestination}
@@ -867,8 +867,7 @@ export default function CreateTripScreen() {
               </View>
 
               <View
-                style={styles.cityScapeWrapper}
-                pointerEvents="none"
+                style={[styles.cityScapeWrapper, { pointerEvents: "none" }]}
                 {...(Platform.OS !== "web" ? { accessible: false } : {})}
               >
                 <CityScape
@@ -879,9 +878,9 @@ export default function CreateTripScreen() {
             </>
           ) : (
             <>
+              
               <View
-                style={styles.curlyWrapper}
-                pointerEvents="none"
+                style={[styles.curlyWrapper, { pointerEvents: "none" }]}
                 {...(Platform.OS !== "web" ? { accessible: false } : {})}
               >
                 <CurlyYellow

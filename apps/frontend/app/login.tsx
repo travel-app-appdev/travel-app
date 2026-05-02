@@ -94,9 +94,9 @@ export default function LoginScreen() {
           {
             paddingTop: headerTop,
             paddingBottom: headerBottom,
+            pointerEvents:"box-none",
           },
         ]}
-        pointerEvents="box-none"
       >
         <View style={styles.backWrapper}>
           <Link

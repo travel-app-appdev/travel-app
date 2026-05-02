@@ -54,8 +54,7 @@ export default function JoinTripScreen() {
     <View style={styles.fullScreen}>
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <View
-          style={styles.leafTopRight}
-          pointerEvents="none"
+          style={[styles.leafTopRight, { pointerEvents: "none" }]}
           accessible={false}
           importantForAccessibility="no-hide-descendants"
         >
@@ -63,8 +62,7 @@ export default function JoinTripScreen() {
         </View>
 
         <View
-          style={styles.leafBottomLeft}
-          pointerEvents="none"
+          style={[styles.leafBottomLeft, { pointerEvents: "none" }]}
           accessible={false}
           importantForAccessibility="no-hide-descendants"
         >

@@ -60,45 +60,45 @@ export default function RegisterScreen() {
   }
 
   async function handleRegister() {
-  if (isSubmitting) return;
+    if (isSubmitting) return;
 
-  const nextErrors = validateRegister({ name, email, password });
-  setErrors(nextErrors);
-  if (hasErrors(nextErrors)) return;
-  Keyboard.dismiss();
+    const nextErrors = validateRegister({ name, email, password });
+    setErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
+    Keyboard.dismiss();
 
-  try {
-    setIsSubmitting(true);
+    try {
+      setIsSubmitting(true);
 
-    const authResponse = await registerUser(
-      name.trim(),
-      email.trim(),
-      password
-    );
+      const authResponse = await registerUser(
+        name.trim(),
+        email.trim(),
+        password
+      );
 
-    setUser(authResponse);
-    router.replace("/home");
-  } catch (error: any) {
-    const message: string =
-      error?.message || "Something went wrong. Please try again.";
+      setUser(authResponse);
+      router.replace("/home");
+    } catch (error: any) {
+      const message: string =
+        error?.message || "Something went wrong. Please try again.";
 
-    if (
-      message.toLowerCase().includes("already registered") ||
-      message.toLowerCase().includes("already in use") ||
-      message.toLowerCase().includes("email-already-in-use") 
-    ) {
-      setErrors((prev) => ({
-        ...prev,
-        email: "This email is already registered. Try logging in instead.",
-      }));
-    } else {
-      const friendlyMessage = getFirebaseAuthMessage(error);
-      setErrors((prev) => ({ ...prev, general: friendlyMessage }));
+      if (
+        message.toLowerCase().includes("already registered") ||
+        message.toLowerCase().includes("already in use") ||
+        message.toLowerCase().includes("email-already-in-use")
+      ) {
+        setErrors((prev) => ({
+          ...prev,
+          email: "This email is already registered. Try logging in instead.",
+        }));
+      } else {
+        const friendlyMessage = getFirebaseAuthMessage(error);
+        setErrors((prev) => ({ ...prev, general: friendlyMessage }));
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-  } finally {
-    setIsSubmitting(false);
   }
-}
 
   return (
     <View style={styles.container}>
@@ -115,9 +115,9 @@ export default function RegisterScreen() {
           {
             paddingTop: headerTop,
             paddingBottom: headerBottom,
+            pointerEvents: "box-none",
           },
         ]}
-        pointerEvents="box-none"
       >
         <View style={styles.backWrapper}>
           <Link
@@ -156,10 +156,13 @@ export default function RegisterScreen() {
                 right: 0,
               },
             ]}
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
           >
-            <MascotHelloPink width={mascotSize} height={mascotSize} />
+            <MascotHelloPink
+              width={mascotSize}
+              height={mascotSize}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+            />
           </View>
 
           <View
@@ -414,7 +417,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontFamily: typography.fontFamily.title,
   },
-
   keyboardArea: {
     flex: 1,
     zIndex: 2,

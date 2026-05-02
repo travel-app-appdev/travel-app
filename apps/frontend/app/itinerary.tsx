@@ -819,7 +819,7 @@ export default function ItineraryScreen() {
                 </View>
 
                 {hasCurrentUserFinished && (
-                  <View style={styles.planningLockOverlay} pointerEvents="auto" />
+              <View style={[styles.planningLockOverlay, { pointerEvents: "auto" }]} />
                 )}
               </View>
             )}
@@ -867,7 +867,7 @@ export default function ItineraryScreen() {
         </ScrollView>
 
         {activeState === "planning" && (
-          <View pointerEvents="none" style={styles.footerBackground} />
+          <View style={[styles.footerBackground, { pointerEvents: "none" }]} />
         )}
 
         {showPlanningInfoPopup && (
@@ -883,7 +883,7 @@ export default function ItineraryScreen() {
               accessibilityRole="button"
               accessibilityLabel="Dismiss planning information"
             />
-            <View style={styles.popupWrapper} pointerEvents="none">
+            <View style={[styles.popupWrapper, { pointerEvents: "none" }]}>
               <View style={styles.popup}>
                 <AppText variant="caption" style={styles.popupText}>
                   You can no longer add activities after submitting.
@@ -963,9 +963,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     height: 110,
-    shadowColor: colors.beachYellow,
-    shadowOpacity: 5,
-    shadowRadius: 10,
+    boxShadow: `0px 0px 10px rgba(255, 214, 0, 0.5)`,
     elevation: 4,
   },
   popupWrapper: {
