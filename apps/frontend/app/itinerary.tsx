@@ -256,9 +256,18 @@ export default function ItineraryScreen() {
     activities: parseActivitiesJson(activitiesJson),
   }));
 
-  const [apiActivities, setApiActivities] = useState<Activity[]>([]);
+  const [apiActivities, setApiActivities] = useState<Activity[]>(() => {
+  const keys = [...activitiesCache.keys()];
+  const matchingKey = keys.find((k) => k.startsWith(`${tripId}_`));
+  return matchingKey ? (activitiesCache.get(matchingKey) ?? []) : [];
+});
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
-  const [isLoadingActivities, setIsLoadingActivities] = useState(true);
+
+  const [isLoadingActivities, setIsLoadingActivities] = useState(() => {
+    const keys = [...activitiesCache.keys()];
+    return !keys.some((k) => k.startsWith(`${tripId}_`));
+  });
+
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
   const [isSubmittingPlanning, setIsSubmittingPlanning] = useState(false);
   const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -358,8 +367,11 @@ export default function ItineraryScreen() {
               slotId: activity.slot_id ?? "",
             })
           );
-          activitiesCache.set(cacheKey, mapped);
-          setApiActivities(mapped);
+          const hasChanged = JSON.stringify(cached) !== JSON.stringify(mapped);
+          if (hasChanged) {
+            activitiesCache.set(cacheKey, mapped);
+            setApiActivities(mapped);
+          }
           setIsLoadingActivities(false);
           return;
         }
@@ -369,6 +381,7 @@ export default function ItineraryScreen() {
             ? tripDays.map((day) => day.id)
             : [selectedDayId];
 
+        // Все слоты загружаются параллельно через Promise.all
         const allActivities = (
           await Promise.all(
             daysToLoad.flatMap((dayId) =>
@@ -390,8 +403,12 @@ export default function ItineraryScreen() {
           )
         ).flat();
 
-        activitiesCache.set(cacheKey, allActivities);
-        setApiActivities(allActivities);
+        // Обновляем UI только если данные изменились — без видимого прыжка
+        const hasChanged = JSON.stringify(cached) !== JSON.stringify(allActivities);
+        if (hasChanged) {
+          activitiesCache.set(cacheKey, allActivities);
+          setApiActivities(allActivities);
+        }
         setIsLoadingActivities(false);
       } catch (error) {
         console.log("Could not load activities:", error);
@@ -864,7 +881,6 @@ export default function ItineraryScreen() {
                       selectedSlotId={selectedVotingSlotId}
                       onSelectSlot={setSelectedVotingSlotId}
                     />
-
                     <View style={styles.slotList}>
                       {votingSlotActivities.map((activity) => (
                         <VotingSlotCard
