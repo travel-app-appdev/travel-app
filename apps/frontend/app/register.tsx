@@ -160,8 +160,6 @@ export default function RegisterScreen() {
             <MascotHelloPink
               width={mascotSize}
               height={mascotSize}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
             />
           </View>
 
