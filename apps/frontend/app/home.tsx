@@ -53,6 +53,12 @@ type TripCardItem = {
   rawState: Trip["state"];
 };
 
+type TripsCache = {
+  yourTrips: TripCardItem[];
+  pastTrips: TripCardItem[];
+};
+let tripsCache: TripsCache | null = null;
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString("en-US", {
@@ -132,8 +138,12 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
 export default function HomeScreen() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("your");
-  const [yourTrips, setYourTrips] = useState<TripCardItem[]>([]);
-  const [pastTrips, setPastTrips] = useState<TripCardItem[]>([]);
+  const [yourTrips, setYourTrips] = useState<TripCardItem[]>(
+    tripsCache?.yourTrips ?? []
+  );
+  const [pastTrips, setPastTrips] = useState<TripCardItem[]>(
+    tripsCache?.pastTrips ?? []
+  );
   const router = useRouter();
 
   const loadTrips = useCallback(async () => {
@@ -141,6 +151,7 @@ export default function HomeScreen() {
       if (!user) {
         setYourTrips([]);
         setPastTrips([]);
+        tripsCache = null;
         return;
       }
 
@@ -164,6 +175,8 @@ export default function HomeScreen() {
         }
       });
 
+      // Обновляем кэш и UI свежими данными
+      tripsCache = { yourTrips: upcoming, pastTrips: past };
       setYourTrips(upcoming);
       setPastTrips(past);
     } catch (error) {
@@ -175,6 +188,10 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      if (tripsCache) {
+        setYourTrips(tripsCache.yourTrips);
+        setPastTrips(tripsCache.pastTrips);
+      }
       void loadTrips();
     }, [loadTrips])
   );

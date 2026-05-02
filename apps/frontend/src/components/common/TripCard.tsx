@@ -211,7 +211,7 @@
 // });
 
 // components/common/TripCard.tsx
-import { Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "./AppText";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import Edit from "@/assets/icons/edit.svg";
@@ -323,30 +323,30 @@ export function TripCard({
           ))}
         </View>
 
-        
-        <TouchableOpacity
-          onPress={(e) => {
-            e.stopPropagation?.();
-            onIconPress?.();
-          }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel={
-            role === "admin" ? "Edit trip" : "Trip information"
-          }
+        {/*accessibilityRole="button" only on mobile, on web it turns
+        View into <button> causing nested button error.
+        On mobile screen readers correctly announce it as a button. */}
+        <View
+          style={styles.iconButton}
+          {...(Platform.OS !== "web" ? { accessibilityRole: "button" } : {})}
+          accessibilityLabel={role === "admin" ? "Edit trip" : "Trip information"}
           accessibilityHint={
             role === "admin"
               ? "Opens trip settings"
               : "Opens trip information screen"
           }
-          activeOpacity={0.7}
+          onStartShouldSetResponder={() => true}
+          onResponderGrant={(e) => {
+            e.stopPropagation();
+            onIconPress?.();
+          }}
         >
           {role === "admin" ? (
             <Edit width={22} height={22} />
           ) : (
             <InfoIcon width={22} height={22} />
           )}
-        </TouchableOpacity>
+        </View>
       </View>
     </Pressable>
   );
@@ -428,5 +428,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 14,
     fontFamily: typography.fontFamily.bodyBold,
+  },
+  iconButton: {
+    padding: 8,
+    marginRight: -8,
   },
 });
