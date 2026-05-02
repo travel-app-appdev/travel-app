@@ -68,13 +68,25 @@ export default function LoginScreen() {
       setIdToken(authResponse.idToken); 
       router.replace("/home");
 
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Something went wrong";
-      setErrors((prev) => ({ ...prev, general: message }));
-    } finally {
-      setIsSubmitting(false);
-    }
+      router.replace("/home");
+    } catch (error: any) {
+  const code = error?.code ?? "";
+  let message = "Something went wrong. Please try again.";
+
+  if (
+    code === "auth/invalid-credential" ||
+    code === "auth/wrong-password" ||
+    code === "auth/user-not-found"
+  ) {
+    message = "Incorrect email or password. Please try again.";
+  } else if (code === "auth/too-many-requests") {
+    message = "Too many attempts. Please try again later.";
+  } else if (code === "auth/user-disabled") {
+    message = "This account has been disabled.";
+  }
+
+  setErrors((prev) => ({ ...prev, general: message }));
+}
   }
 
   return (
