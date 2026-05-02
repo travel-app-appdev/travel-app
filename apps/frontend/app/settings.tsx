@@ -476,3 +476,6 @@
 //     color: colors.textMuted,
 //   },
 // });
+export default function SettingsScreen() {
+  return null;
+}

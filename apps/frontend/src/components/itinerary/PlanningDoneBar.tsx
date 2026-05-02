@@ -21,7 +21,7 @@ export function PlanningDoneBar({
   const isDisabled = checked || disabled;
 
   return (
-    <View style={styles.wrapper} pointerEvents="box-none">
+    <View style={[styles.wrapper, { pointerEvents: "box-none" }]}>
       <View style={styles.footer}>
         <Pressable
           style={[styles.doneButton, checked && styles.doneButtonChecked]}

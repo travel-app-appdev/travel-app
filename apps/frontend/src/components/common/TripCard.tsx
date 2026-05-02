@@ -211,7 +211,7 @@
 // });
 
 // components/common/TripCard.tsx
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
 import { AppText } from "./AppText";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import Edit from "@/assets/icons/edit.svg";
@@ -323,8 +323,12 @@ export function TripCard({
           ))}
         </View>
 
-        <Pressable
-          onPress={onIconPress}
+        
+        <TouchableOpacity
+          onPress={(e) => {
+            e.stopPropagation?.();
+            onIconPress?.();
+          }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={
@@ -335,13 +339,14 @@ export function TripCard({
               ? "Opens trip settings"
               : "Opens trip information screen"
           }
+          activeOpacity={0.7}
         >
           {role === "admin" ? (
             <Edit width={22} height={22} />
           ) : (
             <InfoIcon width={22} height={22} />
           )}
-        </Pressable>
+        </TouchableOpacity>
       </View>
     </Pressable>
   );

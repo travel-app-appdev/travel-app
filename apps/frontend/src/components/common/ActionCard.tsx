@@ -50,10 +50,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    shadowColor: colors.sunsetOrange,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: radius.xl,
+    boxShadow: `0px 8px ${radius.xl}px rgba(255, 107, 53, 0.25)`,
     elevation: 6,
   },
   left: {
