@@ -11,12 +11,12 @@ export function SkeletonSlotCard() {
         Animated.timing(opacity, {
           toValue: 1,
           duration: 700,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(opacity, {
           toValue: 0.4,
           duration: 700,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ])
     );
