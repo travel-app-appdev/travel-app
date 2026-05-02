@@ -27,6 +27,7 @@ import { AppText } from "@/src/components/common/AppText";
 import { ItineraryHeader } from "@/src/components/itinerary/ItineraryHeader";
 import { ItineraryDaySelector } from "@/src/components/itinerary/ItineraryDaySelector";
 import { PlanningSlotCard } from "@/src/components/itinerary/PlanningSlotCard";
+import { SkeletonSlotCard } from "@/src/components/itinerary/SkeletonSlotCard";
 import { PlanningDoneBar } from "@/src/components/itinerary/PlanningDoneBar";
 import { VotingSlotCard } from "@/src/components/itinerary/VoteSlotCard";
 import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
@@ -40,6 +41,8 @@ import {
 } from "@/src/services/activityService";
 
 const DEV_FORCE_STATE: ItineraryState | null = null;
+
+const activitiesCache = new Map<string, Activity[]>();
 
 function parseActivitiesJson(value?: string): Activity[] {
   if (!value) return [];
@@ -255,6 +258,7 @@ export default function ItineraryScreen() {
 
   const [apiActivities, setApiActivities] = useState<Activity[]>([]);
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(true);
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
   const [isSubmittingPlanning, setIsSubmittingPlanning] = useState(false);
   const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -332,20 +336,31 @@ export default function ItineraryScreen() {
         return;
       }
 
+      const cacheKey = `${tripId}_${activeState}_${selectedDayId}`;
+      const cached = activitiesCache.get(cacheKey);
+
+      if (cached) {
+        setApiActivities(cached);
+        setIsLoadingActivities(false);
+      } else {
+        setIsLoadingActivities(true);
+      }
+
       try {
         if (activeState === "final") {
           const finalActivities = await getFinalItineraryActivities(
             tripId,
             currentUserId ?? undefined
           );
-          setApiActivities(
-            finalActivities.map((activity: any) =>
-              mapBackendActivity(activity, {
-                dayId: selectedDayId || itinerary.startDate,
-                slotId: activity.slot_id ?? "",
-              })
-            )
+          const mapped = finalActivities.map((activity: any) =>
+            mapBackendActivity(activity, {
+              dayId: selectedDayId || itinerary.startDate,
+              slotId: activity.slot_id ?? "",
+            })
           );
+          activitiesCache.set(cacheKey, mapped);
+          setApiActivities(mapped);
+          setIsLoadingActivities(false);
           return;
         }
 
@@ -353,30 +368,34 @@ export default function ItineraryScreen() {
           activeState === "voting"
             ? tripDays.map((day) => day.id)
             : [selectedDayId];
-        const allActivities: Activity[] = [];
 
-        for (const dayId of daysToLoad) {
-          for (const slot of slots) {
-            const slotIdWithDate = `${dayId}_${slot.id}`;
-            const slotActivities = await getActivitiesBySlot(
-              tripId,
-              slotIdWithDate,
-              currentUserId ?? undefined
-            );
-
-            const mapped = slotActivities.map((activity: any) =>
-              mapBackendActivity(activity, {
-                dayId,
-                slotId: slot.id,
+        const allActivities = (
+          await Promise.all(
+            daysToLoad.flatMap((dayId) =>
+              slots.map(async (slot) => {
+                const slotIdWithDate = `${dayId}_${slot.id}`;
+                const slotActivities = await getActivitiesBySlot(
+                  tripId,
+                  slotIdWithDate,
+                  currentUserId ?? undefined
+                );
+                return slotActivities.map((activity: any) =>
+                  mapBackendActivity(activity, {
+                    dayId,
+                    slotId: slot.id,
+                  })
+                );
               })
-            );
-            allActivities.push(...mapped);
-          }
-        }
+            )
+          )
+        ).flat();
 
+        activitiesCache.set(cacheKey, allActivities);
         setApiActivities(allActivities);
+        setIsLoadingActivities(false);
       } catch (error) {
         console.log("Could not load activities:", error);
+        setIsLoadingActivities(false);
       }
     }
 
@@ -803,30 +822,42 @@ export default function ItineraryScreen() {
               }
             />
 
+            {/* PLANNING */}
             {activeState === "planning" && (
               <View style={styles.planningContent}>
                 <View style={styles.slotList}>
-                  {slotItems.map(({ slot, activity }) => (
-                    <PlanningSlotCard
-                      key={slot.id}
-                      slot={slot}
-                      activity={activity}
-                      onAddActivity={handleAddActivity}
-                      onEditActivity={handleEditActivity}
-                      disabled={hasCurrentUserFinished}
-                    />
-                  ))}
+                  {isLoadingActivities
+                    ? slots.map((slot) => (
+                        <SkeletonSlotCard key={slot.id} />
+                      ))
+                    : slotItems.map(({ slot, activity }) => (
+                        <PlanningSlotCard
+                          key={slot.id}
+                          slot={slot}
+                          activity={activity}
+                          onAddActivity={handleAddActivity}
+                          onEditActivity={handleEditActivity}
+                          disabled={hasCurrentUserFinished}
+                        />
+                      ))}
                 </View>
 
                 {hasCurrentUserFinished && (
-              <View style={[styles.planningLockOverlay, { pointerEvents: "auto" }]} />
+                  <View style={[styles.planningLockOverlay, { pointerEvents: "auto" }]} />
                 )}
               </View>
             )}
 
+            {/* VOTING */}
             {activeState === "voting" && (
               <View style={styles.votingSection}>
-                {votingTimeChips.length > 0 ? (
+                {isLoadingActivities ? (
+                  <View style={styles.slotList}>
+                    {slots.slice(0, 3).map((slot) => (
+                      <SkeletonSlotCard key={slot.id} />
+                    ))}
+                  </View>
+                ) : votingTimeChips.length > 0 ? (
                   <>
                     <VotingTimeFilter
                       chips={votingTimeChips}
@@ -851,16 +882,21 @@ export default function ItineraryScreen() {
               </View>
             )}
 
+            {/* FINAL */}
             {activeState === "final" && (
               <View style={styles.slotList}>
-                {slots.map((slot) => (
-                  <FinalSlotCard
-                    key={slot.id}
-                    slot={slot}
-                    activity={finalActivityMap.get(slot.id)}
-                    onJoinGroup={handleJoinGroup}
-                  />
-                ))}
+                {isLoadingActivities
+                  ? slots.map((slot) => (
+                      <SkeletonSlotCard key={slot.id} />
+                    ))
+                  : slots.map((slot) => (
+                      <FinalSlotCard
+                        key={slot.id}
+                        slot={slot}
+                        activity={finalActivityMap.get(slot.id)}
+                        onJoinGroup={handleJoinGroup}
+                      />
+                    ))}
               </View>
             )}
           </View>
