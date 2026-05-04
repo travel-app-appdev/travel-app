@@ -508,36 +508,39 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
   totalSteps,
 }) => {
   return (
-    <View
-      style={{
-        width: "100%",
-        height: 20,
-        borderRadius: 20,
-        backgroundColor: colors.grayedOut,
-        overflow: "hidden",
-        justifyContent: "center",
-      }}
-    >
-      {/* Animated fill */}
-      <Animated.View
+    <View style={{ width: "100%" }}>
+      {/* Progress bar */}
+      <View
         style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
+          width: "100%",
+          height: 20,
           borderRadius: 20,
-          backgroundColor: colors.seaBlue,
-          width: progressWidth,
+          backgroundColor: colors.lightWhite,
+          overflow: "hidden",
+          borderWidth: 1,
+          borderColor: colors.nightBlack,
         }}
-      />
+      >
+        <Animated.View
+          style={{
+            height: "100%",
+            borderRadius: 20,
+            backgroundColor: colors.seaBlue,
+            width: progressWidth,
+          }}
+        />
+      </View>
 
-      <Text 
-      style={{
+      {/* Text underneath */}
+      <Text
+        style={{
+          marginTop: 6,
           alignSelf: "center",
           color: colors.nightBlack,
-          fontSize: 12,
+          fontSize: 14,
           fontWeight: "600",
-      }}>
+        }}
+      >
         {currentStep}/{totalSteps}
       </Text>
     </View>
