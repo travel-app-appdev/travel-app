@@ -760,14 +760,22 @@ export default function CreateTripScreen() {
               </AppText>
 
               <View style={styles.fieldGroup}>
-                <View style={styles.fieldLabelRow}>
+                <View style={styles.fieldLabelRow}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+                >
                   <KeyFrame width={20} height={20} />
                   <AppText variant="body" style={styles.fieldLabel}>
                     Code
                   </AppText>
                 </View>
 
-                <Pressable style={styles.codeInput} onPress={handleCopyCode}>
+                <Pressable style={styles.codeInput}
+                onPress={handleCopyCode}
+                accessibilityRole="button"
+                accessibilityLabel={copied ? "Trip code copied" : "Copy trip code"}
+                accessibilityHint="Copies the trip code to clipboard"
+                >
                   <AppText variant="body" style={styles.codeText}>
                     {tripCode}
                   </AppText>
@@ -835,7 +843,10 @@ export default function CreateTripScreen() {
                   </AppText>
 
                   <View style={[styles.fieldGroup, { marginTop: 20 }]}>
-                    <View style={styles.fieldLabelRow}>
+                    <View style={styles.fieldLabelRow}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                    >
                       <Location width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Destination
@@ -913,7 +924,10 @@ export default function CreateTripScreen() {
                   </AppText>
 
                   <View style={styles.fieldGroup}>
-                    <View style={styles.fieldLabelRow}>
+                    <View style={styles.fieldLabelRow}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                    >
                       <TripTitle width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Trip name
@@ -931,7 +945,10 @@ export default function CreateTripScreen() {
                   </View>
 
                   <View style={styles.fieldGroup}>
-                    <View style={styles.fieldLabelRow}>
+                    <View style={styles.fieldLabelRow}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                    >
                       <Calendar width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Trip date
