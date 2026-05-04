@@ -1,4 +1,3 @@
-// src/components/itinerary/ItineraryDaySelector.tsx
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
@@ -8,11 +7,6 @@ type Props = {
   days: TripDay[];
   selectedDayId: string;
   onSelectDay: (dayId: string) => void;
-  /**
-   * Optional set of day IDs that are enabled (selectable).
-   * When provided, days NOT in this set are rendered as disabled/muted.
-   * When omitted, all days are selectable.
-   */
   enabledDayIds?: Set<string>;
 };
 
@@ -27,6 +21,12 @@ export function ItineraryDaySelector({
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.content}
+      accessibilityRole="scrollbar"
+      accessibilityLabel={
+        enabledDayIds !== undefined
+          ? "Trip days with activities, scroll horizontally to see more"
+          : "Trip days, scroll horizontally to see more"
+      }
     >
       {days.map((day) => {
         const isSelected = day.id === selectedDayId;
@@ -43,11 +43,22 @@ export function ItineraryDaySelector({
               isDisabled && styles.dayChipDisabled,
             ]}
             accessibilityRole="button"
-            accessibilityLabel={`${day.dayNumber} ${day.weekdayShort}`}
+            accessibilityLabel={`Day ${day.dayNumber}, ${day.weekdayShort}${isDisabled ? ", no activities" : ""}`}
+            accessibilityHint={
+              isDisabled
+                ? undefined
+                : isSelected
+                  ? "Currently selected"
+                  : "Tap to view this day"
+            }
             accessibilityState={{ selected: isSelected, disabled: isDisabled }}
             disabled={isDisabled}
           >
-            <View style={styles.dayChipInner}>
+            <View
+              style={styles.dayChipInner}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+            >
               <AppText
                 variant="body"
                 style={[
