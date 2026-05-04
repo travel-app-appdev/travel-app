@@ -1,4 +1,3 @@
-// apps/frontend/app/itinerary.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -634,19 +633,26 @@ export default function ItineraryScreen() {
     return set;
   }, [votingActivities]);
 
-  const votingTimeChips = useMemo(() => {
-    const seen = new Map<string, string>();
-    votingActivities
-      .filter((a) => a.dayId === selectedDayId)
-      .forEach((a) => {
-        if (!seen.has(a.slotId)) seen.set(a.slotId, a.slotId);
-      });
+  // app/itinerary.tsx — votingTimeChips useMemo
+const votingTimeChips = useMemo(() => {
+  const seen = new Map<string, string>();
+  votingActivities
+    .filter((a) => a.dayId === selectedDayId)
+    .forEach((a) => {
+      if (!seen.has(a.slotId)) {
+        // Format slotId like "06_08" into "06:00–08:00"
+        const formatted = a.slotId
+          .replace(/_/g, ":")
+          .replace(/:(\d{2})$/, "–$1:00");
+        seen.set(a.slotId, formatted);
+      }
+    });
 
-    return Array.from(seen.entries()).map(([slotId, label]) => ({
-      slotId,
-      label,
-    }));
-  }, [votingActivities, selectedDayId]);
+  return Array.from(seen.entries()).map(([slotId, label]) => ({
+    slotId,
+    label,
+  }));
+}, [votingActivities, selectedDayId]);
 
   const [selectedVotingSlotId, setSelectedVotingSlotId] = useState<string>("");
 
