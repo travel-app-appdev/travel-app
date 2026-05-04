@@ -54,13 +54,19 @@ export default function StartPage() {
     <View style={styles.container}>
       {/* Decorative background visuals — scaled to screen */}
       <View
-        style={[styles.palmTreeWrapper, { top: -245 * sh, right: -560 * sw, pointerEvents: "none" }]}
+        style={[
+          styles.palmTreeWrapper,
+          { top: -245 * sh, right: -560 * sw, pointerEvents: "none" },
+        ]}
       >
         <PalmTree width={1000 * sw} height={1000 * sh} />
       </View>
 
       <View
-        style={[styles.palmLeafWrapper, { top: 50 * sh, left: -240 * sw, pointerEvents: "none" }]}
+        style={[
+          styles.palmLeafWrapper,
+          { top: 50 * sh, left: -240 * sw, pointerEvents: "none" },
+        ]}
       >
         <PalmLeaf width={350 * sw} height={350 * sw} />
       </View>
@@ -123,15 +129,18 @@ export default function StartPage() {
 
         <View style={styles.actions}>
           <Link href="/login" asChild>
-            <View>
-              <AppButton
-                title="Login"
-                onPress={() => router.push("/login")}
-                textStyle={styles.primaryButtonText}
-                accessibilityLabel="Go to login screen"
-                accessibilityHint="Opens the login page"
-              />
-            </View>
+            <AppButton
+              title="Login"
+              onPress={() => {
+                if (typeof document !== "undefined") {
+                  (document.activeElement as HTMLElement | null)?.blur();
+                }
+                router.push("/login");
+              }}
+              textStyle={styles.primaryButtonText}
+              accessibilityLabel="Go to login screen"
+              accessibilityHint="Opens the login page"
+            />
           </Link>
 
           <View style={styles.registerRow}>
