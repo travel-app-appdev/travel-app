@@ -515,10 +515,11 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
           width: "100%",
           height: 20,
           borderRadius: 20,
-          backgroundColor: colors.lightWhite,
+          
+          backgroundColor:
+            currentStep === 3 ? colors.grayedOut : colors.lightWhite,
+
           overflow: "hidden",
-          borderWidth: 1,
-          borderColor: colors.nightBlack,
         }}
       >
         <Animated.View
