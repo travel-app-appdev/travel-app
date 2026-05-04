@@ -12,6 +12,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Alert,
+  Animated
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
@@ -475,6 +476,47 @@ export default function CreateTripScreen() {
     }
   };
 
+const TOTAL_STEPS = 4;
+
+const progress = useRef(new Animated.Value(1)).current;
+
+useEffect(() => {
+  Animated.timing(progress, {
+    toValue: step,
+    duration: 300,
+    useNativeDriver: false,
+  }).start();
+}, [step]);
+
+const progressAnim = progress.interpolate({
+  inputRange: [1, TOTAL_STEPS],
+  outputRange: ["0%", "100%"],
+});
+
+const ProgressBar = () => ({width}: {width: Animated.AnimatedInterpolation<string>}) => {
+  return (
+    <View
+    style={{
+      width: "100%",
+      height: 20,
+      borderRadius: 20,
+      backgroundColor: colors.grayedOut,
+      overflow: "hidden",
+    }}
+  >
+    <Animated.View
+        style={{
+          height: 20,
+          borderRadius: 20,
+          backgroundColor: colors.seaBlue,
+          width,
+        }}
+      />
+
+    </View>
+  )
+}
+
   if (step === 3) {
     return (
       <View style={[styles.fullScreen, styles.bgStep3]}>
@@ -497,6 +539,11 @@ export default function CreateTripScreen() {
                   </AppText>
                 </View>
               </View>
+
+              <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
+                <ProgressBar width={progressAnim} />
+              </View>
+
 
               <AppText variant="title" style={styles.titleStep3}>
                 Set up the timers
