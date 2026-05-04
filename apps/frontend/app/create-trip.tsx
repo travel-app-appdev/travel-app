@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
 import { createTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
@@ -12,12 +12,14 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Alert,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
+import { Calendar as RangeCalendar } from "react-native-calendars";
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppButton } from "@/src/components/common/AppButton";
@@ -58,6 +60,10 @@ type PhaseDates = Record<
   }
 >;
 
+type CalendarDay = {
+  dateString: string;
+};
+
 function formatDateDisplay(date: Date): string {
   const d = date.getDate().toString().padStart(2, "0");
   const m = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -67,6 +73,18 @@ function formatDateDisplay(date: Date): string {
 
 function toDateOnlyString(date: Date): string {
   return date.toISOString().split("T")[0];
+}
+
+function toLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function fromDateString(dateString: string): Date {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day);
 }
 
 function calcCalendarDays(start: Date, end: Date): number {
@@ -122,6 +140,47 @@ function endOfDay(date: Date): Date {
   return next;
 }
 
+function getMarkedRange(
+  start: string | null,
+  end: string | null,
+  edgeColor: string,
+  fillColor: string
+) {
+  if (!start) return {};
+
+  if (!end || start === end) {
+    return {
+      [start]: {
+        startingDay: true,
+        endingDay: true,
+        color: edgeColor,
+        textColor: colors.nightBlack,
+      },
+    };
+  }
+
+  const marked: Record<string, any> = {};
+  let current = fromDateString(start);
+  const last = fromDateString(end);
+
+  while (current <= last) {
+    const dateString = toLocalDateString(current);
+    const isStart = dateString === start;
+    const isEnd = dateString === end;
+
+    marked[dateString] = {
+      startingDay: isStart,
+      endingDay: isEnd,
+      color: isStart || isEnd ? edgeColor : fillColor,
+      textColor: colors.nightBlack,
+    };
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  return marked;
+}
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function CreateTripScreen() {
@@ -132,8 +191,11 @@ export default function CreateTripScreen() {
   const [tripStart, setTripStart] = useState<Date>(new Date());
   const [tripEnd, setTripEnd] = useState<Date>(new Date());
 
-  const [showTripStartPicker, setShowTripStartPicker] = useState(false);
-  const [showTripEndPicker, setShowTripEndPicker] = useState(false);
+  const [showTripCalendar, setShowTripCalendar] = useState(false);
+  const [rangeStart, setRangeStart] = useState<string | null>(
+    toLocalDateString(new Date())
+  );
+  const [rangeEnd, setRangeEnd] = useState<string | null>(null);
 
   const [tripCode, setTripCode] = useState("");
   const [copied, setCopied] = useState(false);
@@ -180,7 +242,7 @@ export default function CreateTripScreen() {
 
   const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
   const [openPhase, setOpenPhase] = useState<PhaseKey | null>(null);
-  const [showPhaseStartPicker, setShowPhaseStartPicker] =
+  const [showPhaseDateCalendar, setShowPhaseDateCalendar] =
     useState<PhaseKey | null>(null);
   const [showPhaseTimePicker, setShowPhaseTimePicker] =
     useState<PhaseKey | null>(null);
@@ -220,33 +282,195 @@ export default function CreateTripScreen() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Planning runs from "today" until the trip start date
     const planningStart = today;
-    const planningEnd = nextTripStart < today ? today : nextTripStart; // just in case start is in the past
-
-    // Voting runs from trip start until trip end by default
+    const planningEnd = nextTripStart < today ? today : nextTripStart;
     const votingStart = planningEnd;
     const votingEnd = nextTripEnd;
 
-    setPhaseDates({
+    setPhaseDates((prev) => ({
       planning: {
         start: planningStart,
         end: planningEnd,
-        // keep whatever default time you want for planning
-        time: phaseDates.planning.time || "12:00",
+        time: prev.planning.time || "12:00",
       },
       voting: {
         start: votingStart,
         end: votingEnd,
-        time: phaseDates.voting.time || "18:00",
+        time: prev.voting.time || "18:00",
       },
       final: {
         start: votingEnd,
         end: votingEnd,
         time: "00:00",
       },
-    });
+    }));
   };
+
+  const openTripCalendar = () => {
+    setRangeStart(toLocalDateString(tripStart));
+    setRangeEnd(null);
+    setShowTripCalendar(true);
+  };
+
+  const handleTripDayPress = (day: CalendarDay) => {
+    const selected = day.dateString;
+
+    if (!rangeStart) {
+      setRangeStart(selected);
+      setRangeEnd(null);
+      return;
+    }
+
+    if (!rangeEnd) {
+      if (selected < rangeStart) {
+        setRangeStart(selected);
+        setRangeEnd(null);
+        return;
+      }
+
+      if (selected === rangeStart) {
+        return;
+      }
+
+      setRangeEnd(selected);
+      return;
+    }
+
+    setRangeStart(selected);
+    setRangeEnd(null);
+  };
+
+  const applyTripRange = () => {
+    if (!rangeStart) return;
+
+    const finalEnd = rangeEnd ?? rangeStart;
+    const start = fromDateString(rangeStart);
+    const end = fromDateString(finalEnd);
+
+    setTripStart(start);
+    setTripEnd(end);
+    setShowTripCalendar(false);
+  };
+
+  const markedTripDates = useMemo(
+    () =>
+      getMarkedRange(
+        rangeStart,
+        rangeEnd,
+        colors.sunsetOrange,
+        colors.sunsetOrange
+      ),
+    [rangeStart, rangeEnd]
+  );
+
+  const openPhaseCalendar = (phaseId: PhaseKey) => {
+    if (phaseId === "final") return;
+    setShowPhaseDateCalendar(phaseId);
+    setShowPhaseTimePicker(null);
+  };
+
+  const handlePhaseCalendarDayPress = (day: CalendarDay) => {
+    if (!showPhaseDateCalendar) return;
+
+    const selectedDate = fromDateString(day.dateString);
+
+    if (showPhaseDateCalendar === "planning") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const tripEndOnly = new Date(tripEnd);
+      tripEndOnly.setHours(0, 0, 0, 0);
+
+      if (selectedDate < today || selectedDate > tripEndOnly) {
+        return;
+      }
+
+      setPhaseDates((prev) => ({
+        ...prev,
+        planning: {
+          ...prev.planning,
+          end: selectedDate,
+        },
+        voting: {
+          ...prev.voting,
+          start: selectedDate,
+          end: prev.voting.end < selectedDate ? selectedDate : prev.voting.end,
+        },
+        final: {
+          ...prev.final,
+          start:
+            prev.voting.end < selectedDate ? selectedDate : prev.final.start,
+          end: prev.voting.end < selectedDate ? selectedDate : prev.final.end,
+        },
+      }));
+      return;
+    }
+
+    if (showPhaseDateCalendar === "voting") {
+      const planningEndOnly = new Date(phaseDates.planning.end);
+      planningEndOnly.setHours(0, 0, 0, 0);
+
+      const tripEndOnly = new Date(tripEnd);
+      tripEndOnly.setHours(0, 0, 0, 0);
+
+      if (selectedDate < planningEndOnly || selectedDate > tripEndOnly) {
+        return;
+      }
+
+      setPhaseDates((prev) => ({
+        ...prev,
+        voting: {
+          ...prev.voting,
+          end: selectedDate,
+        },
+        final: {
+          ...prev.final,
+          start: selectedDate,
+          end: selectedDate,
+        },
+      }));
+    }
+  };
+
+  const getPhaseMarkedDates = useMemo(() => {
+    const tripRange = getMarkedRange(
+      toLocalDateString(tripStart),
+      toLocalDateString(tripEnd),
+      colors.sunsetOrange,
+      colors.sunsetOrange
+    );
+
+    const planningRange = getMarkedRange(
+      toLocalDateString(phaseDates.planning.start),
+      toLocalDateString(phaseDates.planning.end),
+      colors.beachYellow,
+      colors.beachYellow
+    );
+
+    const votingRange = getMarkedRange(
+      toLocalDateString(phaseDates.voting.start),
+      toLocalDateString(phaseDates.voting.end),
+      colors.sunsetPink,
+      colors.sunsetPink
+    );
+
+    if (showPhaseDateCalendar === "planning") {
+      return {
+        ...tripRange,
+        ...planningRange,
+      };
+    }
+
+    if (showPhaseDateCalendar === "voting") {
+      return {
+        ...tripRange,
+        ...planningRange,
+        ...votingRange,
+      };
+    }
+
+    return tripRange;
+  }, [showPhaseDateCalendar, phaseDates, tripStart, tripEnd]);
 
   const handleContinueFromDestination = () => {
     if (!destination.trim()) {
@@ -595,10 +819,7 @@ export default function CreateTripScreen() {
                         <View style={styles.dateTimeRow}>
                           <Pressable
                             style={[styles.dateInput, styles.dateTimeHalf]}
-                            onPress={() => {
-                              setShowPhaseStartPicker(phaseId);
-                              setShowPhaseTimePicker(null);
-                            }}
+                            onPress={() => openPhaseCalendar(phaseId)}
                             accessibilityRole="button"
                             accessibilityLabel={`Select ${phase.label} end date`}
                           >
@@ -612,7 +833,7 @@ export default function CreateTripScreen() {
                             style={[styles.dateInput, styles.dateTimeHalf]}
                             onPress={() => {
                               setShowPhaseTimePicker(phaseId);
-                              setShowPhaseStartPicker(null);
+                              setShowPhaseDateCalendar(null);
                             }}
                             accessibilityRole="button"
                             accessibilityLabel={`Select ${phase.label} end time`}
@@ -623,34 +844,6 @@ export default function CreateTripScreen() {
                             <Timer width={18} height={18} />
                           </Pressable>
                         </View>
-
-                        {showPhaseStartPicker === phaseId && (
-                          <DateTimePicker
-                            value={dates.end}
-                            mode="date"
-                            minimumDate={
-                              phaseId === "voting"
-                                ? phaseDates.planning.end
-                                : undefined
-                            }
-                            maximumDate={tripEnd}
-                            display={
-                              Platform.OS === "ios" ? "spinner" : "default"
-                            }
-                            onChange={(_: DateTimePickerEvent, date?: Date) => {
-                              setShowPhaseStartPicker(null);
-                              if (date) {
-                                setPhaseDates((prev) => ({
-                                  ...prev,
-                                  [phaseId]: {
-                                    ...prev[phaseId],
-                                    end: date,
-                                  },
-                                }));
-                              }
-                            }}
-                          />
-                        )}
 
                         {showPhaseTimePicker === phaseId && (
                           <DateTimePicker
@@ -720,6 +913,108 @@ export default function CreateTripScreen() {
                 accessibilityLabel="Create trip"
               />
             </View>
+
+            <Modal
+              visible={showPhaseDateCalendar !== null}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setShowPhaseDateCalendar(null)}
+            >
+              <View style={styles.calendarOverlay}>
+                <View style={styles.calendarModal}>
+                  <AppText variant="body" style={styles.calendarTitle}>
+                    {showPhaseDateCalendar === "planning"
+                      ? "Select planning end date"
+                      : "Select voting end date"}
+                  </AppText>
+
+                  <RangeCalendar
+                    markingType="period"
+                    minDate={
+                      showPhaseDateCalendar === "planning"
+                        ? toLocalDateString(phaseDates.planning.start)
+                        : toLocalDateString(phaseDates.voting.start)
+                    }
+                    maxDate={toLocalDateString(tripEnd)}
+                    markedDates={getPhaseMarkedDates}
+                    onDayPress={handlePhaseCalendarDayPress}
+                    enableSwipeMonths
+                    hideExtraDays
+                    firstDay={1}
+                    renderArrow={(direction) => (
+                      <AppText variant="body" style={styles.calendarArrow}>
+                        {direction === "left" ? "‹" : "›"}
+                      </AppText>
+                    )}
+                    theme={{
+                      backgroundColor: colors.lightWhite,
+                      calendarBackground: colors.lightWhite,
+                      textSectionTitleColor: colors.textMuted,
+                      dayTextColor: colors.nightBlack,
+                      textDisabledColor: colors.textMuted,
+                      monthTextColor: colors.nightBlack,
+                      arrowColor: colors.nightBlack,
+                      todayTextColor: colors.sunsetOrange,
+                      textDayFontFamily: typography.fontFamily.body,
+                      textMonthFontFamily: typography.fontFamily.bodyBold,
+                      textDayHeaderFontFamily: typography.fontFamily.bodyBold,
+                      textDayFontSize: typography.size.md,
+                      textMonthFontSize: typography.size.lg,
+                      textDayHeaderFontSize: typography.size.sm,
+                    }}
+                    style={styles.calendarCard}
+                  />
+
+                  <View style={styles.calendarLegend}>
+                    <View style={styles.legendRow}>
+                      <View
+                        style={[
+                          styles.legendSwatch,
+                          { backgroundColor: colors.sunsetOrange },
+                        ]}
+                      />
+                      <AppText variant="caption" style={styles.legendLabel}>
+                        Trip dates
+                      </AppText>
+                    </View>
+
+                    <View style={styles.legendRow}>
+                      <View
+                        style={[
+                          styles.legendSwatch,
+                          { backgroundColor: colors.beachYellow },
+                        ]}
+                      />
+                      <AppText variant="caption" style={styles.legendLabel}>
+                        Planning state
+                      </AppText>
+                    </View>
+
+                    <View style={styles.legendRow}>
+                      <View
+                        style={[
+                          styles.legendSwatch,
+                          { backgroundColor: colors.sunsetPink },
+                        ]}
+                      />
+                      <AppText variant="caption" style={styles.legendLabel}>
+                        Voting state
+                      </AppText>
+                    </View>
+                  </View>
+
+                  <View style={styles.calendarActions}>
+                    <AppButton
+                      title="Close"
+                      onPress={() => setShowPhaseDateCalendar(null)}
+                      style={styles.calendarCancelButton}
+                      textStyle={styles.calendarCancelButtonText}
+                      accessibilityLabel="Close timer date selection"
+                    />
+                  </View>
+                </View>
+              </View>
+            </Modal>
           </View>
         </SafeAreaView>
       </View>
@@ -785,7 +1080,9 @@ export default function CreateTripScreen() {
               </View>
             </ScrollView>
 
-            <View style={[styles.continueWrapper, { pointerEvents: "box-none" }]}>
+            <View
+              style={[styles.continueWrapper, { pointerEvents: "box-none" }]}
+            >
               <AppButton
                 title="Back to Landing Page"
                 onPress={() => router.replace("/home")}
@@ -854,7 +1151,9 @@ export default function CreateTripScreen() {
                 </ScrollView>
               </KeyboardAvoidingView>
 
-              <View style={[styles.continueWrapper, { pointerEvents: "box-none" }]}>
+              <View
+                style={[styles.continueWrapper, { pointerEvents: "box-none" }]}
+              >
                 <AppButton
                   title="Continue"
                   onPress={handleContinueFromDestination}
@@ -878,7 +1177,6 @@ export default function CreateTripScreen() {
             </>
           ) : (
             <>
-              
               <View
                 style={[styles.curlyWrapper, { pointerEvents: "none" }]}
                 {...(Platform.OS !== "web" ? { accessible: false } : {})}
@@ -940,48 +1238,16 @@ export default function CreateTripScreen() {
 
                     <Pressable
                       style={styles.dateInput}
-                      onPress={() => {
-                        setShowTripStartPicker(true);
-                        setShowTripEndPicker(false);
-                      }}
+                      onPress={openTripCalendar}
                       accessibilityRole="button"
                       accessibilityLabel="Select trip dates"
-                      accessibilityHint="Opens the date picker"
+                      accessibilityHint="Opens the calendar to select a date range"
                     >
                       <AppText variant="body" style={styles.dateText}>
                         {formatDate(tripStart)} - {formatDate(tripEnd)}
                       </AppText>
                       <Calendar width={20} height={20} />
                     </Pressable>
-
-                    {showTripStartPicker && (
-                      <DateTimePicker
-                        value={tripStart}
-                        mode="date"
-                        display={Platform.OS === "ios" ? "spinner" : "default"}
-                        onChange={(_: DateTimePickerEvent, date?: Date) => {
-                          setShowTripStartPicker(false);
-                          if (date) {
-                            setTripStart(date);
-                            if (tripEnd < date) setTripEnd(date);
-                            setShowTripEndPicker(true);
-                          }
-                        }}
-                      />
-                    )}
-
-                    {showTripEndPicker && (
-                      <DateTimePicker
-                        value={tripEnd}
-                        mode="date"
-                        minimumDate={tripStart}
-                        display={Platform.OS === "ios" ? "spinner" : "default"}
-                        onChange={(_: DateTimePickerEvent, date?: Date) => {
-                          setShowTripEndPicker(false);
-                          if (date) setTripEnd(date);
-                        }}
-                      />
-                    )}
                   </View>
                 </ScrollView>
               </KeyboardAvoidingView>
@@ -998,6 +1264,70 @@ export default function CreateTripScreen() {
               </View>
             </>
           )}
+
+          <Modal
+            visible={showTripCalendar}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowTripCalendar(false)}
+          >
+            <View style={styles.calendarOverlay}>
+              <View style={styles.calendarModal}>
+                <AppText variant="body" style={styles.calendarTitle}>
+                  Select your trip dates
+                </AppText>
+
+                <RangeCalendar
+                  markingType="period"
+                  minDate={toLocalDateString(new Date())}
+                  markedDates={markedTripDates}
+                  onDayPress={handleTripDayPress}
+                  enableSwipeMonths
+                  hideExtraDays
+                  firstDay={1}
+                  renderArrow={(direction) => (
+                    <AppText variant="body" style={styles.calendarArrow}>
+                      {direction === "left" ? "‹" : "›"}
+                    </AppText>
+                  )}
+                  theme={{
+                    backgroundColor: colors.lightWhite,
+                    calendarBackground: colors.lightWhite,
+                    textSectionTitleColor: colors.textMuted,
+                    dayTextColor: colors.nightBlack,
+                    textDisabledColor: colors.textMuted,
+                    monthTextColor: colors.nightBlack,
+                    arrowColor: colors.nightBlack,
+                    todayTextColor: colors.sunsetOrange,
+                    textDayFontFamily: typography.fontFamily.body,
+                    textMonthFontFamily: typography.fontFamily.bodyBold,
+                    textDayHeaderFontFamily: typography.fontFamily.bodyBold,
+                    textDayFontSize: typography.size.md,
+                    textMonthFontSize: typography.size.lg,
+                    textDayHeaderFontSize: typography.size.sm,
+                  }}
+                  style={styles.calendarCard}
+                />
+
+                <View style={styles.calendarActions}>
+                  <AppButton
+                    title="Cancel"
+                    onPress={() => setShowTripCalendar(false)}
+                    style={styles.calendarCancelButton}
+                    textStyle={styles.calendarCancelButtonText}
+                    accessibilityLabel="Cancel date selection"
+                  />
+                  <AppButton
+                    title="Apply dates"
+                    onPress={applyTripRange}
+                    style={styles.calendarApplyButton}
+                    textStyle={styles.calendarApplyButtonText}
+                    accessibilityLabel="Apply selected trip dates"
+                  />
+                </View>
+              </View>
+            </View>
+          </Modal>
         </View>
       </SafeAreaView>
     </View>
@@ -1330,5 +1660,81 @@ const styles = StyleSheet.create({
     fontSize: typography.size.lg,
     lineHeight: typography.lineHeight.lg,
     fontFamily: typography.fontFamily.body,
+  },
+  calendarOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+  },
+  calendarModal: {
+    backgroundColor: colors.lightWhite,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+  },
+  calendarTitle: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+  },
+  calendarCard: {
+    paddingBottom: spacing.sm,
+  },
+  calendarArrow: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+    paddingHorizontal: spacing.sm,
+  },
+  calendarLegend: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
+  legendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  legendSwatch: {
+    width: 16,
+    height: 16,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+  },
+  legendLabel: {
+    color: colors.nightBlack,
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+    fontFamily: typography.fontFamily.body,
+  },
+  calendarActions: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  calendarCancelButton: {
+    flex: 1,
+    backgroundColor: colors.beachYellow,
+  },
+  calendarCancelButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  calendarApplyButton: {
+    flex: 1,
+    backgroundColor: colors.sunsetOrange,
+  },
+  calendarApplyButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
   },
 });
