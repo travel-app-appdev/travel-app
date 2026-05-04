@@ -12,7 +12,8 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Alert,
-  Animated
+  Animated,
+  Text
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
@@ -493,29 +494,55 @@ const progressAnim = progress.interpolate({
   outputRange: ["0%", "100%"],
 });
 
-const ProgressBar = () => ({width}: {width: Animated.AnimatedInterpolation<string>}) => {
+
+type ProgressBarProps = {
+  progressWidth: Animated.AnimatedInterpolation<string>;
+  currentStep: number;
+  totalSteps: number;
+
+};
+
+const ProgressBar: React.FC<ProgressBarProps> = ({
+  progressWidth,
+  currentStep,
+  totalSteps,
+}) => {
   return (
     <View
-    style={{
-      width: "100%",
-      height: 20,
-      borderRadius: 20,
-      backgroundColor: colors.grayedOut,
-      overflow: "hidden",
-    }}
-  >
-    <Animated.View
+      style={{
+        width: "100%",
+        height: 20,
+        borderRadius: 20,
+        backgroundColor: colors.grayedOut,
+        overflow: "hidden",
+        justifyContent: "center",
+      }}
+    >
+      {/* Animated fill */}
+      <Animated.View
         style={{
-          height: 20,
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
           borderRadius: 20,
           backgroundColor: colors.seaBlue,
-          width,
+          width: progressWidth,
         }}
       />
 
+      <Text 
+      style={{
+          alignSelf: "center",
+          color: colors.nightBlack,
+          fontSize: 12,
+          fontWeight: "600",
+      }}>
+        {currentStep}/{totalSteps}
+      </Text>
     </View>
-  )
-}
+  );
+};
 
   if (step === 3) {
     return (
@@ -541,9 +568,8 @@ const ProgressBar = () => ({width}: {width: Animated.AnimatedInterpolation<strin
               </View>
 
               <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
-                <ProgressBar width={progressAnim} />
+                <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
               </View>
-
 
               <AppText variant="title" style={styles.titleStep3}>
                 Set up the timers
@@ -802,6 +828,10 @@ const ProgressBar = () => ({width}: {width: Animated.AnimatedInterpolation<strin
                 </View>
               </View>
 
+            <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
+                <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
+              </View>
+
               <AppText variant="title" style={styles.titleStep3}>
                 Add members to the trip
               </AppText>
@@ -876,6 +906,10 @@ const ProgressBar = () => ({width}: {width: Animated.AnimatedInterpolation<strin
                       </AppText>
                     </View>
                   </View>
+
+                  <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
+                <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
+              </View>
 
                   <AppText variant="title" style={styles.titleStep1}>
                     Where is your trip taking place?
@@ -955,6 +989,10 @@ const ProgressBar = () => ({width}: {width: Animated.AnimatedInterpolation<strin
                       </AppText>
                     </View>
                   </View>
+
+                  <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
+                <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
+              </View>
 
                   <AppText variant="title" style={styles.titleStep2}>
                     Give your trip a name and choose a date
