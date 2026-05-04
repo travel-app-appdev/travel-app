@@ -62,11 +62,15 @@ export function TripCard({
       accessibilityRole="button"
       accessibilityLabel={`${title}, ${destination}, ${startDate} to ${endDate}, ${statusLabel}`}
       accessibilityHint={
-        role === "admin" ? "Opens trip settings" : "Opens trip information"
+        role === "admin" ? "Opens trip itinerary" : "Opens trip itinerary"
       }
     >
-      {/* Row 1: title + status badge */}
-      <View style={styles.titleRow}>
+      {/* Row 1: title + status badge — both decorative, card label covers them */}
+      <View
+        style={styles.titleRow}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+      >
         <AppText variant="title" style={styles.title} numberOfLines={2}>
           {title}
         </AppText>
@@ -78,8 +82,12 @@ export function TripCard({
         </View>
       </View>
 
-      {/* Row 2: destination + date */}
-      <View style={styles.middleRow}>
+      {/* Row 2: destination + date — decorative, card label covers them */}
+      <View
+        style={styles.middleRow}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+      >
         <AppText variant="caption" style={styles.destination} numberOfLines={1}>
           {destination}
         </AppText>
@@ -89,9 +97,15 @@ export function TripCard({
         </AppText>
       </View>
 
-      {/* Row 3: avatars + icon on the same line */}
+      {/* Row 3: avatars + icon button */}
       <View style={styles.bottomRow}>
-        <View style={styles.avatars}>
+
+        {/* Avatars — decorative, member count not critical for navigation */}
+        <View
+          style={styles.avatars}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
           {members.slice(0, 4).map((member, index) => (
             <View
               key={member.id}
@@ -110,30 +124,56 @@ export function TripCard({
           ))}
         </View>
 
-        {/*accessibilityRole="button" only on mobile, on web it turns
-        View into <button> causing nested button error.
-        On mobile screen readers correctly announce it as a button. */}
-        <View
-          style={styles.iconButton}
-          {...(Platform.OS !== "web" ? { accessibilityRole: "button" } : {})}
-          accessibilityLabel={role === "admin" ? "Edit trip" : "Trip information"}
-          accessibilityHint={
-            role === "admin"
-              ? "Opens trip settings"
-              : "Opens trip information screen"
-          }
-          onStartShouldSetResponder={() => true}
-          onResponderGrant={(e) => {
-            e.stopPropagation();
-            onIconPress?.();
-          }}
-        >
-          {role === "admin" ? (
-            <Edit width={22} height={22} />
-          ) : (
-            <InfoIcon width={22} height={22} />
-          )}
-        </View>
+        {/*
+          Fix 6: replaced the View + onStartShouldSetResponder pattern with a
+          proper Pressable on mobile and a plain View on web to avoid the
+          nested button error. The Pressable has a large enough hit area and
+          stopPropagation so tapping it doesn't also fire the card's onPress.
+        */}
+        {Platform.OS === "web" ? (
+          <View
+            style={styles.iconButton}
+            accessibilityLabel={role === "admin" ? "Edit trip" : "Trip information"}
+            accessibilityHint={
+              role === "admin"
+                ? "Opens trip settings"
+                : "Opens trip information screen"
+            }
+            onStartShouldSetResponder={() => true}
+            onResponderGrant={(e) => {
+              e.stopPropagation();
+              onIconPress?.();
+            }}
+          >
+            {role === "admin" ? (
+              <Edit width={22} height={22} />
+            ) : (
+              <InfoIcon width={22} height={22} />
+            )}
+          </View>
+        ) : (
+          <Pressable
+            style={styles.iconButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              onIconPress?.();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={role === "admin" ? "Edit trip" : "Trip information"}
+            accessibilityHint={
+              role === "admin"
+                ? "Opens trip settings"
+                : "Opens trip information screen"
+            }
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            {role === "admin" ? (
+              <Edit width={22} height={22} />
+            ) : (
+              <InfoIcon width={22} height={22} />
+            )}
+          </Pressable>
+        )}
       </View>
     </Pressable>
   );
@@ -219,5 +259,9 @@ const styles = StyleSheet.create({
   iconButton: {
     padding: 8,
     marginRight: -8,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
