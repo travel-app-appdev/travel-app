@@ -1,4 +1,3 @@
-// components/common/AppText.tsx
 import { Text, TextProps, StyleSheet } from "react-native";
 import { colors, typography } from "@/src/theme";
 
@@ -15,7 +14,7 @@ export function AppText({
   return (
     <Text
       style={[styles.base, styles[variant], style]}
-      maxFontSizeMultiplier={1.2}
+      maxFontSizeMultiplier={1.5}
       {...props}
     >
       {children}
