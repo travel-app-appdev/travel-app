@@ -656,7 +656,10 @@ export default function TripSettingsScreen() {
                 accessibilityState={{ expanded: openField === "name" }}
               >
                 <View style={styles.infoLeft}>
-                  <View style={styles.infoLabelRow}>
+                  <View style={styles.infoLabelRow}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                  >
                     <TripTitle width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
                       Trip name
@@ -720,7 +723,10 @@ export default function TripSettingsScreen() {
                 accessibilityState={{ expanded: openField === "date" }}
               >
                 <View style={styles.infoLeft}>
-                  <View style={styles.infoLabelRow}>
+                  <View style={styles.infoLabelRow}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                  >
                     <Calendar width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
                       Trip date
@@ -819,7 +825,10 @@ export default function TripSettingsScreen() {
                 accessibilityState={{ expanded: openField === "destination" }}
               >
                 <View style={styles.infoLeft}>
-                  <View style={styles.infoLabelRow}>
+                  <View style={styles.infoLabelRow}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                  >
                     <Location width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
                       Destination
@@ -883,7 +892,10 @@ export default function TripSettingsScreen() {
                 accessibilityState={{ expanded: openField === "members" }}
               >
                 <View style={styles.infoLeft}>
-                  <View style={styles.infoLabelRow}>
+                  <View style={styles.infoLabelRow}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                  >
                     <AddPeople width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
                       Members
@@ -963,7 +975,10 @@ export default function TripSettingsScreen() {
             <View style={styles.fieldGroup}>
               <View style={styles.infoRow}>
                 <View style={styles.infoLeft}>
-                  <View style={styles.infoLabelRow}>
+                  <View style={styles.infoLabelRow}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                  >
                     <KeyFrame width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
                       Code
