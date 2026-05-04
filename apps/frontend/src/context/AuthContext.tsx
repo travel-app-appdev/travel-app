@@ -9,7 +9,7 @@ type AuthContextValue = {
   idToken: string | null;
   setUser: (user: AuthResponse | null) => void;
   setIdToken: (token: string | null) => void;
-  isLoading: boolean;
+  isBootstrapping: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -17,32 +17,46 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthResponse | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   useEffect(() => {
+    let hasResolvedOnce = false;
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
+      try {
+        if (firebaseUser) {
+          // Get Firebase token
           const token = await firebaseUser.getIdToken();
-          const backendUser = await loginWithToken(token);
           setIdToken(token);
-          setUser(backendUser);
-        } catch {
+
+          // Kick off backend login, but DON'T block bootstrap on it
+          loginWithToken(token)
+            .then((backendUser) => {
+              setUser(backendUser);
+            })
+            .catch(() => {
+              setUser(null);
+              setIdToken(null);
+            });
+        } else {
           setUser(null);
           setIdToken(null);
         }
-      } else {
-        setUser(null);
-        setIdToken(null);
+      } finally {
+        if (!hasResolvedOnce) {
+          hasResolvedOnce = true;
+          setIsBootstrapping(false); // we’re done with initial auth check
+        }
       }
-      setIsLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, idToken, setIdToken, isLoading }}>
+    <AuthContext.Provider
+      value={{ user, setUser, idToken, setIdToken, isBootstrapping }}
+    >
       {children}
     </AuthContext.Provider>
   );
