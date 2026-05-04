@@ -1,4 +1,3 @@
-// components/common/AppInput.tsx
 import { forwardRef } from "react";
 import {
   TextInput,
@@ -21,7 +20,17 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
         ref={ref}
         placeholderTextColor={colors.textMuted}
         style={[styles.input, hasError && styles.inputError, style]}
-        accessibilityState={{ disabled: props.editable === false }}
+        accessibilityState={{
+          disabled: props.editable === false,
+        }}
+        // Communicate error state via hint — 'invalid' is not in RN's AccessibilityState
+        accessibilityHint={
+          hasError
+            ? props.accessibilityHint
+              ? `${props.accessibilityHint}. This field has an error.`
+              : "This field has an error."
+            : props.accessibilityHint
+        }
         {...props}
       />
     );
