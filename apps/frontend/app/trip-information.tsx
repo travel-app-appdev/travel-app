@@ -1,4 +1,3 @@
-// app/trip-information.tsx
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ScrollView,
@@ -288,7 +287,10 @@ export default function TripInformationScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.infoLabelRow}>
+              <View style={styles.infoLabelRow}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
                 <TripTitle width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
                   Trip name
@@ -300,7 +302,10 @@ export default function TripInformationScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.infoLabelRow}>
+              <View style={styles.infoLabelRow}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
                 <Calendar width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
                   Trip date
@@ -313,7 +318,10 @@ export default function TripInformationScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.infoLabelRow}>
+              <View style={styles.infoLabelRow}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
                 <Location width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
                   Destination
@@ -325,7 +333,10 @@ export default function TripInformationScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.infoLabelRow}>
+              <View style={styles.infoLabelRow}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
                 <AddPeople width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
                   Members
