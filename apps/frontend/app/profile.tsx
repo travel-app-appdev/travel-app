@@ -1,8 +1,9 @@
-// app/profile.tsx
 import { useRouter } from "expo-router";
 import { useState, useEffect, useRef } from "react";
 import {
+  AccessibilityInfo,
   Alert,
+  findNodeHandle,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -46,7 +47,6 @@ export default function ProfileScreen() {
   const { height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenHeight < 700;
 
-  // Cleanup timeouts on unmount to prevent state updates on unmounted component
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const safeTimeout = (fn: () => void, delay: number) => {
     const id = setTimeout(fn, delay);
@@ -55,11 +55,22 @@ export default function ProfileScreen() {
   };
   useEffect(() => {
     const timeouts = timeoutRefs.current;
-
     return () => {
       timeouts.forEach(clearTimeout);
     };
   }, []);
+
+  // Ref for skip-to-logout focus jump — Fix 8
+  const logoutRef = useRef<View>(null);
+
+  function skipToLogout() {
+    if (logoutRef.current) {
+      const node = findNodeHandle(logoutRef.current);
+      if (node) {
+        AccessibilityInfo.setAccessibilityFocus(node);
+      }
+    }
+  }
 
   const [name, setName] = useState(user?.name ?? "");
   const [nameInput, setNameInput] = useState(user?.name ?? "");
@@ -234,10 +245,28 @@ export default function ProfileScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* Skip to logout — visually hidden, screen reader only — Fix 8 */}
+            <Pressable
+              onPress={skipToLogout}
+              accessibilityRole="button"
+              accessibilityLabel="Skip to logout button"
+              accessibilityHint="Moves focus directly to the logout action"
+              style={styles.skipButton}
+              importantForAccessibility="yes"
+            >
+              <AppText variant="caption" style={styles.skipButtonText}>
+                Skip to logout
+              </AppText>
+            </Pressable>
+
             {/* Header */}
             <View style={styles.header}>
               <BackLink href="/home" />
-              <View style={styles.headerTitle}>
+              <View
+                style={styles.headerTitle}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
                 <Profile width={20} height={20} />
                 <AppText variant="body" style={styles.headerLabel}>
                   Profile
@@ -256,25 +285,38 @@ export default function ProfileScreen() {
                   setNameInput(name);
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="Edit name"
+                accessibilityLabel={`Edit name, current value: ${name || "not set"}`}
                 accessibilityState={{ expanded: nameOpen }}
               >
                 <View style={styles.infoLeft}>
-                  <View style={styles.infoLabelRow}>
+                  <View
+                    style={styles.infoLabelRow}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                  >
                     <IdCard width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
                       Name
                     </AppText>
                   </View>
-                  <AppText variant="caption" style={styles.infoValue}>
+                  <AppText
+                    variant="caption"
+                    style={styles.infoValue}
+                    accessible={false}
+                  >
                     {name || "—"}
                   </AppText>
                 </View>
-                {nameOpen ? (
-                  <ArrowUp width={20} height={20} />
-                ) : (
-                  <ArrowDown width={20} height={20} />
-                )}
+                <View
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  {nameOpen ? (
+                    <ArrowUp width={20} height={20} />
+                  ) : (
+                    <ArrowDown width={20} height={20} />
+                  )}
+                </View>
               </Pressable>
 
               {nameOpen && (
@@ -290,6 +332,7 @@ export default function ProfileScreen() {
                     autoFocus
                     accessibilityLabel="Name"
                     accessibilityHint="Edit your name"
+                    hasError={!!nameError}
                     style={styles.inputBlackStroke}
                   />
                   {nameError && (
@@ -310,7 +353,11 @@ export default function ProfileScreen() {
                     accessibilityLabel="Update name"
                   />
                   {nameUpdated && (
-                    <View style={styles.successRow}>
+                    <View
+                      style={styles.successRow}
+                      accessible={false}
+                      importantForAccessibility="no-hide-descendants"
+                    >
                       <CheckMark width={18} height={18} />
                       <AppText
                         variant="caption"
@@ -336,25 +383,38 @@ export default function ProfileScreen() {
                   setEmailInput(email);
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="Edit email"
+                accessibilityLabel={`Edit email, current value: ${email || "not set"}`}
                 accessibilityState={{ expanded: emailOpen }}
               >
                 <View style={styles.infoLeft}>
-                  <View style={styles.infoLabelRow}>
+                  <View
+                    style={styles.infoLabelRow}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                  >
                     <Email width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
                       Email
                     </AppText>
                   </View>
-                  <AppText variant="caption" style={styles.infoValue}>
+                  <AppText
+                    variant="caption"
+                    style={styles.infoValue}
+                    accessible={false}
+                  >
                     {email || "—"}
                   </AppText>
                 </View>
-                {emailOpen ? (
-                  <ArrowUp width={20} height={20} />
-                ) : (
-                  <ArrowDown width={20} height={20} />
-                )}
+                <View
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  {emailOpen ? (
+                    <ArrowUp width={20} height={20} />
+                  ) : (
+                    <ArrowDown width={20} height={20} />
+                  )}
+                </View>
               </Pressable>
 
               {emailOpen && (
@@ -372,6 +432,7 @@ export default function ProfileScreen() {
                     autoFocus
                     accessibilityLabel="Email"
                     accessibilityHint="Edit your email"
+                    hasError={!!emailError}
                     style={styles.inputBlackStroke}
                   />
                   {emailError && (
@@ -396,7 +457,11 @@ export default function ProfileScreen() {
                     accessibilityLabel="Update email"
                   />
                   {emailUpdated && (
-                    <View style={styles.successRow}>
+                    <View
+                      style={styles.successRow}
+                      accessible={false}
+                      importantForAccessibility="no-hide-descendants"
+                    >
                       <CheckMark width={18} height={18} />
                       <AppText
                         variant="caption"
@@ -427,21 +492,34 @@ export default function ProfileScreen() {
                 accessibilityState={{ expanded: passwordOpen }}
               >
                 <View style={styles.infoLeft}>
-                  <View style={styles.infoLabelRow}>
+                  <View
+                    style={styles.infoLabelRow}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                  >
                     <KeyFrame width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
                       Password
                     </AppText>
                   </View>
-                  <AppText variant="caption" style={styles.infoValue}>
+                  <AppText
+                    variant="caption"
+                    style={styles.infoValue}
+                    accessible={false}
+                  >
                     ****************
                   </AppText>
                 </View>
-                {passwordOpen ? (
-                  <ArrowUp width={20} height={20} />
-                ) : (
-                  <ArrowDown width={20} height={20} />
-                )}
+                <View
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  {passwordOpen ? (
+                    <ArrowUp width={20} height={20} />
+                  ) : (
+                    <ArrowDown width={20} height={20} />
+                  )}
+                </View>
               </Pressable>
 
               {passwordOpen && (
@@ -462,6 +540,7 @@ export default function ProfileScreen() {
                       autoFocus
                       accessibilityLabel="Current password"
                       accessibilityHint="Enter your current password to verify identity"
+                      hasError={!!passwordError}
                     />
                     <Pressable
                       style={styles.visibilityIcon}
@@ -475,11 +554,16 @@ export default function ProfileScreen() {
                           : "Show current password"
                       }
                     >
-                      {currentPasswordVisible ? (
-                        <VisibilityOff width={24} height={24} />
-                      ) : (
-                        <VisibilityOn width={24} height={24} />
-                      )}
+                      <View
+                        accessible={false}
+                        importantForAccessibility="no-hide-descendants"
+                      >
+                        {currentPasswordVisible ? (
+                          <VisibilityOff width={24} height={24} />
+                        ) : (
+                          <VisibilityOn width={24} height={24} />
+                        )}
+                      </View>
                     </Pressable>
                   </View>
 
@@ -498,6 +582,7 @@ export default function ProfileScreen() {
                       secureTextEntry={!passwordVisible}
                       accessibilityLabel="New password"
                       accessibilityHint="Enter your new password"
+                      hasError={!!passwordError}
                     />
                     <Pressable
                       style={styles.visibilityIcon}
@@ -509,11 +594,16 @@ export default function ProfileScreen() {
                           : "Show new password"
                       }
                     >
-                      {passwordVisible ? (
-                        <VisibilityOff width={24} height={24} />
-                      ) : (
-                        <VisibilityOn width={24} height={24} />
-                      )}
+                      <View
+                        accessible={false}
+                        importantForAccessibility="no-hide-descendants"
+                      >
+                        {passwordVisible ? (
+                          <VisibilityOff width={24} height={24} />
+                        ) : (
+                          <VisibilityOn width={24} height={24} />
+                        )}
+                      </View>
                     </Pressable>
                   </View>
 
@@ -541,7 +631,11 @@ export default function ProfileScreen() {
                   />
 
                   {passwordUpdated && (
-                    <View style={styles.successRow}>
+                    <View
+                      style={styles.successRow}
+                      accessible={false}
+                      importantForAccessibility="no-hide-descendants"
+                    >
                       <CheckMark width={18} height={18} />
                       <AppText
                         variant="caption"
@@ -557,8 +651,12 @@ export default function ProfileScreen() {
             </View>
           </ScrollView>
 
-          {/* Logout — pinned to bottom, always visible above safe area */}
-          <SafeAreaView edges={["bottom"]} style={styles.logoutSafeArea}>
+          {/* Logout — pinned to bottom, ref attached for skip-to focus — Fix 8 */}
+          <SafeAreaView
+            edges={["bottom"]}
+            style={styles.logoutSafeArea}
+            ref={logoutRef}
+          >
             <View style={styles.logoutWrapper}>
               <ActionCard
                 label="Logout"
@@ -589,6 +687,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     gap: spacing.xl,
+  },
+  // Visually hidden skip button — screen readers only — Fix 8
+  skipButton: {
+    opacity: 0,
+    height: 1,
+    overflow: "hidden",
+    marginBottom: -1,
+  },
+  skipButtonText: {
+    color: colors.textPrimary,
   },
   header: {
     flexDirection: "row",
