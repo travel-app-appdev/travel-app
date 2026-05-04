@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
+  findNodeHandle,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -61,10 +63,10 @@ function splitBackendSlotId(slotId: string) {
   };
 }
 
-function mapBackendActivity(activity: any, fallback: {
-  dayId: string;
-  slotId: string;
-}): Activity {
+function mapBackendActivity(
+  activity: any,
+  fallback: { dayId: string; slotId: string }
+): Activity {
   const backendSlot = activity.slot_id
     ? splitBackendSlotId(activity.slot_id)
     : fallback;
@@ -93,12 +95,9 @@ type RouteMember = {
 
 function parsePlanningStatusJson(value?: string) {
   if (!value) return undefined;
-
   try {
     const parsed = JSON.parse(value);
-
     if (!Array.isArray(parsed)) return undefined;
-
     return parsed
       .map((member: RouteMember) => ({
         userId: member.id ?? member.userId ?? "",
@@ -130,11 +129,9 @@ function markPlanningDoneForUser(
   const hasExistingUser = planningStatus.some(
     (member) => member.userId === userId
   );
-
   if (!hasExistingUser) {
     return [...planningStatus, { userId, hasFinishedPlanning: true }];
   }
-
   return planningStatus.map((member) =>
     member.userId === userId ? { ...member, hasFinishedPlanning: true } : member
   );
@@ -256,10 +253,10 @@ export default function ItineraryScreen() {
   }));
 
   const [apiActivities, setApiActivities] = useState<Activity[]>(() => {
-  const keys = [...activitiesCache.keys()];
-  const matchingKey = keys.find((k) => k.startsWith(`${tripId}_`));
-  return matchingKey ? (activitiesCache.get(matchingKey) ?? []) : [];
-});
+    const keys = [...activitiesCache.keys()];
+    const matchingKey = keys.find((k) => k.startsWith(`${tripId}_`));
+    return matchingKey ? (activitiesCache.get(matchingKey) ?? []) : [];
+  });
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   const [isLoadingActivities, setIsLoadingActivities] = useState(() => {
@@ -277,6 +274,9 @@ export default function ItineraryScreen() {
   );
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
+
+  // Ref for moving focus into the popup when it appears — Fix 3
+  const popupRef = useRef<View>(null);
 
   const slots = useMemo(() => generateTimeSlots(), []);
 
@@ -336,6 +336,16 @@ export default function ItineraryScreen() {
     };
   }, []);
 
+  // Move focus into the popup when it appears — Fix 3
+  useEffect(() => {
+    if (showPlanningInfoPopup && popupRef.current) {
+      const node = findNodeHandle(popupRef.current);
+      if (node) {
+        AccessibilityInfo.setAccessibilityFocus(node);
+      }
+    }
+  }, [showPlanningInfoPopup]);
+
   // Load activities from API
   useEffect(() => {
     async function loadActivities() {
@@ -380,7 +390,6 @@ export default function ItineraryScreen() {
             ? tripDays.map((day) => day.id)
             : [selectedDayId];
 
-        // Все слоты загружаются параллельно через Promise.all
         const allActivities = (
           await Promise.all(
             daysToLoad.flatMap((dayId) =>
@@ -402,8 +411,8 @@ export default function ItineraryScreen() {
           )
         ).flat();
 
-        // Обновляем UI только если данные изменились — без видимого прыжка
-        const hasChanged = JSON.stringify(cached) !== JSON.stringify(allActivities);
+        const hasChanged =
+          JSON.stringify(cached) !== JSON.stringify(allActivities);
         if (hasChanged) {
           activitiesCache.set(cacheKey, allActivities);
           setApiActivities(allActivities);
@@ -499,6 +508,7 @@ export default function ItineraryScreen() {
       ),
     [itinerary.planningStatus]
   );
+
   const currentUserStatus = itinerary.planningStatus.find(
     (m) => m.userId === currentUserId
   );
@@ -511,7 +521,6 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
-
     router.push({
       pathname: "/add-activity",
       params: {
@@ -534,7 +543,6 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
-
     router.push({
       pathname: "/add-activity",
       params: {
@@ -559,14 +567,10 @@ export default function ItineraryScreen() {
 
   async function handleFinishPlanning() {
     if (hasCurrentUserFinished || isSubmittingPlanning) return;
-
     if (!currentUserId) return;
 
     if (itinerary.tripId === "trip-fallback") {
-      const nextState = shouldSkipVoting(tripMemberCount)
-        ? "final"
-        : "planning";
-
+      const nextState = shouldSkipVoting(tripMemberCount) ? "final" : "planning";
       setItinerary((current) => ({
         ...current,
         state: nextState,
@@ -575,11 +579,9 @@ export default function ItineraryScreen() {
           currentUserId
         ),
       }));
-
       if (nextState === "final") {
         router.setParams({ state: "final" });
       }
-
       return;
     }
 
@@ -610,7 +612,6 @@ export default function ItineraryScreen() {
           currentUserId
         ),
       }));
-
       router.setParams({ state: nextState });
     } catch (error) {
       Alert.alert(
@@ -633,26 +634,23 @@ export default function ItineraryScreen() {
     return set;
   }, [votingActivities]);
 
-  // app/itinerary.tsx — votingTimeChips useMemo
-const votingTimeChips = useMemo(() => {
-  const seen = new Map<string, string>();
-  votingActivities
-    .filter((a) => a.dayId === selectedDayId)
-    .forEach((a) => {
-      if (!seen.has(a.slotId)) {
-        // Format slotId like "06_08" into "06:00–08:00"
-        const formatted = a.slotId
-          .replace(/_/g, ":")
-          .replace(/:(\d{2})$/, "–$1:00");
-        seen.set(a.slotId, formatted);
-      }
-    });
-
-  return Array.from(seen.entries()).map(([slotId, label]) => ({
-    slotId,
-    label,
-  }));
-}, [votingActivities, selectedDayId]);
+  const votingTimeChips = useMemo(() => {
+    const seen = new Map<string, string>();
+    votingActivities
+      .filter((a) => a.dayId === selectedDayId)
+      .forEach((a) => {
+        if (!seen.has(a.slotId)) {
+          const formatted = a.slotId
+            .replace(/_/g, ":")
+            .replace(/:(\d{2})$/, "–$1:00");
+          seen.set(a.slotId, formatted);
+        }
+      });
+    return Array.from(seen.entries()).map(([slotId, label]) => ({
+      slotId,
+      label,
+    }));
+  }, [votingActivities, selectedDayId]);
 
   const [selectedVotingSlotId, setSelectedVotingSlotId] = useState<string>("");
 
@@ -661,11 +659,9 @@ const votingTimeChips = useMemo(() => {
       setSelectedVotingSlotId("");
       return;
     }
-
     const selectedSlotStillExists = votingTimeChips.some(
       (chip) => chip.slotId === selectedVotingSlotId
     );
-
     if (!selectedSlotStillExists) {
       setSelectedVotingSlotId(votingTimeChips[0].slotId);
     }
@@ -700,11 +696,14 @@ const votingTimeChips = useMemo(() => {
           ) {
             return activity;
           }
-
           const wasSelected = activity.hasCurrentUserVote === true;
           const isSelected = activity.id === activityId;
-          const voteDelta = isSelected && !wasSelected ? 1 : !isSelected && wasSelected ? -1 : 0;
-
+          const voteDelta =
+            isSelected && !wasSelected
+              ? 1
+              : !isSelected && wasSelected
+                ? -1
+                : 0;
           return {
             ...activity,
             hasCurrentUserVote: isSelected,
@@ -716,16 +715,11 @@ const votingTimeChips = useMemo(() => {
 
       if (result.tripState === "Final") {
         setIsPreparingFinalItinerary(true);
-
         if (finalizingTimeoutRef.current) {
           clearTimeout(finalizingTimeoutRef.current);
         }
-
         finalizingTimeoutRef.current = setTimeout(() => {
-          setItinerary((current) => ({
-            ...current,
-            state: "final",
-          }));
+          setItinerary((current) => ({ ...current, state: "final" }));
           setIsPreparingFinalItinerary(false);
           setActivityRefreshKey((value) => value + 1);
           router.setParams({ state: "final" });
@@ -746,7 +740,6 @@ const votingTimeChips = useMemo(() => {
       );
       const selectedDayStillHasVotingActivities =
         daysWithVotingActivities.has(selectedDayId);
-
       if (firstVotingDay && !selectedDayStillHasVotingActivities) {
         setSelectedDayId(firstVotingDay.id);
       }
@@ -768,12 +761,10 @@ const votingTimeChips = useMemo(() => {
 
   async function handleJoinGroup(activityId: string) {
     const activity = finalActivities.find((item) => item.id === activityId);
-
     if (!authToken || !tripId || !activity) {
       Alert.alert("Could not update group", "Please log in again.");
       return;
     }
-
     try {
       const fullSlotId = `${activity.dayId}_${activity.slotId}`;
       const result = await toggleActivityAttendance({
@@ -782,7 +773,6 @@ const votingTimeChips = useMemo(() => {
         slotId: fullSlotId,
         activityId,
       });
-
       setApiActivities((current) =>
         current.map((item) =>
           item.id === activityId &&
@@ -850,9 +840,7 @@ const votingTimeChips = useMemo(() => {
               <View style={styles.planningContent}>
                 <View style={styles.slotList}>
                   {isLoadingActivities
-                    ? slots.map((slot) => (
-                        <SkeletonSlotCard key={slot.id} />
-                      ))
+                    ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
                     : slotItems.map(({ slot, activity }) => (
                         <PlanningSlotCard
                           key={slot.id}
@@ -864,9 +852,13 @@ const votingTimeChips = useMemo(() => {
                         />
                       ))}
                 </View>
-
                 {hasCurrentUserFinished && (
-                  <View style={[styles.planningLockOverlay, { pointerEvents: "auto" }]} />
+                  <View
+                    style={[
+                      styles.planningLockOverlay,
+                      { pointerEvents: "auto" },
+                    ]}
+                  />
                 )}
               </View>
             )}
@@ -908,9 +900,7 @@ const votingTimeChips = useMemo(() => {
             {activeState === "final" && (
               <View style={styles.slotList}>
                 {isLoadingActivities
-                  ? slots.map((slot) => (
-                      <SkeletonSlotCard key={slot.id} />
-                    ))
+                  ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
                   : slots.map((slot) => (
                       <FinalSlotCard
                         key={slot.id}
@@ -928,8 +918,10 @@ const votingTimeChips = useMemo(() => {
           <View style={[styles.footerBackground, { pointerEvents: "none" }]} />
         )}
 
+        {/* Planning info popup — Fix 3: modal focus trap */}
         {showPlanningInfoPopup && (
           <>
+            {/* Full-screen dismiss area sits behind the popup */}
             <Pressable
               style={styles.popupDismissArea}
               onPress={() => {
@@ -941,9 +933,22 @@ const votingTimeChips = useMemo(() => {
               accessibilityRole="button"
               accessibilityLabel="Dismiss planning information"
             />
-            <View style={[styles.popupWrapper, { pointerEvents: "none" }]}>
+
+            {/* Popup — accessibilityViewIsModal traps focus inside */}
+            <View
+              ref={popupRef}
+              style={styles.popupWrapper}
+              accessibilityViewIsModal={true}
+              accessible={true}
+              accessibilityLiveRegion="assertive"
+              accessibilityLabel="You can no longer add activities after submitting."
+            >
               <View style={styles.popup}>
-                <AppText variant="caption" style={styles.popupText}>
+                <AppText
+                  variant="caption"
+                  style={styles.popupText}
+                  accessible={false}
+                >
                   You can no longer add activities after submitting.
                 </AppText>
               </View>
@@ -960,14 +965,29 @@ const votingTimeChips = useMemo(() => {
           />
         )}
 
+        {/* Finalizing overlay — Fix 3 also applies here */}
         {isPreparingFinalItinerary && (
-          <View style={styles.finalizingOverlay}>
+          <View
+            style={styles.finalizingOverlay}
+            accessibilityViewIsModal={true}
+            accessible={true}
+            accessibilityLiveRegion="assertive"
+            accessibilityLabel="Making your itinerary ready. We are choosing the group favorites for each time slot."
+          >
             <View style={styles.finalizingCard}>
               <ActivityIndicator color={colors.nightBlack} />
-              <AppText variant="subtitle" style={styles.finalizingTitle}>
+              <AppText
+                variant="subtitle"
+                style={styles.finalizingTitle}
+                accessible={false}
+              >
                 Making your itinerary ready
               </AppText>
-              <AppText variant="caption" style={styles.finalizingText}>
+              <AppText
+                variant="caption"
+                style={styles.finalizingText}
+                accessible={false}
+              >
                 We are choosing the group favorites for each time slot.
               </AppText>
             </View>
