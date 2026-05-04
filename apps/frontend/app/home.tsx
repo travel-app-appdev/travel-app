@@ -1,4 +1,3 @@
-// app/home.tsx
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
@@ -175,7 +174,6 @@ export default function HomeScreen() {
         }
       });
 
-      // Обновляем кэш и UI свежими данными
       tripsCache = { yourTrips: upcoming, pastTrips: past };
       setYourTrips(upcoming);
       setPastTrips(past);

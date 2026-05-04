@@ -373,11 +373,11 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.xxl,
   },
   badge: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
     alignSelf: "flex-start",
-  },
+    },
   badgeText: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.sm,
