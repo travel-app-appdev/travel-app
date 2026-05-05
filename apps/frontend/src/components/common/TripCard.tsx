@@ -3,6 +3,7 @@ import { AppText } from "./AppText";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import Edit from "@/assets/icons/edit.svg";
 import InfoIcon from "@/assets/icons/info.svg";
+import SettingIcon from "@/assets/icons/settings.svg";
 
 type TripStatus = "planning" | "voting" | "final";
 type TripRole = "admin" | "member";

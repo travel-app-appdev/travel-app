@@ -12,6 +12,8 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Alert,
+  Animated,
+  Text
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
@@ -419,6 +421,77 @@ export default function CreateTripScreen() {
     }
   };
 
+const TOTAL_STEPS = 4;
+
+const progress = useRef(new Animated.Value(1)).current;
+
+useEffect(() => {
+  Animated.timing(progress, {
+    toValue: step,
+    duration: 300,
+    useNativeDriver: false,
+  }).start();
+}, [step]);
+
+const progressAnim = progress.interpolate({
+  inputRange: [1, TOTAL_STEPS],
+  outputRange: ["0%", "100%"],
+});
+
+
+type ProgressBarProps = {
+  progressWidth: Animated.AnimatedInterpolation<string>;
+  currentStep: number;
+  totalSteps: number;
+
+};
+
+const ProgressBar: React.FC<ProgressBarProps> = ({
+  progressWidth,
+  currentStep,
+  totalSteps,
+}) => {
+  return (
+    <View style={{ width: "100%" }}>
+      {/* Progress bar */}
+      <View
+        style={{
+          width: "100%",
+          height: 20,
+          borderRadius: 20,
+          
+          backgroundColor:
+            currentStep === 3 ? colors.grayedOut : colors.lightWhite,
+
+          overflow: "hidden",
+        }}
+      >
+        <Animated.View
+          style={{
+            height: "100%",
+            borderRadius: 20,
+            backgroundColor: colors.seaBlue,
+            width: progressWidth,
+          }}
+        />
+      </View>
+
+      {/* Text underneath */}
+      <Text
+        style={{
+          marginTop: 6,
+          alignSelf: "center",
+          color: colors.nightBlack,
+          fontSize: 14,
+          fontWeight: "600",
+        }}
+      >
+        {currentStep}/{totalSteps}
+      </Text>
+    </View>
+  );
+};
+
   // Step 3 — timer setup
   if (step === 3) {
     return (
@@ -445,6 +518,10 @@ export default function CreateTripScreen() {
                     Create trip
                   </AppText>
                 </View>
+              </View>
+
+              <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
+                <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
               </View>
 
               <AppText variant="title" style={styles.titleStep3}>
@@ -733,6 +810,10 @@ export default function CreateTripScreen() {
                 </View>
               </View>
 
+            <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
+                <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
+              </View>
+
               <AppText variant="title" style={styles.titleStep3}>
                 Add members to the trip
               </AppText>
@@ -831,6 +912,10 @@ export default function CreateTripScreen() {
                     </View>
                   </View>
 
+                  <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
+                <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
+              </View>
+
                   <AppText variant="title" style={styles.titleStep1}>
                     Where is your trip taking place?
                   </AppText>
@@ -917,6 +1002,10 @@ export default function CreateTripScreen() {
                       </AppText>
                     </View>
                   </View>
+
+                  <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
+                <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
+              </View>
 
                   <AppText variant="title" style={styles.titleStep2}>
                     Give your trip a name and choose a date
