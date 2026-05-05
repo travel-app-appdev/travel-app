@@ -1,6 +1,33 @@
-import request from 'supertest';
-import app from '../index';
-import * as tripsService from '../services/tripsService';
+jest.mock('../config/firebase', () => ({
+    __esModule: true,
+    default: {
+        auth: () => ({
+            verifyIdToken: jest.fn(),
+            createUser: jest.fn(),
+            updateUser: jest.fn(),
+        }),
+        firestore: () => ({
+            collection: jest.fn(() => ({
+                doc: jest.fn(() => ({
+                    get: jest.fn(),
+                    set: jest.fn(),
+                    update: jest.fn(),
+                    delete: jest.fn(),
+                })),
+                where: jest.fn().mockReturnThis(),
+                get: jest.fn(),
+                add: jest.fn(),
+            })),
+            batch: jest.fn(() => ({
+                set: jest.fn(),
+                update: jest.fn(),
+                delete: jest.fn(),
+                commit: jest.fn(),
+            })),
+        }),
+    },
+    db: {},
+}));
 
 jest.mock('../services/tripsService', () => ({
     __esModule: true,
@@ -14,6 +41,10 @@ jest.mock('../services/tripsService', () => ({
     finishPlanningForMember: jest.fn(),
     updateTripForAdmin: jest.fn(),
 }));
+
+import request from 'supertest';
+import app from '../index';
+import * as tripsService from '../services/tripsService';
 
 describe('POST /trips/:tripId/finish-planning', () => {
     afterEach(() => {

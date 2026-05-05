@@ -1,6 +1,33 @@
-import request from 'supertest';
-import app from '../index';
-import * as activityService from '../services/activityService';
+jest.mock('../config/firebase', () => ({
+    __esModule: true,
+    default: {
+        auth: () => ({
+            verifyIdToken: jest.fn(),
+            createUser: jest.fn(),
+            updateUser: jest.fn(),
+        }),
+        firestore: () => ({
+            collection: jest.fn(() => ({
+                doc: jest.fn(() => ({
+                    get: jest.fn(),
+                    set: jest.fn(),
+                    update: jest.fn(),
+                    delete: jest.fn(),
+                })),
+                where: jest.fn().mockReturnThis(),
+                get: jest.fn(),
+                add: jest.fn(),
+            })),
+            batch: jest.fn(() => ({
+                set: jest.fn(),
+                update: jest.fn(),
+                delete: jest.fn(),
+                commit: jest.fn(),
+            })),
+        }),
+    },
+    db: {},
+}));
 
 jest.mock('../services/activityService', () => ({
     __esModule: true,
@@ -11,6 +38,10 @@ jest.mock('../services/activityService', () => ({
     updateSuggestedActivity: jest.fn(),
     voteForActivity: jest.fn(),
 }));
+
+import request from 'supertest';
+import app from '../index';
+import * as activityService from '../services/activityService';
 
 describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
     afterEach(() => {
