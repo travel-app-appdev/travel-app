@@ -1,4 +1,3 @@
-// app/join-trip.tsx
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import {
@@ -94,7 +93,10 @@ export default function JoinTripScreen() {
             </AppText>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.fieldLabelRow}>
+              <View style={styles.fieldLabelRow}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
                 <KeyFrame width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
                   Code

@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppText } from "@/src/components/common/AppText";
-import { colors, radius, spacing, typography } from "@/src/theme";
+import { colors, radius, spacing, typography, shadows } from "@/src/theme";
 import { useGoogleLogin } from "@/src/lib/googleAuth";
 import { loginWithToken } from "@/src/api/auth";
 import { useAuth } from "@/src/context/AuthContext";
@@ -219,6 +219,7 @@ const styles = StyleSheet.create({
     color: colors.beachYellow,
     textTransform: "uppercase",
     fontFamily: typography.fontFamily.title,
+    ...shadows.displayTitle,
   },
   titleTraveler: {
     color: colors.sunsetOrange,
@@ -226,6 +227,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.title,
     marginTop: 2,
     paddingBottom: spacing.xl,
+    ...shadows.displayTitle,
   },
   actions: {
     width: "100%",

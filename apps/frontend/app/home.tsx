@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
-import { colors, spacing, radius, typography } from "@/src/theme";
+import { colors, spacing, radius, typography, shadows } from "@/src/theme";
 import { fetchMyTrips, type Trip } from "@/src/api/trips";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
@@ -440,6 +440,7 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.displayMd,
     color: colors.sunsetOrange,
     textAlign: "center",
+    ...shadows.displayTitle,
   },
   subtitleRow: {
     flexDirection: "row",

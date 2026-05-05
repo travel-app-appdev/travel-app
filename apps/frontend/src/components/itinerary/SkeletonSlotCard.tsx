@@ -25,7 +25,11 @@ export function SkeletonSlotCard() {
   }, [opacity]);
 
   return (
-    <Animated.View style={[styles.row, { opacity }]}>
+    <Animated.View style={[styles.row, { opacity }]}
+    accessible={true}
+    accessibilityLabel="Loading activity"
+    accessibilityHint="progress bar"
+    >
       <View style={styles.card}>
         <View style={styles.timeLine} />
         <View style={styles.titleLine} />

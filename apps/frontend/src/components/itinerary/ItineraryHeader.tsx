@@ -1,9 +1,7 @@
-// src/components/itinerary/ItineraryHeader.tsx
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { formatTripDateRange } from "@/src/utils/itinerary/formatTripToDateRange";
-import { Link } from "expo-router";
 import type { ItineraryState } from "@/src/types/itinerary";
 
 import Back from "@/assets/icons/back.svg";
@@ -25,7 +23,6 @@ type Props = {
   state?: ItineraryState;
 };
 
-/** Maps itinerary state to the hero background color */
 function getHeroColor(state: ItineraryState): string {
   switch (state) {
     case "voting":
@@ -67,17 +64,30 @@ export function ItineraryHeader({
     <View style={styles.wrapper}>
       <View style={[styles.hero, { backgroundColor: heroColor }]}>
         <View style={styles.topRow}>
-          <Link
-            href="/home"
-            accessibilityLabel="Go back to welcome screen"
-            accessibilityRole="link"
+
+          {/* Back button — now a Pressable wired to onBackPress */}
+          <Pressable
+            onPress={onBackPress}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={styles.backButton}
           >
             <Back width={20} height={20} />
-          </Link>
+          </Pressable>
 
-          <View style={styles.timerBox}>
-            <HourglassIcon width={18} height={18} />
-            <View>
+          {/* Timer — decorative icon hidden, text grouped */}
+          <View
+            style={styles.timerBox}
+            accessible={true}
+            accessibilityLabel={`${daysLeftText} remaining`}
+          >
+            <HourglassIcon
+              width={18}
+              height={18}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+            />
+            <View accessible={false}>
               <AppText variant="body" style={styles.timerValue}>
                 {daysLeftText}
               </AppText>
@@ -89,21 +99,51 @@ export function ItineraryHeader({
         </View>
 
         <View style={styles.heroContent}>
-          <Mascot width={64} height={64} />
 
+          {/* Mascot — purely decorative */}
+          <Mascot
+            width={64}
+            height={64}
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+          />
+
+          {/* Trip title and destination */}
           <View style={styles.textBlock}>
             <AppText variant="title" style={styles.title}>
               {title}
             </AppText>
 
-            <AppText variant="subtitle" style={styles.destination}>
-              <LocationPin width={18} height={18} style={styles.locationPin} />
-              {destination}
-            </AppText>
+            {/* LocationPin is decorative — destination text carries the meaning */}
+            <View
+              style={styles.destinationRow}
+              accessible={true}
+              accessibilityLabel={`Destination: ${destination}`}
+            >
+              <LocationPin
+                width={18}
+                height={18}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              />
+              <AppText variant="subtitle" style={styles.destination}>
+                {destination}
+              </AppText>
+            </View>
           </View>
 
-          <View style={styles.dateBadge}>
-            <CalendarIcon width={18} height={18} />
+          {/* Date badge — calendar icon is decorative */}
+          <View
+            style={styles.dateBadge}
+            accessible={true}
+            accessibilityLabel={`Trip dates: ${formatTripDateRange(startDate, endDate)}`}
+          >
+            <CalendarIcon
+              width={18}
+              height={18}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+            />
             <AppText variant="body" style={styles.dateText}>
               {formatTripDateRange(startDate, endDate)}
             </AppText>
@@ -125,7 +165,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   hero: {
-    // backgroundColor set dynamically via style prop
     borderTopLeftRadius: 50,
     borderTopRightRadius: 50,
     paddingHorizontal: spacing.xl,
@@ -139,6 +178,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     paddingHorizontal: spacing.sm,
     marginBottom: spacing.xs,
+  },
+  backButton: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
   },
   timerBox: {
     flexDirection: "row",
@@ -162,6 +207,11 @@ const styles = StyleSheet.create({
     color: colors.nightBlack,
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
+  },
+  destinationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
   destination: {
     color: colors.nightBlack,
