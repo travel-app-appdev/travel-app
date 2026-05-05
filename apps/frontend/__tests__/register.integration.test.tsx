@@ -1,51 +1,44 @@
-// apps/frontend/__tests__/register.integration.test.tsx
 import React from "react";
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import RegisterScreen from "@/app/register";
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
+const mockBack = jest.fn();
 const mockHandleRegister = jest.fn();
-
 const mockSetUser = jest.fn();
+
+const mockRouter = {
+  replace: mockReplace,
+  push: mockPush,
+  back: mockBack,
+};
 
 jest.mock("@/src/context/AuthContext", () => ({
   useAuth: () => ({
     user: null,
     setUser: mockSetUser,
+    setIdToken: jest.fn(),
+    isAuthenticated: false,
     loading: false,
+    logout: jest.fn(),
   }),
 }));
 
 jest.mock("expo-router", () => ({
   Link: ({ children }: any) => children,
-  router: {
-    replace: (...args: any[]) => mockReplace(...args),
-  },
+  router: mockRouter,
+  useRouter: () => mockRouter,
 }));
 
 jest.mock("@/src/services/authServices", () => ({
   handleRegister: (...args: any[]) => mockHandleRegister(...args),
 }));
 
-jest.mock("@/assets/icons/back.svg", () => ({
-  __esModule: true,
-  default: () => null,
-}));
-
-jest.mock("@/assets/mascots/mascot-hello-pink.svg", () => ({
-  __esModule: true,
-  default: () => null,
-}));
-
-jest.mock("@/assets/visuals/pink-background.svg", () => ({
-  __esModule: true,
-  default: () => null,
-}));
-
-jest.mock("@/assets/visuals/flowers-blue.svg", () => ({
-  __esModule: true,
-  default: () => null,
-}));
+jest.mock("@/assets/icons/back.svg", () => "Back");
+jest.mock("@/assets/mascots/mascot-hello-pink.svg", () => "MascotHelloPink");
+jest.mock("@/assets/visuals/pink-background.svg", () => "PinkBackground");
+jest.mock("@/assets/visuals/flowers-blue.svg", () => "Flowers");
 
 describe("RegisterScreen", () => {
   beforeEach(() => {
@@ -64,11 +57,12 @@ describe("RegisterScreen", () => {
     });
   });
 
-  it("redirects to home page after successful registration", async () => {
+  it("updates auth state after successful registration", async () => {
     mockHandleRegister.mockResolvedValueOnce({
       uid: "123",
       email: "test@test.com",
       name: "Helen",
+      idToken: "valid-id-token",
     });
 
     const { getByText, getByTestId } = render(<RegisterScreen />);
@@ -87,14 +81,17 @@ describe("RegisterScreen", () => {
       );
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith("/home");
+    expect(mockSetUser).toHaveBeenCalledWith({
+      uid: "123",
+      email: "test@test.com",
+      name: "Helen",
+      idToken: "valid-id-token",
     });
   });
 
   it("shows service error message on failed registration", async () => {
     mockHandleRegister.mockRejectedValueOnce(
-      new Error("Email is already registered")
+      new Error("This email is already registered. Try logging in instead.")
     );
 
     const { getByText, getByTestId } = render(<RegisterScreen />);
@@ -106,7 +103,9 @@ describe("RegisterScreen", () => {
     fireEvent.press(getByText("LET'S GOOOO"));
 
     await waitFor(() => {
-      expect(getByText("Something went wrong. Please try again.")).toBeTruthy();
+      expect(
+        getByText("This email is already registered. Try logging in instead.")
+      ).toBeTruthy();
     });
 
     expect(mockReplace).not.toHaveBeenCalled();

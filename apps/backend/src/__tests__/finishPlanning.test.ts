@@ -1,61 +1,55 @@
-import request from 'supertest';
-import app from '../index';
-
-const mockMarkDone = jest.fn().mockResolvedValue(undefined);
-const mockUpdateState = jest.fn().mockResolvedValue(undefined);
-
 jest.mock('../config/firebase', () => ({
     __esModule: true,
     default: {
         auth: () => ({
-            verifyIdToken: jest.fn().mockImplementation((token) => {
-                if (token === 'valid-token') {
-                    return Promise.resolve({ uid: 'user-123' });
-                }
-                throw new Error('Invalid token');
-            }),
+            verifyIdToken: jest.fn(),
+            createUser: jest.fn(),
+            updateUser: jest.fn(),
         }),
         firestore: () => ({
-            collection: jest.fn().mockImplementation((collectionName) => ({
-                doc: jest.fn().mockImplementation(() => ({
-                    get: jest.fn().mockResolvedValue({
-                        exists: true,
-                        id: 'trip-123',
-                        data: () => ({
-                            title: 'Test Trip',
-                            destination: 'Vienna',
-                            start_date: '2026-05-01',
-                            end_date: '2026-05-03',
-                            state: 'Planning',
-                        }),
-                    }),
-                    update: mockUpdateState,
+            collection: jest.fn(() => ({
+                doc: jest.fn(() => ({
+                    get: jest.fn(),
+                    set: jest.fn(),
+                    update: jest.fn(),
+                    delete: jest.fn(),
                 })),
                 where: jest.fn().mockReturnThis(),
-                get: jest.fn().mockImplementation(() => {
-                    if (collectionName === 'trip_members') {
-                        return Promise.resolve({
-                            empty: false,
-                            docs: [{
-                                data: () => ({
-                                    user_id: 'user-123',
-                                    trip_id: 'trip-123',
-                                    role: 'admin',
-                                    invite_status: 'accepted',
-                                    planning_done: false,
-                                }),
-                                ref: { update: mockMarkDone },
-                            }],
-                        });
-                    }
-                }),
+                get: jest.fn(),
+                add: jest.fn(),
+            })),
+            batch: jest.fn(() => ({
+                set: jest.fn(),
+                update: jest.fn(),
+                delete: jest.fn(),
+                commit: jest.fn(),
             })),
         }),
     },
     db: {},
 }));
 
+jest.mock('../services/tripsService', () => ({
+    __esModule: true,
+    getTripsForUser: jest.fn(),
+    createTripForAuthenticatedUser: jest.fn(),
+    createTripForUserWithoutAuth: jest.fn(),
+    joinTripWithInviteCode: jest.fn(),
+    deleteTripForAdmin: jest.fn(),
+    leaveTripForMember: jest.fn(),
+    removeMemberForAdmin: jest.fn(),
+    finishPlanningForMember: jest.fn(),
+    updateTripForAdmin: jest.fn(),
+}));
+
+import request from 'supertest';
+import app from '../index';
+import * as tripsService from '../services/tripsService';
+
 describe('POST /trips/:tripId/finish-planning', () => {
+    afterEach(() => {
+        jest.clearAllMocks();
+    });
 
     it('should return 400 if idToken is missing', async () => {
         const res = await request(app)
@@ -67,19 +61,22 @@ describe('POST /trips/:tripId/finish-planning', () => {
     });
 
     it('should return 200 and switch state when all members done', async () => {
+        (tripsService.finishPlanningForMember as jest.Mock).mockResolvedValueOnce({
+            allDone: true,
+            tripState: 'Voting',
+            completedMembers: 3,
+            totalMembers: 3,
+        });
+
         const res = await request(app)
             .post('/trips/trip-123/finish-planning')
             .send({ idToken: 'valid-token' });
 
+        expect(tripsService.finishPlanningForMember).toHaveBeenCalledWith('trip-123', 'valid-token');
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('allDone');
         expect(res.body).toHaveProperty('tripState');
         expect(res.body).toHaveProperty('completedMembers');
         expect(res.body).toHaveProperty('totalMembers');
     });
-
-    afterAll(done => {
-        done();
-    });
-
 });
