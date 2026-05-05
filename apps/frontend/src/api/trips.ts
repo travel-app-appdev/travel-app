@@ -163,19 +163,25 @@ type UpdateTripPayload = {
 };
 
 export async function updateTrip(payload: UpdateTripPayload): Promise<Trip> {
+  const requestBody = {
+    idToken: payload.idToken,
+    tripId: payload.tripId,
+    title: payload.title,
+    destination: payload.destination,
+    start_date: payload.start_date,
+    end_date: payload.end_date,
+    planning_end_at: payload.planning_end_at,
+    voting_end_at: payload.voting_end_at,
+    state: payload.state,
+  };
+
   const response = await fetch(`${API_URL}/trips/${payload.tripId}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      idToken: payload.idToken,
-      title: payload.title,
-      destination: payload.destination,
-      start_date: payload.start_date,
-      end_date: payload.end_date,
-      planning_end_at: payload.planning_end_at,
-      voting_end_at: payload.voting_end_at,
-      state: payload.state,
-    }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${payload.idToken}`,
+    },
+    body: JSON.stringify(requestBody),
   });
 
   const data: Trip | ApiErrorResponse = await response.json();
@@ -200,6 +206,7 @@ type FinishPlanningPayload = {
   idToken: string;
   tripId: string;
 };
+
 
 export async function finishPlanning(
   payload: FinishPlanningPayload
