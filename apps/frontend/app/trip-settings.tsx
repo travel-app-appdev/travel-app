@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   useWindowDimensions,
   Modal,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar as RangeCalendar } from "react-native-calendars";
@@ -158,6 +159,17 @@ function parseIsoToTimeString(value?: string): string {
   return parsed ? dateToTimeString(parsed) : "00:00";
 }
 
+function isValidTimeString(value: string): boolean {
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
+}
+
+function normalizeTimeInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 4);
+
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
 function getMarkedRange(
   start: string | null,
   end: string | null,
@@ -257,10 +269,11 @@ export default function TripSettingsScreen() {
   const [isUpdatingName, setIsUpdatingName] = useState(false);
 
   const [tripStart, setTripStart] = useState(
-    startDate ? new Date(startDate) : new Date()
+    startDate ? fromDateString(startDate) : new Date()
   );
+
   const [tripEnd, setTripEnd] = useState(
-    endDate ? new Date(endDate) : new Date()
+    endDate ? fromDateString(endDate) : new Date()
   );
   const [tripDateUpdated, setTripDateUpdated] = useState(false);
   const [isUpdatingDate, setIsUpdatingDate] = useState(false);
@@ -323,30 +336,45 @@ export default function TripSettingsScreen() {
     },
   });
 
+  const [tempPhaseTime, setTempPhaseTime] = useState("12:00");
+
   useEffect(() => {
-    const nextPlanningStart = parseIsoToDate(planningStartedAt);
-    const nextPlanningEnd = parseIsoToDate(planningEndAt);
-    const nextVotingEnd = parseIsoToDate(votingEndAt);
-    const nextFinalDisplay = nextVotingEnd ?? tripEnd;
+    const nextPlanningStart = parseIsoToDate(planningStartedAt) ?? tripStart;
+    const nextPlanningEnd = parseIsoToDate(planningEndAt) ?? tripStart;
+    const nextVotingEnd = parseIsoToDate(votingEndAt) ?? tripEnd;
+
+    const safePlanningEnd =
+      nextPlanningEnd < nextPlanningStart
+        ? nextPlanningStart
+        : nextPlanningEnd > tripEnd
+          ? tripEnd
+          : nextPlanningEnd;
+
+    const safeVotingEnd =
+      nextVotingEnd < safePlanningEnd
+        ? safePlanningEnd
+        : nextVotingEnd > tripEnd
+          ? tripEnd
+          : nextVotingEnd;
 
     setPhaseDates({
       planning: {
-        start: nextPlanningStart ?? tripStart,
-        end: nextPlanningEnd ?? tripStart,
+        start: nextPlanningStart,
+        end: safePlanningEnd,
         time: parseIsoToTimeString(planningEndAt),
       },
       voting: {
-        start: nextPlanningEnd ?? tripStart,
-        end: nextVotingEnd ?? tripStart,
+        start: safePlanningEnd,
+        end: safeVotingEnd,
         time: parseIsoToTimeString(votingEndAt),
       },
       final: {
-        start: nextFinalDisplay ?? tripEnd,
-        end: nextFinalDisplay ?? tripEnd,
+        start: safeVotingEnd,
+        end: safeVotingEnd,
         time: "00:00",
       },
     });
-  }, [planningStartedAt, planningEndAt, votingEndAt, tripStart, tripEnd]);
+  }, [planningStartedAt, planningEndAt, votingEndAt]);
 
   const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
   const [showPhaseDateCalendar, setShowPhaseDateCalendar] =
@@ -380,6 +408,8 @@ export default function TripSettingsScreen() {
   };
 
   const togglePhase = (key: PhaseKey) => {
+    setShowPhaseDateCalendar(null);
+    setShowPhaseTimePicker(null);
     setOpenPhase((prev) => (prev === key ? null : key));
   };
 
@@ -396,7 +426,20 @@ export default function TripSettingsScreen() {
 
     try {
       setIsUpdatingName(true);
-      await updateTrip({ idToken, tripId, title: tripNameInput.trim() });
+      await updateTrip({
+        idToken,
+        tripId,
+        start_date: toLocalDateString(tripStart),
+        end_date: toLocalDateString(tripEnd),
+        planning_end_at: combineDateAndTime(
+          phaseDates.planning.end,
+          phaseDates.planning.time
+        ),
+        voting_end_at: combineDateAndTime(
+          phaseDates.voting.end,
+          phaseDates.voting.time
+        ),
+      });
       setTripName(tripNameInput.trim());
       setTripNameUpdated(true);
       safeTimeout(() => {
@@ -441,19 +484,20 @@ export default function TripSettingsScreen() {
 
   const handleUpdateTripDate = async () => {
     if (isUpdatingDate) return;
+
     const idToken = await getIdToken();
     if (!idToken) return;
 
     try {
-      const tripEndBoundary = endOfDay(tripEnd);
-      const currentPlanningEnd = new Date(
+      const planningEnd = new Date(
         combineDateAndTime(phaseDates.planning.end, phaseDates.planning.time)
       );
-      const currentVotingEnd = new Date(
+      const votingEnd = new Date(
         combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
       );
+      const tripEndBoundary = endOfDay(tripEnd);
 
-      if (currentPlanningEnd > tripEndBoundary) {
+      if (planningEnd > tripEndBoundary) {
         Alert.alert(
           "Invalid trip end",
           "Trip end cannot be before the planning end date."
@@ -461,7 +505,15 @@ export default function TripSettingsScreen() {
         return;
       }
 
-      if (currentVotingEnd > tripEndBoundary) {
+      if (planningEnd >= votingEnd) {
+        Alert.alert(
+          "Invalid phase order",
+          "Voting end must be after planning end."
+        );
+        return;
+      }
+
+      if (votingEnd > tripEndBoundary) {
         Alert.alert(
           "Invalid trip end",
           "Trip end cannot be before the voting end date."
@@ -470,12 +522,22 @@ export default function TripSettingsScreen() {
       }
 
       setIsUpdatingDate(true);
+
       await updateTrip({
         idToken,
         tripId,
-        start_date: toDateOnlyString(tripStart),
-        end_date: toDateOnlyString(tripEnd),
+        start_date: toLocalDateString(tripStart),
+        end_date: toLocalDateString(tripEnd),
+        planning_end_at: combineDateAndTime(
+          phaseDates.planning.end,
+          phaseDates.planning.time
+        ),
+        voting_end_at: combineDateAndTime(
+          phaseDates.voting.end,
+          phaseDates.voting.time
+        ),
       });
+
       setTripDateUpdated(true);
       safeTimeout(() => {
         setTripDateUpdated(false);
@@ -489,7 +551,6 @@ export default function TripSettingsScreen() {
       setIsUpdatingDate(false);
     }
   };
-
   const handleAddMember = () => {
     const trimmed = newMember.trim();
     if (!trimmed) return;
@@ -566,9 +627,44 @@ export default function TripSettingsScreen() {
 
   const applyTripRange = () => {
     if (!tripRangeStart) return;
-    const finalEnd = tripRangeEnd ?? tripRangeStart;
-    setTripStart(fromDateString(tripRangeStart));
-    setTripEnd(fromDateString(finalEnd));
+
+    const nextTripStart = fromDateString(tripRangeStart);
+    const nextTripEnd = fromDateString(tripRangeEnd ?? tripRangeStart);
+
+    setTripStart(nextTripStart);
+    setTripEnd(nextTripEnd);
+
+    setPhaseDates((prev) => {
+      const planningStart = prev.planning.start;
+      const planningEnd =
+        prev.planning.end > nextTripEnd ? nextTripEnd : prev.planning.end;
+      const safePlanningEnd =
+        planningEnd < planningStart ? planningStart : planningEnd;
+
+      const votingEnd =
+        prev.voting.end > nextTripEnd ? nextTripEnd : prev.voting.end;
+      const safeVotingEnd =
+        votingEnd < safePlanningEnd ? safePlanningEnd : votingEnd;
+
+      return {
+        planning: {
+          ...prev.planning,
+          start: planningStart,
+          end: safePlanningEnd,
+        },
+        voting: {
+          ...prev.voting,
+          start: safePlanningEnd,
+          end: safeVotingEnd,
+        },
+        final: {
+          ...prev.final,
+          start: safeVotingEnd,
+          end: safeVotingEnd,
+        },
+      };
+    });
+
     setShowTripDateCalendar(false);
   };
 
@@ -688,6 +784,24 @@ export default function TripSettingsScreen() {
     return tripRange;
   }, [showPhaseDateCalendar, phaseDates, tripStart, tripEnd]);
 
+  const handleApplyPhaseTime = () => {
+    if (!showPhaseTimePicker) return;
+
+    if (!isValidTimeString(tempPhaseTime)) {
+      Alert.alert("Invalid time", "Please enter a valid time as HH:MM.");
+      return;
+    }
+
+    setPhaseDates((prev) => ({
+      ...prev,
+      [showPhaseTimePicker]: {
+        ...prev[showPhaseTimePicker],
+        time: tempPhaseTime,
+      },
+    }));
+
+    setShowPhaseTimePicker(null);
+  };
   const handleUpdatePhaseDate = async (phaseId: PhaseKey) => {
     const idToken = await getIdToken();
     if (!idToken) return;
@@ -698,11 +812,10 @@ export default function TripSettingsScreen() {
       const tripEndBoundary = endOfDay(tripEnd);
 
       if (phaseId === "planning") {
-        const currentVotingEnd = new Date(
-          combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
-        );
+        const endAtIso = combineDateAndTime(phase.end, phase.time);
+        const nextPlanningEnd = new Date(endAtIso);
 
-        if (nextEnd > tripEndBoundary) {
+        if (nextPlanningEnd > tripEndBoundary) {
           Alert.alert(
             "Invalid planning end",
             "Planning end cannot be after the trip end date."
@@ -710,15 +823,33 @@ export default function TripSettingsScreen() {
           return;
         }
 
-        if (nextEnd > currentVotingEnd) {
-          Alert.alert(
-            "Invalid planning end",
-            "Planning end cannot be after voting end."
-          );
-          return;
-        }
+        const currentVotingEnd = new Date(
+          combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
+        );
 
-        const endAtIso = combineDateAndTime(phase.end, phase.time);
+        const safeVotingEnd =
+          currentVotingEnd < nextPlanningEnd
+            ? nextPlanningEnd
+            : currentVotingEnd;
+
+        const payload = {
+          idToken,
+          tripId,
+          start_date: toLocalDateString(tripStart),
+          end_date: toLocalDateString(tripEnd),
+          planning_end_at: combineDateAndTime(
+            phaseDates.planning.end,
+            phaseDates.planning.time
+          ),
+          voting_end_at: combineDateAndTime(
+            phaseDates.voting.end,
+            phaseDates.voting.time
+          ),
+        };
+
+        console.log("TRIP SETTINGS PATCH PAYLOAD", payload);
+
+        await updateTrip(payload);
 
         await updateTrip({
           idToken,
@@ -736,6 +867,12 @@ export default function TripSettingsScreen() {
           voting: {
             ...prev.voting,
             start: phase.end,
+            end: safeVotingEnd,
+          },
+          final: {
+            ...prev.final,
+            start: safeVotingEnd,
+            end: safeVotingEnd,
           },
         }));
       }
@@ -786,7 +923,9 @@ export default function TripSettingsScreen() {
         }));
       }
 
+      setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
       setPhaseUpdated((prev) => ({ ...prev, [phaseId]: true }));
+
       safeTimeout(() => {
         setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
         setOpenPhase(null);
@@ -939,7 +1078,8 @@ export default function TripSettingsScreen() {
                     </AppText>
                   </View>
                   <AppText variant="caption" style={styles.infoValue}>
-                    {formatDateDisplay(tripStart)} – {formatDateDisplay(tripEnd)}
+                    {formatDateDisplay(tripStart)} –{" "}
+                    {formatDateDisplay(tripEnd)}
                   </AppText>
                 </View>
                 {openField === "date" ? (
@@ -958,7 +1098,8 @@ export default function TripSettingsScreen() {
                     accessibilityLabel="Select trip dates"
                   >
                     <AppText variant="body" style={styles.dateText}>
-                      {formatDateDisplay(tripStart)} – {formatDateDisplay(tripEnd)}
+                      {formatDateDisplay(tripStart)} –{" "}
+                      {formatDateDisplay(tripEnd)}
                     </AppText>
                     <Calendar width={20} height={20} />
                   </Pressable>
@@ -981,7 +1122,7 @@ export default function TripSettingsScreen() {
                         style={styles.successText}
                         accessibilityRole="alert"
                       >
-                        Date is updated!
+                        Trip dates are updated!
                       </AppText>
                     </View>
                   )}
@@ -1268,6 +1409,7 @@ export default function TripSettingsScreen() {
                         <Pressable
                           style={[styles.dateInput, styles.dateTimeHalf]}
                           onPress={() => {
+                            setTempPhaseTime(dates.time);
                             setShowPhaseTimePicker(phaseId);
                             setShowPhaseDateCalendar(null);
                           }}
@@ -1281,14 +1423,16 @@ export default function TripSettingsScreen() {
                         </Pressable>
                       </View>
 
-                      {showPhaseTimePicker === phaseId && (
-                        <View />
-                      )}
+                      {showPhaseTimePicker === phaseId && <View />}
 
                       <AppButton
                         title="Update"
                         onPress={() => handleUpdatePhaseDate(phaseId)}
-                        style={styles.updateButton}
+                        style={
+                          phaseId === "planning"
+                            ? styles.updateButtonPlanning
+                            : styles.updateButtonVoting
+                        }
                         textStyle={styles.updateButtonText}
                         accessibilityLabel={`Update ${phase.label} phase`}
                       />
@@ -1322,105 +1466,141 @@ export default function TripSettingsScreen() {
               />
             </View>
           </SafeAreaView>
+          <Modal
+            visible={showTripDateCalendar}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowTripDateCalendar(false)}
+          >
+            <View style={styles.calendarOverlay}>
+              <View style={styles.calendarModal}>
+                <AppText variant="body" style={styles.calendarTitle}>
+                  Update trip dates
+                </AppText>
+
+                <RangeCalendar
+                  markingType="period"
+                  minDate={toLocalDateString(new Date())}
+                  markedDates={markedTripDates}
+                  onDayPress={handleTripDayPress}
+                  enableSwipeMonths
+                  hideExtraDays
+                  firstDay={1}
+                  renderArrow={(direction) => (
+                    <AppText variant="body" style={styles.calendarArrow}>
+                      {direction === "left" ? "‹" : "›"}
+                    </AppText>
+                  )}
+                  theme={{
+                    backgroundColor: colors.lightWhite,
+                    calendarBackground: colors.lightWhite,
+                    textSectionTitleColor: colors.textMuted,
+                    dayTextColor: colors.nightBlack,
+                    textDisabledColor: colors.textMuted,
+                    monthTextColor: colors.nightBlack,
+                    arrowColor: colors.nightBlack,
+                    todayTextColor: colors.sunsetOrange,
+                    textDayFontFamily: typography.fontFamily.body,
+                    textMonthFontFamily: typography.fontFamily.bodyBold,
+                    textDayHeaderFontFamily: typography.fontFamily.bodyBold,
+                    textDayFontSize: typography.size.md,
+                    textMonthFontSize: typography.size.lg,
+                    textDayHeaderFontSize: typography.size.sm,
+                  }}
+                  style={styles.calendarCard}
+                />
+
+                <View style={styles.calendarLegend}>
+                  <View style={styles.legendRow}>
+                    <View
+                      style={[
+                        styles.legendSwatch,
+                        { backgroundColor: colors.sunsetOrange },
+                      ]}
+                    />
+                    <AppText variant="caption" style={styles.legendLabel}>
+                      Trip dates
+                    </AppText>
+                  </View>
+                </View>
+
+                <View style={styles.calendarActions}>
+                  <AppButton
+                    title="Cancel"
+                    onPress={() => setShowTripDateCalendar(false)}
+                    style={styles.calendarCancelButton}
+                    textStyle={styles.calendarCancelButtonText}
+                    accessibilityLabel="Cancel trip date selection"
+                  />
+                  <AppButton
+                    title="Apply"
+                    onPress={applyTripRange}
+                    style={styles.calendarApplyButton}
+                    textStyle={styles.calendarApplyButtonText}
+                    accessibilityLabel="Apply selected trip dates"
+                  />
+                </View>
+              </View>
+            </View>
+          </Modal>
         </KeyboardAvoidingView>
       </SafeAreaView>
 
       <Modal
-        visible={showTripDateCalendar}
+        visible={showPhaseTimePicker !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowTripDateCalendar(false)}
+        onRequestClose={() => setShowPhaseTimePicker(null)}
       >
         <View style={styles.calendarOverlay}>
           <View style={styles.calendarModal}>
             <AppText variant="body" style={styles.calendarTitle}>
-              Select your trip dates
+              {showPhaseTimePicker === "planning"
+                ? "Select planning end time"
+                : "Select voting end time"}
             </AppText>
 
-            <RangeCalendar
-              markingType="period"
-              minDate={toLocalDateString(new Date())}
-              markedDates={markedTripDates}
-              onDayPress={handleTripDayPress}
-              enableSwipeMonths
-              hideExtraDays
-              firstDay={1}
-              renderArrow={(direction) => (
-                <AppText variant="body" style={styles.calendarArrow}>
-                  {direction === "left" ? "‹" : "›"}
-                </AppText>
-              )}
-              theme={{
-                backgroundColor: colors.lightWhite,
-                calendarBackground: colors.lightWhite,
-                textSectionTitleColor: colors.textMuted,
-                dayTextColor: colors.nightBlack,
-                textDisabledColor: colors.textMuted,
-                monthTextColor: colors.nightBlack,
-                arrowColor: colors.nightBlack,
-                todayTextColor: colors.sunsetOrange,
-                textDayFontFamily: typography.fontFamily.body,
-                textMonthFontFamily: typography.fontFamily.bodyBold,
-                textDayHeaderFontFamily: typography.fontFamily.bodyBold,
-                textDayFontSize: typography.size.md,
-                textMonthFontSize: typography.size.lg,
-                textDayHeaderFontSize: typography.size.sm,
-              }}
-              style={styles.calendarCard}
-            />
+            <View style={styles.timeModalContent}>
+              <AppText variant="caption" style={styles.timeModalHint}>
+                Enter the exact time in 24-hour format
+              </AppText>
 
-            <View style={styles.calendarLegend}>
-              <View style={styles.legendRow}>
-                <View
-                  style={[
-                    styles.legendSwatch,
-                    { backgroundColor: colors.sunsetOrange },
-                  ]}
+              <View style={styles.timeInputModalBox}>
+                <TextInput
+                  value={tempPhaseTime}
+                  onChangeText={(value) =>
+                    setTempPhaseTime(normalizeTimeInput(value))
+                  }
+                  placeholder="HH:MM"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType={
+                    Platform.OS === "ios"
+                      ? "numbers-and-punctuation"
+                      : "numeric"
+                  }
+                  maxLength={5}
+                  style={styles.timeInputModal}
+                  textAlign="center"
+                  accessibilityLabel="Enter time in HH colon MM format"
                 />
-                <AppText variant="caption" style={styles.legendLabel}>
-                  Trip dates
-                </AppText>
-              </View>
-
-              <View style={styles.legendRow}>
-                <View
-                  style={[
-                    styles.legendSwatch,
-                    { backgroundColor: colors.beachYellow },
-                  ]}
-                />
-                <AppText variant="caption" style={styles.legendLabel}>
-                  Planning state
-                </AppText>
-              </View>
-
-              <View style={styles.legendRow}>
-                <View
-                  style={[
-                    styles.legendSwatch,
-                    { backgroundColor: colors.sunsetPink },
-                  ]}
-                />
-                <AppText variant="caption" style={styles.legendLabel}>
-                  Voting state
-                </AppText>
+                <Timer width={20} height={20} />
               </View>
             </View>
 
             <View style={styles.calendarActions}>
               <AppButton
-                title="Close"
-                onPress={() => setShowTripDateCalendar(false)}
+                title="Cancel"
+                onPress={() => setShowPhaseTimePicker(null)}
                 style={styles.calendarCancelButton}
                 textStyle={styles.calendarCancelButtonText}
-                accessibilityLabel="Close timer date selection"
+                accessibilityLabel="Cancel time selection"
               />
               <AppButton
-                title="Apply dates"
-                onPress={applyTripRange}
+                title="Apply time"
+                onPress={handleApplyPhaseTime}
                 style={styles.calendarApplyButton}
                 textStyle={styles.calendarApplyButtonText}
-                accessibilityLabel="Apply selected trip dates"
+                accessibilityLabel="Apply selected time"
               />
             </View>
           </View>
@@ -1794,5 +1974,50 @@ const styles = StyleSheet.create({
   calendarApplyButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
+  },
+
+  timeModalContent: {
+    gap: spacing.md,
+  },
+
+  timeModalHint: {
+    color: colors.textMuted,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.body,
+  },
+
+  timeInputModalBox: {
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+    minHeight: 64,
+  },
+
+  timeInputModal: {
+    flex: 1,
+    minHeight: 44,
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodySemiBold,
+    fontSize: typography.size.xxl,
+    lineHeight: typography.lineHeight.xxl,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    includeFontPadding: false,
+    textAlignVertical: "center",
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
+  },
+
+  updateButtonPlanning: {
+    backgroundColor: colors.beachYellow,
+  },
+  updateButtonVoting: {
+    backgroundColor: colors.sunsetPink,
   },
 });

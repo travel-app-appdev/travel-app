@@ -13,12 +13,10 @@ import {
   KeyboardAvoidingView,
   Alert,
   Modal,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
 import { Calendar as RangeCalendar } from "react-native-calendars";
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
@@ -114,19 +112,6 @@ function dayLabel(days: number, active: boolean): string {
   return days === 1 ? "1 day" : `${days} days`;
 }
 
-function dateToTimeString(date: Date): string {
-  const h = date.getHours().toString().padStart(2, "0");
-  const m = date.getMinutes().toString().padStart(2, "0");
-  return `${h}:${m}`;
-}
-
-function timeStringToDate(timeStr: string): Date {
-  const [h, m] = timeStr.split(":").map(Number);
-  const d = new Date();
-  d.setHours(h, m, 0, 0);
-  return d;
-}
-
 function combineDateAndTime(date: Date, timeStr: string): string {
   const [hours, minutes] = timeStr.split(":").map(Number);
   const combined = new Date(date);
@@ -179,6 +164,17 @@ function getMarkedRange(
   }
 
   return marked;
+}
+
+function isValidTimeString(value: string): boolean {
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
+}
+
+function normalizeTimeInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 4);
+
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
 }
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -246,6 +242,7 @@ export default function CreateTripScreen() {
     useState<PhaseKey | null>(null);
   const [showPhaseTimePicker, setShowPhaseTimePicker] =
     useState<PhaseKey | null>(null);
+  const [tempPhaseTime, setTempPhaseTime] = useState("12:00");
 
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const { user } = useAuth();
@@ -269,6 +266,8 @@ export default function CreateTripScreen() {
     date.toLocaleDateString("en-GB").replace(/\//g, ".");
 
   const togglePhase = (key: PhaseKey) => {
+    setShowPhaseDateCalendar(null);
+    setShowPhaseTimePicker(null);
     setOpenPhase((prev) => (prev === key ? null : key));
   };
 
@@ -601,6 +600,25 @@ export default function CreateTripScreen() {
     }
   };
 
+  const handleApplyPhaseTime = () => {
+    if (!showPhaseTimePicker) return;
+
+    if (!isValidTimeString(tempPhaseTime)) {
+      Alert.alert("Invalid time", "Please enter a valid time as HH:MM.");
+      return;
+    }
+
+    setPhaseDates((prev) => ({
+      ...prev,
+      [showPhaseTimePicker]: {
+        ...prev[showPhaseTimePicker],
+        time: tempPhaseTime,
+      },
+    }));
+
+    setShowPhaseTimePicker(null);
+  };
+
   const handleCreateTrip = async () => {
     if (isCreating) return;
 
@@ -832,6 +850,7 @@ export default function CreateTripScreen() {
                           <Pressable
                             style={[styles.dateInput, styles.dateTimeHalf]}
                             onPress={() => {
+                              setTempPhaseTime(dates.time);
                               setShowPhaseTimePicker(phaseId);
                               setShowPhaseDateCalendar(null);
                             }}
@@ -845,36 +864,23 @@ export default function CreateTripScreen() {
                           </Pressable>
                         </View>
 
-                        {showPhaseTimePicker === phaseId && (
-                          <DateTimePicker
-                            value={timeStringToDate(dates.time)}
-                            mode="time"
-                            is24Hour
-                            display={
-                              Platform.OS === "ios" ? "spinner" : "default"
-                            }
-                            onChange={(_: DateTimePickerEvent, date?: Date) => {
-                              setShowPhaseTimePicker(null);
-                              if (date) {
-                                setPhaseDates((prev) => ({
-                                  ...prev,
-                                  [phaseId]: {
-                                    ...prev[phaseId],
-                                    time: dateToTimeString(date),
-                                  },
-                                }));
-                              }
-                            }}
+                        {phaseId === "planning" ? (
+                          <AppButton
+                            title="Confirm"
+                            onPress={() => handleUpdatePhaseDate("planning")}
+                            style={styles.updateButtonPlanning}
+                            textStyle={styles.updateButtonText}
+                            accessibilityLabel="Update Planning phase"
+                          />
+                        ) : (
+                          <AppButton
+                            title="Confirm"
+                            onPress={() => handleUpdatePhaseDate("voting")}
+                            style={styles.updateButtonVoting}
+                            textStyle={styles.updateButtonText}
+                            accessibilityLabel="Update Voting phase"
                           />
                         )}
-
-                        <AppButton
-                          title="Update"
-                          onPress={() => handleUpdatePhaseDate(phaseId)}
-                          style={styles.updateButton}
-                          textStyle={styles.updateButtonText}
-                          accessibilityLabel={`Update ${phase.label} phase`}
-                        />
 
                         {phaseUpdated[phaseId] && (
                           <View style={styles.successRow}>
@@ -1010,6 +1016,63 @@ export default function CreateTripScreen() {
                       style={styles.calendarCancelButton}
                       textStyle={styles.calendarCancelButtonText}
                       accessibilityLabel="Close timer date selection"
+                    />
+                  </View>
+                </View>
+              </View>
+            </Modal>
+
+            <Modal
+              visible={showPhaseTimePicker !== null}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setShowPhaseTimePicker(null)}
+            >
+              <View style={styles.calendarOverlay}>
+                <View style={styles.calendarModal}>
+                  <AppText variant="body" style={styles.calendarTitle}>
+                    {showPhaseTimePicker === "planning"
+                      ? "Select planning end time"
+                      : "Select voting end time"}
+                  </AppText>
+
+                  <View style={styles.timeModalContent}>
+                    <AppText variant="caption" style={styles.timeModalHint}>
+                      Enter the exact time in 24-hour format
+                    </AppText>
+
+                    <View style={styles.timeInputModalBox}>
+                      <TextInput
+                        value={tempPhaseTime}
+                        onChangeText={(value) =>
+                          setTempPhaseTime(normalizeTimeInput(value))
+                        }
+                        placeholder="HH:MM"
+                        placeholderTextColor={colors.textMuted}
+                        keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
+                        maxLength={5}
+                        style={styles.timeInputModal}
+                        textAlign="center"
+                        accessibilityLabel="Enter time in HH colon MM format"
+                      />
+                      <Timer width={20} height={20} />
+                    </View>
+                  </View>
+
+                  <View style={styles.calendarActions}>
+                    <AppButton
+                      title="Cancel"
+                      onPress={() => setShowPhaseTimePicker(null)}
+                      style={styles.calendarCancelButton}
+                      textStyle={styles.calendarCancelButtonText}
+                      accessibilityLabel="Cancel time selection"
+                    />
+                    <AppButton
+                      title="Apply time"
+                      onPress={handleApplyPhaseTime}
+                      style={styles.calendarApplyButton}
+                      textStyle={styles.calendarApplyButtonText}
+                      accessibilityLabel="Apply selected time"
                     />
                   </View>
                 </View>
@@ -1617,7 +1680,11 @@ const styles = StyleSheet.create({
   expandedField: {
     gap: spacing.md,
   },
-  updateButton: {
+  updateButtonVoting: {
+    backgroundColor: colors.sunsetPink,
+  },
+
+  updateButtonPlanning: {
     backgroundColor: colors.beachYellow,
   },
   updateButtonText: {
@@ -1736,5 +1803,64 @@ const styles = StyleSheet.create({
   calendarApplyButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
+  },
+  timeModalContent: {
+    gap: spacing.md,
+  },
+  timeModalHint: {
+    color: colors.textMuted,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.body,
+  },
+  timeInputModalBox: {
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+    minHeight: 64,
+  },
+  timeInputModal: {
+    flex: 1,
+    minHeight: 44,
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xxl,
+    lineHeight: typography.lineHeight.xxl,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    includeFontPadding: false,
+    textAlignVertical: "center",
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
+  },
+  quickTimeWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  quickTimeChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.white,
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+  },
+  quickTimeChipActive: {
+    backgroundColor: colors.beachYellow,
+  },
+  quickTimeChipText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+  },
+  quickTimeChipTextActive: {
+    color: colors.nightBlack,
   },
 });
