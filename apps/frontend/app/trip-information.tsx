@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { AppText } from "@/src/components/common/AppText";
 import {
   ActionCard,
@@ -142,27 +142,29 @@ export default function TripInformationScreen() {
   const [isLeaving, setIsLeaving] = useState(false);
 
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
-  useEffect(() => {
-    return () => timeoutRefs.current.forEach(clearTimeout);
-  }, []);
+  // If you later push timeouts into timeoutRefs.current, this will still clean them up.
+  // Right now it's harmless but safe to keep.
+  // useEffect(() => {
+  //   return () => timeoutRefs.current.forEach(clearTimeout);
+  // }, []);
 
-  const members: MemberParam[] = (() => {
+  const members: MemberParam[] = useMemo(() => {
     try {
       return membersParam ? JSON.parse(membersParam) : [];
     } catch {
       return [];
     }
-  })();
+  }, [membersParam]);
 
-  const tripStart = startDate ? new Date(startDate) : new Date();
-  const tripEnd = endDate ? new Date(endDate) : new Date();
+  const tripStart = useMemo(
+    () => (startDate ? new Date(startDate) : new Date()),
+    [startDate]
+  );
 
-  const planningStartDate = parseIsoToDate(planningStartedAt);
-  const planningEndDate = parseIsoToDate(planningEndAt);
-  const votingEndDate = parseIsoToDate(votingEndAt);
-
-  const votingStartDate = planningEndDate ?? tripStart;
-  const finalDisplayDate = votingEndDate ?? tripEnd;
+  const tripEnd = useMemo(
+    () => (endDate ? new Date(endDate) : new Date()),
+    [endDate]
+  );
 
   const phases = [
     {
@@ -185,47 +187,31 @@ export default function TripInformationScreen() {
     },
   ];
 
-  const [phaseDates, setPhaseDates] = useState<PhaseDates>({
-    planning: {
-      start: planningStartDate ?? tripStart,
-      end: planningEndDate ?? tripStart,
-      time: parseIsoToTimeString(planningEndAt),
-    },
-    voting: {
-      start: votingStartDate,
-      end: votingEndDate ?? tripStart,
-      time: parseIsoToTimeString(votingEndAt),
-    },
-    final: {
-      start: finalDisplayDate,
-      end: finalDisplayDate,
-      time: "00:00",
-    },
-  });
+  const phaseDates: PhaseDates = useMemo(() => {
+    const planningStartDate = parseIsoToDate(planningStartedAt);
+    const planningEndDate = parseIsoToDate(planningEndAt);
+    const votingEndDate = parseIsoToDate(votingEndAt);
 
-  useEffect(() => {
-    const nextPlanningStart = parseIsoToDate(planningStartedAt);
-    const nextPlanningEnd = parseIsoToDate(planningEndAt);
-    const nextVotingEnd = parseIsoToDate(votingEndAt);
-    const nextFinalDisplay = nextVotingEnd ?? tripEnd;
+    const votingStartDate = planningEndDate ?? tripStart;
+    const finalDisplayDate = votingEndDate ?? tripEnd;
 
-    setPhaseDates({
+    return {
       planning: {
-        start: nextPlanningStart ?? tripStart,
-        end: nextPlanningEnd ?? tripStart,
+        start: planningStartDate ?? tripStart,
+        end: planningEndDate ?? tripStart,
         time: parseIsoToTimeString(planningEndAt),
       },
       voting: {
-        start: nextPlanningEnd ?? tripStart,
-        end: nextVotingEnd ?? tripStart,
+        start: votingStartDate,
+        end: votingEndDate ?? tripStart,
         time: parseIsoToTimeString(votingEndAt),
       },
       final: {
-        start: nextFinalDisplay ?? tripEnd,
-        end: nextFinalDisplay ?? tripEnd,
+        start: finalDisplayDate,
+        end: finalDisplayDate,
         time: "00:00",
       },
-    });
+    };
   }, [planningStartedAt, planningEndAt, votingEndAt, tripStart, tripEnd]);
 
   const handleLeaveTrip = () => {
@@ -287,7 +273,8 @@ export default function TripInformationScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.infoLabelRow}
+              <View
+                style={styles.infoLabelRow}
                 accessible={false}
                 importantForAccessibility="no-hide-descendants"
               >
@@ -302,7 +289,8 @@ export default function TripInformationScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.infoLabelRow}
+              <View
+                style={styles.infoLabelRow}
                 accessible={false}
                 importantForAccessibility="no-hide-descendants"
               >
@@ -318,7 +306,8 @@ export default function TripInformationScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.infoLabelRow}
+              <View
+                style={styles.infoLabelRow}
                 accessible={false}
                 importantForAccessibility="no-hide-descendants"
               >
@@ -333,7 +322,8 @@ export default function TripInformationScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.infoLabelRow}
+              <View
+                style={styles.infoLabelRow}
                 accessible={false}
                 importantForAccessibility="no-hide-descendants"
               >
