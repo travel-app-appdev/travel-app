@@ -1439,38 +1439,6 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
                         <Calendar width={20} height={20} />
                       </View>
                     </Pressable>
-
-                    {/* Fix 9: accessibilityLabel on each picker */}
-                    {showTripStartPicker && (
-                      <DateTimePicker
-                        value={tripStart}
-                        mode="date"
-                        display={Platform.OS === "ios" ? "spinner" : "default"}
-                        accessibilityLabel="Select trip start date"
-                        onChange={(_: DateTimePickerEvent, date?: Date) => {
-                          setShowTripStartPicker(false);
-                          if (date) {
-                            setTripStart(date);
-                            if (tripEnd < date) setTripEnd(date);
-                            setShowTripEndPicker(true);
-                          }
-                        }}
-                      />
-                    )}
-
-                    {showTripEndPicker && (
-                      <DateTimePicker
-                        value={tripEnd}
-                        mode="date"
-                        minimumDate={tripStart}
-                        display={Platform.OS === "ios" ? "spinner" : "default"}
-                        accessibilityLabel="Select trip end date"
-                        onChange={(_: DateTimePickerEvent, date?: Date) => {
-                          setShowTripEndPicker(false);
-                          if (date) setTripEnd(date);
-                        }}
-                      />
-                    )}
                   </View>
                 </ScrollView>
               </KeyboardAvoidingView>
