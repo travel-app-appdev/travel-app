@@ -17,6 +17,9 @@ import {
   Animated,
   Text
 } from "react-native";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import { Calendar as RangeCalendar } from "react-native-calendars";
@@ -184,6 +187,8 @@ export default function CreateTripScreen() {
   const [tripStart, setTripStart] = useState<Date>(new Date());
   const [tripEnd, setTripEnd] = useState<Date>(new Date());
 
+  const [showTripStartPicker, setShowTripStartPicker] = useState(false);
+  const [showTripEndPicker, setShowTripEndPicker] = useState(false);
   const [showTripCalendar, setShowTripCalendar] = useState(false);
   const [rangeStart, setRangeStart] = useState<string | null>(
     toLocalDateString(new Date())
