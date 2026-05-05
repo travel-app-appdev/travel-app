@@ -338,7 +338,7 @@ export function TripCard({
           }
         >
           {role === "admin" ? (
-            <SettingIcon width={22} height={22} />
+            <Edit width={22} height={22} />
           ) : (
             <InfoIcon width={22} height={22} />
           )}
