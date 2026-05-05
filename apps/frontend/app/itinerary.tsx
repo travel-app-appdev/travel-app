@@ -1,8 +1,9 @@
-// apps/frontend/app/itinerary.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
+  findNodeHandle,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,6 +28,7 @@ import { AppText } from "@/src/components/common/AppText";
 import { ItineraryHeader } from "@/src/components/itinerary/ItineraryHeader";
 import { ItineraryDaySelector } from "@/src/components/itinerary/ItineraryDaySelector";
 import { PlanningSlotCard } from "@/src/components/itinerary/PlanningSlotCard";
+import { SkeletonSlotCard } from "@/src/components/itinerary/SkeletonSlotCard";
 import { PlanningDoneBar } from "@/src/components/itinerary/PlanningDoneBar";
 import { VotingSlotCard } from "@/src/components/itinerary/VoteSlotCard";
 import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
@@ -40,6 +42,8 @@ import {
 } from "@/src/services/activityService";
 
 const DEV_FORCE_STATE: ItineraryState | null = null;
+
+const activitiesCache = new Map<string, Activity[]>();
 
 function parseActivitiesJson(value?: string): Activity[] {
   if (!value) return [];
@@ -59,10 +63,10 @@ function splitBackendSlotId(slotId: string) {
   };
 }
 
-function mapBackendActivity(activity: any, fallback: {
-  dayId: string;
-  slotId: string;
-}): Activity {
+function mapBackendActivity(
+  activity: any,
+  fallback: { dayId: string; slotId: string }
+): Activity {
   const backendSlot = activity.slot_id
     ? splitBackendSlotId(activity.slot_id)
     : fallback;
@@ -91,12 +95,9 @@ type RouteMember = {
 
 function parsePlanningStatusJson(value?: string) {
   if (!value) return undefined;
-
   try {
     const parsed = JSON.parse(value);
-
     if (!Array.isArray(parsed)) return undefined;
-
     return parsed
       .map((member: RouteMember) => ({
         userId: member.id ?? member.userId ?? "",
@@ -128,11 +129,9 @@ function markPlanningDoneForUser(
   const hasExistingUser = planningStatus.some(
     (member) => member.userId === userId
   );
-
   if (!hasExistingUser) {
     return [...planningStatus, { userId, hasFinishedPlanning: true }];
   }
-
   return planningStatus.map((member) =>
     member.userId === userId ? { ...member, hasFinishedPlanning: true } : member
   );
@@ -253,8 +252,18 @@ export default function ItineraryScreen() {
     activities: parseActivitiesJson(activitiesJson),
   }));
 
-  const [apiActivities, setApiActivities] = useState<Activity[]>([]);
+  const [apiActivities, setApiActivities] = useState<Activity[]>(() => {
+    const keys = [...activitiesCache.keys()];
+    const matchingKey = keys.find((k) => k.startsWith(`${tripId}_`));
+    return matchingKey ? (activitiesCache.get(matchingKey) ?? []) : [];
+  });
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
+
+  const [isLoadingActivities, setIsLoadingActivities] = useState(() => {
+    const keys = [...activitiesCache.keys()];
+    return !keys.some((k) => k.startsWith(`${tripId}_`));
+  });
+
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
   const [isSubmittingPlanning, setIsSubmittingPlanning] = useState(false);
   const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -265,6 +274,9 @@ export default function ItineraryScreen() {
   );
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
+
+  // Ref for moving focus into the popup when it appears — Fix 3
+  const popupRef = useRef<View>(null);
 
   const slots = useMemo(() => generateTimeSlots(), []);
 
@@ -324,6 +336,16 @@ export default function ItineraryScreen() {
     };
   }, []);
 
+  // Move focus into the popup when it appears — Fix 3
+  useEffect(() => {
+    if (showPlanningInfoPopup && popupRef.current) {
+      const node = findNodeHandle(popupRef.current);
+      if (node) {
+        AccessibilityInfo.setAccessibilityFocus(node);
+      }
+    }
+  }, [showPlanningInfoPopup]);
+
   // Load activities from API
   useEffect(() => {
     async function loadActivities() {
@@ -332,20 +354,34 @@ export default function ItineraryScreen() {
         return;
       }
 
+      const cacheKey = `${tripId}_${activeState}_${selectedDayId}`;
+      const cached = activitiesCache.get(cacheKey);
+
+      if (cached) {
+        setApiActivities(cached);
+        setIsLoadingActivities(false);
+      } else {
+        setIsLoadingActivities(true);
+      }
+
       try {
         if (activeState === "final") {
           const finalActivities = await getFinalItineraryActivities(
             tripId,
             currentUserId ?? undefined
           );
-          setApiActivities(
-            finalActivities.map((activity: any) =>
-              mapBackendActivity(activity, {
-                dayId: selectedDayId || itinerary.startDate,
-                slotId: activity.slot_id ?? "",
-              })
-            )
+          const mapped = finalActivities.map((activity: any) =>
+            mapBackendActivity(activity, {
+              dayId: selectedDayId || itinerary.startDate,
+              slotId: activity.slot_id ?? "",
+            })
           );
+          const hasChanged = JSON.stringify(cached) !== JSON.stringify(mapped);
+          if (hasChanged) {
+            activitiesCache.set(cacheKey, mapped);
+            setApiActivities(mapped);
+          }
+          setIsLoadingActivities(false);
           return;
         }
 
@@ -353,30 +389,38 @@ export default function ItineraryScreen() {
           activeState === "voting"
             ? tripDays.map((day) => day.id)
             : [selectedDayId];
-        const allActivities: Activity[] = [];
 
-        for (const dayId of daysToLoad) {
-          for (const slot of slots) {
-            const slotIdWithDate = `${dayId}_${slot.id}`;
-            const slotActivities = await getActivitiesBySlot(
-              tripId,
-              slotIdWithDate,
-              currentUserId ?? undefined
-            );
-
-            const mapped = slotActivities.map((activity: any) =>
-              mapBackendActivity(activity, {
-                dayId,
-                slotId: slot.id,
+        const allActivities = (
+          await Promise.all(
+            daysToLoad.flatMap((dayId) =>
+              slots.map(async (slot) => {
+                const slotIdWithDate = `${dayId}_${slot.id}`;
+                const slotActivities = await getActivitiesBySlot(
+                  tripId,
+                  slotIdWithDate,
+                  currentUserId ?? undefined
+                );
+                return slotActivities.map((activity: any) =>
+                  mapBackendActivity(activity, {
+                    dayId,
+                    slotId: slot.id,
+                  })
+                );
               })
-            );
-            allActivities.push(...mapped);
-          }
-        }
+            )
+          )
+        ).flat();
 
-        setApiActivities(allActivities);
+        const hasChanged =
+          JSON.stringify(cached) !== JSON.stringify(allActivities);
+        if (hasChanged) {
+          activitiesCache.set(cacheKey, allActivities);
+          setApiActivities(allActivities);
+        }
+        setIsLoadingActivities(false);
       } catch (error) {
         console.log("Could not load activities:", error);
+        setIsLoadingActivities(false);
       }
     }
 
@@ -464,6 +508,7 @@ export default function ItineraryScreen() {
       ),
     [itinerary.planningStatus]
   );
+
   const currentUserStatus = itinerary.planningStatus.find(
     (m) => m.userId === currentUserId
   );
@@ -476,7 +521,6 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
-
     router.push({
       pathname: "/add-activity",
       params: {
@@ -499,7 +543,6 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
-
     router.push({
       pathname: "/add-activity",
       params: {
@@ -524,14 +567,10 @@ export default function ItineraryScreen() {
 
   async function handleFinishPlanning() {
     if (hasCurrentUserFinished || isSubmittingPlanning) return;
-
     if (!currentUserId) return;
 
     if (itinerary.tripId === "trip-fallback") {
-      const nextState = shouldSkipVoting(tripMemberCount)
-        ? "final"
-        : "planning";
-
+      const nextState = shouldSkipVoting(tripMemberCount) ? "final" : "planning";
       setItinerary((current) => ({
         ...current,
         state: nextState,
@@ -540,11 +579,9 @@ export default function ItineraryScreen() {
           currentUserId
         ),
       }));
-
       if (nextState === "final") {
         router.setParams({ state: "final" });
       }
-
       return;
     }
 
@@ -575,7 +612,6 @@ export default function ItineraryScreen() {
           currentUserId
         ),
       }));
-
       router.setParams({ state: nextState });
     } catch (error) {
       Alert.alert(
@@ -603,9 +639,13 @@ export default function ItineraryScreen() {
     votingActivities
       .filter((a) => a.dayId === selectedDayId)
       .forEach((a) => {
-        if (!seen.has(a.slotId)) seen.set(a.slotId, a.slotId);
+        if (!seen.has(a.slotId)) {
+          const formatted = a.slotId
+            .replace(/_/g, ":")
+            .replace(/:(\d{2})$/, "–$1:00");
+          seen.set(a.slotId, formatted);
+        }
       });
-
     return Array.from(seen.entries()).map(([slotId, label]) => ({
       slotId,
       label,
@@ -619,11 +659,9 @@ export default function ItineraryScreen() {
       setSelectedVotingSlotId("");
       return;
     }
-
     const selectedSlotStillExists = votingTimeChips.some(
       (chip) => chip.slotId === selectedVotingSlotId
     );
-
     if (!selectedSlotStillExists) {
       setSelectedVotingSlotId(votingTimeChips[0].slotId);
     }
@@ -658,11 +696,14 @@ export default function ItineraryScreen() {
           ) {
             return activity;
           }
-
           const wasSelected = activity.hasCurrentUserVote === true;
           const isSelected = activity.id === activityId;
-          const voteDelta = isSelected && !wasSelected ? 1 : !isSelected && wasSelected ? -1 : 0;
-
+          const voteDelta =
+            isSelected && !wasSelected
+              ? 1
+              : !isSelected && wasSelected
+                ? -1
+                : 0;
           return {
             ...activity,
             hasCurrentUserVote: isSelected,
@@ -674,16 +715,11 @@ export default function ItineraryScreen() {
 
       if (result.tripState === "Final") {
         setIsPreparingFinalItinerary(true);
-
         if (finalizingTimeoutRef.current) {
           clearTimeout(finalizingTimeoutRef.current);
         }
-
         finalizingTimeoutRef.current = setTimeout(() => {
-          setItinerary((current) => ({
-            ...current,
-            state: "final",
-          }));
+          setItinerary((current) => ({ ...current, state: "final" }));
           setIsPreparingFinalItinerary(false);
           setActivityRefreshKey((value) => value + 1);
           router.setParams({ state: "final" });
@@ -704,7 +740,6 @@ export default function ItineraryScreen() {
       );
       const selectedDayStillHasVotingActivities =
         daysWithVotingActivities.has(selectedDayId);
-
       if (firstVotingDay && !selectedDayStillHasVotingActivities) {
         setSelectedDayId(firstVotingDay.id);
       }
@@ -726,12 +761,10 @@ export default function ItineraryScreen() {
 
   async function handleJoinGroup(activityId: string) {
     const activity = finalActivities.find((item) => item.id === activityId);
-
     if (!authToken || !tripId || !activity) {
       Alert.alert("Could not update group", "Please log in again.");
       return;
     }
-
     try {
       const fullSlotId = `${activity.dayId}_${activity.slotId}`;
       const result = await toggleActivityAttendance({
@@ -740,7 +773,6 @@ export default function ItineraryScreen() {
         slotId: fullSlotId,
         activityId,
       });
-
       setApiActivities((current) =>
         current.map((item) =>
           item.id === activityId &&
@@ -803,37 +835,50 @@ export default function ItineraryScreen() {
               }
             />
 
+            {/* PLANNING */}
             {activeState === "planning" && (
               <View style={styles.planningContent}>
                 <View style={styles.slotList}>
-                  {slotItems.map(({ slot, activity }) => (
-                    <PlanningSlotCard
-                      key={slot.id}
-                      slot={slot}
-                      activity={activity}
-                      onAddActivity={handleAddActivity}
-                      onEditActivity={handleEditActivity}
-                      disabled={hasCurrentUserFinished}
-                    />
-                  ))}
+                  {isLoadingActivities
+                    ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
+                    : slotItems.map(({ slot, activity }) => (
+                        <PlanningSlotCard
+                          key={slot.id}
+                          slot={slot}
+                          activity={activity}
+                          onAddActivity={handleAddActivity}
+                          onEditActivity={handleEditActivity}
+                          disabled={hasCurrentUserFinished}
+                        />
+                      ))}
                 </View>
-
                 {hasCurrentUserFinished && (
-                  <View style={styles.planningLockOverlay} pointerEvents="auto" />
+                  <View
+                    style={[
+                      styles.planningLockOverlay,
+                      { pointerEvents: "auto" },
+                    ]}
+                  />
                 )}
               </View>
             )}
 
+            {/* VOTING */}
             {activeState === "voting" && (
               <View style={styles.votingSection}>
-                {votingTimeChips.length > 0 ? (
+                {isLoadingActivities ? (
+                  <View style={styles.slotList}>
+                    {slots.slice(0, 3).map((slot) => (
+                      <SkeletonSlotCard key={slot.id} />
+                    ))}
+                  </View>
+                ) : votingTimeChips.length > 0 ? (
                   <>
                     <VotingTimeFilter
                       chips={votingTimeChips}
                       selectedSlotId={selectedVotingSlotId}
                       onSelectSlot={setSelectedVotingSlotId}
                     />
-
                     <View style={styles.slotList}>
                       {votingSlotActivities.map((activity) => (
                         <VotingSlotCard
@@ -851,27 +896,32 @@ export default function ItineraryScreen() {
               </View>
             )}
 
+            {/* FINAL */}
             {activeState === "final" && (
               <View style={styles.slotList}>
-                {slots.map((slot) => (
-                  <FinalSlotCard
-                    key={slot.id}
-                    slot={slot}
-                    activity={finalActivityMap.get(slot.id)}
-                    onJoinGroup={handleJoinGroup}
-                  />
-                ))}
+                {isLoadingActivities
+                  ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
+                  : slots.map((slot) => (
+                      <FinalSlotCard
+                        key={slot.id}
+                        slot={slot}
+                        activity={finalActivityMap.get(slot.id)}
+                        onJoinGroup={handleJoinGroup}
+                      />
+                    ))}
               </View>
             )}
           </View>
         </ScrollView>
 
         {activeState === "planning" && (
-          <View pointerEvents="none" style={styles.footerBackground} />
+          <View style={[styles.footerBackground, { pointerEvents: "none" }]} />
         )}
 
+        {/* Planning info popup — Fix 3: modal focus trap */}
         {showPlanningInfoPopup && (
           <>
+            {/* Full-screen dismiss area sits behind the popup */}
             <Pressable
               style={styles.popupDismissArea}
               onPress={() => {
@@ -883,9 +933,22 @@ export default function ItineraryScreen() {
               accessibilityRole="button"
               accessibilityLabel="Dismiss planning information"
             />
-            <View style={styles.popupWrapper} pointerEvents="none">
+
+            {/* Popup — accessibilityViewIsModal traps focus inside */}
+            <View
+              ref={popupRef}
+              style={styles.popupWrapper}
+              accessibilityViewIsModal={true}
+              accessible={true}
+              accessibilityLiveRegion="assertive"
+              accessibilityLabel="You can no longer add activities after submitting."
+            >
               <View style={styles.popup}>
-                <AppText variant="caption" style={styles.popupText}>
+                <AppText
+                  variant="caption"
+                  style={styles.popupText}
+                  accessible={false}
+                >
                   You can no longer add activities after submitting.
                 </AppText>
               </View>
@@ -902,14 +965,29 @@ export default function ItineraryScreen() {
           />
         )}
 
+        {/* Finalizing overlay — Fix 3 also applies here */}
         {isPreparingFinalItinerary && (
-          <View style={styles.finalizingOverlay}>
+          <View
+            style={styles.finalizingOverlay}
+            accessibilityViewIsModal={true}
+            accessible={true}
+            accessibilityLiveRegion="assertive"
+            accessibilityLabel="Making your itinerary ready. We are choosing the group favorites for each time slot."
+          >
             <View style={styles.finalizingCard}>
               <ActivityIndicator color={colors.nightBlack} />
-              <AppText variant="subtitle" style={styles.finalizingTitle}>
+              <AppText
+                variant="subtitle"
+                style={styles.finalizingTitle}
+                accessible={false}
+              >
                 Making your itinerary ready
               </AppText>
-              <AppText variant="caption" style={styles.finalizingText}>
+              <AppText
+                variant="caption"
+                style={styles.finalizingText}
+                accessible={false}
+              >
                 We are choosing the group favorites for each time slot.
               </AppText>
             </View>
@@ -963,9 +1041,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     height: 110,
-    shadowColor: colors.beachYellow,
-    shadowOpacity: 5,
-    shadowRadius: 10,
+    boxShadow: `0px 0px 10px rgba(255, 214, 0, 0.5)`,
     elevation: 4,
   },
   popupWrapper: {

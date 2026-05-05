@@ -1,4 +1,3 @@
-// app/_layout.tsx
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
@@ -9,9 +8,11 @@ import {
   Nunito_700Bold,
 } from "@expo-google-fonts/nunito";
 import { View, ActivityIndicator } from "react-native";
-import { AuthProvider } from "@/src/context/AuthContext";
+import { AuthProvider, useAuth } from "@/src/context/AuthContext";
 
-export default function RootLayout() {
+function AppStartupGate() {
+  const { isBootstrapping } = useAuth();
+
   const [fontsLoaded] = useFonts({
     BagelFatOne_400Regular,
     Nunito_400Regular,
@@ -19,7 +20,9 @@ export default function RootLayout() {
     Nunito_700Bold,
   });
 
-  if (!fontsLoaded) {
+  const appReady = fontsLoaded && !isBootstrapping;
+
+  if (!appReady) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator />
@@ -28,12 +31,8 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" options={{ title: "Home" }} />
         <Stack.Screen name="login" options={{ title: "Login" }} />
         <Stack.Screen name="register" options={{ title: "Register" }} />
@@ -41,7 +40,6 @@ export default function RootLayout() {
         <Stack.Screen name="profile" options={{ title: "Profile" }} />
         <Stack.Screen name="create-trip" options={{ title: "Create Trip" }} />
         <Stack.Screen name="join-trip" options={{ title: "Join Trip" }} />
-        {/* <Stack.Screen name="settings" options={{ title: "Settings" }} /> */}
         <Stack.Screen
           name="trip-settings"
           options={{ title: "Trip Settings" }}
@@ -69,6 +67,14 @@ export default function RootLayout() {
         <Stack.Screen name="add-activity" options={{ title: "Add Activity" }} />
       </Stack>
       <StatusBar style="dark" />
+    </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <AppStartupGate />
     </AuthProvider>
   );
 }

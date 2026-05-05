@@ -1,4 +1,3 @@
-// app/home.tsx
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
@@ -7,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
-import { colors, spacing, radius, typography } from "@/src/theme";
+import { colors, spacing, radius, typography, shadows } from "@/src/theme";
 import { fetchMyTrips, type Trip } from "@/src/api/trips";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
@@ -52,6 +51,12 @@ type TripCardItem = {
   votingEndAt?: string;
   rawState: Trip["state"];
 };
+
+type TripsCache = {
+  yourTrips: TripCardItem[];
+  pastTrips: TripCardItem[];
+};
+let tripsCache: TripsCache | null = null;
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -132,8 +137,12 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
 export default function HomeScreen() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("your");
-  const [yourTrips, setYourTrips] = useState<TripCardItem[]>([]);
-  const [pastTrips, setPastTrips] = useState<TripCardItem[]>([]);
+  const [yourTrips, setYourTrips] = useState<TripCardItem[]>(
+    tripsCache?.yourTrips ?? []
+  );
+  const [pastTrips, setPastTrips] = useState<TripCardItem[]>(
+    tripsCache?.pastTrips ?? []
+  );
   const router = useRouter();
 
   const loadTrips = useCallback(async () => {
@@ -141,6 +150,7 @@ export default function HomeScreen() {
       if (!user) {
         setYourTrips([]);
         setPastTrips([]);
+        tripsCache = null;
         return;
       }
 
@@ -164,6 +174,7 @@ export default function HomeScreen() {
         }
       });
 
+      tripsCache = { yourTrips: upcoming, pastTrips: past };
       setYourTrips(upcoming);
       setPastTrips(past);
     } catch (error) {
@@ -175,6 +186,10 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      if (tripsCache) {
+        setYourTrips(tripsCache.yourTrips);
+        setPastTrips(tripsCache.pastTrips);
+      }
       void loadTrips();
     }, [loadTrips])
   );
@@ -425,6 +440,7 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.displayMd,
     color: colors.sunsetOrange,
     textAlign: "center",
+    ...shadows.displayTitle,
   },
   subtitleRow: {
     flexDirection: "row",

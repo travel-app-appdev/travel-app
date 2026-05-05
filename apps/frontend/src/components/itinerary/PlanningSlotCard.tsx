@@ -39,10 +39,15 @@ export function PlanningSlotCard({
 
   return (
     <View style={styles.row}>
-      <View style={[styles.card, hasActivity && styles.filledCard]}>
+      <View style={styles.card}>
         {hasActivity ? (
-          <View style={styles.filledContent}>
-            <View style={styles.timeRow}>
+          <View style={[styles.card, styles.filledCard]}>
+            {/* Time label row — icon is decorative */}
+            <View
+              style={styles.timeRow}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+            >
               <LocationHeart width={24} height={24} />
               <AppText variant="body" style={styles.filledTimeLabel}>
                 {slot.label}
@@ -57,26 +62,48 @@ export function PlanningSlotCard({
               {activity?.name}
             </AppText>
 
+            {/* Address row — icon is decorative */}
             {!!activity?.address && (
-              <View style={styles.infoRow}>
-                <LocationPin width={20} height={20} />
+              <View
+                style={styles.infoRow}
+                accessible={true}
+                accessibilityLabel={`Address: ${activity.address}`}
+              >
+                <LocationPin
+                  width={20}
+                  height={20}
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants"
+                />
                 <AppText
                   variant="body"
                   style={styles.infoText}
                   numberOfLines={1}
+                  accessible={false}
                 >
                   {activity.address}
                 </AppText>
               </View>
             )}
 
+            {/* Google Maps link row — icon is decorative */}
             {!!activity?.googleMapsUrl && (
-              <View style={styles.infoRow}>
-                <GoogleIcon width={20} height={20} />
+              <View
+                style={styles.infoRow}
+                accessible={true}
+                accessibilityLabel="Google Maps link available"
+              >
+                <GoogleIcon
+                  width={20}
+                  height={20}
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants"
+                />
                 <AppText
                   variant="body"
                   style={styles.linkText}
                   numberOfLines={1}
+                  accessible={false}
                 >
                   {activity.googleMapsUrl}
                 </AppText>
@@ -90,7 +117,11 @@ export function PlanningSlotCard({
             </AppText>
 
             <View style={styles.emptyContent}>
-              <View style={styles.emptyIconWrapper}>
+              <View
+                style={styles.emptyIconWrapper}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
                 <LocationHeart width={24} height={24} />
               </View>
 
@@ -102,6 +133,7 @@ export function PlanningSlotCard({
         )}
       </View>
 
+      {/* CTA button — full slot context in label */}
       <Pressable
         onPress={handlePress}
         style={({ pressed }) => [
@@ -112,14 +144,35 @@ export function PlanningSlotCard({
         ]}
         disabled={disabled}
         accessibilityRole="button"
+        accessibilityLabel={
+          hasActivity
+            ? `Edit activity ${activity?.name} at ${slot.label}`
+            : `Add activity at ${slot.label}`
+        }
+        accessibilityHint={
+          hasActivity
+            ? "Opens the edit activity screen"
+            : "Opens the add activity screen"
+        }
+        accessibilityState={{ disabled }}
       >
-        {hasActivity ? (
-          <EditIcon width={36} height={36} />
-        ) : (
-          <AddIcon width={36} height={36} />
-        )}
+        {/* Icon and label text are decorative — the accessibilityLabel above carries the full meaning */}
+        <View
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
+          {hasActivity ? (
+            <EditIcon width={36} height={36} />
+          ) : (
+            <AddIcon width={36} height={36} />
+          )}
+        </View>
 
-        <AppText variant="body" style={styles.ctaText}>
+        <AppText
+          variant="body"
+          style={styles.ctaText}
+          accessible={false}
+        >
           {hasActivity ? "Edit\nactivity" : "Add\nactivity"}
         </AppText>
       </Pressable>

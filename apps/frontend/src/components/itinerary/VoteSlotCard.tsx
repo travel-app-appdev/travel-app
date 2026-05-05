@@ -1,4 +1,3 @@
-// src/components/itinerary/VotingSlotCard.tsx
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
@@ -19,8 +18,13 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
   return (
     <View style={styles.row}>
       <View style={styles.card}>
-        {/* Time label */}
-        <View style={styles.timeRow}>
+
+        {/* Time label — icon is decorative */}
+        <View
+          style={styles.timeRow}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
           <LocationIcon width={16} height={16} />
           <AppText variant="body" style={styles.timeLabel}>
             {activity.slotId}
@@ -32,23 +36,51 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           {activity.name}
         </AppText>
 
-        {/* Address */}
-        <View style={styles.addressRow}>
-          <LocationIcon width={14} height={14} />
-          <AppText variant="caption" style={styles.address}>
+        {/* Address — icon is decorative */}
+        <View
+          style={styles.addressRow}
+          accessible={true}
+          accessibilityLabel={`Address: ${activity.address}`}
+        >
+          <LocationIcon
+            width={14}
+            height={14}
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+          />
+          <AppText
+            variant="caption"
+            style={styles.address}
+            accessible={false}
+          >
             {activity.address}
           </AppText>
         </View>
 
-        {/* Google Link */}
+        {/* Google Link — icon is decorative */}
         {activity.googleMapsUrl ? (
-          <View style={styles.googleRow}>
+          <View
+            style={styles.googleRow}
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+          >
             <GoogleIcon width={14} height={14} />
             <AppText variant="caption" style={styles.googleLink}>
-              Google-Link
+              Google Maps link
             </AppText>
           </View>
         ) : null}
+
+        {/* Vote count — live region so screen readers announce changes */}
+        <View
+          accessibilityLiveRegion="polite"
+          accessible={true}
+          accessibilityLabel={`${activity.voteCount ?? 0} ${activity.voteCount === 1 ? "vote" : "votes"}`}
+        >
+          <AppText variant="caption" style={styles.voteCount}>
+            {activity.voteCount ?? 0} {activity.voteCount === 1 ? "vote" : "votes"}
+          </AppText>
+        </View>
       </View>
 
       {/* Vote CTA */}
@@ -60,15 +92,25 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           pressed && styles.ctaPressed,
         ]}
         accessibilityRole="button"
-        accessibilityLabel={`Vote for ${activity.name}`}
+        accessibilityLabel={selected ? `Remove vote for ${activity.name}` : `Vote for ${activity.name}`}
+        accessibilityHint={selected ? "Removes your vote for this activity" : "Adds your vote for this activity"}
         accessibilityState={{ selected }}
       >
-        {selected ? (
-          <CheckIcon width={28} height={28} color={colors.nightBlack} />
-        ) : (
-          <VoteIcon width={28} height={28} color={colors.nightBlack} />
-        )}
-        <AppText variant="body" style={styles.ctaText}>
+        <View
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
+          {selected ? (
+            <CheckIcon width={28} height={28} color={colors.nightBlack} />
+          ) : (
+            <VoteIcon width={28} height={28} color={colors.nightBlack} />
+          )}
+        </View>
+        <AppText
+          variant="body"
+          style={styles.ctaText}
+          accessible={false}
+        >
           {selected ? "Added\nvote" : "Add\nvote"}
         </AppText>
       </Pressable>
@@ -126,6 +168,12 @@ const styles = StyleSheet.create({
   googleLink: {
     color: colors.seaBlue,
     fontFamily: typography.fontFamily.bodySemiBold,
+  },
+  voteCount: {
+    color: colors.textMuted,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    marginTop: spacing.xs,
   },
   cta: {
     width: 72,

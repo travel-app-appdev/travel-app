@@ -1,4 +1,3 @@
-// app/login.tsx
 import { Link, router } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -69,7 +68,6 @@ export default function LoginScreen() {
       setIdToken(authResponse.idToken); 
       router.replace("/home");
 
-      router.replace("/home");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Something went wrong";
@@ -94,9 +92,9 @@ export default function LoginScreen() {
           {
             paddingTop: headerTop,
             paddingBottom: headerBottom,
+            pointerEvents:"box-none",
           },
         ]}
-        pointerEvents="box-none"
       >
         <View style={styles.backWrapper}>
           <Link

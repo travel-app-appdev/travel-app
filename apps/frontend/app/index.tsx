@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppText } from "@/src/components/common/AppText";
-import { colors, radius, spacing, typography } from "@/src/theme";
+import { colors, radius, spacing, typography, shadows } from "@/src/theme";
 import { useGoogleLogin } from "@/src/lib/googleAuth";
 import { loginWithToken } from "@/src/api/auth";
 import { useAuth } from "@/src/context/AuthContext";
@@ -54,19 +54,19 @@ export default function StartPage() {
     <View style={styles.container}>
       {/* Decorative background visuals — scaled to screen */}
       <View
-        style={[styles.palmTreeWrapper, { top: -245 * sh, right: -560 * sw }]}
-        pointerEvents="none"
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
+        style={[
+          styles.palmTreeWrapper,
+          { top: -245 * sh, right: -560 * sw, pointerEvents: "none" },
+        ]}
       >
         <PalmTree width={1000 * sw} height={1000 * sh} />
       </View>
 
       <View
-        style={[styles.palmLeafWrapper, { top: 50 * sh, left: -240 * sw }]}
-        pointerEvents="none"
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
+        style={[
+          styles.palmLeafWrapper,
+          { top: 50 * sh, left: -240 * sw, pointerEvents: "none" },
+        ]}
       >
         <PalmLeaf width={350 * sw} height={350 * sw} />
       </View>
@@ -74,11 +74,8 @@ export default function StartPage() {
       <View
         style={[
           styles.curlyGreenWrapper,
-          { bottom: -220 * sh, left: -215 * sw },
+          { bottom: -220 * sh, left: -215 * sw, pointerEvents: "none" },
         ]}
-        pointerEvents="none"
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
       >
         <CurlyGreen width={500 * sw} height={500 * sw} />
       </View>
@@ -132,15 +129,18 @@ export default function StartPage() {
 
         <View style={styles.actions}>
           <Link href="/login" asChild>
-            <View>
-              <AppButton
-                title="Login"
-                onPress={() => router.push("/login")}
-                textStyle={styles.primaryButtonText}
-                accessibilityLabel="Go to login screen"
-                accessibilityHint="Opens the login page"
-              />
-            </View>
+            <AppButton
+              title="Login"
+              onPress={() => {
+                if (typeof document !== "undefined") {
+                  (document.activeElement as HTMLElement | null)?.blur();
+                }
+                router.push("/login");
+              }}
+              textStyle={styles.primaryButtonText}
+              accessibilityLabel="Go to login screen"
+              accessibilityHint="Opens the login page"
+            />
           </Link>
 
           <View style={styles.registerRow}>
@@ -219,6 +219,7 @@ const styles = StyleSheet.create({
     color: colors.beachYellow,
     textTransform: "uppercase",
     fontFamily: typography.fontFamily.title,
+    ...shadows.displayTitle,
   },
   titleTraveler: {
     color: colors.sunsetOrange,
@@ -226,6 +227,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.title,
     marginTop: 2,
     paddingBottom: spacing.xl,
+    ...shadows.displayTitle,
   },
   actions: {
     width: "100%",
