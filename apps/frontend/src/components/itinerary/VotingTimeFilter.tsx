@@ -1,5 +1,4 @@
-// src/components/itinerary/VotingTimeFilter.tsx
-import { Pressable, ScrollView, StyleSheet } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 
@@ -7,7 +6,7 @@ import LocationIcon from "@/assets/icons/location.svg";
 
 type TimeChip = {
   slotId: string;
-  label: string; // "06:00-08:00"
+  label: string; // "06:00–08:00"
 };
 
 type Props = {
@@ -26,6 +25,8 @@ export function VotingTimeFilter({
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.content}
+      accessibilityRole="scrollbar"
+      accessibilityLabel="Time slot filters, scroll horizontally to see more"
     >
       {chips.map((chip) => {
         const isSelected = chip.slotId === selectedSlotId;
@@ -40,17 +41,30 @@ export function VotingTimeFilter({
               pressed && styles.chipPressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel={`Filter conflicts for ${chip.label}`}
+            accessibilityLabel={`Time slot ${chip.label}`}
+            accessibilityHint={
+              isSelected
+                ? "Currently selected"
+                : "Tap to filter activities for this time slot"
+            }
             accessibilityState={{ selected: isSelected }}
           >
-            <LocationIcon
-              width={14}
-              height={14}
-              color={isSelected ? colors.nightBlack : colors.textMuted}
-            />
+            {/* Icon is decorative — label on Pressable carries the meaning */}
+            <View
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+            >
+              <LocationIcon
+                width={14}
+                height={14}
+                color={isSelected ? colors.nightBlack : colors.textMuted}
+              />
+            </View>
+
             <AppText
               variant="caption"
               style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}
+              accessible={false}
             >
               {chip.label}
             </AppText>

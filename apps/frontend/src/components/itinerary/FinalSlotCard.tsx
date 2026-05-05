@@ -1,4 +1,3 @@
-// src/components/itinerary/FinalSlotCard.tsx
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
@@ -24,7 +23,11 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
           <AppText variant="body" style={styles.emptyTimeLabel}>
             {slot.label}
           </AppText>
-          <View style={styles.emptyContent}>
+          <View
+            style={styles.emptyContent}
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+          >
             <LocationIcon width={20} height={20} color={colors.textMuted} />
             <AppText variant="subtitle" style={styles.emptyTitle}>
               Empty Activity
@@ -38,8 +41,12 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
   return (
     <View style={styles.row}>
       <View style={styles.card}>
-        {/* Time label */}
-        <View style={styles.timeRow}>
+        {/* Time label row — icon is decorative */}
+        <View
+          style={styles.timeRow}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
           <LocationIcon width={16} height={16} />
           <AppText variant="body" style={styles.timeLabel}>
             {slot.label}
@@ -51,29 +58,41 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
           {activity.name}
         </AppText>
 
-        {/* Address */}
-        <View style={styles.addressRow}>
+        {/* Address row — icon is decorative */}
+        <View
+          style={styles.addressRow}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
           <LocationIcon width={14} height={14} />
           <AppText variant="caption" style={styles.address}>
             {activity.address}
           </AppText>
         </View>
 
-        {/* Google Link */}
+        {/* Google Link row — icon is decorative */}
         {activity.googleMapsUrl ? (
-          <View style={styles.googleRow}>
+          <View
+            style={styles.googleRow}
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+          >
             <GoogleIcon width={14} height={14} />
             <AppText variant="caption" style={styles.googleLink}>
-              Google-Link
+              Google Maps link
             </AppText>
           </View>
         ) : null}
 
-        {/* Joined count */}
-        <View style={styles.joinedRow}>
+        {/* Joined count row — icon is decorative */}
+        <View
+          style={styles.joinedRow}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
           <MembersIcon width={14} height={14} />
           <AppText variant="caption" style={styles.joinedCount}>
-            {activity.joinedCount ?? 0}
+            {activity.joinedCount ?? 0} joined
           </AppText>
         </View>
       </View>
@@ -83,17 +102,34 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
         onPress={() => onJoinGroup?.(activity.id)}
         style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
         accessibilityRole="button"
-        accessibilityLabel={`Join group for ${activity.name}`}
+        accessibilityLabel={
+          activity.hasCurrentUserJoined
+            ? `Leave group for ${activity.name}`
+            : `Join group for ${activity.name}`
+        }
+        accessibilityHint={
+          activity.hasCurrentUserJoined
+            ? "Removes you from this activity group"
+            : "Adds you to this activity group"
+        }
+        accessibilityState={{ checked: activity.hasCurrentUserJoined }}
       >
-        {/* Circle with plus icon */}
-        <View style={styles.joinIcon}>
+        <View
+          style={styles.joinIcon}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
           {activity.hasCurrentUserJoined ? (
             <CheckIcon width={36} height={36} color={colors.nightBlack} />
           ) : (
             <JoinGroup width={36} height={36} />
           )}
         </View>
-        <AppText variant="body" style={styles.ctaText}>
+        <AppText
+          variant="body"
+          style={styles.ctaText}
+          accessible={false}
+        >
           {activity.hasCurrentUserJoined ? "Joined\ngroup" : "Join\ngroup"}
         </AppText>
       </Pressable>

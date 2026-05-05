@@ -237,7 +237,10 @@ export default function AddActivityScreen() {
         <View style={styles.form}>
           <View style={styles.fields}>
             <View style={styles.fieldGroup}>
-              <View style={styles.labelRow}>
+              <View style={styles.labelRow}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+              >
                 <TextStyle width={24} height={24} />
                 <AppText variant="body" style={styles.label}>
                   Activity Name
@@ -250,11 +253,16 @@ export default function AddActivityScreen() {
                 placeholder="Roman Agora"
                 placeholderTextColor={colors.textMuted}
                 style={styles.input}
+                accessibilityLabel="Activity name"
+                accessibilityHint="Enter the name of the activity"
               />
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.labelRow}>
+              <View style={styles.labelRow}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+              >
                 <EditIcon width={24} height={24} />
                 <AppText variant="body" style={styles.label}>
                   Description
@@ -269,11 +277,16 @@ export default function AddActivityScreen() {
                 style={[styles.input, styles.multilineInput]}
                 multiline
                 textAlignVertical="top"
+                accessibilityLabel="Description"
+                accessibilityHint="Enter the description of the activity"
               />
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.labelRow}>
+              <View style={styles.labelRow}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+              >
                 <LocationIcon width={24} height={24} />
                 <AppText variant="body" style={styles.label}>
                   Location
@@ -286,11 +299,16 @@ export default function AddActivityScreen() {
                 placeholder="Address"
                 placeholderTextColor={colors.textMuted}
                 style={styles.input}
+                accessibilityLabel="Location"
+                accessibilityHint="Enter the location of the activity"
               />
             </View>
-
+ 
             <View style={styles.fieldGroup}>
-              <View style={styles.labelRow}>
+              <View style={styles.labelRow}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+              >
                 <GoogleIcon width={24} height={24} />
                 <AppText variant="body" style={styles.label}>
                   Google-Link
@@ -305,6 +323,8 @@ export default function AddActivityScreen() {
                 style={styles.input}
                 autoCapitalize="none"
                 keyboardType="url"
+                accessibilityLabel="Google Maps link"
+                accessibilityHint="Paste a Google Maps URL for this activity"
               />
             </View>
           </View>

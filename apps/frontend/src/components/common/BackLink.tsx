@@ -1,6 +1,5 @@
-// components/common/BackLink.tsx
 import { Link } from "expo-router";
-import { Pressable, StyleSheet } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { type Href } from "expo-router";
 import { spacing } from "@/src/theme";
 import Back from "@/assets/icons/back.svg";
@@ -11,6 +10,16 @@ type BackLinkProps = {
 };
 
 export function BackLink({ href, onPress }: BackLinkProps) {
+  // Decorative icon — hidden from accessibility tree in both variants
+  const icon = (
+    <View
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Back width={20} height={20} />
+    </View>
+  );
+
   if (onPress) {
     return (
       <Pressable
@@ -18,20 +27,25 @@ export function BackLink({ href, onPress }: BackLinkProps) {
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel="Go back"
+        accessibilityHint="Returns to the previous screen"
       >
-        <Back width={20} height={20} />
+        {icon}
       </Pressable>
     );
   }
 
+  // Link variant — use button role on mobile, link role on web
+  // On mobile, navigating "back" feels like a button action not a hyperlink,
+  // and screen readers announce it more naturally as "Go back, button"
   return (
     <Link
       href={href!}
       style={styles.backLink}
-      accessibilityRole="link"
+      accessibilityRole={Platform.OS === "web" ? "link" : "button"}
       accessibilityLabel="Go back"
+      accessibilityHint="Returns to the previous screen"
     >
-      <Back width={20} height={20} />
+      {icon}
     </Link>
   );
 }

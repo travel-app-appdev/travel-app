@@ -49,14 +49,13 @@ const PHASE_TEXT_COLORS: Record<string, string> = {
 
 type PhaseKey = "planning" | "voting" | "final";
 
-type PhaseDates = Record<
-  PhaseKey,
-  {
-    start: Date;
-    end: Date;
-    time: string;
-  }
->;
+type PhaseValue = {
+  start: Date;
+  end: Date;
+  time: string;
+};
+
+type PhaseDates = Record<PhaseKey, PhaseValue>;
 
 function formatDateDisplay(date: Date): string {
   const d = date.getDate().toString().padStart(2, "0");
@@ -72,10 +71,8 @@ function toDateOnlyString(date: Date): string {
 function calcCalendarDays(start: Date, end: Date): number {
   const startOnly = new Date(start);
   startOnly.setHours(0, 0, 0, 0);
-
   const endOnly = new Date(end);
   endOnly.setHours(0, 0, 0, 0);
-
   const ms = endOnly.getTime() - startOnly.getTime();
   return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
 }
@@ -83,10 +80,8 @@ function calcCalendarDays(start: Date, end: Date): number {
 function calcDaysLeft(end: Date): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
   const endOnly = new Date(end);
   endOnly.setHours(0, 0, 0, 0);
-
   const ms = endOnly.getTime() - today.getTime();
   return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
 }
@@ -219,12 +214,8 @@ export default function CreateTripScreen() {
   const syncPhasesFromTripDates = (nextTripStart: Date, nextTripEnd: Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    // Planning runs from "today" until the trip start date
     const planningStart = today;
-    const planningEnd = nextTripStart < today ? today : nextTripStart; // just in case start is in the past
-
-    // Voting runs from trip start until trip end by default
+    const planningEnd = nextTripStart < today ? today : nextTripStart;
     const votingStart = planningEnd;
     const votingEnd = nextTripEnd;
 
@@ -232,7 +223,6 @@ export default function CreateTripScreen() {
       planning: {
         start: planningStart,
         end: planningEnd,
-        // keep whatever default time you want for planning
         time: phaseDates.planning.time || "12:00",
       },
       voting: {
@@ -261,12 +251,10 @@ export default function CreateTripScreen() {
       Alert.alert("Missing trip name", "Please enter a trip name.");
       return;
     }
-
     if (tripEnd < tripStart) {
       Alert.alert("Invalid dates", "End date cannot be before start date.");
       return;
     }
-
     syncPhasesFromTripDates(tripStart, tripEnd);
     setStep(3);
   };
@@ -281,7 +269,6 @@ export default function CreateTripScreen() {
         const currentVotingEnd = new Date(
           combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
         );
-
         if (nextEnd > tripEndBoundary) {
           Alert.alert(
             "Invalid planning end",
@@ -289,7 +276,6 @@ export default function CreateTripScreen() {
           );
           return;
         }
-
         if (nextEnd >= currentVotingEnd) {
           Alert.alert(
             "Invalid planning end",
@@ -297,32 +283,18 @@ export default function CreateTripScreen() {
           );
           return;
         }
-
-        setPhaseDates((prev) => ({
+        setPhaseDates((prev: PhaseDates) => ({
           ...prev,
-          planning: {
-            ...prev.planning,
-            end: phase.end,
-            time: phase.time,
-          },
+          planning: { ...prev.planning, end: phase.end, time: phase.time },
           voting: {
             ...prev.voting,
             start: phase.end,
-            end:
-              prev.voting.end < phase.end
-                ? new Date(phase.end)
-                : prev.voting.end,
+            end: prev.voting.end < phase.end ? new Date(phase.end) : prev.voting.end,
           },
           final: {
             ...prev.final,
-            start:
-              prev.voting.end < phase.end
-                ? new Date(phase.end)
-                : prev.final.start,
-            end:
-              prev.voting.end < phase.end
-                ? new Date(phase.end)
-                : prev.final.end,
+            start: prev.voting.end < phase.end ? new Date(phase.end) : prev.final.start,
+            end: prev.voting.end < phase.end ? new Date(phase.end) : prev.final.end,
           },
         }));
       }
@@ -331,7 +303,6 @@ export default function CreateTripScreen() {
         const currentPlanningEnd = new Date(
           combineDateAndTime(phaseDates.planning.end, phaseDates.planning.time)
         );
-
         if (nextEnd <= currentPlanningEnd) {
           Alert.alert(
             "Invalid voting end",
@@ -339,7 +310,6 @@ export default function CreateTripScreen() {
           );
           return;
         }
-
         if (nextEnd > tripEndBoundary) {
           Alert.alert(
             "Invalid voting end",
@@ -347,27 +317,23 @@ export default function CreateTripScreen() {
           );
           return;
         }
-
         const nextFinalDisplay = phase.end;
-
-        setPhaseDates((prev) => ({
+        setPhaseDates((prev: PhaseDates) => ({
           ...prev,
-          voting: {
-            ...prev.voting,
-            end: phase.end,
-            time: phase.time,
-          },
-          final: {
-            ...prev.final,
-            start: nextFinalDisplay,
-            end: nextFinalDisplay,
-          },
+          voting: { ...prev.voting, end: phase.end, time: phase.time },
+          final: { ...prev.final, start: nextFinalDisplay, end: nextFinalDisplay },
         }));
       }
 
-      setPhaseUpdated((prev) => ({ ...prev, [phaseId]: true }));
+      setPhaseUpdated((prev: Record<string, boolean>) => ({
+        ...prev,
+        [phaseId]: true,
+      }));
       safeTimeout(() => {
-        setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
+        setPhaseUpdated((prev: Record<string, boolean>) => ({
+          ...prev,
+          [phaseId]: false,
+        }));
         setOpenPhase(null);
       }, 1500);
     } catch (error) {
@@ -379,25 +345,18 @@ export default function CreateTripScreen() {
 
   const handleCreateTrip = async () => {
     if (isCreating) return;
-
     if (!user) {
-      Alert.alert(
-        "Not logged in",
-        "Please log in again and try creating a trip."
-      );
+      Alert.alert("Not logged in", "Please log in again and try creating a trip.");
       return;
     }
-
     if (!destination.trim()) {
       Alert.alert("Missing destination", "Please enter a destination.");
       return;
     }
-
     if (!tripName.trim()) {
       Alert.alert("Missing trip name", "Please enter a trip name.");
       return;
     }
-
     if (tripEnd < tripStart) {
       Alert.alert("Invalid dates", "End date cannot be before start date.");
       return;
@@ -413,42 +372,26 @@ export default function CreateTripScreen() {
       const tripEndBoundary = endOfDay(tripEnd);
 
       if (planningEnd > tripEndBoundary) {
-        Alert.alert(
-          "Invalid planning end",
-          "Planning end cannot be after the trip end date."
-        );
+        Alert.alert("Invalid planning end", "Planning end cannot be after the trip end date.");
         return;
       }
-
       if (planningEnd >= votingEnd) {
-        Alert.alert(
-          "Invalid voting end",
-          "Voting end must be after planning end."
-        );
+        Alert.alert("Invalid voting end", "Voting end must be after planning end.");
         return;
       }
-
       if (votingEnd > tripEndBoundary) {
-        Alert.alert(
-          "Invalid voting end",
-          "Voting end cannot be after the trip end date."
-        );
+        Alert.alert("Invalid voting end", "Voting end cannot be after the trip end date.");
         return;
       }
 
       setIsCreating(true);
-
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert(
-          "Authentication error",
-          "No Firebase user found. Please log in again."
-        );
+        Alert.alert("Authentication error", "No Firebase user found. Please log in again.");
         return;
       }
 
       const idToken = await currentUser.getIdToken();
-
       const result = await createTrip({
         idToken,
         title: tripName.trim(),
@@ -476,6 +419,7 @@ export default function CreateTripScreen() {
     }
   };
 
+  // Step 3 — timer setup
   if (step === 3) {
     return (
       <View style={[styles.fullScreen, styles.bgStep3]}>
@@ -491,7 +435,11 @@ export default function CreateTripScreen() {
             >
               <View style={styles.header}>
                 <BackLink onPress={() => setStep(2)} />
-                <View style={styles.headerTitle}>
+                <View
+                  style={styles.headerTitle}
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants"
+                >
                   <Plane width={25} height={25} />
                   <AppText variant="body" style={styles.headerLabel}>
                     Create trip
@@ -522,10 +470,15 @@ export default function CreateTripScreen() {
                       style={styles.phaseRow}
                       onPress={() => togglePhase(phaseId)}
                       accessibilityRole="button"
-                      accessibilityLabel={`Edit ${phase.label} phase`}
+                      accessibilityLabel={`${phase.label} phase, ${dayLabel(days, phase.active)}`}
+                      accessibilityHint={`Tap to edit ${phase.label} end date and time`}
                       accessibilityState={{ expanded: isOpen }}
                     >
-                      <View style={styles.phaseLeft}>
+                      <View
+                        style={styles.phaseLeft}
+                        accessible={false}
+                        importantForAccessibility="no-hide-descendants"
+                      >
                         <View
                           style={[
                             styles.phaseBadge,
@@ -562,21 +515,23 @@ export default function CreateTripScreen() {
                                 </View>
                               )}
                             </View>
-                            <AppText
-                              variant="caption"
-                              style={styles.timerLabel}
-                            >
+                            <AppText variant="caption" style={styles.timerLabel}>
                               Timer
                             </AppText>
                           </View>
                         </View>
                       </View>
 
-                      {isOpen ? (
-                        <ArrowUp width={20} height={20} />
-                      ) : (
-                        <ArrowDown width={20} height={20} />
-                      )}
+                      <View
+                        accessible={false}
+                        importantForAccessibility="no-hide-descendants"
+                      >
+                        {isOpen ? (
+                          <ArrowUp width={20} height={20} />
+                        ) : (
+                          <ArrowDown width={20} height={20} />
+                        )}
+                      </View>
                     </Pressable>
 
                     <AppText variant="caption" style={styles.phaseDateLabel}>
@@ -593,6 +548,7 @@ export default function CreateTripScreen() {
                         </AppText>
 
                         <View style={styles.dateTimeRow}>
+                          {/* Fix 9: context-aware label */}
                           <Pressable
                             style={[styles.dateInput, styles.dateTimeHalf]}
                             onPress={() => {
@@ -600,14 +556,20 @@ export default function CreateTripScreen() {
                               setShowPhaseTimePicker(null);
                             }}
                             accessibilityRole="button"
-                            accessibilityLabel={`Select ${phase.label} end date`}
+                            accessibilityLabel={`${phase.label} end date, currently ${formatDateDisplay(dates.end)}. Tap to change`}
                           >
                             <AppText variant="body" style={styles.dateText}>
                               {formatDateDisplay(dates.end)}
                             </AppText>
-                            <Calendar width={18} height={18} />
+                            <View
+                              accessible={false}
+                              importantForAccessibility="no-hide-descendants"
+                            >
+                              <Calendar width={18} height={18} />
+                            </View>
                           </Pressable>
 
+                          {/* Fix 9: context-aware label */}
                           <Pressable
                             style={[styles.dateInput, styles.dateTimeHalf]}
                             onPress={() => {
@@ -615,15 +577,21 @@ export default function CreateTripScreen() {
                               setShowPhaseStartPicker(null);
                             }}
                             accessibilityRole="button"
-                            accessibilityLabel={`Select ${phase.label} end time`}
+                            accessibilityLabel={`${phase.label} end time, currently ${dates.time}. Tap to change`}
                           >
                             <AppText variant="body" style={styles.dateText}>
                               {dates.time}
                             </AppText>
-                            <Timer width={18} height={18} />
+                            <View
+                              accessible={false}
+                              importantForAccessibility="no-hide-descendants"
+                            >
+                              <Timer width={18} height={18} />
+                            </View>
                           </Pressable>
                         </View>
 
+                        {/* Fix 9: accessibilityLabel on each picker */}
                         {showPhaseStartPicker === phaseId && (
                           <DateTimePicker
                             value={dates.end}
@@ -634,18 +602,14 @@ export default function CreateTripScreen() {
                                 : undefined
                             }
                             maximumDate={tripEnd}
-                            display={
-                              Platform.OS === "ios" ? "spinner" : "default"
-                            }
+                            display={Platform.OS === "ios" ? "spinner" : "default"}
+                            accessibilityLabel={`Select ${phase.label} phase end date`}
                             onChange={(_: DateTimePickerEvent, date?: Date) => {
                               setShowPhaseStartPicker(null);
                               if (date) {
-                                setPhaseDates((prev) => ({
+                                setPhaseDates((prev: PhaseDates) => ({
                                   ...prev,
-                                  [phaseId]: {
-                                    ...prev[phaseId],
-                                    end: date,
-                                  },
+                                  [phaseId]: { ...prev[phaseId], end: date },
                                 }));
                               }
                             }}
@@ -657,13 +621,12 @@ export default function CreateTripScreen() {
                             value={timeStringToDate(dates.time)}
                             mode="time"
                             is24Hour
-                            display={
-                              Platform.OS === "ios" ? "spinner" : "default"
-                            }
+                            display={Platform.OS === "ios" ? "spinner" : "default"}
+                            accessibilityLabel={`Select ${phase.label} phase end time`}
                             onChange={(_: DateTimePickerEvent, date?: Date) => {
                               setShowPhaseTimePicker(null);
                               if (date) {
-                                setPhaseDates((prev) => ({
+                                setPhaseDates((prev: PhaseDates) => ({
                                   ...prev,
                                   [phaseId]: {
                                     ...prev[phaseId],
@@ -684,7 +647,11 @@ export default function CreateTripScreen() {
                         />
 
                         {phaseUpdated[phaseId] && (
-                          <View style={styles.successRow}>
+                          <View
+                            style={styles.successRow}
+                            accessible={false}
+                            importantForAccessibility="no-hide-descendants"
+                          >
                             <CheckMark width={18} height={18} />
                             <AppText
                               variant="caption"
@@ -701,7 +668,12 @@ export default function CreateTripScreen() {
                 );
               })}
 
-              <View style={styles.finalInfoBox}>
+              {/* Info box — icon is decorative */}
+              <View
+                style={styles.finalInfoBox}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
                 <Info width={24} height={24} />
                 <AppText variant="body" style={styles.finalInfoText}>
                   Final itinerary is shown automatically after Voting ends.
@@ -717,7 +689,7 @@ export default function CreateTripScreen() {
                 disabled={isCreating}
                 style={styles.nextButton}
                 textStyle={styles.nextButtonText}
-                accessibilityLabel="Create trip"
+                accessibilityLabel={isCreating ? "Creating trip" : "Create trip"}
               />
             </View>
           </View>
@@ -726,6 +698,7 @@ export default function CreateTripScreen() {
     );
   }
 
+  // Step 4 — share code
   if (step === 4) {
     return (
       <View style={[styles.fullScreen, styles.bgStep1]}>
@@ -733,7 +706,8 @@ export default function CreateTripScreen() {
           <View style={[styles.root, styles.bgStep1]}>
             <View
               style={[styles.curlyOrangeWrapper, { pointerEvents: "none" }]}
-              {...(Platform.OS !== "web" ? { accessible: false } : {})}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
             >
               <CurlyOrange
                 width={SCREEN_WIDTH * 1.1}
@@ -747,7 +721,11 @@ export default function CreateTripScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.header}>
-                <View style={styles.headerTitle}>
+                <View
+                  style={styles.headerTitle}
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants"
+                >
                   <Plane width={25} height={25} />
                   <AppText variant="body" style={styles.headerLabel}>
                     Create trip
@@ -760,18 +738,36 @@ export default function CreateTripScreen() {
               </AppText>
 
               <View style={styles.fieldGroup}>
-                <View style={styles.fieldLabelRow}>
+                <View
+                  style={styles.fieldLabelRow}
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants"
+                >
                   <KeyFrame width={20} height={20} />
                   <AppText variant="body" style={styles.fieldLabel}>
                     Code
                   </AppText>
                 </View>
 
-                <Pressable style={styles.codeInput} onPress={handleCopyCode}>
-                  <AppText variant="body" style={styles.codeText}>
+                <Pressable
+                  style={styles.codeInput}
+                  onPress={handleCopyCode}
+                  accessibilityRole="button"
+                  accessibilityLabel={copied ? "Trip code copied" : "Copy trip code"}
+                  accessibilityHint="Copies the trip invite code to your clipboard"
+                >
+                  <AppText
+                    variant="body"
+                    style={styles.codeText}
+                    accessible={false}
+                  >
                     {tripCode}
                   </AppText>
-                  <View style={styles.copyActionArea}>
+                  <View
+                    style={styles.copyActionArea}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                  >
                     <AppText variant="caption" style={styles.copiedText}>
                       {copied ? "✓ Copied!" : "Tap to copy"}
                     </AppText>
@@ -801,6 +797,7 @@ export default function CreateTripScreen() {
     );
   }
 
+  // Steps 1 and 2
   return (
     <View
       style={[styles.fullScreen, step === 1 ? styles.bgStep1 : styles.bgStep2]}
@@ -822,7 +819,11 @@ export default function CreateTripScreen() {
                 >
                   <View style={styles.header}>
                     <BackLink href="/home" />
-                    <View style={styles.headerTitle}>
+                    <View
+                      style={styles.headerTitle}
+                      accessible={false}
+                      importantForAccessibility="no-hide-descendants"
+                    >
                       <Plane width={25} height={25} />
                       <AppText variant="body" style={styles.headerLabel}>
                         Create trip
@@ -835,7 +836,11 @@ export default function CreateTripScreen() {
                   </AppText>
 
                   <View style={[styles.fieldGroup, { marginTop: 20 }]}>
-                    <View style={styles.fieldLabelRow}>
+                    <View
+                      style={styles.fieldLabelRow}
+                      accessible={false}
+                      importantForAccessibility="no-hide-descendants"
+                    >
                       <Location width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Destination
@@ -868,7 +873,8 @@ export default function CreateTripScreen() {
 
               <View
                 style={[styles.cityScapeWrapper, { pointerEvents: "none" }]}
-                {...(Platform.OS !== "web" ? { accessible: false } : {})}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
               >
                 <CityScape
                   width={SCREEN_WIDTH}
@@ -878,10 +884,10 @@ export default function CreateTripScreen() {
             </>
           ) : (
             <>
-              
               <View
                 style={[styles.curlyWrapper, { pointerEvents: "none" }]}
-                {...(Platform.OS !== "web" ? { accessible: false } : {})}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
               >
                 <CurlyYellow
                   width={SCREEN_WIDTH * 1.1}
@@ -900,7 +906,11 @@ export default function CreateTripScreen() {
                 >
                   <View style={styles.header}>
                     <BackLink onPress={() => setStep(1)} />
-                    <View style={styles.headerTitle}>
+                    <View
+                      style={styles.headerTitle}
+                      accessible={false}
+                      importantForAccessibility="no-hide-descendants"
+                    >
                       <Plane width={25} height={25} />
                       <AppText variant="body" style={styles.headerLabel}>
                         Create trip
@@ -913,7 +923,11 @@ export default function CreateTripScreen() {
                   </AppText>
 
                   <View style={styles.fieldGroup}>
-                    <View style={styles.fieldLabelRow}>
+                    <View
+                      style={styles.fieldLabelRow}
+                      accessible={false}
+                      importantForAccessibility="no-hide-descendants"
+                    >
                       <TripTitle width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Trip name
@@ -931,13 +945,18 @@ export default function CreateTripScreen() {
                   </View>
 
                   <View style={styles.fieldGroup}>
-                    <View style={styles.fieldLabelRow}>
+                    <View
+                      style={styles.fieldLabelRow}
+                      accessible={false}
+                      importantForAccessibility="no-hide-descendants"
+                    >
                       <Calendar width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Trip date
                       </AppText>
                     </View>
 
+                    {/* Fix 9: context-aware label */}
                     <Pressable
                       style={styles.dateInput}
                       onPress={() => {
@@ -945,20 +964,27 @@ export default function CreateTripScreen() {
                         setShowTripEndPicker(false);
                       }}
                       accessibilityRole="button"
-                      accessibilityLabel="Select trip dates"
+                      accessibilityLabel={`Trip start date, currently ${formatDate(tripStart)}. Tap to change`}
                       accessibilityHint="Opens the date picker"
                     >
                       <AppText variant="body" style={styles.dateText}>
                         {formatDate(tripStart)} - {formatDate(tripEnd)}
                       </AppText>
-                      <Calendar width={20} height={20} />
+                      <View
+                        accessible={false}
+                        importantForAccessibility="no-hide-descendants"
+                      >
+                        <Calendar width={20} height={20} />
+                      </View>
                     </Pressable>
 
+                    {/* Fix 9: accessibilityLabel on each picker */}
                     {showTripStartPicker && (
                       <DateTimePicker
                         value={tripStart}
                         mode="date"
                         display={Platform.OS === "ios" ? "spinner" : "default"}
+                        accessibilityLabel="Select trip start date"
                         onChange={(_: DateTimePickerEvent, date?: Date) => {
                           setShowTripStartPicker(false);
                           if (date) {
@@ -976,6 +1002,7 @@ export default function CreateTripScreen() {
                         mode="date"
                         minimumDate={tripStart}
                         display={Platform.OS === "ios" ? "spinner" : "default"}
+                        accessibilityLabel="Select trip end date"
                         onChange={(_: DateTimePickerEvent, date?: Date) => {
                           setShowTripEndPicker(false);
                           if (date) setTripEnd(date);
