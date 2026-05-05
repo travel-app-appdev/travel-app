@@ -3,7 +3,15 @@ import { createTrip } from "../controllers/tripsController";
 const mockBatchSet = jest.fn();
 const mockBatchCommit = jest.fn().mockResolvedValue(undefined);
 const mockVerifyIdToken = jest.fn().mockResolvedValue({ uid: "test123" });
+const originalConsoleError = console.error;
 
+beforeAll(() => {
+    console.error = jest.fn();
+});
+
+afterAll(() => {
+    console.error = originalConsoleError;
+});
 const mockResponse = () => {
     const res: any = {};
     res.status = jest.fn().mockReturnValue(res);
