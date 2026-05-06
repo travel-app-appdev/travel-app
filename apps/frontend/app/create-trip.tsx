@@ -1,5 +1,5 @@
-import { useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useFocusEffect } from "expo-router";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useAuth } from "@/src/context/AuthContext";
 import { createTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
@@ -252,13 +252,15 @@ export default function CreateTripScreen() {
   const router = useRouter();
 
   // Lock this screen to portrait
-  useEffect(() => {
+ // In CreateTripScreen (lock)
+useFocusEffect(
+  useCallback(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
     return () => {
       ScreenOrientation.unlockAsync();
     };
-  }, []);
-
+  }, [])
+);
   const TIMER_PHASES = phases.filter(
     (phase) => phase.id === "planning" || phase.id === "voting"
   );
