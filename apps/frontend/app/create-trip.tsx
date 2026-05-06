@@ -22,6 +22,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { Calendar as RangeCalendar } from "react-native-calendars";
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
@@ -249,6 +250,14 @@ export default function CreateTripScreen() {
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const { user } = useAuth();
   const router = useRouter();
+
+  // Lock this screen to portrait
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
+    return () => {
+      ScreenOrientation.unlockAsync();
+    };
+  }, []);
 
   const TIMER_PHASES = phases.filter(
     (phase) => phase.id === "planning" || phase.id === "voting"
@@ -673,76 +682,70 @@ export default function CreateTripScreen() {
     }
   };
 
-const TOTAL_STEPS = 4;
+  const TOTAL_STEPS = 4;
 
-const progress = useRef(new Animated.Value(1)).current;
+  const progress = useRef(new Animated.Value(1)).current;
 
-useEffect(() => {
-  Animated.timing(progress, {
-    toValue: step,
-    duration: 300,
-    useNativeDriver: false,
-  }).start();
-}, [step]);
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: step,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [step]);
 
-const progressAnim = progress.interpolate({
-  inputRange: [1, TOTAL_STEPS],
-  outputRange: ["0%", "100%"],
-});
+  const progressAnim = progress.interpolate({
+    inputRange: [1, TOTAL_STEPS],
+    outputRange: ["0%", "100%"],
+  });
 
+  type ProgressBarProps = {
+    progressWidth: Animated.AnimatedInterpolation<string>;
+    currentStep: number;
+    totalSteps: number;
+  };
 
-type ProgressBarProps = {
-  progressWidth: Animated.AnimatedInterpolation<string>;
-  currentStep: number;
-  totalSteps: number;
-
-};
-
-const ProgressBar: React.FC<ProgressBarProps> = ({
-  progressWidth,
-  currentStep,
-  totalSteps,
-}) => {
-  return (
-    <View style={{ width: "100%" }}>
-      {/* Progress bar */}
-      <View
-        style={{
-          width: "100%",
-          height: 20,
-          borderRadius: 20,
-          
-          backgroundColor:
-            currentStep === 3 ? colors.grayedOut : colors.lightWhite,
-
-          overflow: "hidden",
-        }}
-      >
-        <Animated.View
+  const ProgressBar: React.FC<ProgressBarProps> = ({
+    progressWidth,
+    currentStep,
+    totalSteps,
+  }) => {
+    return (
+      <View style={{ width: "100%" }}>
+        <View
           style={{
-            height: "100%",
+            width: "100%",
+            height: 20,
             borderRadius: 20,
-            backgroundColor: colors.seaBlue,
-            width: progressWidth,
+            backgroundColor:
+              currentStep === 3 ? colors.grayedOut : colors.lightWhite,
+            overflow: "hidden",
           }}
-        />
-      </View>
+        >
+          <Animated.View
+            style={{
+              height: "100%",
+              borderRadius: 20,
+              backgroundColor: colors.seaBlue,
+              width: progressWidth,
+            }}
+          />
+        </View>
 
-      {/* Text underneath */}
-      <Text
-        style={{
-          marginTop: 6,
-          alignSelf: "center",
-          color: colors.nightBlack,
-          fontSize: 14,
-          fontWeight: "600",
-        }}
-      >
-        {currentStep}/{totalSteps}
-      </Text>
-    </View>
-  );
-};
+        <Text
+          style={{
+            marginTop: 6,
+            alignSelf: "center",
+            color: colors.nightBlack,
+            fontSize: 14,
+            fontWeight: "600",
+          }}
+        >
+          {currentStep}/{totalSteps}
+        </Text>
+      </View>
+    );
+  };
 
   // Step 3 — timer setup
   if (step === 3) {
@@ -877,7 +880,6 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
                         </AppText>
 
                         <View style={styles.dateTimeRow}>
-                          {/* Fix 9: context-aware label */}
                           <Pressable
                             style={[styles.dateInput, styles.dateTimeHalf]}
                             onPress={() => openPhaseCalendar(phaseId)}
@@ -895,7 +897,6 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
                             </View>
                           </Pressable>
 
-                          {/* Fix 9: context-aware label */}
                           <Pressable
                             style={[styles.dateInput, styles.dateTimeHalf]}
                             onPress={() => {
@@ -958,7 +959,6 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
                 );
               })}
 
-              {/* Info box — icon is decorative */}
               <View
                 style={styles.finalInfoBox}
                 accessible={false}
@@ -1182,7 +1182,7 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
                 </View>
               </View>
 
-            <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
+              <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
                 <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
               </View>
 
@@ -1287,8 +1287,8 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
                   </View>
 
                   <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
-                <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
-              </View>
+                    <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
+                  </View>
 
                   <AppText variant="title" style={styles.titleStep1}>
                     Where is your trip taking place?
@@ -1380,8 +1380,8 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
                   </View>
 
                   <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
-                <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
-              </View>
+                    <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
+                  </View>
 
                   <AppText variant="title" style={styles.titleStep2}>
                     Give your trip a name and choose a date
@@ -1421,7 +1421,6 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
                       </AppText>
                     </View>
 
-                    {/* Fix 9: context-aware label */}
                     <Pressable
                       style={styles.dateInput}
                       onPress={openTripCalendar}
@@ -1811,7 +1810,6 @@ const styles = StyleSheet.create({
   updateButtonVoting: {
     backgroundColor: colors.sunsetPink,
   },
-
   updateButtonPlanning: {
     backgroundColor: colors.beachYellow,
   },
