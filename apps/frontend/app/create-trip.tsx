@@ -715,8 +715,8 @@ export default function CreateTripScreen() {
         <View
           style={{
             width: "100%",
-            height: 20,
-            borderRadius: 20,
+            height: 8,
+            borderRadius: 8,
             backgroundColor:
               currentStep === 3 ? colors.grayedOut : colors.lightWhite,
             overflow: "hidden",
@@ -725,7 +725,7 @@ export default function CreateTripScreen() {
           <Animated.View
             style={{
               height: "100%",
-              borderRadius: 20,
+              borderRadius: 8,
               backgroundColor: colors.seaBlue,
               width: progressWidth,
             }}
@@ -775,7 +775,7 @@ export default function CreateTripScreen() {
                 </View>
               </View>
 
-              <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
+              <View style={{ paddingHorizontal: 20, marginVertical: 4 }}>
                 <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
               </View>
 
@@ -1551,19 +1551,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: SCREEN_HEIGHT * 0.28,
-    gap: spacing.xl,
+    gap: spacing.sm,
   },
   containerStep2: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: SCREEN_HEIGHT * 0.18,
-    gap: spacing.xl,
+    gap: spacing.sm,
   },
   containerStep3: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
-    gap: spacing.xl,
+    gap: spacing.sm,
   },
   header: {
     flexDirection: "row",
