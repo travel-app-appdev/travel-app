@@ -249,7 +249,6 @@ export default function TripSettingsScreen() {
     return () => timeoutRefs.current.forEach(clearTimeout);
   }, []);
 
-  // Ref for skip-to-delete focus jump — Fix 8
   const deleteRef = useRef<View>(null);
 
   function skipToDelete() {
@@ -293,8 +292,6 @@ export default function TripSettingsScreen() {
   const [isUpdatingDestination, setIsUpdatingDestination] = useState(false);
 
   const [members, setMembers] = useState<MemberParam[]>(parsedMembers);
-  const [newMember, setNewMember] = useState("");
-  const [membersUpdated, setMembersUpdated] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
   const [codeCopied, setCodeCopied] = useState(false);
@@ -413,7 +410,6 @@ export default function TripSettingsScreen() {
     setTripNameUpdated(false);
     setTripDateUpdated(false);
     setDestinationUpdated(false);
-    setMembersUpdated(false);
   };
 
   const togglePhase = (key: PhaseKey) => {
@@ -522,8 +518,8 @@ export default function TripSettingsScreen() {
         );
         return;
       }
-      setIsUpdatingDate(true);
 
+      setIsUpdatingDate(true);
       await updateTrip({
         idToken,
         tripId,
@@ -551,20 +547,6 @@ export default function TripSettingsScreen() {
     } finally {
       setIsUpdatingDate(false);
     }
-  };
-  const handleAddMember = () => {
-    const trimmed = newMember.trim();
-    if (!trimmed) return;
-    const newEntry: MemberParam = {
-      id: `local-${Date.now()}`,
-      name: trimmed,
-      initials: trimmed.slice(0, 2).toUpperCase(),
-      color: colors.sunsetOrange,
-    };
-    setMembers((prev) => [...prev, newEntry]);
-    setNewMember("");
-    setMembersUpdated(true);
-    safeTimeout(() => setMembersUpdated(false), 1500);
   };
 
   const handleRemoveMember = (id: string, name: string) => {
@@ -686,7 +668,6 @@ export default function TripSettingsScreen() {
 
   const handlePhaseCalendarDayPress = (day: CalendarDay) => {
     if (!showPhaseDateCalendar) return;
-
     const selectedDate = fromDateString(day.dateString);
 
     if (showPhaseDateCalendar === "planning") {
@@ -801,6 +782,7 @@ export default function TripSettingsScreen() {
 
     setShowPhaseTimePicker(null);
   };
+
   const handleUpdatePhaseDate = async (phaseId: PhaseKey) => {
     const idToken = await getIdToken();
     if (!idToken) return;
@@ -854,6 +836,7 @@ export default function TripSettingsScreen() {
           tripId,
           planning_end_at: combineDateAndTime(phase.end, phase.time),
         });
+
         setPhaseDates((prev: PhaseDates) => ({
           ...prev,
           planning: {
@@ -972,7 +955,6 @@ export default function TripSettingsScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Skip to delete — visually hidden, screen readers only — Fix 8 */}
             <Pressable
               onPress={skipToDelete}
               accessibilityRole="button"
@@ -1000,7 +982,6 @@ export default function TripSettingsScreen() {
               </View>
             </View>
 
-            {/* Trip name */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -1082,7 +1063,6 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* Trip date */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -1124,7 +1104,6 @@ export default function TripSettingsScreen() {
 
               {openField === "date" && (
                 <View style={styles.expandedField}>
-                  {/* Fix 9: label tells user which date they are picking */}
                   <Pressable
                     style={styles.dateInput}
                     onPress={openTripCalendar}
@@ -1142,7 +1121,6 @@ export default function TripSettingsScreen() {
                       <Calendar width={20} height={20} />
                     </View>
                   </Pressable>
-
                   <AppButton
                     title={isUpdatingDate ? "Updating..." : "Update"}
                     onPress={handleUpdateTripDate}
@@ -1173,7 +1151,6 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* Destination */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -1255,13 +1232,12 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* Members */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
                 onPress={() => toggleField("members")}
                 accessibilityRole="button"
-                accessibilityLabel={`Edit members, current value: ${members.map((m) => m.name).join(", ") || "none"}`}
+                accessibilityLabel={`View members, current value: ${members.map((m) => m.name).join(", ") || "none"}`}
                 accessibilityState={{ expanded: openField === "members" }}
               >
                 <View style={styles.infoLeft}>
@@ -1297,75 +1273,48 @@ export default function TripSettingsScreen() {
 
               {openField === "members" && (
                 <View style={styles.expandedField}>
-                  {members.map((member) => (
-                    <View key={member.id} style={styles.memberRow}>
-                      <AppText variant="body" style={styles.memberName}>
-                        {member.name}
-                      </AppText>
-                      <Pressable
-                        onPress={() =>
-                          handleRemoveMember(member.id, member.name)
-                        }
-                        disabled={removingMemberId === member.id}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        accessibilityRole="button"
-                        accessibilityLabel={
-                          removingMemberId === member.id
-                            ? `Removing ${member.name}`
-                            : `Remove ${member.name}`
-                        }
-                        style={
-                          removingMemberId === member.id
-                            ? styles.removingIcon
-                            : undefined
-                        }
-                      >
-                        <View
-                          accessible={false}
-                          importantForAccessibility="no-hide-descendants"
+                  {members.length > 0 ? (
+                    members.map((member) => (
+                      <View key={member.id} style={styles.memberRow}>
+                        <AppText variant="body" style={styles.memberName}>
+                          {member.name}
+                        </AppText>
+                        <Pressable
+                          onPress={() =>
+                            handleRemoveMember(member.id, member.name)
+                          }
+                          disabled={removingMemberId === member.id}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          accessibilityRole="button"
+                          accessibilityLabel={
+                            removingMemberId === member.id
+                              ? `Removing ${member.name}`
+                              : `Remove ${member.name}`
+                          }
+                          style={
+                            removingMemberId === member.id
+                              ? styles.removingIcon
+                              : undefined
+                          }
                         >
-                          <RemovePerson width={22} height={22} />
-                        </View>
-                      </Pressable>
-                    </View>
-                  ))}
-                  <AppInput
-                    value={newMember}
-                    onChangeText={setNewMember}
-                    placeholder="Add member name"
-                    accessibilityLabel="New member name"
-                    accessibilityHint="Enter a name and tap Add member"
-                    style={styles.inputBlackStroke}
-                  />
-                  <AppButton
-                    title="Add member"
-                    onPress={handleAddMember}
-                    disabled={!newMember.trim()}
-                    style={styles.updateButton}
-                    textStyle={styles.updateButtonText}
-                    accessibilityLabel="Add member"
-                  />
-                  {membersUpdated && (
-                    <View
-                      style={styles.successRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
-                    >
-                      <CheckMark width={18} height={18} />
-                      <AppText
-                        variant="caption"
-                        style={styles.successText}
-                        accessibilityRole="alert"
-                      >
-                        Member added!
-                      </AppText>
-                    </View>
+                          <View
+                            accessible={false}
+                            importantForAccessibility="no-hide-descendants"
+                          >
+                            <RemovePerson width={22} height={22} />
+                          </View>
+                        </Pressable>
+                      </View>
+                    ))
+                  ) : (
+                    <AppText variant="caption" style={styles.infoValue}>
+                      No members yet.
+                    </AppText>
                   )}
                 </View>
               )}
             </View>
 
-            {/* Code */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoRow}>
                 <View style={styles.infoLeft}>
@@ -1415,7 +1364,6 @@ export default function TripSettingsScreen() {
               )}
             </View>
 
-            {/* Phase rows */}
             {phases.map((phase) => {
               const phaseId = phase.id as PhaseKey;
               const isOpen = openPhase === phaseId;
@@ -1512,7 +1460,6 @@ export default function TripSettingsScreen() {
                       </AppText>
 
                       <View style={styles.dateTimeRow}>
-                        {/* Fix 9: context-aware label */}
                         <Pressable
                           style={[styles.dateInput, styles.dateTimeHalf]}
                           onPress={() => openPhaseCalendar(phaseId)}
@@ -1530,7 +1477,6 @@ export default function TripSettingsScreen() {
                           </View>
                         </Pressable>
 
-                        {/* Fix 9: context-aware label */}
                         <Pressable
                           style={[styles.dateInput, styles.dateTimeHalf]}
                           onPress={() => {
@@ -1590,7 +1536,6 @@ export default function TripSettingsScreen() {
             })}
           </ScrollView>
 
-          {/* Delete — pinned to bottom */}
           <SafeAreaView
             edges={["bottom"]}
             style={styles.deleteSafeArea}
@@ -1605,6 +1550,7 @@ export default function TripSettingsScreen() {
               />
             </View>
           </SafeAreaView>
+
           <Modal
             visible={showTripDateCalendar}
             transparent
@@ -2123,18 +2069,15 @@ const styles = StyleSheet.create({
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
   },
-
   timeModalContent: {
     gap: spacing.md,
   },
-
   timeModalHint: {
     color: colors.textMuted,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
     fontFamily: typography.fontFamily.body,
   },
-
   timeInputModalBox: {
     backgroundColor: colors.white,
     borderRadius: radius.md,
@@ -2147,7 +2090,6 @@ const styles = StyleSheet.create({
     borderColor: colors.nightBlack,
     minHeight: 64,
   },
-
   timeInputModal: {
     flex: 1,
     minHeight: 44,
@@ -2161,7 +2103,6 @@ const styles = StyleSheet.create({
     textAlignVertical: "center",
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
   },
-
   updateButtonPlanning: {
     backgroundColor: colors.beachYellow,
   },
