@@ -1717,7 +1717,7 @@ const styles = StyleSheet.create({
   },
   createWrapper: {
     position: "absolute",
-    bottom: SCREEN_WIDTH * (221 / 393) + 47,
+    bottom: SCREEN_WIDTH * (221 / 393) + 5,
     left: spacing.xl,
     right: spacing.xl,
     zIndex: 10,
