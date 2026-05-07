@@ -17,9 +17,6 @@ import {
   Animated,
   Text
 } from "react-native";
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import { Calendar as RangeCalendar } from "react-native-calendars";
@@ -212,8 +209,6 @@ export default function CreateTripScreen() {
   const [tripStart, setTripStart] = useState<Date>(new Date());
   const [tripEnd, setTripEnd] = useState<Date>(new Date());
 
-  const [showTripStartPicker, setShowTripStartPicker] = useState(false);
-  const [showTripEndPicker, setShowTripEndPicker] = useState(false);
   const [showTripCalendar, setShowTripCalendar] = useState(false);
   const [rangeStart, setRangeStart] = useState<string | null>(
     toLocalDateString(new Date())
@@ -223,6 +218,12 @@ export default function CreateTripScreen() {
   const [tripCode, setTripCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+
+  const disabledTripOrange = "#facbb8";
+  const disabledPlanningYellow = "#F6E08F";
+
+  const [activePhaseCalendar, setActivePhaseCalendar] =
+    useState<PhaseKey | null>(null);
 
   const phases = [
     {
@@ -323,7 +324,7 @@ export default function CreateTripScreen() {
     const planningStart = today;
     const planningEnd = nextTripStart < today ? today : nextTripStart;
     const votingStart = planningEnd;
-    const votingEnd = nextTripEnd;
+    const votingEnd = planningEnd;
 
     setPhaseDates((prev) => ({
       planning: {
@@ -401,6 +402,7 @@ export default function CreateTripScreen() {
 
   const openPhaseCalendar = (phaseId: PhaseKey) => {
     if (phaseId === "final") return;
+    setActivePhaseCalendar(phaseId);
     setShowPhaseDateCalendar(phaseId);
     setShowPhaseTimePicker(null);
   };
@@ -469,18 +471,25 @@ export default function CreateTripScreen() {
   };
 
   const getPhaseMarkedDates = useMemo(() => {
+    const isPlanningEditor = showPhaseDateCalendar === "planning";
+    const isVotingEditor = showPhaseDateCalendar === "voting";
+
     const tripRange = getMarkedRange(
       toLocalDateString(tripStart),
       toLocalDateString(tripEnd),
-      colors.sunsetOrange,
-      colors.sunsetOrange
+      isPlanningEditor || isVotingEditor
+        ? disabledTripOrange
+        : colors.sunsetOrange,
+      isPlanningEditor || isVotingEditor
+        ? disabledTripOrange
+        : colors.sunsetOrange
     );
 
     const planningRange = getMarkedRange(
       toLocalDateString(phaseDates.planning.start),
       toLocalDateString(phaseDates.planning.end),
-      colors.beachYellow,
-      colors.beachYellow
+      isVotingEditor ? disabledPlanningYellow : colors.beachYellow,
+      isVotingEditor ? disabledPlanningYellow : colors.beachYellow
     );
 
     const votingRange = getMarkedRange(
@@ -490,16 +499,23 @@ export default function CreateTripScreen() {
       colors.sunsetPink
     );
 
-    if (showPhaseDateCalendar === "planning") {
+    if (isPlanningEditor) {
       return { ...tripRange, ...planningRange };
     }
 
-    if (showPhaseDateCalendar === "voting") {
+    if (isVotingEditor) {
       return { ...tripRange, ...planningRange, ...votingRange };
     }
 
     return tripRange;
-  }, [showPhaseDateCalendar, phaseDates, tripStart, tripEnd]);
+  }, [
+    showPhaseDateCalendar,
+    phaseDates,
+    tripStart,
+    tripEnd,
+    disabledTripOrange,
+    disabledPlanningYellow,
+  ]);
 
   const handleContinueFromDestination = () => {
     if (!destination.trim()) {
@@ -781,7 +797,11 @@ export default function CreateTripScreen() {
               </View>
 
               <View style={{ paddingHorizontal: 20, marginVertical: 4 }}>
-                <ProgressBar progressWidth={progressAnim} currentStep={step} totalSteps={TOTAL_STEPS} />
+                <ProgressBar
+                  progressWidth={progressAnim}
+                  currentStep={step}
+                  totalSteps={TOTAL_STEPS}
+                />
               </View>
 
               <AppText variant="title" style={styles.titleStep3}>
@@ -789,7 +809,8 @@ export default function CreateTripScreen() {
               </AppText>
 
               <AppText variant="body" style={styles.setupText}>
-                Set an end time for each state so the next one starts automatically.
+                Set an end time for each state so the next one starts
+                automatically.
               </AppText>
 
               {TIMER_PHASES.map((phase) => {
@@ -851,7 +872,10 @@ export default function CreateTripScreen() {
                                 </View>
                               )}
                             </View>
-                            <AppText variant="caption" style={styles.timerLabel}>
+                            <AppText
+                              variant="caption"
+                              style={styles.timerLabel}
+                            >
                               Timer
                             </AppText>
                           </View>
@@ -983,7 +1007,9 @@ export default function CreateTripScreen() {
                 disabled={isCreating}
                 style={styles.nextButton}
                 textStyle={styles.nextButtonText}
-                accessibilityLabel={isCreating ? "Creating trip" : "Create trip"}
+                accessibilityLabel={
+                  isCreating ? "Creating trip" : "Create trip"
+                }
               />
             </View>
 
@@ -1039,17 +1065,53 @@ export default function CreateTripScreen() {
 
                 <View style={styles.calendarLegend}>
                   <View style={styles.legendRow}>
-                    <View style={[styles.legendSwatch, { backgroundColor: colors.sunsetOrange }]} />
-                    <AppText variant="caption" style={styles.legendLabel}>Trip dates</AppText>
+                    <View
+                      style={[
+                        styles.legendSwatch,
+                        {
+                          backgroundColor:
+                            showPhaseDateCalendar === "planning" ||
+                            showPhaseDateCalendar === "voting"
+                              ? disabledTripOrange
+                              : colors.sunsetOrange,
+                        },
+                      ]}
+                    />
+                    <AppText variant="caption" style={styles.legendLabel}>
+                      Trip dates
+                    </AppText>
                   </View>
+
                   <View style={styles.legendRow}>
-                    <View style={[styles.legendSwatch, { backgroundColor: colors.beachYellow }]} />
-                    <AppText variant="caption" style={styles.legendLabel}>Planning state</AppText>
+                    <View
+                      style={[
+                        styles.legendSwatch,
+                        {
+                          backgroundColor:
+                            showPhaseDateCalendar === "voting"
+                              ? disabledPlanningYellow
+                              : colors.beachYellow,
+                        },
+                      ]}
+                    />
+                    <AppText variant="caption" style={styles.legendLabel}>
+                      Planning state
+                    </AppText>
                   </View>
-                  <View style={styles.legendRow}>
-                    <View style={[styles.legendSwatch, { backgroundColor: colors.sunsetPink }]} />
-                    <AppText variant="caption" style={styles.legendLabel}>Voting state</AppText>
-                  </View>
+
+                  {showPhaseDateCalendar === "voting" && (
+                    <View style={styles.legendRow}>
+                      <View
+                        style={[
+                          styles.legendSwatch,
+                          { backgroundColor: colors.sunsetPink },
+                        ]}
+                      />
+                      <AppText variant="caption" style={styles.legendLabel}>
+                        Voting state
+                      </AppText>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.calendarActions}>
@@ -1089,7 +1151,11 @@ export default function CreateTripScreen() {
                       }
                       placeholder="HH:MM"
                       placeholderTextColor={colors.textMuted}
-                      keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
+                      keyboardType={
+                        Platform.OS === "ios"
+                          ? "numbers-and-punctuation"
+                          : "numeric"
+                      }
                       maxLength={5}
                       style={styles.timeInputModal}
                       textAlign="center"

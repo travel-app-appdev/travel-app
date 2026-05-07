@@ -125,13 +125,6 @@ function dateToTimeString(date: Date): string {
   return `${h}:${m}`;
 }
 
-function timeStringToDate(timeStr: string): Date {
-  const [h, m] = timeStr.split(":").map(Number);
-  const d = new Date();
-  d.setHours(h, m, 0, 0);
-  return d;
-}
-
 function combineDateAndTime(date: Date, timeStr: string): string {
   const [hours, minutes] = timeStr.split(":").map(Number);
   const combined = new Date(date);
@@ -338,7 +331,7 @@ export default function TripSettingsScreen() {
     final: {
       start: finalDisplayDate,
       end: finalDisplayDate,
-      time: "00:00",
+      time: parseIsoToTimeString(votingEndAt),
     },
   });
 
@@ -377,13 +370,19 @@ export default function TripSettingsScreen() {
       final: {
         start: safeVotingEnd,
         end: safeVotingEnd,
-        time: "00:00",
+        time: parseIsoToTimeString(votingEndAt),
       },
     });
   }, [planningStartedAt, planningEndAt, votingEndAt]);
 
   const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
+
+  const disabledTripOrange = "#facbb8";
+  const disabledPlanningYellow = "#F6E08F";
+
   const [showPhaseDateCalendar, setShowPhaseDateCalendar] =
+    useState<PhaseKey | null>(null);
+  const [activePhaseCalendar, setActivePhaseCalendar] =
     useState<PhaseKey | null>(null);
   const [showPhaseTimePicker, setShowPhaseTimePicker] =
     useState<PhaseKey | null>(null);
@@ -412,8 +411,13 @@ export default function TripSettingsScreen() {
     setDestinationUpdated(false);
   };
 
-  const togglePhase = (key: PhaseKey) => {
+  const closePhaseCalendar = () => {
     setShowPhaseDateCalendar(null);
+    safeTimeout(() => setActivePhaseCalendar(null), 200);
+  };
+
+  const togglePhase = (key: PhaseKey) => {
+    closePhaseCalendar();
     setShowPhaseTimePicker(null);
     setOpenPhase((prev) => (prev === key ? null : key));
   };
@@ -642,6 +646,7 @@ export default function TripSettingsScreen() {
           ...prev.final,
           start: safeVotingEnd,
           end: safeVotingEnd,
+          time: prev.voting.time,
         },
       };
     });
@@ -662,6 +667,7 @@ export default function TripSettingsScreen() {
 
   const openPhaseCalendar = (phaseId: PhaseKey) => {
     if (phaseId === "final") return;
+    setActivePhaseCalendar(phaseId);
     setShowPhaseDateCalendar(phaseId);
     setShowPhaseTimePicker(null);
   };
@@ -725,18 +731,25 @@ export default function TripSettingsScreen() {
   };
 
   const getPhaseMarkedDates = useMemo(() => {
+    const isPlanningEditor = activePhaseCalendar === "planning";
+    const isVotingEditor = activePhaseCalendar === "voting";
+
     const tripRange = getMarkedRange(
       toLocalDateString(tripStart),
       toLocalDateString(tripEnd),
-      colors.sunsetOrange,
-      colors.sunsetOrange
+      isPlanningEditor || isVotingEditor
+        ? disabledTripOrange
+        : colors.sunsetOrange,
+      isPlanningEditor || isVotingEditor
+        ? disabledTripOrange
+        : colors.sunsetOrange
     );
 
     const planningRange = getMarkedRange(
       toLocalDateString(phaseDates.planning.start),
       toLocalDateString(phaseDates.planning.end),
-      colors.beachYellow,
-      colors.beachYellow
+      isVotingEditor ? disabledPlanningYellow : colors.beachYellow,
+      isVotingEditor ? disabledPlanningYellow : colors.beachYellow
     );
 
     const votingRange = getMarkedRange(
@@ -746,14 +759,14 @@ export default function TripSettingsScreen() {
       colors.sunsetPink
     );
 
-    if (showPhaseDateCalendar === "planning") {
+    if (isPlanningEditor) {
       return {
         ...tripRange,
         ...planningRange,
       };
     }
 
-    if (showPhaseDateCalendar === "voting") {
+    if (isVotingEditor) {
       return {
         ...tripRange,
         ...planningRange,
@@ -762,8 +775,14 @@ export default function TripSettingsScreen() {
     }
 
     return tripRange;
-  }, [showPhaseDateCalendar, phaseDates, tripStart, tripEnd]);
-
+  }, [
+    activePhaseCalendar,
+    phaseDates,
+    tripStart,
+    tripEnd,
+    disabledTripOrange,
+    disabledPlanningYellow,
+  ]);
   const handleApplyPhaseTime = () => {
     if (!showPhaseTimePicker) return;
 
@@ -883,7 +902,12 @@ export default function TripSettingsScreen() {
         setPhaseDates((prev: PhaseDates) => ({
           ...prev,
           voting: { ...prev.voting, end: phase.end, time: phase.time },
-          final: { ...prev.final, start: phase.end, end: phase.end },
+          final: {
+            ...prev.final,
+            start: phase.end,
+            end: phase.end,
+            time: phase.time,
+          },
         }));
       }
 
@@ -1087,7 +1111,8 @@ export default function TripSettingsScreen() {
                     style={styles.infoValue}
                     accessible={false}
                   >
-                    {formatDateDisplay(tripStart)} – {formatDateDisplay(tripEnd)}
+                    {formatDateDisplay(tripStart)} –{" "}
+                    {formatDateDisplay(tripEnd)}
                   </AppText>
                 </View>
                 <View
@@ -1376,15 +1401,28 @@ export default function TripSettingsScreen() {
                 <View key={phaseId} style={styles.fieldGroup}>
                   <Pressable
                     style={styles.phaseRow}
-                    onPress={() => togglePhase(phaseId)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${phase.label} phase, ${dayLabel(days, phase.active)}`}
+                    onPress={
+                      phaseId === "final"
+                        ? undefined
+                        : () => togglePhase(phaseId)
+                    }
+                    disabled={phaseId === "final"}
+                    accessibilityRole={
+                      phaseId === "final" ? undefined : "button"
+                    }
+                    accessibilityLabel={
+                      phaseId === "final"
+                        ? `Final phase, itinerary shown on ${formatDateDisplay(dates.end)} at ${dates.time}`
+                        : `${phase.label} phase, ${dayLabel(days, phase.active)}`
+                    }
                     accessibilityHint={
                       phaseId === "final"
                         ? undefined
                         : `Tap to edit ${phase.label} end date and time`
                     }
-                    accessibilityState={{ expanded: isOpen }}
+                    accessibilityState={
+                      phaseId === "final" ? undefined : { expanded: isOpen }
+                    }
                   >
                     <View
                       style={styles.phaseLeft}
@@ -1408,50 +1446,69 @@ export default function TripSettingsScreen() {
                         </AppText>
                       </View>
 
-                      <View style={styles.phaseTimerBlock}>
-                        <View style={styles.hourglassCol}>
-                          {phase.active ? (
-                            <Hourglass1 width={20} height={20} />
-                          ) : (
-                            <Hourglass0 width={20} height={20} />
-                          )}
-                        </View>
+                      {phaseId === "final" ? (
                         <View style={styles.phaseTextCol}>
-                          <View style={styles.daysRow}>
-                            <AppText variant="body" style={styles.phaseDays}>
-                              {dayLabel(days, phase.active)}
-                            </AppText>
-                            {phase.active && (
-                              <View style={styles.timepointWrapper}>
-                                <Timepoint width={7} height={7} />
-                              </View>
-                            )}
-                          </View>
+                          <AppText variant="body" style={styles.phaseDays}>
+                            Itinerary shown
+                          </AppText>
                           <AppText variant="caption" style={styles.timerLabel}>
-                            Timer
+                            {formatDateDisplay(dates.end)} at {dates.time}
                           </AppText>
                         </View>
-                      </View>
-                    </View>
-
-                    <View
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
-                    >
-                      {isOpen ? (
-                        <ArrowUp width={20} height={20} />
                       ) : (
-                        <ArrowDown width={20} height={20} />
+                        <View style={styles.phaseTimerBlock}>
+                          <View style={styles.hourglassCol}>
+                            {phase.active ? (
+                              <Hourglass1 width={20} height={20} />
+                            ) : (
+                              <Hourglass0 width={20} height={20} />
+                            )}
+                          </View>
+
+                          <View style={styles.phaseTextCol}>
+                            <View style={styles.daysRow}>
+                              <AppText variant="body" style={styles.phaseDays}>
+                                {dayLabel(days, phase.active)}
+                              </AppText>
+                              {phase.active && (
+                                <View style={styles.timepointWrapper}>
+                                  <Timepoint width={7} height={7} />
+                                </View>
+                              )}
+                            </View>
+                            <AppText
+                              variant="caption"
+                              style={styles.timerLabel}
+                            >
+                              Timer
+                            </AppText>
+                          </View>
+                        </View>
                       )}
                     </View>
+
+                    {phaseId !== "final" && (
+                      <View
+                        accessible={false}
+                        importantForAccessibility="no-hide-descendants"
+                      >
+                        {isOpen ? (
+                          <ArrowUp width={20} height={20} />
+                        ) : (
+                          <ArrowDown width={20} height={20} />
+                        )}
+                      </View>
+                    )}
                   </Pressable>
 
-                  <AppText variant="caption" style={styles.phaseDateLabel}>
-                    {formatDateDisplay(dates.start)}
-                    {dates.start.getTime() !== dates.end.getTime()
-                      ? ` - ${formatDateDisplay(dates.end)}`
-                      : ""}
-                  </AppText>
+                  {phaseId !== "final" && (
+                    <AppText variant="caption" style={styles.phaseDateLabel}>
+                      {formatDateDisplay(dates.start)}
+                      {dates.start.getTime() !== dates.end.getTime()
+                        ? ` - ${formatDateDisplay(dates.end)}`
+                        : ""}
+                    </AppText>
+                  )}
 
                   {isOpen && phaseId !== "final" && (
                     <View style={styles.expandedField}>
@@ -1482,7 +1539,7 @@ export default function TripSettingsScreen() {
                           onPress={() => {
                             setTempPhaseTime(dates.time);
                             setShowPhaseTimePicker(phaseId);
-                            setShowPhaseDateCalendar(null);
+                            closePhaseCalendar();
                           }}
                           accessibilityRole="button"
                           accessibilityLabel={`${phase.label} end time, currently ${dates.time}. Tap to change`}
@@ -1494,13 +1551,12 @@ export default function TripSettingsScreen() {
                             accessible={false}
                             importantForAccessibility="no-hide-descendants"
                           >
-                            <Timer width={18} height={18} />
+                            <Timer width={20} height={20} />
                           </View>
                         </Pressable>
                       </View>
 
                       {showPhaseTimePicker === phaseId && <View />}
-
                       <AppButton
                         title="Update"
                         onPress={() => handleUpdatePhaseDate(phaseId)}
@@ -1550,7 +1606,66 @@ export default function TripSettingsScreen() {
               />
             </View>
           </SafeAreaView>
+          <Modal
+            visible={showPhaseTimePicker !== null}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowPhaseTimePicker(null)}
+          >
+            <View style={styles.calendarOverlay}>
+              <View style={styles.calendarModal}>
+                <AppText variant="body" style={styles.calendarTitle}>
+                  {showPhaseTimePicker === "planning"
+                    ? "Select planning end time"
+                    : "Select voting end time"}
+                </AppText>
 
+                <View style={styles.timeModalContent}>
+                  <AppText variant="caption" style={styles.timeModalHint}>
+                    Enter the exact time in 24-hour format
+                  </AppText>
+
+                  <View style={styles.timeInputModalBox}>
+                    <TextInput
+                      value={tempPhaseTime}
+                      onChangeText={(value) =>
+                        setTempPhaseTime(normalizeTimeInput(value))
+                      }
+                      placeholder="HH:MM"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType={
+                        Platform.OS === "ios"
+                          ? "numbers-and-punctuation"
+                          : "numeric"
+                      }
+                      maxLength={5}
+                      style={styles.timeInputModal}
+                      textAlign="center"
+                      accessibilityLabel="Enter time in HH colon MM format"
+                    />
+                    <Timer width={20} height={20} />
+                  </View>
+                </View>
+
+                <View style={styles.calendarActions}>
+                  <AppButton
+                    title="Cancel"
+                    onPress={() => setShowPhaseTimePicker(null)}
+                    style={styles.calendarCancelButton}
+                    textStyle={styles.calendarCancelButtonText}
+                    accessibilityLabel="Cancel time selection"
+                  />
+                  <AppButton
+                    title="Apply time"
+                    onPress={handleApplyPhaseTime}
+                    style={styles.calendarApplyButton}
+                    textStyle={styles.calendarApplyButtonText}
+                    accessibilityLabel="Apply selected time"
+                  />
+                </View>
+              </View>
+            </View>
+          </Modal>
           <Modal
             visible={showTripDateCalendar}
             transparent
@@ -1696,12 +1811,12 @@ export default function TripSettingsScreen() {
         visible={showPhaseDateCalendar !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowPhaseDateCalendar(null)}
+        onRequestClose={closePhaseCalendar}
       >
         <View style={styles.calendarOverlay}>
           <View style={styles.calendarModal}>
             <AppText variant="body" style={styles.calendarTitle}>
-              {showPhaseDateCalendar === "planning"
+              {activePhaseCalendar === "planning"
                 ? "Select planning end date"
                 : "Select voting end date"}
             </AppText>
@@ -1709,7 +1824,7 @@ export default function TripSettingsScreen() {
             <RangeCalendar
               markingType="period"
               minDate={
-                showPhaseDateCalendar === "planning"
+                activePhaseCalendar === "planning"
                   ? toLocalDateString(phaseDates.planning.start)
                   : toLocalDateString(phaseDates.voting.start)
               }
@@ -1748,7 +1863,13 @@ export default function TripSettingsScreen() {
                 <View
                   style={[
                     styles.legendSwatch,
-                    { backgroundColor: colors.sunsetOrange },
+                    {
+                      backgroundColor:
+                        activePhaseCalendar === "planning" ||
+                        activePhaseCalendar === "voting"
+                          ? disabledTripOrange
+                          : colors.sunsetOrange,
+                    },
                   ]}
                 />
                 <AppText variant="caption" style={styles.legendLabel}>
@@ -1760,7 +1881,12 @@ export default function TripSettingsScreen() {
                 <View
                   style={[
                     styles.legendSwatch,
-                    { backgroundColor: colors.beachYellow },
+                    {
+                      backgroundColor:
+                        activePhaseCalendar === "voting"
+                          ? disabledPlanningYellow
+                          : colors.beachYellow,
+                    },
                   ]}
                 />
                 <AppText variant="caption" style={styles.legendLabel}>
@@ -1768,23 +1894,25 @@ export default function TripSettingsScreen() {
                 </AppText>
               </View>
 
-              <View style={styles.legendRow}>
-                <View
-                  style={[
-                    styles.legendSwatch,
-                    { backgroundColor: colors.sunsetPink },
-                  ]}
-                />
-                <AppText variant="caption" style={styles.legendLabel}>
-                  Voting state
-                </AppText>
-              </View>
+              {activePhaseCalendar === "voting" && (
+                <View style={styles.legendRow}>
+                  <View
+                    style={[
+                      styles.legendSwatch,
+                      { backgroundColor: colors.sunsetPink },
+                    ]}
+                  />
+                  <AppText variant="caption" style={styles.legendLabel}>
+                    Voting state
+                  </AppText>
+                </View>
+              )}
             </View>
 
             <View style={styles.calendarActions}>
               <AppButton
                 title="Close"
-                onPress={() => setShowPhaseDateCalendar(null)}
+                onPress={closePhaseCalendar}
                 style={styles.calendarCancelButton}
                 textStyle={styles.calendarCancelButtonText}
                 accessibilityLabel="Close timer date selection"
