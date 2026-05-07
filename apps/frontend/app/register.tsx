@@ -77,7 +77,7 @@ export default function RegisterScreen() {
       );
 
       setUser(authResponse);
-      router.replace("/home");
+      router.replace("/onboarding");
     } catch (error: any) {
       const message: string =
         error?.message || "Something went wrong. Please try again.";
