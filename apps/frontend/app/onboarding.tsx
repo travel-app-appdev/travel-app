@@ -34,13 +34,23 @@ export default function Onboarding() {
                     <>
                         <View style={Styles.header}>
                             <View
-                        style={Styles.headerTitle}
-                        accessible={false}
-                        importantForAccessibility="no-hide-descendants"
-                        >
-                        <Plane width={25} height={25} />
-                            <Text style={Styles.headerLabel}>Onboarding</Text>
+                            style={Styles.headerTitle}
+                            accessible={false}
+                            importantForAccessibility="no-hide-descendants"
+                            >
+                                <Plane width={25} height={25} />
+                                <Text style={Styles.headerLabel}>Onboarding</Text>
+                                
                             </View>
+                            <AppButton
+                                title="Skip"
+                                onPress={() => navigate("/home")}
+                                style={Styles.skipButton}
+                                textStyle={Styles.skipButtonText}
+                                accessibilityLabel="Skip onboarding"
+                                accessibilityHint="Skips the onboarding process and navigates to the home screen"
+                                        />
+
                         </View>
 
                         <View style={Styles.container}>
@@ -155,17 +165,20 @@ const Styles = StyleSheet.create({
     overflow: "hidden",
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingHorizontal: spacing.sm,
+  paddingTop: spacing.xl,
+},
   headerTitle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingTop: spacing.xl,
-  },
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  paddingTop: spacing.xl,
+  flex: 1,
+  justifyContent: "center",
+},
   headerLabel: {
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
@@ -216,12 +229,28 @@ const Styles = StyleSheet.create({
     zIndex: 10,
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     },
   continueButton: {
     backgroundColor: colors.sunsetOrange,
     flex: 1, 
     marginRight: spacing.sm
   },
+skipButton: {
+  backgroundColor: colors.grayedOut,
+  maxWidth: 80,
+  height: 36,               
+  alignItems: "center",    
+  justifyContent: "center", 
+  paddingHorizontal: spacing.sm,
+  borderRadius: 25,         
+
+},
+skipButtonText: {
+   textAlign: "center",
+   color: colors.nightBlack,
+   lineHeight: typography.size.sm,
+},
   continueButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
