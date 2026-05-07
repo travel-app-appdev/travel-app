@@ -32,16 +32,18 @@ export default function Onboarding() {
                     {step === 1 ? (
 
                     <>
-                        <View style={Styles.header}>
+                       <View style={Styles.header}>
+                            <View style={Styles.headerSide} />
+
                             <View
-                            style={Styles.headerTitle}
-                            accessible={false}
-                            importantForAccessibility="no-hide-descendants"
+                                style={Styles.headerTitle}
+                                accessible={false}
+                                importantForAccessibility="no-hide-descendants"
                             >
                                 <Plane width={25} height={25} />
                                 <Text style={Styles.headerLabel}>Onboarding</Text>
-                                
                             </View>
+
                             <AppButton
                                 title="Skip"
                                 onPress={() => navigate("/home")}
@@ -49,7 +51,7 @@ export default function Onboarding() {
                                 textStyle={Styles.skipButtonText}
                                 accessibilityLabel="Skip onboarding"
                                 accessibilityHint="Skips the onboarding process and navigates to the home screen"
-                                        />
+                            />
 
                         </View>
 
@@ -59,7 +61,9 @@ export default function Onboarding() {
 
                         <View>
                             <Text style={Styles.InfoText}>
-                                Plan your trip together with your travel companions. Add activities in the itinerary, and collaborate on the details of your trip in one place.
+                                Plan your trip together with your travel companions.{" "}
+                                <Text style={Styles.InfoTextBold}>Add activities</Text> in the itinerary, and collaborate on the details of your trip{" "} 
+                                <Text style={Styles.InfoTextBold}>in one place.</Text>
                             </Text>
                         </View>
 
@@ -78,14 +82,19 @@ export default function Onboarding() {
                     ) : step === 2 ? (
                     <>
                         <View style={Styles.header}>
+                            <View style={Styles.headerSide} />
+
                             <View
                                 style={Styles.headerTitle}
                                 accessible={false}
                                 importantForAccessibility="no-hide-descendants"
-                                >
+                            >
                                 <Plane width={25} height={25} />
                                 <Text style={Styles.headerLabel}>Onboarding</Text>
                             </View>
+
+                            <View style={Styles.headerSide} />
+
                         </View>
 
                         <View style={Styles.container}>
@@ -94,7 +103,9 @@ export default function Onboarding() {
 
                         <View>
                             <Text style={Styles.InfoText}>
-                               Say goodbye to endless debates and make decisions together with ease. Use our voting feature to let everyone have a say in choosing activities.
+                               Say goodbye to endless debates and{" "} 
+                               <Text style={Styles.InfoTextBold}>make decisions together </Text>with ease. Use our{" "} 
+                               <Text style={Styles.InfoTextBold}>voting feature</Text> to let everyone have a say in choosing activities.
                             </Text>
                         </View>
 
@@ -122,6 +133,7 @@ export default function Onboarding() {
 
                     <>
                         <View style={Styles.header}>
+                            <View style={Styles.headerSide} /> 
                             <View
                             style={Styles.headerTitle}
                             accessible={false}
@@ -130,6 +142,7 @@ export default function Onboarding() {
                                 <Plane width={25} height={25} />
                                 <Text style={Styles.headerLabel}>Onboarding</Text>
                             </View>
+                            <View style={Styles.headerSide} />
                         </View>
 
                         <View style={Styles.container}>
@@ -138,7 +151,9 @@ export default function Onboarding() {
 
                         <View>
                             <Text style={Styles.InfoText}>
-                                Enjoy a seamless travel experience with your friends and family. Access your itinerary and important travel information on the go.
+                                Enjoy a{" "} 
+                                <Text style={Styles.InfoTextBold}>seamless travel experience</Text> with your friends and family. Access your itinerary and important travel information{" "} 
+                                <Text style={Styles.InfoTextBold}>on the go</Text>.
                             </Text>
                         </View>
 
@@ -188,21 +203,24 @@ const Styles = StyleSheet.create({
   justifyContent: "space-between",
   paddingHorizontal: spacing.sm,
   paddingTop: spacing.xl,
+  },
+
+headerSide: {
+  width: 80, // MUST match Skip button width
 },
-  headerTitle: {
+
+headerTitle: {
   flexDirection: "row",
   alignItems: "center",
   gap: spacing.sm,
-  paddingTop: spacing.xl,
-  flex: 1,
-  justifyContent: "center",
 },
-  headerLabel: {
-    fontSize: typography.size.xxl,
-    lineHeight: typography.lineHeight.xxl,
-    fontFamily: typography.fontFamily.bodyBold,
-    color: colors.textPrimary,
-  },
+
+headerLabel: {
+  fontSize: typography.size.xxl,
+  lineHeight: typography.lineHeight.xxl,
+  fontFamily: typography.fontFamily.bodyBold,
+  color: colors.textPrimary,
+},
   title: {
       fontSize: typography.size.displaySm,
       lineHeight: typography.lineHeight.displayLg,
@@ -262,7 +280,6 @@ skipButton: {
   justifyContent: "center", 
   paddingHorizontal: spacing.sm,
   borderRadius: 25,         
-
 },
 skipButtonText: {
    textAlign: "center",
@@ -281,5 +298,13 @@ skipButtonText: {
     marginTop: spacing.xxxxl2,
     paddingLeft: spacing.xl,
     paddingRight: spacing.xl,
+  },
+  InfoTextBold: {
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
+    color: colors.textPrimary,
+    textAlign: "center",
+    marginTop: spacing.xxxxl2,
+    fontWeight: "bold",
   },
 });
