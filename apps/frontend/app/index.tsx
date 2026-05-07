@@ -1,10 +1,10 @@
 import { Link, router } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   StyleSheet,
   View,
   ScrollView,
-  useWindowDimensions,
+  Dimensions,
 } from "react-native";
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppText } from "@/src/components/common/AppText";
@@ -19,6 +19,8 @@ import PalmTree from "@/assets/visuals/palm-tree.svg";
 import Google from "@/assets/icons/google.svg";
 import Stars from "@/assets/visuals/stars.svg";
 
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -31,77 +33,44 @@ export default function StartPage() {
   const { response, signInWithGoogleToken, promptAsync, request } =
     useGoogleLogin();
   const { setUser, setIdToken } = useAuth();
-  const { width, height } = useWindowDimensions();
 
+  const [dimensions, setDimensions] = useState(() => Dimensions.get("window"));
+  const [svgDimensions] = useState(() => Dimensions.get("window"));
+
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener("change", ({ window }) => {
+      setDimensions(window);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  const { width, height } = dimensions;
+  const { width: svgWidth, height: svgHeight } = svgDimensions;
+
+  // Layout / text — reactive to rotation
   const sw = width / 390;
   const sh = height / 844;
   const baseScale = Math.min(sw, sh);
-
-  const wideProgress = clamp((width - 390) / (1440 - 390), 0, 1);
   const midProgress = clamp((width - 390) / (1024 - 390), 0, 1);
-
-  // TUNE THESE VALUES:
-  // bigger "scaleTo" => grows more on wider screens
-  // bigger positive xShift => moves right more on wider screens
-  // bigger positive yShift => moves down more on wider screens
-  // bigger negative xShift => moves left more
-  // bigger negative yShift => moves up more
-
-  const palmTreeBaseSize = 1000 * sw;
-  const palmTreeScaleTo = 0.78;
-  const palmTreeXShift = 600;
-  const palmTreeYShift = -700;
-
-  const palmLeafBaseSize = 350 * sw;
-  const palmLeafScaleTo = 0.7;
-  const palmLeafXShift = 350;
-  const palmLeafYShift = -600;
-
-  const curlyGreenBaseSize = 500 * sw;
-  const curlyGreenScaleTo = 0.6;
-  const curlyGreenXShift = 500;
-  const curlyGreenYShift = -400;
-
-  const palmTreeSize =
-    palmTreeBaseSize * lerp(1, palmTreeScaleTo, wideProgress);
-  const palmLeafSize =
-    palmLeafBaseSize * lerp(1, palmLeafScaleTo, wideProgress);
-  const curlyGreenSize =
-    curlyGreenBaseSize * lerp(1, curlyGreenScaleTo, wideProgress);
-
-  const palmTreeRight = lerp(
-    -560 * sw,
-    -560 * sw + palmTreeXShift,
-    wideProgress
-  );
-  const palmTreeTop = lerp(-245 * sh, -245 * sh + palmTreeYShift, wideProgress);
-
-  const palmLeafLeft = lerp(
-    -240 * sw,
-    -240 * sw + palmLeafXShift,
-    wideProgress
-  );
-  const palmLeafTop = lerp(50 * sh, 50 * sh + palmLeafYShift, wideProgress);
-
-  const curlyGreenLeft = lerp(
-    -215 * sw,
-    -215 * sw + curlyGreenXShift,
-    wideProgress
-  );
-  const curlyGreenBottom = lerp(
-    -220 * sh,
-    -220 * sh + curlyGreenYShift,
-    wideProgress
-  );
-
+  const contentMaxWidth = lerp(320, 460, midProgress);
   const logoWidth = lerp(280 * baseScale, 380, midProgress);
   const logoHeight = lerp(180 * baseScale, 240, midProgress);
-
   const titleYoooSize = Math.round(lerp(50 * baseScale, 72, midProgress));
   const titleVotiesSize = Math.round(lerp(56 * baseScale, 82, midProgress));
   const starsSize = lerp(50 * baseScale, 62, midProgress);
 
-  const contentMaxWidth = lerp(320, 460, midProgress);
+  // SVG sizes / positions — frozen at mount, never resize on rotation
+  const svgSw = svgWidth / 390;
+  const svgSh = svgHeight / 844;
+  const svgWideProgress = clamp((svgWidth - 390) / (1440 - 390), 0, 1);
+
+  const palmTreeSize = 1000 * svgSw * lerp(1, 0.78, svgWideProgress);
+  const palmLeafSize = 350 * svgSw * lerp(1, 0.7, svgWideProgress);
+
+  const palmTreeRight = lerp(-560 * svgSw, -560 * svgSw + 600, svgWideProgress);
+  const palmTreeTop = lerp(-245 * svgSh, -245 * svgSh - 700, svgWideProgress);
+  const palmLeafLeft = lerp(-240 * svgSw, -240 * svgSw + 350, svgWideProgress);
+  const palmLeafTop = lerp(50 * svgSh, 50 * svgSh - 600, svgWideProgress);
 
   useEffect(() => {
     async function handleGoogleResponse() {
@@ -153,16 +122,11 @@ export default function StartPage() {
       </View>
 
       <View
-        style={[
-          styles.curlyGreenWrapper,
-          {
-            bottom: curlyGreenBottom,
-            left: curlyGreenLeft,
-            pointerEvents: "none",
-          },
-        ]}
+        style={[styles.curlyGreenWrapper, { pointerEvents: "none" }]}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
       >
-        <CurlyGreen width={curlyGreenSize} height={curlyGreenSize} />
+        <CurlyGreen width={SCREEN_WIDTH * 1.1} height={SCREEN_WIDTH * 1.1} />
       </View>
 
       <ScrollView
@@ -299,6 +263,9 @@ const styles = StyleSheet.create({
   },
   curlyGreenWrapper: {
     position: "absolute",
+    bottom: -SCREEN_WIDTH * 0.3,
+    left: -SCREEN_WIDTH * 0.1,
+    zIndex: 0,
   },
   logoWrapper: {
     alignItems: "center",
