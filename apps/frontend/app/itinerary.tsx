@@ -519,7 +519,7 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
-    router.push({
+    router.replace({
       pathname: "/add-activity",
       params: {
         tripId: itinerary.tripId,
@@ -541,7 +541,7 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
-    router.push({
+    router.replace({
       pathname: "/add-activity",
       params: {
         tripId: itinerary.tripId,
@@ -623,13 +623,11 @@ export default function ItineraryScreen() {
 
   const votingActivities = useMemo(() => {
     const all = apiActivities.length > 0 ? apiActivities : itinerary.activities;
-
     const groups = new Map<string, Activity[]>();
     all.forEach((a) => {
       const key = `${a.dayId}_${a.slotId}`;
       groups.set(key, [...(groups.get(key) ?? []), a]);
     });
-
     return Array.from(groups.values())
       .filter((group) => group.length > 1)
       .flat();
@@ -828,7 +826,13 @@ export default function ItineraryScreen() {
             endDate={itinerary.endDate}
             introText={getIntroText(activeState)}
             daysLeftText={getDaysLeftText(activeState)}
-            onBackPress={() => router.back()}
+            onBackPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace("/home");
+              }
+            }}
             state={activeState}
           />
 
