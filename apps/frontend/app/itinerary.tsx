@@ -275,7 +275,6 @@ export default function ItineraryScreen() {
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
 
-  // Ref for moving focus into the popup when it appears — Fix 3
   const popupRef = useRef<View>(null);
 
   const slots = useMemo(() => generateTimeSlots(), []);
@@ -336,7 +335,6 @@ export default function ItineraryScreen() {
     };
   }, []);
 
-  // Move focus into the popup when it appears — Fix 3
   useEffect(() => {
     if (showPlanningInfoPopup && popupRef.current) {
       const node = findNodeHandle(popupRef.current);
@@ -623,10 +621,19 @@ export default function ItineraryScreen() {
     }
   }
 
-  const votingActivities = useMemo(
-    () => (apiActivities.length > 0 ? apiActivities : itinerary.activities),
-    [apiActivities, itinerary.activities]
-  );
+  const votingActivities = useMemo(() => {
+    const all = apiActivities.length > 0 ? apiActivities : itinerary.activities;
+
+    const groups = new Map<string, Activity[]>();
+    all.forEach((a) => {
+      const key = `${a.dayId}_${a.slotId}`;
+      groups.set(key, [...(groups.get(key) ?? []), a]);
+    });
+
+    return Array.from(groups.values())
+      .filter((group) => group.length > 1)
+      .flat();
+  }, [apiActivities, itinerary.activities]);
 
   const daysWithVotingActivities = useMemo(() => {
     const set = new Set<string>();
@@ -918,10 +925,8 @@ export default function ItineraryScreen() {
           <View style={[styles.footerBackground, { pointerEvents: "none" }]} />
         )}
 
-        {/* Planning info popup — Fix 3: modal focus trap */}
         {showPlanningInfoPopup && (
           <>
-            {/* Full-screen dismiss area sits behind the popup */}
             <Pressable
               style={styles.popupDismissArea}
               onPress={() => {
@@ -934,7 +939,6 @@ export default function ItineraryScreen() {
               accessibilityLabel="Dismiss planning information"
             />
 
-            {/* Popup — accessibilityViewIsModal traps focus inside */}
             <View
               ref={popupRef}
               style={styles.popupWrapper}
@@ -965,7 +969,6 @@ export default function ItineraryScreen() {
           />
         )}
 
-        {/* Finalizing overlay — Fix 3 also applies here */}
         {isPreparingFinalItinerary && (
           <View
             style={styles.finalizingOverlay}
