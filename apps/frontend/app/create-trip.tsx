@@ -1,5 +1,5 @@
-import { useRouter, useFocusEffect } from "expo-router";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useRouter } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
 import { createTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
@@ -22,7 +22,6 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
-import * as ScreenOrientation from "expo-screen-orientation";
 import { Calendar as RangeCalendar } from "react-native-calendars";
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
@@ -173,12 +172,37 @@ function isValidTimeString(value: string): boolean {
 
 function normalizeTimeInput(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 4);
-
   if (digits.length <= 2) return digits;
   return `${digits.slice(0, 2)}:${digits.slice(2)}`;
 }
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// Defined OUTSIDE the component to prevent remounting on re-render
+const CalendarModalWrapper = ({
+  children,
+  isLandscape,
+}: {
+  children: React.ReactNode;
+  isLandscape: boolean;
+}) => (
+  <View style={styles.calendarOverlay}>
+    <ScrollView
+      contentContainerStyle={[
+        { flexGrow: 1 },
+        isLandscape
+          ? { justifyContent: "flex-start" }
+          : { justifyContent: "center" },
+      ]}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.calendarModal}>
+        {children}
+      </View>
+    </ScrollView>
+  </View>
+);
 
 export default function CreateTripScreen() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -251,16 +275,18 @@ export default function CreateTripScreen() {
   const { user } = useAuth();
   const router = useRouter();
 
-  // Lock this screen to portrait
- // In CreateTripScreen (lock)
-useFocusEffect(
-  useCallback(() => {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
-    return () => {
-      ScreenOrientation.unlockAsync();
-    };
-  }, [])
-);
+  const [isLandscape, setIsLandscape] = useState(() => {
+    const { width, height } = Dimensions.get("window");
+    return width > height;
+  });
+
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener("change", ({ window }) => {
+      setIsLandscape(window.width > window.height);
+    });
+    return () => subscription.remove();
+  }, []);
+
   const TIMER_PHASES = phases.filter(
     (phase) => phase.id === "planning" || phase.id === "voting"
   );
@@ -339,11 +365,9 @@ useFocusEffect(
         setRangeEnd(null);
         return;
       }
-
       if (selected === rangeStart) {
         return;
       }
-
       setRangeEnd(selected);
       return;
     }
@@ -467,18 +491,11 @@ useFocusEffect(
     );
 
     if (showPhaseDateCalendar === "planning") {
-      return {
-        ...tripRange,
-        ...planningRange,
-      };
+      return { ...tripRange, ...planningRange };
     }
 
     if (showPhaseDateCalendar === "voting") {
-      return {
-        ...tripRange,
-        ...planningRange,
-        ...votingRange,
-      };
+      return { ...tripRange, ...planningRange, ...votingRange };
     }
 
     return tripRange;
@@ -516,17 +533,11 @@ useFocusEffect(
           combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
         );
         if (nextEnd > tripEndBoundary) {
-          Alert.alert(
-            "Invalid planning end",
-            "Planning end cannot be after the trip end date."
-          );
+          Alert.alert("Invalid planning end", "Planning end cannot be after the trip end date.");
           return;
         }
         if (nextEnd >= currentVotingEnd) {
-          Alert.alert(
-            "Invalid planning end",
-            "Planning end must be before voting end."
-          );
+          Alert.alert("Invalid planning end", "Planning end must be before voting end.");
           return;
         }
         setPhaseDates((prev: PhaseDates) => ({
@@ -550,17 +561,11 @@ useFocusEffect(
           combineDateAndTime(phaseDates.planning.end, phaseDates.planning.time)
         );
         if (nextEnd <= currentPlanningEnd) {
-          Alert.alert(
-            "Invalid voting end",
-            "Voting end must be after planning end."
-          );
+          Alert.alert("Invalid voting end", "Voting end must be after planning end.");
           return;
         }
         if (nextEnd > tripEndBoundary) {
-          Alert.alert(
-            "Invalid voting end",
-            "Voting end cannot be after the trip end date."
-          );
+          Alert.alert("Invalid voting end", "Voting end cannot be after the trip end date.");
           return;
         }
         const nextFinalDisplay = phase.end;
@@ -685,7 +690,6 @@ useFocusEffect(
   };
 
   const TOTAL_STEPS = 4;
-
   const progress = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -733,7 +737,6 @@ useFocusEffect(
             }}
           />
         </View>
-
         <Text
           style={{
             marginTop: 6,
@@ -786,8 +789,7 @@ useFocusEffect(
               </AppText>
 
               <AppText variant="body" style={styles.setupText}>
-                Set an end time for each state so the next one starts
-                automatically.
+                Set an end time for each state so the next one starts automatically.
               </AppText>
 
               {TIMER_PHASES.map((phase) => {
@@ -991,100 +993,75 @@ useFocusEffect(
               animationType="fade"
               onRequestClose={() => setShowPhaseDateCalendar(null)}
             >
-              <View style={styles.calendarOverlay}>
-                <View style={styles.calendarModal}>
-                  <AppText variant="body" style={styles.calendarTitle}>
-                    {showPhaseDateCalendar === "planning"
-                      ? "Select planning end date"
-                      : "Select voting end date"}
-                  </AppText>
+              <CalendarModalWrapper isLandscape={isLandscape}>
+                <AppText variant="body" style={styles.calendarTitle}>
+                  {showPhaseDateCalendar === "planning"
+                    ? "Select planning end date"
+                    : "Select voting end date"}
+                </AppText>
 
-                  <RangeCalendar
-                    markingType="period"
-                    minDate={
-                      showPhaseDateCalendar === "planning"
-                        ? toLocalDateString(phaseDates.planning.start)
-                        : toLocalDateString(phaseDates.voting.start)
-                    }
-                    maxDate={toLocalDateString(tripEnd)}
-                    markedDates={getPhaseMarkedDates}
-                    onDayPress={handlePhaseCalendarDayPress}
-                    enableSwipeMonths
-                    hideExtraDays
-                    firstDay={1}
-                    renderArrow={(direction) => (
-                      <AppText variant="body" style={styles.calendarArrow}>
-                        {direction === "left" ? "‹" : "›"}
-                      </AppText>
-                    )}
-                    theme={{
-                      backgroundColor: colors.lightWhite,
-                      calendarBackground: colors.lightWhite,
-                      textSectionTitleColor: colors.textMuted,
-                      dayTextColor: colors.nightBlack,
-                      textDisabledColor: colors.textMuted,
-                      monthTextColor: colors.nightBlack,
-                      arrowColor: colors.nightBlack,
-                      todayTextColor: colors.sunsetOrange,
-                      textDayFontFamily: typography.fontFamily.body,
-                      textMonthFontFamily: typography.fontFamily.bodyBold,
-                      textDayHeaderFontFamily: typography.fontFamily.bodyBold,
-                      textDayFontSize: typography.size.md,
-                      textMonthFontSize: typography.size.lg,
-                      textDayHeaderFontSize: typography.size.sm,
-                    }}
-                    style={styles.calendarCard}
-                  />
+                <RangeCalendar
+                  markingType="period"
+                  minDate={
+                    showPhaseDateCalendar === "planning"
+                      ? toLocalDateString(phaseDates.planning.start)
+                      : toLocalDateString(phaseDates.voting.start)
+                  }
+                  maxDate={toLocalDateString(tripEnd)}
+                  markedDates={getPhaseMarkedDates}
+                  onDayPress={handlePhaseCalendarDayPress}
+                  enableSwipeMonths
+                  hideExtraDays
+                  firstDay={1}
+                  renderArrow={(direction) => (
+                    <AppText variant="body" style={styles.calendarArrow}>
+                      {direction === "left" ? "‹" : "›"}
+                    </AppText>
+                  )}
+                  theme={{
+                    backgroundColor: colors.lightWhite,
+                    calendarBackground: colors.lightWhite,
+                    textSectionTitleColor: colors.textMuted,
+                    dayTextColor: colors.nightBlack,
+                    textDisabledColor: colors.textMuted,
+                    monthTextColor: colors.nightBlack,
+                    arrowColor: colors.nightBlack,
+                    todayTextColor: colors.sunsetOrange,
+                    textDayFontFamily: typography.fontFamily.body,
+                    textMonthFontFamily: typography.fontFamily.bodyBold,
+                    textDayHeaderFontFamily: typography.fontFamily.bodyBold,
+                    textDayFontSize: typography.size.md,
+                    textMonthFontSize: typography.size.lg,
+                    textDayHeaderFontSize: typography.size.sm,
+                  }}
+                  style={styles.calendarCard}
+                />
 
-                  <View style={styles.calendarLegend}>
-                    <View style={styles.legendRow}>
-                      <View
-                        style={[
-                          styles.legendSwatch,
-                          { backgroundColor: colors.sunsetOrange },
-                        ]}
-                      />
-                      <AppText variant="caption" style={styles.legendLabel}>
-                        Trip dates
-                      </AppText>
-                    </View>
-
-                    <View style={styles.legendRow}>
-                      <View
-                        style={[
-                          styles.legendSwatch,
-                          { backgroundColor: colors.beachYellow },
-                        ]}
-                      />
-                      <AppText variant="caption" style={styles.legendLabel}>
-                        Planning state
-                      </AppText>
-                    </View>
-
-                    <View style={styles.legendRow}>
-                      <View
-                        style={[
-                          styles.legendSwatch,
-                          { backgroundColor: colors.sunsetPink },
-                        ]}
-                      />
-                      <AppText variant="caption" style={styles.legendLabel}>
-                        Voting state
-                      </AppText>
-                    </View>
+                <View style={styles.calendarLegend}>
+                  <View style={styles.legendRow}>
+                    <View style={[styles.legendSwatch, { backgroundColor: colors.sunsetOrange }]} />
+                    <AppText variant="caption" style={styles.legendLabel}>Trip dates</AppText>
                   </View>
-
-                  <View style={styles.calendarActions}>
-                    <AppButton
-                      title="Close"
-                      onPress={() => setShowPhaseDateCalendar(null)}
-                      style={styles.calendarCancelButton}
-                      textStyle={styles.calendarCancelButtonText}
-                      accessibilityLabel="Close timer date selection"
-                    />
+                  <View style={styles.legendRow}>
+                    <View style={[styles.legendSwatch, { backgroundColor: colors.beachYellow }]} />
+                    <AppText variant="caption" style={styles.legendLabel}>Planning state</AppText>
+                  </View>
+                  <View style={styles.legendRow}>
+                    <View style={[styles.legendSwatch, { backgroundColor: colors.sunsetPink }]} />
+                    <AppText variant="caption" style={styles.legendLabel}>Voting state</AppText>
                   </View>
                 </View>
-              </View>
+
+                <View style={styles.calendarActions}>
+                  <AppButton
+                    title="Close"
+                    onPress={() => setShowPhaseDateCalendar(null)}
+                    style={styles.calendarCancelButton}
+                    textStyle={styles.calendarCancelButtonText}
+                    accessibilityLabel="Close timer date selection"
+                  />
+                </View>
+              </CalendarModalWrapper>
             </Modal>
 
             <Modal
@@ -1093,55 +1070,52 @@ useFocusEffect(
               animationType="fade"
               onRequestClose={() => setShowPhaseTimePicker(null)}
             >
-              <View style={styles.calendarOverlay}>
-                <View style={styles.calendarModal}>
-                  <AppText variant="body" style={styles.calendarTitle}>
-                    {showPhaseTimePicker === "planning"
-                      ? "Select planning end time"
-                      : "Select voting end time"}
+              <CalendarModalWrapper isLandscape={isLandscape}>
+                <AppText variant="body" style={styles.calendarTitle}>
+                  {showPhaseTimePicker === "planning"
+                    ? "Select planning end time"
+                    : "Select voting end time"}
+                </AppText>
+
+                <View style={styles.timeModalContent}>
+                  <AppText variant="caption" style={styles.timeModalHint}>
+                    Enter the exact time in 24-hour format
                   </AppText>
-
-                  <View style={styles.timeModalContent}>
-                    <AppText variant="caption" style={styles.timeModalHint}>
-                      Enter the exact time in 24-hour format
-                    </AppText>
-
-                    <View style={styles.timeInputModalBox}>
-                      <TextInput
-                        value={tempPhaseTime}
-                        onChangeText={(value) =>
-                          setTempPhaseTime(normalizeTimeInput(value))
-                        }
-                        placeholder="HH:MM"
-                        placeholderTextColor={colors.textMuted}
-                        keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
-                        maxLength={5}
-                        style={styles.timeInputModal}
-                        textAlign="center"
-                        accessibilityLabel="Enter time in HH colon MM format"
-                      />
-                      <Timer width={20} height={20} />
-                    </View>
-                  </View>
-
-                  <View style={styles.calendarActions}>
-                    <AppButton
-                      title="Cancel"
-                      onPress={() => setShowPhaseTimePicker(null)}
-                      style={styles.calendarCancelButton}
-                      textStyle={styles.calendarCancelButtonText}
-                      accessibilityLabel="Cancel time selection"
+                  <View style={styles.timeInputModalBox}>
+                    <TextInput
+                      value={tempPhaseTime}
+                      onChangeText={(value) =>
+                        setTempPhaseTime(normalizeTimeInput(value))
+                      }
+                      placeholder="HH:MM"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"}
+                      maxLength={5}
+                      style={styles.timeInputModal}
+                      textAlign="center"
+                      accessibilityLabel="Enter time in HH colon MM format"
                     />
-                    <AppButton
-                      title="Apply time"
-                      onPress={handleApplyPhaseTime}
-                      style={styles.calendarApplyButton}
-                      textStyle={styles.calendarApplyButtonText}
-                      accessibilityLabel="Apply selected time"
-                    />
+                    <Timer width={20} height={20} />
                   </View>
                 </View>
-              </View>
+
+                <View style={styles.calendarActions}>
+                  <AppButton
+                    title="Cancel"
+                    onPress={() => setShowPhaseTimePicker(null)}
+                    style={styles.calendarCancelButton}
+                    textStyle={styles.calendarCancelButtonText}
+                    accessibilityLabel="Cancel time selection"
+                  />
+                  <AppButton
+                    title="Apply time"
+                    onPress={handleApplyPhaseTime}
+                    style={styles.calendarApplyButton}
+                    textStyle={styles.calendarApplyButtonText}
+                    accessibilityLabel="Apply selected time"
+                  />
+                </View>
+              </CalendarModalWrapper>
             </Modal>
           </View>
         </SafeAreaView>
@@ -1167,7 +1141,10 @@ useFocusEffect(
             </View>
 
             <ScrollView
-              contentContainerStyle={styles.containerStep3}
+              contentContainerStyle={[
+                styles.containerStep3,
+                isLandscape && { paddingBottom: 80 },
+              ]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
@@ -1211,11 +1188,7 @@ useFocusEffect(
                   accessibilityLabel={copied ? "Trip code copied" : "Copy trip code"}
                   accessibilityHint="Copies the trip invite code to your clipboard"
                 >
-                  <AppText
-                    variant="body"
-                    style={styles.codeText}
-                    accessible={false}
-                  >
+                  <AppText variant="body" style={styles.codeText} accessible={false}>
                     {tripCode}
                   </AppText>
                   <View
@@ -1237,7 +1210,11 @@ useFocusEffect(
             </ScrollView>
 
             <View
-              style={[styles.continueWrapper, { pointerEvents: "box-none" }]}
+              style={[
+                styles.continueWrapper,
+                { bottom: isLandscape ? 20 : SCREEN_WIDTH * (221 / 393) + 47 },
+                { pointerEvents: "box-none" },
+              ]}
             >
               <AppButton
                 title="Back to Landing Page"
@@ -1321,7 +1298,11 @@ useFocusEffect(
               </KeyboardAvoidingView>
 
               <View
-                style={[styles.continueWrapper, { pointerEvents: "box-none" }]}
+                style={[
+                  styles.continueWrapper,
+                  { bottom: isLandscape ? 20 : SCREEN_WIDTH * (221 / 393) + 47 },
+                  { pointerEvents: "box-none" },
+                ]}
               >
                 <AppButton
                   title="Continue"
@@ -1334,16 +1315,18 @@ useFocusEffect(
                 />
               </View>
 
-              <View
-                style={[styles.cityScapeWrapper, { pointerEvents: "none" }]}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
-              >
-                <CityScape
-                  width={SCREEN_WIDTH}
-                  height={SCREEN_WIDTH * (221 / 393)}
-                />
-              </View>
+              {!isLandscape && (
+                <View
+                  style={[styles.cityScapeWrapper, { pointerEvents: "none" }]}
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  <CityScape
+                    width={SCREEN_WIDTH}
+                    height={SCREEN_WIDTH * (221 / 393)}
+                  />
+                </View>
+              )}
             </>
           ) : (
             <>
@@ -1444,7 +1427,12 @@ useFocusEffect(
                 </ScrollView>
               </KeyboardAvoidingView>
 
-              <View style={styles.createWrapper}>
+              <View
+                style={[
+                  styles.createWrapper,
+                  { bottom: isLandscape ? 20 : SCREEN_WIDTH * (221 / 393) + 5 },
+                ]}
+              >
                 <AppButton
                   title="Continue"
                   onPress={handleContinueToTimers}
@@ -1463,62 +1451,60 @@ useFocusEffect(
             animationType="fade"
             onRequestClose={() => setShowTripCalendar(false)}
           >
-            <View style={styles.calendarOverlay}>
-              <View style={styles.calendarModal}>
-                <AppText variant="body" style={styles.calendarTitle}>
-                  Select your trip dates
-                </AppText>
+            <CalendarModalWrapper isLandscape={isLandscape}>
+              <AppText variant="body" style={styles.calendarTitle}>
+                Select your trip dates
+              </AppText>
 
-                <RangeCalendar
-                  markingType="period"
-                  minDate={toLocalDateString(new Date())}
-                  markedDates={markedTripDates}
-                  onDayPress={handleTripDayPress}
-                  enableSwipeMonths
-                  hideExtraDays
-                  firstDay={1}
-                  renderArrow={(direction) => (
-                    <AppText variant="body" style={styles.calendarArrow}>
-                      {direction === "left" ? "‹" : "›"}
-                    </AppText>
-                  )}
-                  theme={{
-                    backgroundColor: colors.lightWhite,
-                    calendarBackground: colors.lightWhite,
-                    textSectionTitleColor: colors.textMuted,
-                    dayTextColor: colors.nightBlack,
-                    textDisabledColor: colors.textMuted,
-                    monthTextColor: colors.nightBlack,
-                    arrowColor: colors.nightBlack,
-                    todayTextColor: colors.sunsetOrange,
-                    textDayFontFamily: typography.fontFamily.body,
-                    textMonthFontFamily: typography.fontFamily.bodyBold,
-                    textDayHeaderFontFamily: typography.fontFamily.bodyBold,
-                    textDayFontSize: typography.size.md,
-                    textMonthFontSize: typography.size.lg,
-                    textDayHeaderFontSize: typography.size.sm,
-                  }}
-                  style={styles.calendarCard}
+              <RangeCalendar
+                markingType="period"
+                minDate={toLocalDateString(new Date())}
+                markedDates={markedTripDates}
+                onDayPress={handleTripDayPress}
+                enableSwipeMonths
+                hideExtraDays
+                firstDay={1}
+                renderArrow={(direction) => (
+                  <AppText variant="body" style={styles.calendarArrow}>
+                    {direction === "left" ? "‹" : "›"}
+                  </AppText>
+                )}
+                theme={{
+                  backgroundColor: colors.lightWhite,
+                  calendarBackground: colors.lightWhite,
+                  textSectionTitleColor: colors.textMuted,
+                  dayTextColor: colors.nightBlack,
+                  textDisabledColor: colors.textMuted,
+                  monthTextColor: colors.nightBlack,
+                  arrowColor: colors.nightBlack,
+                  todayTextColor: colors.sunsetOrange,
+                  textDayFontFamily: typography.fontFamily.body,
+                  textMonthFontFamily: typography.fontFamily.bodyBold,
+                  textDayHeaderFontFamily: typography.fontFamily.bodyBold,
+                  textDayFontSize: typography.size.md,
+                  textMonthFontSize: typography.size.lg,
+                  textDayHeaderFontSize: typography.size.sm,
+                }}
+                style={styles.calendarCard}
+              />
+
+              <View style={styles.calendarActions}>
+                <AppButton
+                  title="Cancel"
+                  onPress={() => setShowTripCalendar(false)}
+                  style={styles.calendarCancelButton}
+                  textStyle={styles.calendarCancelButtonText}
+                  accessibilityLabel="Cancel date selection"
                 />
-
-                <View style={styles.calendarActions}>
-                  <AppButton
-                    title="Cancel"
-                    onPress={() => setShowTripCalendar(false)}
-                    style={styles.calendarCancelButton}
-                    textStyle={styles.calendarCancelButtonText}
-                    accessibilityLabel="Cancel date selection"
-                  />
-                  <AppButton
-                    title="Apply dates"
-                    onPress={applyTripRange}
-                    style={styles.calendarApplyButton}
-                    textStyle={styles.calendarApplyButtonText}
-                    accessibilityLabel="Apply selected trip dates"
-                  />
-                </View>
+                <AppButton
+                  title="Apply dates"
+                  onPress={applyTripRange}
+                  style={styles.calendarApplyButton}
+                  textStyle={styles.calendarApplyButtonText}
+                  accessibilityLabel="Apply selected trip dates"
+                />
               </View>
-            </View>
+            </CalendarModalWrapper>
           </Modal>
         </View>
       </SafeAreaView>
@@ -1684,7 +1670,6 @@ const styles = StyleSheet.create({
   },
   continueWrapper: {
     position: "absolute",
-    bottom: SCREEN_WIDTH * (221 / 393) + 47,
     left: spacing.xl,
     right: spacing.xl,
     zIndex: 10,
@@ -1719,7 +1704,6 @@ const styles = StyleSheet.create({
   },
   createWrapper: {
     position: "absolute",
-    bottom: SCREEN_WIDTH * (221 / 393) + 5,
     left: spacing.xl,
     right: spacing.xl,
     zIndex: 10,
@@ -1858,8 +1842,8 @@ const styles = StyleSheet.create({
   },
   calendarOverlay: {
     flex: 1,
-    justifyContent: "center",
     paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
   },
   calendarModal: {
     backgroundColor: colors.lightWhite,
