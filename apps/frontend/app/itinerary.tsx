@@ -521,7 +521,7 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
-    router.replace({
+    router.push({
       pathname: "/add-activity",
       params: {
         tripId: itinerary.tripId,
@@ -543,7 +543,7 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
-    router.replace({
+    router.push({
       pathname: "/add-activity",
       params: {
         tripId: itinerary.tripId,
