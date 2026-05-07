@@ -16,6 +16,7 @@ import {
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { AppButton } from "@/src/components/common/AppButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { navigate } from "expo-router/build/global-state/routing";
 
 
 
@@ -121,6 +122,14 @@ export default function Onboarding() {
                                 textStyle={Styles.continueButtonText}
                                 accessibilityLabel="Go to Previous step"
                                 accessibilityHint="Moves to the previous step of onboarding"
+                            />
+                            <AppButton
+                                title="Finish"
+                                onPress={() => navigate("/home")}
+                                style={Styles.continueButton}
+                                textStyle={Styles.continueButtonText}
+                                accessibilityLabel="Finish onboarding"
+                                accessibilityHint="Completes the onboarding process and navigates to the home screen"
                             />
                         </View>
                     </>
