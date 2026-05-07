@@ -19,6 +19,14 @@ import PalmTree from "@/assets/visuals/palm-tree.svg";
 import Google from "@/assets/icons/google.svg";
 import Stars from "@/assets/visuals/stars.svg";
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function lerp(start: number, end: number, t: number) {
+  return start + (end - start) * t;
+}
+
 export default function StartPage() {
   const { response, signInWithGoogleToken, promptAsync, request } =
     useGoogleLogin();
@@ -27,7 +35,73 @@ export default function StartPage() {
 
   const sw = width / 390;
   const sh = height / 844;
-  const scale = Math.min(sw, sh);
+  const baseScale = Math.min(sw, sh);
+
+  const wideProgress = clamp((width - 390) / (1440 - 390), 0, 1);
+  const midProgress = clamp((width - 390) / (1024 - 390), 0, 1);
+
+  // TUNE THESE VALUES:
+  // bigger "scaleTo" => grows more on wider screens
+  // bigger positive xShift => moves right more on wider screens
+  // bigger positive yShift => moves down more on wider screens
+  // bigger negative xShift => moves left more
+  // bigger negative yShift => moves up more
+
+  const palmTreeBaseSize = 1000 * sw;
+  const palmTreeScaleTo = 0.78;
+  const palmTreeXShift = 600;
+  const palmTreeYShift = -700;
+
+  const palmLeafBaseSize = 350 * sw;
+  const palmLeafScaleTo = 0.7;
+  const palmLeafXShift = 350;
+  const palmLeafYShift = -600;
+
+  const curlyGreenBaseSize = 500 * sw;
+  const curlyGreenScaleTo = 0.6;
+  const curlyGreenXShift = 500;
+  const curlyGreenYShift = -400;
+
+  const palmTreeSize =
+    palmTreeBaseSize * lerp(1, palmTreeScaleTo, wideProgress);
+  const palmLeafSize =
+    palmLeafBaseSize * lerp(1, palmLeafScaleTo, wideProgress);
+  const curlyGreenSize =
+    curlyGreenBaseSize * lerp(1, curlyGreenScaleTo, wideProgress);
+
+  const palmTreeRight = lerp(
+    -560 * sw,
+    -560 * sw + palmTreeXShift,
+    wideProgress
+  );
+  const palmTreeTop = lerp(-245 * sh, -245 * sh + palmTreeYShift, wideProgress);
+
+  const palmLeafLeft = lerp(
+    -240 * sw,
+    -240 * sw + palmLeafXShift,
+    wideProgress
+  );
+  const palmLeafTop = lerp(50 * sh, 50 * sh + palmLeafYShift, wideProgress);
+
+  const curlyGreenLeft = lerp(
+    -215 * sw,
+    -215 * sw + curlyGreenXShift,
+    wideProgress
+  );
+  const curlyGreenBottom = lerp(
+    -220 * sh,
+    -220 * sh + curlyGreenYShift,
+    wideProgress
+  );
+
+  const logoWidth = lerp(280 * baseScale, 380, midProgress);
+  const logoHeight = lerp(180 * baseScale, 240, midProgress);
+
+  const titleYoooSize = Math.round(lerp(50 * baseScale, 72, midProgress));
+  const titleVotiesSize = Math.round(lerp(56 * baseScale, 82, midProgress));
+  const starsSize = lerp(50 * baseScale, 62, midProgress);
+
+  const contentMaxWidth = lerp(320, 460, midProgress);
 
   useEffect(() => {
     async function handleGoogleResponse() {
@@ -52,51 +126,69 @@ export default function StartPage() {
 
   return (
     <View style={styles.container}>
-      {/* Decorative background visuals — scaled to screen */}
       <View
         style={[
           styles.palmTreeWrapper,
-          { top: -245 * sh, right: -560 * sw, pointerEvents: "none" },
+          {
+            top: palmTreeTop,
+            right: palmTreeRight,
+            pointerEvents: "none",
+          },
         ]}
       >
-        <PalmTree width={1000 * sw} height={1000 * sh} />
+        <PalmTree width={palmTreeSize} height={palmTreeSize} />
       </View>
 
       <View
         style={[
           styles.palmLeafWrapper,
-          { top: 50 * sh, left: -240 * sw, pointerEvents: "none" },
+          {
+            top: palmLeafTop,
+            left: palmLeafLeft,
+            pointerEvents: "none",
+          },
         ]}
       >
-        <PalmLeaf width={350 * sw} height={350 * sw} />
+        <PalmLeaf width={palmLeafSize} height={palmLeafSize} />
       </View>
 
       <View
         style={[
           styles.curlyGreenWrapper,
-          { bottom: -220 * sh, left: -215 * sw, pointerEvents: "none" },
+          {
+            bottom: curlyGreenBottom,
+            left: curlyGreenLeft,
+            pointerEvents: "none",
+          },
         ]}
       >
-        <CurlyGreen width={500 * sw} height={500 * sw} />
+        <CurlyGreen width={curlyGreenSize} height={curlyGreenSize} />
       </View>
 
-      {/* ScrollView so tiny phones (SE) can still reach the buttons */}
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingHorizontal: lerp(spacing.xl, spacing.xxxxl2, midProgress),
+          },
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.logoWrapper}>
-          <VoteyLogo width={280 * scale} height={180 * scale} />
+        <View style={[styles.logoWrapper, { maxWidth: contentMaxWidth }]}>
+          <VoteyLogo width={logoWidth} height={logoHeight} />
 
           <View style={styles.titleWrapper}>
             <View
               style={[
                 styles.starsWrapper,
-                { top: -26 * scale, right: -20 * scale },
+                {
+                  top: lerp(-26 * baseScale, -30, midProgress),
+                  right: lerp(-20 * baseScale, -18, midProgress),
+                },
               ]}
             >
-              <Stars width={50 * scale} height={50 * scale} />
+              <Stars width={starsSize} height={starsSize} />
             </View>
 
             <AppText
@@ -104,8 +196,8 @@ export default function StartPage() {
               style={[
                 styles.titleYooo,
                 {
-                  fontSize: Math.round(50 * scale),
-                  lineHeight: Math.round(50 * scale * 1.15),
+                  fontSize: titleYoooSize,
+                  lineHeight: Math.round(titleYoooSize * 1.15),
                 },
               ]}
             >
@@ -117,8 +209,8 @@ export default function StartPage() {
               style={[
                 styles.titleTraveler,
                 {
-                  fontSize: Math.round(56 * scale),
-                  lineHeight: Math.round(56 * scale * 1.15),
+                  fontSize: titleVotiesSize,
+                  lineHeight: Math.round(titleVotiesSize * 1.15),
                 },
               ]}
             >
@@ -127,7 +219,14 @@ export default function StartPage() {
           </View>
         </View>
 
-        <View style={styles.actions}>
+        <View
+          style={[
+            styles.actions,
+            {
+              maxWidth: contentMaxWidth,
+            },
+          ]}
+        >
           <Link href="/login" asChild>
             <AppButton
               title="Login"
@@ -153,7 +252,7 @@ export default function StartPage() {
               accessibilityLabel="Go to registration screen"
               accessibilityRole="link"
             >
-              <View>
+              <View style={styles.registerLinkWrapper}>
                 <AppText style={styles.registerLink}>Register here</AppText>
                 <View style={styles.registerHighlight} />
               </View>
@@ -189,7 +288,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xxxxl2,
     gap: spacing.xxxxl2,
   },
@@ -205,6 +303,7 @@ const styles = StyleSheet.create({
   logoWrapper: {
     alignItems: "center",
     gap: spacing.xxxxl2,
+    width: "100%",
   },
   titleWrapper: {
     alignItems: "center",
@@ -231,7 +330,6 @@ const styles = StyleSheet.create({
   },
   actions: {
     width: "100%",
-    maxWidth: 320,
     alignSelf: "center",
     gap: spacing.md,
   },
