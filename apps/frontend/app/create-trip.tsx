@@ -1141,6 +1141,7 @@ export default function CreateTripScreen() {
             </View>
 
             <ScrollView
+            style={styles.scroll}
               contentContainerStyle={[
                 styles.containerStep3,
                 isLandscape && { paddingBottom: 80 },
