@@ -57,6 +57,12 @@ export default function Onboarding() {
                             <Text style={[Styles.title, Styles.titleBg1]}>Plan Together</Text>
                         </View>
 
+                        <View>
+                            <Text style={Styles.InfoText}>
+                                Plan your trip together with your travel companions. Add activities in the itinerary, and collaborate on the details of your trip in one place.
+                            </Text>
+                        </View>
+
                         <View style={[Styles.continueWrapper, { pointerEvents: "box-none" }]}>
                             <AppButton
                                 title="Continue"
@@ -84,6 +90,12 @@ export default function Onboarding() {
 
                         <View style={Styles.container}>
                             <Text style={[Styles.title, Styles.titleBg2]}>Decide Together</Text>
+                        </View>
+
+                        <View>
+                            <Text style={Styles.InfoText}>
+                               Say goodbye to endless debates and make decisions together with ease. Use our voting feature to let everyone have a say in choosing activities.
+                            </Text>
                         </View>
 
                         <View style={[Styles.continueWrapper, { pointerEvents: "box-none" }]}>
@@ -122,6 +134,12 @@ export default function Onboarding() {
 
                         <View style={Styles.container}>
                             <Text style={[Styles.title, Styles.titleBg3]}>Travel Together</Text>
+                        </View>
+
+                        <View>
+                            <Text style={Styles.InfoText}>
+                                Enjoy a seamless travel experience with your friends and family. Access your itinerary and important travel information on the go.
+                            </Text>
                         </View>
 
                         <View style={[Styles.continueWrapper, { pointerEvents: "box-none" }]}>
@@ -254,5 +272,14 @@ skipButtonText: {
   continueButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
+  },
+  InfoText: {
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
+    color: colors.textPrimary,
+    textAlign: "center",
+    marginTop: spacing.xxxxl2,
+    paddingLeft: spacing.xl,
+    paddingRight: spacing.xl,
   },
 });
