@@ -65,28 +65,31 @@ export default function LoginScreen() {
 
       const authResponse = await loginUser(email.trim(), password);
       setUser(authResponse);
-      setIdToken(authResponse.idToken); 
-      router.replace("/home");
-
+      setIdToken(authResponse.idToken);
       router.replace("/home");
     } catch (error: any) {
-  const code = error?.code ?? error?.message ?? "";
-  let message = "Something went wrong. Please try again.";
+      const rawMessage = error?.message ?? "";
+      const code = error?.code ?? "";
 
-  if (
-    code.includes("auth/invalid-credential") ||
-    code.includes("auth/wrong-password") ||
-    code.includes("auth/user-not-found")
-  ) {
-    message = "Incorrect email or password. Please try again.";
-  } else if (code.includes("auth/too-many-requests")) {
-    message = "Too many attempts. Please try again later.";
-  } else if (code.includes("auth/user-disabled")) {
-    message = "This account has been disabled.";
-  }
+      let message = "Something went wrong. Please try again.";
 
-  setErrors((prev) => ({ ...prev, general: message }));
-}
+      if (
+        code.includes("auth/invalid-credential") ||
+        code.includes("auth/wrong-password") ||
+        code.includes("auth/user-not-found") ||
+        rawMessage.includes("Incorrect email or password")
+      ) {
+        message = "Incorrect email or password.";
+      } else if (code.includes("auth/too-many-requests")) {
+        message = "Too many attempts. Please try again later.";
+      } else if (code.includes("auth/user-disabled")) {
+        message = "This account has been disabled.";
+      }
+
+      setErrors((prev) => ({ ...prev, general: message }));
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -104,7 +107,7 @@ export default function LoginScreen() {
           {
             paddingTop: headerTop,
             paddingBottom: headerBottom,
-            pointerEvents:"box-none",
+            pointerEvents: "box-none",
           },
         ]}
       >
@@ -368,7 +371,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontFamily: typography.fontFamily.title,
   },
-
   keyboardArea: {
     flex: 1,
     zIndex: 2,

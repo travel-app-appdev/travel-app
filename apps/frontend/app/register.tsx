@@ -77,23 +77,41 @@ export default function RegisterScreen() {
       );
 
       setUser(authResponse);
+      setIdToken(authResponse.idToken);
       router.replace("/home");
     } catch (error: any) {
-      const message: string =
-        error?.message || "Something went wrong. Please try again.";
+      const status = error?.response?.status;
+      const backendCode = error?.response?.data?.code ?? "";
+      const backendMessage =
+        error?.response?.data?.message ??
+        error?.response?.data?.error ??
+        error?.message ??
+        "";
+      const firebaseCode = error?.code ?? "";
 
       if (
-        message.toLowerCase().includes("already registered") ||
-        message.toLowerCase().includes("already in use") ||
-        message.toLowerCase().includes("email-already-in-use")
+        status === 409 ||
+        backendCode === "EMAIL_ALREADY_EXISTS" ||
+        firebaseCode === "auth/email-already-exists" ||
+        firebaseCode === "auth/email-already-in-use" ||
+        backendMessage.toLowerCase().includes("already") ||
+        backendMessage.toLowerCase().includes("in use")
       ) {
         setErrors((prev) => ({
           ...prev,
           email: "This email is already registered. Try logging in instead.",
+          general: undefined,
         }));
       } else {
-        const friendlyMessage = getFirebaseAuthMessage(error);
-        setErrors((prev) => ({ ...prev, general: friendlyMessage }));
+        const friendlyMessage =
+          backendMessage ||
+          getFirebaseAuthMessage(error) ||
+          "Something went wrong. Please try again.";
+
+        setErrors((prev) => ({
+          ...prev,
+          general: friendlyMessage,
+        }));
       }
     } finally {
       setIsSubmitting(false);
@@ -157,10 +175,7 @@ export default function RegisterScreen() {
               },
             ]}
           >
-            <MascotHelloPink
-              width={mascotSize}
-              height={mascotSize}
-            />
+            <MascotHelloPink width={mascotSize} height={mascotSize} />
           </View>
 
           <View
