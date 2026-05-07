@@ -39,9 +39,9 @@ export function PlanningSlotCard({
 
   return (
     <View style={styles.row}>
-      <View style={styles.card}>
+      <View style={[styles.card, hasActivity && styles.filledCard]}>
         {hasActivity ? (
-          <View style={[styles.card, styles.filledCard]}>
+          <>
             {/* Time label row — icon is decorative */}
             <View
               style={styles.timeRow}
@@ -109,7 +109,7 @@ export function PlanningSlotCard({
                 </AppText>
               </View>
             )}
-          </View>
+          </>
         ) : (
           <>
             <AppText variant="body" style={styles.timeLabel}>
