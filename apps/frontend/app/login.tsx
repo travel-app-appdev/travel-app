@@ -70,18 +70,18 @@ export default function LoginScreen() {
 
       router.replace("/home");
     } catch (error: any) {
-  const code = error?.code ?? "";
+  const code = error?.code ?? error?.message ?? "";
   let message = "Something went wrong. Please try again.";
 
   if (
-    code === "auth/invalid-credential" ||
-    code === "auth/wrong-password" ||
-    code === "auth/user-not-found"
+    code.includes("auth/invalid-credential") ||
+    code.includes("auth/wrong-password") ||
+    code.includes("auth/user-not-found")
   ) {
     message = "Incorrect email or password. Please try again.";
-  } else if (code === "auth/too-many-requests") {
+  } else if (code.includes("auth/too-many-requests")) {
     message = "Too many attempts. Please try again later.";
-  } else if (code === "auth/user-disabled") {
+  } else if (code.includes("auth/user-disabled")) {
     message = "This account has been disabled.";
   }
 
