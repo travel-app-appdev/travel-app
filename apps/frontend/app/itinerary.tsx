@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -34,7 +34,7 @@ import { PlanningDoneBar } from "@/src/components/itinerary/PlanningDoneBar";
 import { VotingSlotCard } from "@/src/components/itinerary/VoteSlotCard";
 import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
-import { fetchMyTrips, finishPlanning } from "@/src/api/trips";
+import { fetchMyTrips, finishPlanning, type Trip } from "@/src/api/trips";
 import {
   getActivitiesBySlot,
   getFinalItineraryActivities,
@@ -138,6 +138,35 @@ function markPlanningDoneForUser(
   );
 }
 
+function resetPlanningStatus(
+  planningStatus: TripItinerary["planningStatus"]
+): TripItinerary["planningStatus"] {
+  return planningStatus.map((member) => ({
+    ...member,
+    hasFinishedPlanning: false,
+  }));
+}
+
+function mapTripMembersToPlanningStatus(
+  members?: Trip["members"]
+): TripItinerary["planningStatus"] | undefined {
+  if (!members || members.length === 0) return undefined;
+
+  return members
+    .map((member) => ({
+      userId: member.id,
+      hasFinishedPlanning: member.planning_done ?? false,
+    }))
+    .filter((member) => member.userId);
+}
+
+function isDeadlinePast(deadline?: string): boolean {
+  if (!deadline) return false;
+
+  const parsed = new Date(deadline);
+  return !Number.isNaN(parsed.getTime()) && parsed.getTime() <= Date.now();
+}
+
 function shouldSkipVoting(memberCount: number) {
   return memberCount <= 1;
 }
@@ -210,6 +239,41 @@ function getActiveTimerText(
   if (state === "planning") return getTimerText(planningEndAt);
   if (state === "voting") return getTimerText(votingEndAt);
   return "0 days";
+}
+
+type TransitionOverlayProps = {
+  title: string;
+  text: string;
+};
+
+function TransitionOverlay({ title, text }: TransitionOverlayProps) {
+  return (
+    <View
+      style={styles.finalizingOverlay}
+      accessibilityViewIsModal={true}
+      accessible={true}
+      accessibilityLiveRegion="assertive"
+      accessibilityLabel={`${title}. ${text}`}
+    >
+      <View style={styles.finalizingCard}>
+        <ActivityIndicator color={colors.nightBlack} />
+        <AppText
+          variant="subtitle"
+          style={styles.finalizingTitle}
+          accessible={false}
+        >
+          {title}
+        </AppText>
+        <AppText
+          variant="caption"
+          style={styles.finalizingText}
+          accessible={false}
+        >
+          {text}
+        </AppText>
+      </View>
+    </View>
+  );
 }
 
 export default function ItineraryScreen() {
@@ -298,8 +362,13 @@ export default function ItineraryScreen() {
   const finalizingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const votingTransitionTimeoutRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const initialTripRefreshKeyRef = useRef<string | null>(null);
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
+  const [isPreparingVoting, setIsPreparingVoting] = useState(false);
 
   const popupRef = useRef<View>(null);
 
@@ -375,35 +444,124 @@ export default function ItineraryScreen() {
     });
   }, [planningEndAt, votingEndAt]);
 
-  useEffect(() => {
-    if (!currentUserId || !tripId) return;
+  const refreshTripTimerFields = useCallback(
+    async (options: { forceRefresh?: boolean } = {}) => {
+      if (!currentUserId || !tripId) return;
 
-    const userId = currentUserId;
-    let isCancelled = false;
-
-    async function refreshTripTimerFields() {
       try {
-        const trips = await fetchMyTrips(userId);
-        if (isCancelled) return;
+        const trips = await fetchMyTrips(currentUserId, {
+          forceRefresh: options.forceRefresh,
+          allowStaleOnError: true,
+        });
 
         const currentTrip = trips.find((trip) => trip.trip_id === tripId);
         if (!currentTrip) return;
 
+        const refreshedPlanningStatus = mapTripMembersToPlanningStatus(
+          currentTrip.members
+        );
+        const nextState = toUiState(currentTrip.state);
+        const nextPlanningEndAt = currentTrip.planning_end_at ?? planningEndAt;
+        const nextVotingEndAt = currentTrip.voting_end_at ?? votingEndAt;
+
         setTimerDeadlines({
-          planningEndAt: currentTrip.planning_end_at ?? planningEndAt,
-          votingEndAt: currentTrip.voting_end_at ?? votingEndAt,
+          planningEndAt: nextPlanningEndAt,
+          votingEndAt: nextVotingEndAt,
+        });
+
+        setItinerary((current) => ({
+          ...current,
+          title: currentTrip.title ?? current.title,
+          destination: currentTrip.destination ?? current.destination,
+          startDate: currentTrip.start_date ?? current.startDate,
+          endDate: currentTrip.end_date ?? current.endDate,
+          state: nextState,
+          planningStatus:
+            refreshedPlanningStatus ??
+            (nextState === "planning" &&
+            nextPlanningEndAt &&
+            nextPlanningEndAt !== timerDeadlines.planningEndAt
+              ? resetPlanningStatus(current.planningStatus)
+              : current.planningStatus),
+        }));
+
+        router.setParams({
+          state: nextState,
+          title: currentTrip.title,
+          destination: currentTrip.destination,
+          startDate: currentTrip.start_date,
+          endDate: currentTrip.end_date,
+          planningEndAt: nextPlanningEndAt ?? "",
+          votingEndAt: nextVotingEndAt ?? "",
+          members: refreshedPlanningStatus
+            ? JSON.stringify(refreshedPlanningStatus)
+            : members,
         });
       } catch (error) {
         console.log("Could not refresh trip timer:", error);
       }
+    },
+    [
+      currentUserId,
+      members,
+      planningEndAt,
+      timerDeadlines.planningEndAt,
+      tripId,
+      votingEndAt,
+    ]
+  );
+
+  useEffect(() => {
+    if (!currentUserId || !tripId) return;
+
+    let deadlineTimeout: ReturnType<typeof setTimeout> | null = null;
+    const refreshKey = `${currentUserId}:${tripId}`;
+
+    if (initialTripRefreshKeyRef.current !== refreshKey) {
+      initialTripRefreshKeyRef.current = refreshKey;
+      void refreshTripTimerFields();
     }
 
-    void refreshTripTimerFields();
+    const activeDeadline =
+      activeState === "planning"
+        ? timerDeadlines.planningEndAt
+        : activeState === "voting"
+          ? timerDeadlines.votingEndAt
+          : undefined;
+
+    if (
+      (activeState === "planning" || activeState === "voting") &&
+      activeDeadline
+    ) {
+      if (isDeadlinePast(activeDeadline)) {
+        void refreshTripTimerFields({ forceRefresh: true });
+      } else {
+        const delay = Math.max(
+          0,
+          new Date(activeDeadline).getTime() - Date.now() + 1000
+        );
+        deadlineTimeout = setTimeout(() => {
+          void refreshTripTimerFields({ forceRefresh: true });
+        }, delay);
+      }
+    }
 
     return () => {
-      isCancelled = true;
+      if (deadlineTimeout) {
+        clearTimeout(deadlineTimeout);
+      }
     };
-  }, [currentUserId, tripId, planningEndAt, votingEndAt]);
+  }, [
+    activeState,
+    currentUserId,
+    tripId,
+    planningEndAt,
+    votingEndAt,
+    members,
+    refreshTripTimerFields,
+    timerDeadlines.planningEndAt,
+    timerDeadlines.votingEndAt,
+  ]);
 
   useEffect(() => {
     const updateTimer = () => {
@@ -428,6 +586,9 @@ export default function ItineraryScreen() {
       }
       if (finalizingTimeoutRef.current) {
         clearTimeout(finalizingTimeoutRef.current);
+      }
+      if (votingTransitionTimeoutRef.current) {
+        clearTimeout(votingTransitionTimeoutRef.current);
       }
     };
   }, []);
@@ -719,13 +880,29 @@ export default function ItineraryScreen() {
 
       setItinerary((current) => ({
         ...current,
-        state: nextState,
+        state: nextState === "voting" ? current.state : nextState,
         planningStatus: markPlanningDoneForUser(
           current.planningStatus,
           currentUserId
         ),
       }));
-      router.setParams({ state: nextState });
+
+      if (nextState === "voting") {
+        setIsPreparingVoting(true);
+        if (votingTransitionTimeoutRef.current) {
+          clearTimeout(votingTransitionTimeoutRef.current);
+        }
+        votingTransitionTimeoutRef.current = setTimeout(() => {
+          setItinerary((current) => ({ ...current, state: "voting" }));
+          setIsPreparingVoting(false);
+          setActivityRefreshKey((value) => value + 1);
+          router.setParams({ state: "voting" });
+          void refreshTripTimerFields({ forceRefresh: true });
+        }, 1800);
+      } else {
+        router.setParams({ state: nextState });
+        void refreshTripTimerFields({ forceRefresh: true });
+      }
     } catch (error) {
       Alert.alert(
         "Could not finish planning",
@@ -1095,31 +1272,17 @@ export default function ItineraryScreen() {
         )}
 
         {isPreparingFinalItinerary && (
-          <View
-            style={styles.finalizingOverlay}
-            accessibilityViewIsModal={true}
-            accessible={true}
-            accessibilityLiveRegion="assertive"
-            accessibilityLabel="Making your itinerary ready. We are choosing the group favorites for each time slot."
-          >
-            <View style={styles.finalizingCard}>
-              <ActivityIndicator color={colors.nightBlack} />
-              <AppText
-                variant="subtitle"
-                style={styles.finalizingTitle}
-                accessible={false}
-              >
-                Making your itinerary ready
-              </AppText>
-              <AppText
-                variant="caption"
-                style={styles.finalizingText}
-                accessible={false}
-              >
-                We are choosing the group favorites for each time slot.
-              </AppText>
-            </View>
-          </View>
+          <TransitionOverlay
+            title="Making your itinerary ready"
+            text="We are choosing the group favorites for each time slot."
+          />
+        )}
+
+        {isPreparingVoting && (
+          <TransitionOverlay
+            title="Getting voting ready"
+            text="We are preparing the activities your group can vote on."
+          />
         )}
       </View>
     </SafeAreaView>

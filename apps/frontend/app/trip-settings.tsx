@@ -25,7 +25,12 @@ import {
   ACTION_CARD_HEIGHT,
 } from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
-import { deleteTrip, removeMember, updateTrip } from "@/src/api/trips";
+import {
+  deleteTrip,
+  removeMember,
+  updateTrip,
+  type Trip,
+} from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import Edit from "@/assets/icons/edit.svg";
@@ -150,6 +155,16 @@ function parseIsoToTimeString(value?: string): string {
   return parsed ? dateToTimeString(parsed) : "00:00";
 }
 
+function parseTripDate(value: string | undefined, fallback: Date): Date {
+  if (!value) return fallback;
+
+  const dateOnly = value.split("T")[0];
+  if (!dateOnly) return fallback;
+
+  const parsed = fromDateString(dateOnly);
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+}
+
 function isValidTimeString(value: string): boolean {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
 }
@@ -224,7 +239,7 @@ export default function TripSettingsScreen() {
   const endDate = String(raw.endDate ?? "");
   const membersParam = String(raw.members ?? "");
   const inviteCodeParam = String(raw.inviteCode ?? "");
-  const tripState = String(raw.state ?? "Planning");
+  const initialTripState = (raw.state ?? "Planning") as Trip["state"];
   const planningStartedAt = String(raw.planningStartedAt ?? "");
   const planningEndAt = String(raw.planningEndAt ?? "");
   const votingEndAt = String(raw.votingEndAt ?? "");
@@ -299,6 +314,7 @@ export default function TripSettingsScreen() {
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
   const [codeCopied, setCodeCopied] = useState(false);
+  const [tripState, setTripState] = useState<Trip["state"]>(initialTripState);
 
   const planningStartDate = parseIsoToDate(planningStartedAt);
   const planningEndDate = parseIsoToDate(planningEndAt);
@@ -345,6 +361,41 @@ export default function TripSettingsScreen() {
       time: parseIsoToTimeString(votingEndAt),
     },
   });
+
+  const syncTripResponse = (trip: Trip) => {
+    const nextTripStart = parseTripDate(trip.start_date, tripStart);
+    const nextTripEnd = parseTripDate(trip.end_date, tripEnd);
+    const nextPlanningStart =
+      parseIsoToDate(trip.planning_started_at) ?? nextTripStart;
+    const nextPlanningEnd =
+      parseIsoToDate(trip.planning_end_at) ?? nextTripStart;
+    const nextVotingEnd = parseIsoToDate(trip.voting_end_at) ?? nextTripEnd;
+
+    setTripState(trip.state);
+    setTripName(trip.title);
+    setTripNameInput(trip.title);
+    setDestination(trip.destination);
+    setDestinationInput(trip.destination);
+    setTripStart(nextTripStart);
+    setTripEnd(nextTripEnd);
+    setPhaseDates({
+      planning: {
+        start: nextPlanningStart,
+        end: nextPlanningEnd,
+        time: parseIsoToTimeString(trip.planning_end_at),
+      },
+      voting: {
+        start: nextPlanningEnd,
+        end: nextVotingEnd,
+        time: parseIsoToTimeString(trip.voting_end_at),
+      },
+      final: {
+        start: nextVotingEnd,
+        end: nextVotingEnd,
+        time: parseIsoToTimeString(trip.voting_end_at),
+      },
+    });
+  };
 
   const [tempPhaseTime, setTempPhaseTime] = useState("12:00");
 
@@ -445,21 +496,12 @@ export default function TripSettingsScreen() {
     if (!idToken) return;
     try {
       setIsUpdatingName(true);
-      await updateTrip({
+      const updatedTrip = await updateTrip({
         idToken,
         tripId,
-        start_date: toLocalDateString(tripStart),
-        end_date: toLocalDateString(tripEnd),
-        planning_end_at: combineDateAndTime(
-          phaseDates.planning.end,
-          phaseDates.planning.time
-        ),
-        voting_end_at: combineDateAndTime(
-          phaseDates.voting.end,
-          phaseDates.voting.time
-        ),
+        title: tripNameInput.trim(),
       });
-      setTripName(tripNameInput.trim());
+      syncTripResponse(updatedTrip);
       setTripNameUpdated(true);
       safeTimeout(() => {
         setTripNameUpdated(false);
@@ -480,8 +522,12 @@ export default function TripSettingsScreen() {
     if (!idToken) return;
     try {
       setIsUpdatingDestination(true);
-      await updateTrip({ idToken, tripId, destination: destinationInput.trim() });
-      setDestination(destinationInput.trim());
+      const updatedTrip = await updateTrip({
+        idToken,
+        tripId,
+        destination: destinationInput.trim(),
+      });
+      syncTripResponse(updatedTrip);
       setDestinationUpdated(true);
       safeTimeout(() => {
         setDestinationUpdated(false);
@@ -535,7 +581,7 @@ export default function TripSettingsScreen() {
       }
 
       setIsUpdatingDate(true);
-      await updateTrip({
+      const updatedTrip = await updateTrip({
         idToken,
         tripId,
         start_date: toLocalDateString(tripStart),
@@ -549,6 +595,7 @@ export default function TripSettingsScreen() {
           phaseDates.voting.time
         ),
       });
+      syncTripResponse(updatedTrip);
 
       setTripDateUpdated(true);
       safeTimeout(() => {
@@ -837,54 +884,26 @@ export default function TripSettingsScreen() {
           combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
         );
 
-        const safeVotingEnd =
-          currentVotingEnd < nextPlanningEnd
-            ? nextPlanningEnd
-            : currentVotingEnd;
+        if (nextPlanningEnd >= currentVotingEnd) {
+          Alert.alert(
+            "Invalid phase order",
+            "Voting end must be after planning end."
+          );
+          return;
+        }
 
-        const payload = {
+        const updatedTrip = await updateTrip({
           idToken,
           tripId,
           start_date: toLocalDateString(tripStart),
           end_date: toLocalDateString(tripEnd),
-          planning_end_at: combineDateAndTime(
-            phaseDates.planning.end,
-            phaseDates.planning.time
-          ),
+          planning_end_at: endAtIso,
           voting_end_at: combineDateAndTime(
             phaseDates.voting.end,
             phaseDates.voting.time
           ),
-        };
-
-        console.log("TRIP SETTINGS PATCH PAYLOAD", payload);
-
-        await updateTrip(payload);
-
-        await updateTrip({
-          idToken,
-          tripId,
-          planning_end_at: combineDateAndTime(phase.end, phase.time),
         });
-
-        setPhaseDates((prev: PhaseDates) => ({
-          ...prev,
-          planning: {
-            ...prev.planning,
-            end: phase.end,
-            time: phase.time,
-          },
-          voting: {
-            ...prev.voting,
-            start: phase.end,
-            end: safeVotingEnd,
-          },
-          final: {
-            ...prev.final,
-            start: safeVotingEnd,
-            end: safeVotingEnd,
-          },
-        }));
+        syncTripResponse(updatedTrip);
       }
 
       if (phaseId === "voting") {
@@ -905,21 +924,18 @@ export default function TripSettingsScreen() {
           );
           return;
         }
-        await updateTrip({
+        const updatedTrip = await updateTrip({
           idToken,
           tripId,
+          start_date: toLocalDateString(tripStart),
+          end_date: toLocalDateString(tripEnd),
+          planning_end_at: combineDateAndTime(
+            phaseDates.planning.end,
+            phaseDates.planning.time
+          ),
           voting_end_at: combineDateAndTime(phase.end, phase.time),
         });
-        setPhaseDates((prev: PhaseDates) => ({
-          ...prev,
-          voting: { ...prev.voting, end: phase.end, time: phase.time },
-          final: {
-            ...prev.final,
-            start: phase.end,
-            end: phase.end,
-            time: phase.time,
-          },
-        }));
+        syncTripResponse(updatedTrip);
       }
 
       setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
