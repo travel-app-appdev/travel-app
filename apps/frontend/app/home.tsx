@@ -1,16 +1,17 @@
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Animated, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
-import { colors, spacing, radius, typography, shadows } from "@/src/theme";
+import { colors, spacing, radius, typography } from "@/src/theme";
 import { fetchMyTrips, type Trip } from "@/src/api/trips";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
+import { useEffect, useRef } from "react";
 
 type Tab = "your" | "past";
 
@@ -134,6 +135,53 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
   };
 }
 
+// Skeleton shimmer animation
+function SkeletonCard() {
+  const shimmer = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmer, {
+          toValue: 0,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [shimmer]);
+
+  const opacity = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 0.7],
+  });
+
+  return (
+    <Animated.View style={[styles.skeletonCard, { opacity }]}>
+      <View style={styles.skeletonTitleRow}>
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonBadge} />
+      </View>
+      <View style={styles.skeletonMiddleRow}>
+        <View style={styles.skeletonDestination} />
+        <View style={styles.skeletonDate} />
+      </View>
+      <View style={styles.skeletonBottomRow}>
+        <View style={styles.skeletonAvatars}>
+          <View style={styles.skeletonAvatar} />
+          <View style={[styles.skeletonAvatar, { marginLeft: -10 }]} />
+          <View style={[styles.skeletonAvatar, { marginLeft: -10 }]} />
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("your");
@@ -143,6 +191,7 @@ export default function HomeScreen() {
   const [pastTrips, setPastTrips] = useState<TripCardItem[]>(
     tripsCache?.pastTrips ?? []
   );
+  const [isLoading, setIsLoading] = useState(!tripsCache);
   const router = useRouter();
 
   const loadTrips = useCallback(async () => {
@@ -151,6 +200,7 @@ export default function HomeScreen() {
         setYourTrips([]);
         setPastTrips([]);
         tripsCache = null;
+        setIsLoading(false);
         return;
       }
 
@@ -181,6 +231,8 @@ export default function HomeScreen() {
       console.error("Error loading trips:", error);
       setYourTrips([]);
       setPastTrips([]);
+    } finally {
+      setIsLoading(false);
     }
   }, [user]);
 
@@ -189,6 +241,9 @@ export default function HomeScreen() {
       if (tripsCache) {
         setYourTrips(tripsCache.yourTrips);
         setPastTrips(tripsCache.pastTrips);
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
       }
       void loadTrips();
     }, [loadTrips])
@@ -318,8 +373,14 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Trip Cards or Empty State */}
-        {trips.length > 0 ? (
+        {/* Trip Cards, Skeletons, or Empty State */}
+        {isLoading ? (
+          <View style={styles.tripList}>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
+        ) : trips.length > 0 ? (
           <View style={styles.tripList}>
             {trips.map((trip: TripCardItem) => (
               <TripCard
@@ -440,7 +501,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.displayMd,
     color: colors.sunsetOrange,
     textAlign: "center",
-    ...shadows.displayTitle,
   },
   subtitleRow: {
     flexDirection: "row",
@@ -521,5 +581,74 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 260,
     lineHeight: typography.lineHeight.md,
+  },
+
+  // Skeleton styles — match TripCard dimensions
+  skeletonCard: {
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.sm,
+    minHeight: 148,
+    backgroundColor: colors.grayedOut,
+  },
+  skeletonTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  skeletonTitle: {
+    flex: 1,
+    height: 20,
+    borderRadius: radius.sm,
+    backgroundColor: colors.textMuted,
+    opacity: 0.4,
+    maxWidth: "60%",
+  },
+  skeletonBadge: {
+    width: 64,
+    height: 22,
+    borderRadius: radius.pill,
+    backgroundColor: colors.textMuted,
+    opacity: 0.4,
+  },
+  skeletonMiddleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  skeletonDestination: {
+    flex: 1,
+    height: 14,
+    borderRadius: radius.sm,
+    backgroundColor: colors.textMuted,
+    opacity: 0.3,
+    maxWidth: "45%",
+  },
+  skeletonDate: {
+    width: 80,
+    height: 14,
+    borderRadius: radius.sm,
+    backgroundColor: colors.textMuted,
+    opacity: 0.3,
+  },
+  skeletonBottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing.xs,
+  },
+  skeletonAvatars: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  skeletonAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.textMuted,
+    opacity: 0.35,
+    borderWidth: 2,
+    borderColor: colors.lightWhite,
   },
 });
