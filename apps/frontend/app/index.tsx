@@ -36,10 +36,15 @@ export default function StartPage() {
 
   const [dimensions, setDimensions] = useState(() => Dimensions.get("window"));
   const [svgDimensions] = useState(() => Dimensions.get("window"));
+  const [isLandscape, setIsLandscape] = useState(() => {
+    const { width, height } = Dimensions.get("window");
+    return width > height;
+  });
 
   useEffect(() => {
     const subscription = Dimensions.addEventListener("change", ({ window }) => {
       setDimensions(window);
+      setIsLandscape(window.width > window.height);
     });
     return () => subscription.remove();
   }, []);
@@ -121,13 +126,15 @@ export default function StartPage() {
         <PalmLeaf width={palmLeafSize} height={palmLeafSize} />
       </View>
 
-      <View
-        style={[styles.curlyGreenWrapper, { pointerEvents: "none" }]}
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
-      >
-        <CurlyGreen width={SCREEN_WIDTH * 1.1} height={SCREEN_WIDTH * 1.1} />
-      </View>
+      {!isLandscape && (
+        <View
+          style={[styles.curlyGreenWrapper, { pointerEvents: "none" }]}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
+          <CurlyGreen width={SCREEN_WIDTH * 1.1} height={SCREEN_WIDTH * 1.1} />
+        </View>
+      )}
 
       <ScrollView
         contentContainerStyle={[
