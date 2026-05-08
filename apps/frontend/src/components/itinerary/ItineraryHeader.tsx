@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { formatTripDateRange } from "@/src/utils/itinerary/formatTripToDateRange";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { ItineraryState } from "@/src/types/itinerary";
 
 import Back from "@/assets/icons/back.svg";
@@ -59,15 +60,15 @@ export function ItineraryHeader({
 }: Props) {
   const heroColor = getHeroColor(state);
   const Mascot = getMascotByState(state);
+  const handleBack = useSinglePress(onBackPress);
 
   return (
     <View style={styles.wrapper}>
       <View style={[styles.hero, { backgroundColor: heroColor }]}>
         <View style={styles.topRow}>
 
-          {/* Back button — now a Pressable wired to onBackPress */}
           <Pressable
-            onPress={onBackPress}
+            onPress={handleBack}
             accessibilityRole="button"
             accessibilityLabel="Go back"
             style={styles.backButton}
@@ -75,7 +76,6 @@ export function ItineraryHeader({
             <Back width={20} height={20} />
           </Pressable>
 
-          {/* Timer — decorative icon hidden, text grouped */}
           <View
             style={styles.timerBox}
             accessible={true}
@@ -100,7 +100,6 @@ export function ItineraryHeader({
 
         <View style={styles.heroContent}>
 
-          {/* Mascot — purely decorative */}
           <Mascot
             width={64}
             height={64}
@@ -108,13 +107,11 @@ export function ItineraryHeader({
             importantForAccessibility="no-hide-descendants"
           />
 
-          {/* Trip title and destination */}
           <View style={styles.textBlock}>
             <AppText variant="title" style={styles.title}>
               {title}
             </AppText>
 
-            {/* LocationPin is decorative — destination text carries the meaning */}
             <View
               style={styles.destinationRow}
               accessible={true}
@@ -132,7 +129,6 @@ export function ItineraryHeader({
             </View>
           </View>
 
-          {/* Date badge — calendar icon is decorative */}
           <View
             style={styles.dateBadge}
             accessible={true}

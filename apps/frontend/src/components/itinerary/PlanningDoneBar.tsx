@@ -1,6 +1,8 @@
+import { useCallback } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, spacing, typography } from "@/src/theme";
+import { PressLock } from "@/src/utils/PressLock";
 
 import CheckIcon from "@/assets/icons/check_mark.svg";
 import InfoIcon from "@/assets/icons/info.svg";
@@ -20,12 +22,27 @@ export function PlanningDoneBar({
 }: Props) {
   const isDisabled = checked || disabled;
 
+  const handlePress = useCallback(() => {
+    if (isDisabled) return;
+    if (!PressLock.acquire()) return;
+    Promise.resolve()
+      .then(() => onPress())
+      .finally(() => setTimeout(() => PressLock.release(), 500));
+  }, [onPress, isDisabled]);
+
+  const handleInfoPress = useCallback(() => {
+    if (!PressLock.acquire()) return;
+    Promise.resolve()
+      .then(() => onInfoPress())
+      .finally(() => setTimeout(() => PressLock.release(), 300));
+  }, [onInfoPress]);
+
   return (
     <View style={[styles.wrapper, { pointerEvents: "box-none" }]}>
       <View style={styles.footer}>
         <Pressable
           style={[styles.doneButton, checked && styles.doneButtonChecked]}
-          onPress={onPress}
+          onPress={handlePress}
           disabled={isDisabled}
           accessibilityRole="button"
           accessibilityLabel={
@@ -46,7 +63,7 @@ export function PlanningDoneBar({
 
         <Pressable
           style={styles.infoButton}
-          onPress={onInfoPress}
+          onPress={handleInfoPress}
           accessibilityRole="button"
           accessibilityLabel="Show planning submission info"
         >

@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity } from "@/src/types/itinerary";
 
 import LocationIcon from "@/assets/icons/location.svg";
@@ -16,6 +17,8 @@ type Props = {
 };
 
 export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
+  const handleJoin = useSinglePress(() => onJoinGroup?.(activity!.id));
+
   if (!activity) {
     return (
       <View style={styles.emptyRow}>
@@ -41,7 +44,6 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
   return (
     <View style={styles.row}>
       <View style={styles.card}>
-        {/* Time label row — icon is decorative */}
         <View
           style={styles.timeRow}
           accessible={false}
@@ -53,12 +55,10 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
           </AppText>
         </View>
 
-        {/* Activity name */}
         <AppText variant="subtitle" style={styles.name}>
           {activity.name}
         </AppText>
 
-        {/* Address row — icon is decorative */}
         <View
           style={styles.addressRow}
           accessible={false}
@@ -70,7 +70,6 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
           </AppText>
         </View>
 
-        {/* Google Link row — icon is decorative */}
         {activity.googleMapsUrl ? (
           <View
             style={styles.googleRow}
@@ -84,7 +83,6 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
           </View>
         ) : null}
 
-        {/* Joined count row — icon is decorative */}
         <View
           style={styles.joinedRow}
           accessible={false}
@@ -97,9 +95,8 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
         </View>
       </View>
 
-      {/* Join CTA */}
       <Pressable
-        onPress={() => onJoinGroup?.(activity.id)}
+        onPress={handleJoin}
         style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
         accessibilityRole="button"
         accessibilityLabel={
@@ -138,7 +135,6 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
 }
 
 const styles = StyleSheet.create({
-  // Empty state
   emptyRow: {
     flexDirection: "row",
   },
@@ -168,7 +164,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xl,
     lineHeight: typography.lineHeight.xl,
   },
-  // Filled state
   row: {
     flexDirection: "row",
     gap: spacing.md,
@@ -227,7 +222,6 @@ const styles = StyleSheet.create({
   joinedCount: {
     color: colors.textMuted,
   },
-  // CTA
   cta: {
     width: 72,
     borderRadius: radius.xl,

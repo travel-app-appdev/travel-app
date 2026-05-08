@@ -1,9 +1,9 @@
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "./AppText";
 import { colors, spacing, radius, typography } from "@/src/theme";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import Edit from "@/assets/icons/edit.svg";
 import InfoIcon from "@/assets/icons/info.svg";
-import SettingIcon from "@/assets/icons/settings.svg";
 
 type TripStatus = "planning" | "voting" | "final";
 type TripRole = "admin" | "member";
@@ -56,17 +56,19 @@ export function TripCard({
   const statusStyle = STATUS_COLORS[status];
   const statusLabel = STATUS_LABELS[status];
 
+  const handleCardPress = useSinglePress(onPress ?? (() => {}));
+  const handleIconPress = useSinglePress(onIconPress ?? (() => {}));
+
   return (
     <Pressable
       style={[styles.card, { backgroundColor: cardColor }]}
-      onPress={onPress}
+      onPress={handleCardPress}
       accessibilityRole="button"
       accessibilityLabel={`${title}, ${destination}, ${startDate} to ${endDate}, ${statusLabel}`}
       accessibilityHint={
         role === "admin" ? "Opens trip itinerary" : "Opens trip itinerary"
       }
     >
-      {/* Row 1: title + status badge — both decorative, card label covers them */}
       <View
         style={styles.titleRow}
         accessible={false}
@@ -83,7 +85,6 @@ export function TripCard({
         </View>
       </View>
 
-      {/* Row 2: destination + date — decorative, card label covers them */}
       <View
         style={styles.middleRow}
         accessible={false}
@@ -98,10 +99,7 @@ export function TripCard({
         </AppText>
       </View>
 
-      {/* Row 3: avatars + icon button */}
       <View style={styles.bottomRow}>
-
-        {/* Avatars — decorative, member count not critical for navigation */}
         <View
           style={styles.avatars}
           accessible={false}
@@ -125,12 +123,6 @@ export function TripCard({
           ))}
         </View>
 
-        {/*
-          Fix 6: replaced the View + onStartShouldSetResponder pattern with a
-          proper Pressable on mobile and a plain View on web to avoid the
-          nested button error. The Pressable has a large enough hit area and
-          stopPropagation so tapping it doesn't also fire the card's onPress.
-        */}
         {Platform.OS === "web" ? (
           <View
             style={styles.iconButton}
@@ -143,7 +135,7 @@ export function TripCard({
             onStartShouldSetResponder={() => true}
             onResponderGrant={(e) => {
               e.stopPropagation();
-              onIconPress?.();
+              handleIconPress();
             }}
           >
             {role === "admin" ? (
@@ -157,7 +149,7 @@ export function TripCard({
             style={styles.iconButton}
             onPress={(e) => {
               e.stopPropagation();
-              onIconPress?.();
+              handleIconPress();
             }}
             accessibilityRole="button"
             accessibilityLabel={role === "admin" ? "Edit trip" : "Trip information"}
@@ -205,7 +197,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radius.md,
     alignSelf: "flex-start",
-    },
+  },
   badgeText: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.sm,

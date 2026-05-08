@@ -8,6 +8,7 @@ import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
 import { colors, spacing, radius, typography, shadows } from "@/src/theme";
 import { fetchMyTrips, type Trip } from "@/src/api/trips";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
@@ -196,6 +197,10 @@ export default function HomeScreen() {
 
   const trips = activeTab === "your" ? yourTrips : pastTrips;
 
+  const handleProfile = useSinglePress(() => router.push("/profile"));
+  const handleYourTab = useSinglePress(() => setActiveTab("your"));
+  const handlePastTab = useSinglePress(() => setActiveTab("past"));
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
@@ -204,11 +209,10 @@ export default function HomeScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Row */}
         <View style={styles.headerRow}>
           <Pressable
             style={styles.profileButton}
-            onPress={() => router.push("/profile")}
+            onPress={handleProfile}
             accessibilityRole="button"
             accessibilityLabel="Go to profile"
             accessibilityHint="Opens your profile screen"
@@ -220,7 +224,6 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Title */}
         <View style={styles.titleBlock}>
           <AppText variant="title" style={styles.helloText}>
             Helloooo
@@ -238,7 +241,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Action Cards */}
         <View style={styles.actionRow}>
           <Link href="/create-trip" asChild>
             <Pressable
@@ -273,10 +275,9 @@ export default function HomeScreen() {
           </Link>
         </View>
 
-        {/* Tabs */}
         <View style={styles.tabRow}>
           <Pressable
-            onPress={() => setActiveTab("your")}
+            onPress={handleYourTab}
             style={styles.tabItem}
             accessibilityRole="button"
             accessibilityLabel="Show your trips"
@@ -297,7 +298,7 @@ export default function HomeScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => setActiveTab("past")}
+            onPress={handlePastTab}
             style={styles.tabItem}
             accessibilityRole="button"
             accessibilityLabel="Show past trips"
@@ -318,7 +319,6 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Trip Cards or Empty State */}
         {trips.length > 0 ? (
           <View style={styles.tripList}>
             {trips.map((trip: TripCardItem) => (

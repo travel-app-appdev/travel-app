@@ -1,5 +1,4 @@
-// components/common/AppButton.tsx
-import { ReactNode } from "react";
+import { ReactNode, useCallback } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
 } from "react-native";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { AppText } from "./AppText";
+import { PressLock } from "@/src/utils/PressLock";
 
 type AppButtonProps = {
   title: string;
@@ -38,6 +38,14 @@ export function AppButton({
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
 
+  const handlePress = useCallback(() => {
+    if (isDisabled) return;
+    if (!PressLock.acquire()) return;
+    Promise.resolve()
+      .then(() => onPress())
+      .finally(() => setTimeout(() => PressLock.release(), 500));
+  }, [onPress, isDisabled]);
+
   return (
     <Pressable
       style={({ pressed }) => [
@@ -47,7 +55,7 @@ export function AppButton({
         pressed && !isDisabled && styles.pressedButton,
         style,
       ]}
-      onPress={onPress}
+      onPress={handlePress}
       disabled={isDisabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}

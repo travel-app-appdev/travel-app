@@ -1,6 +1,8 @@
+import { useCallback } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity, TimeSlot } from "@/src/types/itinerary";
 
 import LocationHeart from "@/assets/icons/location-heart.svg";
@@ -26,23 +28,22 @@ export function PlanningSlotCard({
 }: Props) {
   const hasActivity = Boolean(activity);
 
-  function handlePress() {
+  const handlePressRaw = useCallback(() => {
     if (disabled) return;
-
     if (activity) {
       onEditActivity(activity);
       return;
     }
-
     onAddActivity(slot.id);
-  }
+  }, [disabled, activity, onEditActivity, onAddActivity, slot.id]);
+
+  const handlePress = useSinglePress(handlePressRaw);
 
   return (
     <View style={styles.row}>
       <View style={[styles.card, hasActivity && styles.filledCard]}>
         {hasActivity ? (
           <>
-            {/* Time label row — icon is decorative */}
             <View
               style={styles.timeRow}
               accessible={false}
@@ -62,7 +63,6 @@ export function PlanningSlotCard({
               {activity?.name}
             </AppText>
 
-            {/* Address row — icon is decorative */}
             {!!activity?.address && (
               <View
                 style={styles.infoRow}
@@ -86,7 +86,6 @@ export function PlanningSlotCard({
               </View>
             )}
 
-            {/* Google Maps link row — icon is decorative */}
             {!!activity?.googleMapsUrl && (
               <View
                 style={styles.infoRow}
@@ -133,7 +132,6 @@ export function PlanningSlotCard({
         )}
       </View>
 
-      {/* CTA button — full slot context in label */}
       <Pressable
         onPress={handlePress}
         style={({ pressed }) => [
@@ -156,7 +154,6 @@ export function PlanningSlotCard({
         }
         accessibilityState={{ disabled }}
       >
-        {/* Icon and label text are decorative — the accessibilityLabel above carries the full meaning */}
         <View
           accessible={false}
           importantForAccessibility="no-hide-descendants"
@@ -188,7 +185,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     alignItems: "stretch",
   },
-
   card: {
     flex: 1,
     minHeight: CARD_HEIGHT,
@@ -200,31 +196,26 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     overflow: "hidden",
   },
-
   filledCard: {
     borderColor: colors.nightBlack,
   },
-
   filledContent: {
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
   },
-
   timeRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
     marginBottom: 2,
   },
-
   filledTimeLabel: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
   },
-
   activityTitle: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
@@ -232,14 +223,12 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.lg,
     marginBottom: 2,
   },
-
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
     marginTop: 1,
   },
-
   infoText: {
     flex: 1,
     color: colors.nightBlack,
@@ -247,7 +236,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
   },
-
   linkText: {
     flex: 1,
     color: colors.nightBlack,
@@ -256,32 +244,27 @@ const styles = StyleSheet.create({
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
   },
-
   timeLabel: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.lg,
     lineHeight: typography.lineHeight.lg,
   },
-
   emptyContent: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xs,
   },
-
   emptyIconWrapper: {
     opacity: 0.35,
   },
-
   emptyTitle: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.xl,
     lineHeight: typography.lineHeight.xl,
   },
-
   cta: {
     width: 92,
     minHeight: CARD_HEIGHT,
@@ -292,23 +275,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     gap: spacing.xs,
   },
-
   addCta: {
     backgroundColor: colors.beachYellow,
   },
-
   editCta: {
     backgroundColor: colors.border,
   },
-
   ctaPressed: {
     opacity: 0.85,
   },
-
   ctaDisabled: {
     opacity: 0.5,
   },
-
   ctaText: {
     color: colors.nightBlack,
     textAlign: "center",
