@@ -24,6 +24,7 @@ import Back from "@/assets/icons/back.svg";
 import { createActivity, updateActivity } from "@/src/services/activityService";
 import { useAuth } from "@/src/context/AuthContext";
 import { auth } from "@/src/lib/firebase";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 function splitSlotId(value?: string) {
   if (!value) return { dayId: undefined, slotId: undefined };
@@ -59,6 +60,9 @@ export default function AddActivityScreen() {
     initialDescription,
     initialAddress,
     initialGoogleMapsUrl,
+    planningEndAt,
+    votingEndAt,
+    selectedDay,
   } = useLocalSearchParams<{
     tripId?: string;
     title?: string;
@@ -75,6 +79,9 @@ export default function AddActivityScreen() {
     initialDescription?: string;
     initialAddress?: string;
     initialGoogleMapsUrl?: string;
+    planningEndAt?: string;
+    votingEndAt?: string;
+    selectedDay?: string;
   }>();
 
   const isEditMode = useMemo(() => Boolean(activityId), [activityId]);
@@ -135,6 +142,9 @@ export default function AddActivityScreen() {
         newActivityDescription: nextActivity.description,
         newActivityAddress: nextActivity.address,
         newActivityGoogleMapsUrl: nextActivity.googleMapsUrl,
+        planningEndAt,
+        votingEndAt,
+        selectedDay: nextActivity.dayId ?? selectedDay,
       },
     });
   }
@@ -214,6 +224,9 @@ export default function AddActivityScreen() {
                   state,
                   members,
                   activitiesJson,
+                  planningEndAt,
+                  votingEndAt,
+                  selectedDay: selectedDay ?? dayId,
                 },
               })
             }
@@ -238,8 +251,7 @@ export default function AddActivityScreen() {
           <View style={styles.fields}>
             <View style={styles.fieldGroup}>
               <View style={styles.labelRow}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...hiddenFromAccessibility}
               >
                 <TextStyle width={24} height={24} />
                 <AppText variant="body" style={styles.label}>
@@ -260,8 +272,7 @@ export default function AddActivityScreen() {
 
             <View style={styles.fieldGroup}>
               <View style={styles.labelRow}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...hiddenFromAccessibility}
               >
                 <EditIcon width={24} height={24} />
                 <AppText variant="body" style={styles.label}>
@@ -284,8 +295,7 @@ export default function AddActivityScreen() {
 
             <View style={styles.fieldGroup}>
               <View style={styles.labelRow}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...hiddenFromAccessibility}
               >
                 <LocationIcon width={24} height={24} />
                 <AppText variant="body" style={styles.label}>
@@ -306,8 +316,7 @@ export default function AddActivityScreen() {
  
             <View style={styles.fieldGroup}>
               <View style={styles.labelRow}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...hiddenFromAccessibility}
               >
                 <GoogleIcon width={24} height={24} />
                 <AppText variant="body" style={styles.label}>

@@ -4,6 +4,7 @@ import { colors, spacing, radius, typography } from "@/src/theme";
 import Edit from "@/assets/icons/edit.svg";
 import InfoIcon from "@/assets/icons/info.svg";
 import SettingIcon from "@/assets/icons/settings.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type TripStatus = "planning" | "voting" | "final";
 type TripRole = "admin" | "member";
@@ -69,8 +70,7 @@ export function TripCard({
       {/* Row 1: title + status badge — both decorative, card label covers them */}
       <View
         style={styles.titleRow}
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
+        {...hiddenFromAccessibility}
       >
         <AppText variant="title" style={styles.title} numberOfLines={2}>
           {title}
@@ -86,8 +86,7 @@ export function TripCard({
       {/* Row 2: destination + date — decorative, card label covers them */}
       <View
         style={styles.middleRow}
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
+        {...hiddenFromAccessibility}
       >
         <AppText variant="caption" style={styles.destination} numberOfLines={1}>
           {destination}
@@ -104,8 +103,7 @@ export function TripCard({
         {/* Avatars — decorative, member count not critical for navigation */}
         <View
           style={styles.avatars}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          {...hiddenFromAccessibility}
         >
           {members.slice(0, 4).map((member, index) => (
             <View

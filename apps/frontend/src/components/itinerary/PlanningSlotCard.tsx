@@ -8,6 +8,7 @@ import LocationPin from "@/assets/icons/location-pin.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import AddIcon from "@/assets/icons/add.svg";
 import EditIcon from "@/assets/icons/edit.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
   slot: TimeSlot;
@@ -45,8 +46,7 @@ export function PlanningSlotCard({
             {/* Time label row — icon is decorative */}
             <View
               style={styles.timeRow}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...hiddenFromAccessibility}
             >
               <LocationHeart width={24} height={24} />
               <AppText variant="body" style={styles.filledTimeLabel}>
@@ -72,8 +72,7 @@ export function PlanningSlotCard({
                 <LocationPin
                   width={20}
                   height={20}
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 />
                 <AppText
                   variant="body"
@@ -96,8 +95,7 @@ export function PlanningSlotCard({
                 <GoogleIcon
                   width={20}
                   height={20}
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 />
                 <AppText
                   variant="body"
@@ -119,8 +117,7 @@ export function PlanningSlotCard({
             <View style={styles.emptyContent}>
               <View
                 style={styles.emptyIconWrapper}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+                {...hiddenFromAccessibility}
               >
                 <LocationHeart width={24} height={24} />
               </View>
@@ -158,8 +155,7 @@ export function PlanningSlotCard({
       >
         {/* Icon and label text are decorative — the accessibilityLabel above carries the full meaning */}
         <View
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          {...hiddenFromAccessibility}
         >
           {hasActivity ? (
             <EditIcon width={36} height={36} />

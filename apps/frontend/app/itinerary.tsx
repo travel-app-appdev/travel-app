@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   findNodeHandle,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,7 +34,7 @@ import { PlanningDoneBar } from "@/src/components/itinerary/PlanningDoneBar";
 import { VotingSlotCard } from "@/src/components/itinerary/VoteSlotCard";
 import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
-import { finishPlanning } from "@/src/api/trips";
+import { fetchMyTrips, finishPlanning } from "@/src/api/trips";
 import {
   getActivitiesBySlot,
   getFinalItineraryActivities,
@@ -180,16 +181,35 @@ function getIntroText(state: ItineraryState): string {
   }
 }
 
-function getDaysLeftText(state: ItineraryState): string {
-  switch (state) {
-    case "voting":
-      return "3 days";
-    case "final":
-      return "0 days";
-    case "planning":
-    default:
-      return "73 days";
+function getTimerText(deadline?: string): string {
+  if (!deadline) return "0 days";
+
+  const deadlineDate = new Date(deadline);
+  if (Number.isNaN(deadlineDate.getTime())) return "0 days";
+
+  const msLeft = deadlineDate.getTime() - Date.now();
+  if (msLeft <= 0) return "0 hours";
+
+  const hourMs = 1000 * 60 * 60;
+  const dayMs = hourMs * 24;
+
+  if (msLeft < dayMs) {
+    const hours = Math.max(1, Math.ceil(msLeft / hourMs));
+    return hours === 1 ? "1 hour" : `${hours} hours`;
   }
+
+  const days = Math.ceil(msLeft / dayMs);
+  return days === 1 ? "1 day" : `${days} days`;
+}
+
+function getActiveTimerText(
+  state: ItineraryState,
+  planningEndAt?: string,
+  votingEndAt?: string
+): string {
+  if (state === "planning") return getTimerText(planningEndAt);
+  if (state === "voting") return getTimerText(votingEndAt);
+  return "0 days";
 }
 
 export default function ItineraryScreen() {
@@ -212,6 +232,9 @@ export default function ItineraryScreen() {
     newActivityDescription,
     newActivityAddress,
     newActivityGoogleMapsUrl,
+    planningEndAt,
+    votingEndAt,
+    selectedDay,
   } = useLocalSearchParams<{
     tripId?: string;
     state?: "planning" | "voting" | "final";
@@ -228,6 +251,9 @@ export default function ItineraryScreen() {
     newActivityDescription?: string;
     newActivityAddress?: string;
     newActivityGoogleMapsUrl?: string;
+    planningEndAt?: string;
+    votingEndAt?: string;
+    selectedDay?: string;
   }>();
 
   const routeState: ItineraryState | undefined =
@@ -282,20 +308,38 @@ export default function ItineraryScreen() {
   const activeState: ItineraryState =
     DEV_FORCE_STATE ?? routeState ?? itinerary.state;
 
+  const [timerDeadlines, setTimerDeadlines] = useState(() => ({
+    planningEndAt,
+    votingEndAt,
+  }));
+
+  const [timerText, setTimerText] = useState(() =>
+    getActiveTimerText(activeState, planningEndAt, votingEndAt)
+  );
+
   const tripDays = useMemo(
     () => generateTripDays(itinerary.startDate, itinerary.endDate),
     [itinerary.startDate, itinerary.endDate]
   );
 
   const [selectedDayId, setSelectedDayId] = useState<string>("");
+  const requestedSelectedDayId = newActivityDayId ?? selectedDay;
 
   useEffect(() => {
+    if (
+      requestedSelectedDayId &&
+      tripDays.some((day) => day.id === requestedSelectedDayId)
+    ) {
+      setSelectedDayId(requestedSelectedDayId);
+      return;
+    }
+
     if (tripDays.length > 0) {
       setSelectedDayId(tripDays[0].id);
     } else {
       setSelectedDayId(itinerary.startDate);
     }
-  }, [tripDays, itinerary.startDate]);
+  }, [tripDays, itinerary.startDate, requestedSelectedDayId]);
 
   useEffect(() => {
     setItinerary((current) => ({
@@ -325,6 +369,59 @@ export default function ItineraryScreen() {
   ]);
 
   useEffect(() => {
+    setTimerDeadlines({
+      planningEndAt,
+      votingEndAt,
+    });
+  }, [planningEndAt, votingEndAt]);
+
+  useEffect(() => {
+    if (!currentUserId || !tripId) return;
+
+    const userId = currentUserId;
+    let isCancelled = false;
+
+    async function refreshTripTimerFields() {
+      try {
+        const trips = await fetchMyTrips(userId);
+        if (isCancelled) return;
+
+        const currentTrip = trips.find((trip) => trip.trip_id === tripId);
+        if (!currentTrip) return;
+
+        setTimerDeadlines({
+          planningEndAt: currentTrip.planning_end_at ?? planningEndAt,
+          votingEndAt: currentTrip.voting_end_at ?? votingEndAt,
+        });
+      } catch (error) {
+        console.log("Could not refresh trip timer:", error);
+      }
+    }
+
+    void refreshTripTimerFields();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentUserId, tripId, planningEndAt, votingEndAt]);
+
+  useEffect(() => {
+    const updateTimer = () => {
+      setTimerText(
+        getActiveTimerText(
+          activeState,
+          timerDeadlines.planningEndAt,
+          timerDeadlines.votingEndAt
+        )
+      );
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [activeState, timerDeadlines]);
+
+  useEffect(() => {
     return () => {
       if (planningInfoTimeoutRef.current) {
         clearTimeout(planningInfoTimeoutRef.current);
@@ -336,11 +433,23 @@ export default function ItineraryScreen() {
   }, []);
 
   useEffect(() => {
-    if (showPlanningInfoPopup && popupRef.current) {
-      const node = findNodeHandle(popupRef.current);
-      if (node) {
-        AccessibilityInfo.setAccessibilityFocus(node);
-      }
+    if (!showPlanningInfoPopup || !popupRef.current) {
+      return;
+    }
+
+    if (Platform.OS === "web") {
+      requestAnimationFrame(() => {
+        const popupElement = popupRef.current as unknown as {
+          focus?: () => void;
+        };
+        popupElement?.focus?.();
+      });
+      return;
+    }
+
+    const node = findNodeHandle(popupRef.current);
+    if (node) {
+      AccessibilityInfo.setAccessibilityFocus(node);
     }
   }, [showPlanningInfoPopup]);
 
@@ -531,7 +640,10 @@ export default function ItineraryScreen() {
         members: planningStatusParam,
         dayId: selectedDayId,
         slotId: `${selectedDayId}_${slotId}`,
+        selectedDay: selectedDayId,
         activitiesJson: JSON.stringify(itinerary.activities),
+        planningEndAt: timerDeadlines.planningEndAt ?? "",
+        votingEndAt: timerDeadlines.votingEndAt ?? "",
       },
     });
   }
@@ -553,12 +665,15 @@ export default function ItineraryScreen() {
         members: planningStatusParam,
         dayId: activity.dayId,
         slotId: activity.slotId,
+        selectedDay: activity.dayId,
         activityId: activity.id,
         initialName: activity.name,
         initialDescription: activity.description ?? "",
         initialAddress: activity.address ?? "",
         initialGoogleMapsUrl: activity.googleMapsUrl ?? "",
         activitiesJson: JSON.stringify(itinerary.activities),
+        planningEndAt: timerDeadlines.planningEndAt ?? "",
+        votingEndAt: timerDeadlines.votingEndAt ?? "",
       },
     });
   }
@@ -825,7 +940,7 @@ export default function ItineraryScreen() {
             startDate={itinerary.startDate}
             endDate={itinerary.endDate}
             introText={getIntroText(activeState)}
-            daysLeftText={getDaysLeftText(activeState)}
+            daysLeftText={timerText}
             onBackPress={() => {
               if (router.canGoBack()) {
                 router.back();
@@ -945,11 +1060,17 @@ export default function ItineraryScreen() {
 
             <View
               ref={popupRef}
-              style={styles.popupWrapper}
+              style={[
+                styles.popupWrapper,
+                Platform.OS === "web"
+                  ? ({ outlineStyle: "none" } as any)
+                  : null,
+              ]}
               accessibilityViewIsModal={true}
               accessible={true}
               accessibilityLiveRegion="assertive"
               accessibilityLabel="You can no longer add activities after submitting."
+              {...(Platform.OS === "web" ? ({ tabIndex: -1 } as any) : {})}
             >
               <View style={styles.popup}>
                 <AppText
