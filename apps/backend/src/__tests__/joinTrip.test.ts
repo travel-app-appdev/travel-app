@@ -1,5 +1,4 @@
 import request from "supertest";
-import app from "../index";
 import { joinTripWithInviteCode } from "../services/tripsService";
 
 jest.mock("../services/tripsService", () => ({
@@ -15,6 +14,9 @@ jest.mock("../services/tripsService", () => ({
 }));
 
 const mockJoinTripWithInviteCode = joinTripWithInviteCode as jest.Mock;
+
+// import AFTER jest.mock
+const app = require("../index").default;
 
 describe("POST /trips/join", () => {
     beforeEach(() => {
