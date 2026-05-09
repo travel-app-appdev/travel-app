@@ -7,7 +7,12 @@ import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
 import { colors, spacing, radius, typography, shadows } from "@/src/theme";
-import { fetchMyTrips, type Trip } from "@/src/api/trips";
+import {
+  fetchMyTrips,
+  getCachedMyTrips,
+  isMyTripsCacheFresh,
+  type Trip,
+} from "@/src/api/trips";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
@@ -134,6 +139,28 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
   };
 }
 
+function mapTripsToCache(backendTrips: TripWithMembers[]): TripsCache {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const upcoming: TripCardItem[] = [];
+  const past: TripCardItem[] = [];
+
+  backendTrips.forEach((trip: TripWithMembers) => {
+    const mappedTrip = mapTripToCardTrip(trip);
+    const tripEndDate = new Date(trip.end_date);
+    tripEndDate.setHours(0, 0, 0, 0);
+
+    if (tripEndDate < today) {
+      past.push(mappedTrip);
+    } else {
+      upcoming.push(mappedTrip);
+    }
+  });
+
+  return { yourTrips: upcoming, pastTrips: past };
+}
+
 export default function HomeScreen() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("your");
@@ -145,6 +172,13 @@ export default function HomeScreen() {
   );
   const router = useRouter();
 
+  const applyTrips = useCallback((backendTrips: TripWithMembers[]) => {
+    const nextCache = mapTripsToCache(backendTrips);
+    tripsCache = nextCache;
+    setYourTrips(nextCache.yourTrips);
+    setPastTrips(nextCache.pastTrips);
+  }, []);
+
   const loadTrips = useCallback(async () => {
     try {
       if (!user) {
@@ -155,43 +189,35 @@ export default function HomeScreen() {
       }
 
       const backendTrips = await fetchMyTrips(user.uid);
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const upcoming: TripCardItem[] = [];
-      const past: TripCardItem[] = [];
-
-      (backendTrips as TripWithMembers[]).forEach((trip: TripWithMembers) => {
-        const mappedTrip = mapTripToCardTrip(trip);
-        const tripEndDate = new Date(trip.end_date);
-        tripEndDate.setHours(0, 0, 0, 0);
-
-        if (tripEndDate < today) {
-          past.push(mappedTrip);
-        } else {
-          upcoming.push(mappedTrip);
-        }
-      });
-
-      tripsCache = { yourTrips: upcoming, pastTrips: past };
-      setYourTrips(upcoming);
-      setPastTrips(past);
+      applyTrips(backendTrips as TripWithMembers[]);
     } catch (error) {
       console.error("Error loading trips:", error);
-      setYourTrips([]);
-      setPastTrips([]);
     }
-  }, [user]);
+  }, [applyTrips, user]);
 
   useFocusEffect(
     useCallback(() => {
+      if (!user) {
+        void loadTrips();
+        return;
+      }
+
+      const cachedTrips = getCachedMyTrips(user.uid);
+      if (cachedTrips) {
+        applyTrips(cachedTrips as TripWithMembers[]);
+      }
+
       if (tripsCache) {
         setYourTrips(tripsCache.yourTrips);
         setPastTrips(tripsCache.pastTrips);
       }
+
+      if (isMyTripsCacheFresh(user.uid)) {
+        return;
+      }
+
       void loadTrips();
-    }, [loadTrips])
+    }, [applyTrips, loadTrips, user])
   );
 
   const trips = activeTab === "your" ? yourTrips : pastTrips;
@@ -344,6 +370,8 @@ export default function HomeScreen() {
                       startDate: trip.rawStartDate,
                       endDate: trip.rawEndDate,
                       members: JSON.stringify(trip.members),
+                      planningEndAt: trip.planningEndAt ?? "",
+                      votingEndAt: trip.votingEndAt ?? "",
                     },
                   });
                 }}

@@ -40,6 +40,7 @@ import CheckMark from "@/assets/icons/check_mark.svg";
 import VisibilityOn from "@/assets/icons/visibility_on.svg";
 import VisibilityOff from "@/assets/icons/visibility_off.svg";
 import Exit from "@/assets/icons/exit.svg";
+import { hiddenFromAccessibility, nativeImportantForAccessibility } from "@/src/utils/accessibility";
 
 export default function ProfileScreen() {
   const { user, setUser } = useAuth();
@@ -64,11 +65,21 @@ export default function ProfileScreen() {
   const logoutRef = useRef<View>(null);
 
   function skipToLogout() {
-    if (logoutRef.current) {
-      const node = findNodeHandle(logoutRef.current);
-      if (node) {
-        AccessibilityInfo.setAccessibilityFocus(node);
-      }
+    if (!logoutRef.current) {
+      return;
+    }
+
+    if (Platform.OS === "web") {
+      const logoutElement = logoutRef.current as unknown as {
+        focus?: () => void;
+      };
+      logoutElement?.focus?.();
+      return;
+    }
+
+    const node = findNodeHandle(logoutRef.current);
+    if (node) {
+      AccessibilityInfo.setAccessibilityFocus(node);
     }
   }
 
@@ -252,7 +263,7 @@ export default function ProfileScreen() {
               accessibilityLabel="Skip to logout button"
               accessibilityHint="Moves focus directly to the logout action"
               style={styles.skipButton}
-              importantForAccessibility="yes"
+              {...nativeImportantForAccessibility}
             >
               <AppText variant="caption" style={styles.skipButtonText}>
                 Skip to logout
@@ -264,8 +275,7 @@ export default function ProfileScreen() {
               <BackLink href="/home" />
               <View
                 style={styles.headerTitle}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+                {...hiddenFromAccessibility}
               >
                 <Profile width={20} height={20} />
                 <AppText variant="body" style={styles.headerLabel}>
@@ -291,8 +301,7 @@ export default function ProfileScreen() {
                 <View style={styles.infoLeft}>
                   <View
                     style={styles.infoLabelRow}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <IdCard width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
@@ -308,8 +317,7 @@ export default function ProfileScreen() {
                   </AppText>
                 </View>
                 <View
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   {nameOpen ? (
                     <ArrowUp width={20} height={20} />
@@ -355,8 +363,7 @@ export default function ProfileScreen() {
                   {nameUpdated && (
                     <View
                       style={styles.successRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <CheckMark width={18} height={18} />
                       <AppText
@@ -389,8 +396,7 @@ export default function ProfileScreen() {
                 <View style={styles.infoLeft}>
                   <View
                     style={styles.infoLabelRow}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <Email width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
@@ -406,8 +412,7 @@ export default function ProfileScreen() {
                   </AppText>
                 </View>
                 <View
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   {emailOpen ? (
                     <ArrowUp width={20} height={20} />
@@ -459,8 +464,7 @@ export default function ProfileScreen() {
                   {emailUpdated && (
                     <View
                       style={styles.successRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <CheckMark width={18} height={18} />
                       <AppText
@@ -494,8 +498,7 @@ export default function ProfileScreen() {
                 <View style={styles.infoLeft}>
                   <View
                     style={styles.infoLabelRow}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <KeyFrame width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
@@ -511,8 +514,7 @@ export default function ProfileScreen() {
                   </AppText>
                 </View>
                 <View
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   {passwordOpen ? (
                     <ArrowUp width={20} height={20} />
@@ -555,8 +557,7 @@ export default function ProfileScreen() {
                       }
                     >
                       <View
-                        accessible={false}
-                        importantForAccessibility="no-hide-descendants"
+                        {...hiddenFromAccessibility}
                       >
                         {currentPasswordVisible ? (
                           <VisibilityOff width={24} height={24} />
@@ -595,8 +596,7 @@ export default function ProfileScreen() {
                       }
                     >
                       <View
-                        accessible={false}
-                        importantForAccessibility="no-hide-descendants"
+                        {...hiddenFromAccessibility}
                       >
                         {passwordVisible ? (
                           <VisibilityOff width={24} height={24} />
@@ -633,8 +633,7 @@ export default function ProfileScreen() {
                   {passwordUpdated && (
                     <View
                       style={styles.successRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <CheckMark width={18} height={18} />
                       <AppText
@@ -654,8 +653,12 @@ export default function ProfileScreen() {
           {/* Logout — pinned to bottom, ref attached for skip-to focus — Fix 8 */}
           <SafeAreaView
             edges={["bottom"]}
-            style={styles.logoutSafeArea}
+            style={[
+              styles.logoutSafeArea,
+              Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : null,
+            ]}
             ref={logoutRef}
+            {...(Platform.OS === "web" ? ({ tabIndex: -1 } as any) : {})}
           >
             <View style={styles.logoutWrapper}>
               <ActionCard

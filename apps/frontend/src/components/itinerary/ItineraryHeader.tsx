@@ -11,6 +11,7 @@ import MascotFinal from "@/assets/mascots/mascot-final.svg";
 import CalendarIcon from "@/assets/icons/calendar.svg";
 import HourglassIcon from "@/assets/icons/hourglass.svg";
 import LocationPin from "@/assets/icons/location-pin.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
   title: string;
@@ -53,7 +54,7 @@ export function ItineraryHeader({
   startDate,
   endDate,
   introText,
-  daysLeftText = "73 days",
+  daysLeftText = "0 days",
   onBackPress,
   state = "planning",
 }: Props) {
@@ -84,8 +85,7 @@ export function ItineraryHeader({
             <HourglassIcon
               width={18}
               height={18}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...hiddenFromAccessibility}
             />
             <View accessible={false}>
               <AppText variant="body" style={styles.timerValue}>
@@ -104,8 +104,7 @@ export function ItineraryHeader({
           <Mascot
             width={64}
             height={64}
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
+            {...hiddenFromAccessibility}
           />
 
           {/* Trip title and destination */}
@@ -123,8 +122,7 @@ export function ItineraryHeader({
               <LocationPin
                 width={18}
                 height={18}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+                {...hiddenFromAccessibility}
               />
               <AppText variant="subtitle" style={styles.destination}>
                 {destination}
@@ -141,8 +139,7 @@ export function ItineraryHeader({
             <CalendarIcon
               width={18}
               height={18}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...hiddenFromAccessibility}
             />
             <AppText variant="body" style={styles.dateText}>
               {formatTripDateRange(startDate, endDate)}

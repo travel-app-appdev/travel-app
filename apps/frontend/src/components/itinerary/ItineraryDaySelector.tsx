@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import type { TripDay } from "@/src/types/itinerary";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
   days: TripDay[];
@@ -56,8 +57,7 @@ export function ItineraryDaySelector({
           >
             <View
               style={styles.dayChipInner}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...hiddenFromAccessibility}
             >
               <AppText
                 variant="body"

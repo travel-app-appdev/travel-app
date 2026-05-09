@@ -7,6 +7,7 @@ import LocationIcon from "@/assets/icons/location.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import VoteIcon from "@/assets/icons/voting.svg";
 import CheckIcon from "@/assets/icons/check_mark.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
   activity: Activity;
@@ -22,8 +23,7 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
         {/* Time label — icon is decorative */}
         <View
           style={styles.timeRow}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          {...hiddenFromAccessibility}
         >
           <LocationIcon width={16} height={16} />
           <AppText variant="body" style={styles.timeLabel}>
@@ -45,8 +45,7 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           <LocationIcon
             width={14}
             height={14}
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
+            {...hiddenFromAccessibility}
           />
           <AppText
             variant="caption"
@@ -61,8 +60,7 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
         {activity.googleMapsUrl ? (
           <View
             style={styles.googleRow}
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
+            {...hiddenFromAccessibility}
           >
             <GoogleIcon width={14} height={14} />
             <AppText variant="caption" style={styles.googleLink}>
@@ -97,8 +95,7 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
         accessibilityState={{ selected }}
       >
         <View
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          {...hiddenFromAccessibility}
         >
           {selected ? (
             <CheckIcon width={28} height={28} color={colors.nightBlack} />

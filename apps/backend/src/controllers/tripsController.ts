@@ -335,6 +335,8 @@ export const updateTrip = async (req: Request, res: Response): Promise<void> => 
             res.status(403).json({ error: error.message });
         } else if (error.status === 404) {
             res.status(404).json({ error: error.message });
+        } else if (error.status === 400) {
+            res.status(400).json({ error: error.message });
         } else {
             res.status(401).json({ error: "Invalid token or failed to update trip" });
         }
