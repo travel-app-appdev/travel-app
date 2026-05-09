@@ -64,6 +64,47 @@ function splitBackendSlotId(slotId: string) {
   };
 }
 
+function formatSlotLabel(slotId: string) {
+  return slotId.replace(/_/g, ":");
+}
+
+function selectVoteForActivity(
+  activities: Activity[],
+  dayId: string,
+  slotId: string,
+  activityId: string
+) {
+  return activities.map((activity) => {
+    if (activity.dayId !== dayId || activity.slotId !== slotId) {
+      return activity;
+    }
+
+    const wasSelected = activity.hasCurrentUserVote === true;
+    const isSelected = activity.id === activityId;
+    const voteDelta =
+      isSelected && !wasSelected ? 1 : !isSelected && wasSelected ? -1 : 0;
+
+    return {
+      ...activity,
+      hasCurrentUserVote: isSelected,
+      voteCount: Math.max(0, (activity.voteCount ?? 0) + voteDelta),
+    };
+  });
+}
+
+function updateCachedActivities(
+  tripId: string,
+  updater: (activities: Activity[]) => Activity[]
+) {
+  const prefix = `${tripId}_`;
+
+  activitiesCache.forEach((activities, key) => {
+    if (key.startsWith(prefix)) {
+      activitiesCache.set(key, updater(activities));
+    }
+  });
+}
+
 function mapBackendActivity(
   activity: any,
   fallback: { dayId: string; slotId: string }
@@ -937,10 +978,7 @@ export default function ItineraryScreen() {
       .filter((a) => a.dayId === selectedDayId)
       .forEach((a) => {
         if (!seen.has(a.slotId)) {
-          const formatted = a.slotId
-            .replace(/_/g, ":")
-            .replace(/:(\d{2})$/, "–$1:00");
-          seen.set(a.slotId, formatted);
+          seen.set(a.slotId, formatSlotLabel(a.slotId));
         }
       });
     return Array.from(seen.entries()).map(([slotId, label]) => ({
@@ -985,30 +1023,18 @@ export default function ItineraryScreen() {
         activityId,
       });
 
-      setApiActivities((current) =>
-        current.map((activity) => {
-          if (
-            activity.dayId !== selectedDayId ||
-            activity.slotId !== selectedVotingSlotId
-          ) {
-            return activity;
-          }
-          const wasSelected = activity.hasCurrentUserVote === true;
-          const isSelected = activity.id === activityId;
-          const voteDelta =
-            isSelected && !wasSelected
-              ? 1
-              : !isSelected && wasSelected
-                ? -1
-                : 0;
-          return {
-            ...activity,
-            hasCurrentUserVote: isSelected,
-            voteCount: Math.max(0, (activity.voteCount ?? 0) + voteDelta),
-          };
-        })
-      );
-      setActivityRefreshKey((value) => value + 1);
+      const applyVote = (activities: Activity[]) =>
+        selectVoteForActivity(
+          activities,
+          selectedDayId,
+          selectedVotingSlotId,
+          activityId
+        );
+
+      if (result.voteAccepted !== false) {
+        updateCachedActivities(tripId, applyVote);
+        setApiActivities((current) => applyVote(current));
+      }
 
       if (result.tripState === "Final") {
         setIsPreparingFinalItinerary(true);

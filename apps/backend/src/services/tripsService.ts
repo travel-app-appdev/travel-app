@@ -523,12 +523,14 @@ export async function transitionVotingToFinalIfNeeded(tripId: string): Promise<T
     }
 
     const members = await findAcceptedMembersByTripId(tripId);
+    const votingEnd = parseIsoDate(trip.voting_end_at);
+    const votingEnded = votingEnd ? isPast(votingEnd) : false;
     const completion = await getVotingCompletionStatus(
         tripId,
         members.map((member) => member.user_id)
     );
 
-    if (!completion.isComplete) {
+    if (!completion.isComplete && !votingEnded) {
         return trip;
     }
 

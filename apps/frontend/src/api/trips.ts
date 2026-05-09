@@ -57,10 +57,12 @@ export function isMyTripsCacheFresh(
 export function invalidateMyTripsCache(userId?: string): void {
   if (userId) {
     tripsCache.delete(userId);
+    inFlightTripsRequests.delete(userId);
     return;
   }
 
   tripsCache.clear();
+  inFlightTripsRequests.clear();
 }
 
 async function readApiJson<T>(response: Response): Promise<T | ApiErrorResponse> {
