@@ -1,75 +1,108 @@
-import request from 'supertest';
-import app from '../index';
+import request from "supertest";
+import app from "../index";
+import { joinTripWithInviteCode } from "../services/tripsService";
 
-jest.mock('../config/firebase', () => ({
-    __esModule: true,
-    default: {
-        auth: () => ({
-            verifyIdToken: jest.fn().mockImplementation((token) => {
-                if (token === 'valid-token') {
-                    return Promise.resolve({ uid: 'user-123' });
-                }
-                throw new Error('Invalid token');
-            }),
-        }),
-        firestore: () => ({
-            collection: jest.fn().mockImplementation((collectionName) => ({
-                where: jest.fn().mockReturnThis(),
-                get: jest.fn().mockImplementation(() => {
-                    if (collectionName === 'trips') {
-                        return Promise.resolve({
-                            empty: false,
-                            docs: [{
-                                id: 'trip-123',
-                                data: () => ({
-                                    title: 'Test Trip',
-                                    destination: 'Vienna',
-                                    start_date: '2026-06-01',
-                                    end_date: '2026-06-10',
-                                    state: 'Planning',
-                                }),
-                            }],
-                        });
-                    }
-                    if (collectionName === 'trip_members') {
-                        return Promise.resolve({ empty: true, docs: [] });
-                    }
-                }),
-                doc: jest.fn().mockReturnThis(),
-                set: jest.fn().mockResolvedValue({}),
-            })),
-        }),
-    },
-    db: {},
+jest.mock("../services/tripsService", () => ({
+    getTripsForUser: jest.fn(),
+    createTripForAuthenticatedUser: jest.fn(),
+    createTripForUserWithoutAuth: jest.fn(),
+    joinTripWithInviteCode: jest.fn(),
+    deleteTripForAdmin: jest.fn(),
+    leaveTripForMember: jest.fn(),
+    removeMemberForAdmin: jest.fn(),
+    finishPlanningForMember: jest.fn(),
+    updateTripForAdmin: jest.fn(),
 }));
 
-describe('POST /trips/join', () => {
+const mockJoinTripWithInviteCode = joinTripWithInviteCode as jest.Mock;
 
-    it('should return 400 if fields are missing', async () => {
+describe("POST /trips/join", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it("should return 400 if fields are missing", async () => {
         const res = await request(app)
-            .post('/trips/join')
-            .send({ idToken: 'valid-token' });
+            .post("/trips/join")
+            .send({ idToken: "valid-token" });
 
         expect(res.status).toBe(400);
-        expect(res.body.error).toBe('idToken and inviteCode are required');
+        expect(res.body.error).toBe("idToken and inviteCode are required");
     });
 
-    it('should return 200 and trip data on success', async () => {
+    it("should return 200 and trip data on success", async () => {
+        mockJoinTripWithInviteCode.mockResolvedValue({
+            trip_id: "trip-123",
+            title: "Test Trip",
+            destination: "Vienna",
+            start_date: "2026-06-01",
+            end_date: "2026-06-10",
+            state: "Planning",
+            role: "member",
+        });
+
         const res = await request(app)
-            .post('/trips/join')
+            .post("/trips/join")
             .send({
-                idToken: 'valid-token',
-                inviteCode: 'valid-invite-code',
+                idToken: "valid-token",
+                inviteCode: "valid-invite-code",
             });
 
+        expect(mockJoinTripWithInviteCode).toHaveBeenCalledWith({
+            idToken: "valid-token",
+            inviteCode: "valid-invite-code",
+        });
         expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('trip_id');
-        expect(res.body).toHaveProperty('title');
-        expect(res.body.role).toBe('member');
+        expect(res.body).toHaveProperty("trip_id");
+        expect(res.body).toHaveProperty("title");
+        expect(res.body.role).toBe("member");
     });
 
-    afterAll(done => {
-        done();
+    it("should return 404 if service throws 404", async () => {
+        mockJoinTripWithInviteCode.mockRejectedValueOnce({
+            status: 404,
+            message: "Trip not found",
+        });
+
+        const res = await request(app)
+            .post("/trips/join")
+            .send({
+                idToken: "valid-token",
+                inviteCode: "bad-code",
+            });
+
+        expect(res.status).toBe(404);
+        expect(res.body.error).toBe("Trip not found");
     });
 
+    it("should return 409 if service throws 409", async () => {
+        mockJoinTripWithInviteCode.mockRejectedValueOnce({
+            status: 409,
+            message: "User already joined this trip",
+        });
+
+        const res = await request(app)
+            .post("/trips/join")
+            .send({
+                idToken: "valid-token",
+                inviteCode: "valid-invite-code",
+            });
+
+        expect(res.status).toBe(409);
+        expect(res.body.error).toBe("User already joined this trip");
+    });
+
+    it("should return 401 for other errors", async () => {
+        mockJoinTripWithInviteCode.mockRejectedValueOnce(new Error("Invalid token"));
+
+        const res = await request(app)
+            .post("/trips/join")
+            .send({
+                idToken: "bad-token",
+                inviteCode: "valid-invite-code",
+            });
+
+        expect(res.status).toBe(401);
+        expect(res.body.error).toBe("Invalid token or failed to join trip");
+    });
 });
