@@ -17,9 +17,7 @@ export async function findAcceptedMembershipsByUserId(
         .where("invite_status", "==", "accepted")
         .get();
 
-    return snapshot.docs.map(
-        (doc) => doc.data() as TripMembershipDocument
-    );
+    return snapshot.docs.map((doc) => doc.data() as TripMembershipDocument);
 }
 
 export async function findTripById(tripId: string): Promise<Trip | null> {
@@ -57,9 +55,7 @@ export async function findAcceptedMembersByTripId(
         .where("invite_status", "==", "accepted")
         .get();
 
-    return snapshot.docs.map(
-        (doc) => doc.data() as TripMembershipDocument
-    );
+    return snapshot.docs.map((doc) => doc.data() as TripMembershipDocument);
 }
 
 export async function findUserById(userId: string): Promise<UserDocument | null> {
@@ -83,6 +79,7 @@ export async function createTripWithAdminMembership(data: {
     voting_end_at: string;
 }): Promise<Trip> {
     const db = admin.firestore();
+    const user = await findUserById(data.userId);
 
     const tripRef = db.collection("trips").doc();
     const memberRef = db.collection("trip_members").doc();
@@ -103,9 +100,11 @@ export async function createTripWithAdminMembership(data: {
 
     batch.set(memberRef, {
         user_id: data.userId,
+        user_name: user?.name ?? "Unknown User",
         trip_id: tripRef.id,
         role: "admin",
         invite_status: "accepted",
+        planning_done: false,
     });
 
     await batch.commit();
@@ -124,7 +123,9 @@ export async function createTripWithAdminMembership(data: {
     };
 }
 
-export async function findTripByInviteCode(inviteCode: string): Promise<(Trip & { trip_id: string }) | null> {
+export async function findTripByInviteCode(
+    inviteCode: string
+): Promise<(Trip & { trip_id: string }) | null> {
     const db = admin.firestore();
 
     const snapshot = await db
@@ -151,7 +152,10 @@ export async function findTripByInviteCode(inviteCode: string): Promise<(Trip & 
     };
 }
 
-export async function findMembership(tripId: string, userId: string): Promise<TripMembershipDocument | null> {
+export async function findMembership(
+    tripId: string,
+    userId: string
+): Promise<TripMembershipDocument | null> {
     const db = admin.firestore();
 
     const snapshot = await db
@@ -167,12 +171,15 @@ export async function findMembership(tripId: string, userId: string): Promise<Tr
 
 export async function addTripMember(tripId: string, userId: string): Promise<void> {
     const db = admin.firestore();
+    const user = await findUserById(userId);
 
     await db.collection("trip_members").doc().set({
         user_id: userId,
+        user_name: user?.name ?? "Unknown User",
         trip_id: tripId,
         role: "member",
         invite_status: "accepted",
+        planning_done: false,
     });
 }
 
@@ -187,6 +194,7 @@ export async function createTripWithInviteCode(data: {
     voting_end_at: string;
 }): Promise<Trip> {
     const db = admin.firestore();
+    const user = await findUserById(data.userId);
 
     const tripRef = db.collection("trips").doc();
     const memberRef = db.collection("trip_members").doc();
@@ -208,9 +216,11 @@ export async function createTripWithInviteCode(data: {
 
     batch.set(memberRef, {
         user_id: data.userId,
+        user_name: user?.name ?? "Unknown User",
         trip_id: tripRef.id,
         role: "admin",
         invite_status: "accepted",
+        planning_done: false,
     });
 
     await batch.commit();
@@ -234,11 +244,9 @@ export async function deleteTripById(tripId: string): Promise<void> {
     const db = admin.firestore();
     const batch = db.batch();
 
-    // Delete the trip document
     const tripRef = db.collection("trips").doc(tripId);
     batch.delete(tripRef);
 
-    // Delete all trip_members documents for this trip
     const membersSnapshot = await db
         .collection("trip_members")
         .where("trip_id", "==", tripId)
@@ -284,9 +292,7 @@ export async function markMemberPlanningDone(tripId: string, userId: string): Pr
 export async function updateTripState(tripId: string, state: string): Promise<void> {
     const db = admin.firestore();
     await db.collection("trips").doc(tripId).update({ state });
-    }
-
-// New function to update trip details by admin
+}
 
 export async function updateTripById(
     tripId: string,

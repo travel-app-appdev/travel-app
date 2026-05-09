@@ -41,21 +41,20 @@ export async function getTripsForUser(userId: string): Promise<Trip[]> {
             const trip = await findTripById(membership.trip_id);
             if (!trip) return null;
 
-            const updatedTrip = await advanceTripStateIfNeeded(membership.trip_id);
             const tripMembers = await findAcceptedMembersByTripId(membership.trip_id);
 
-            const members = await Promise.all(
-                tripMembers.map(async (member) => {
-                    const user = await findUserById(member.user_id);
-                    return {
-                        id: member.user_id,
-                        name: user?.name ?? "Unknown User",
-                        role: member.role,
-                        planning_done: member.planning_done ?? false,
-                    };
-                })
-            );
-            return { ...updatedTrip, role: membership.role, members };
+            const members = tripMembers.map((member) => ({
+                id: member.user_id,
+                name: (member as any).user_name ?? "Unknown User",
+                role: member.role,
+                planning_done: member.planning_done ?? false,
+            }));
+
+            return {
+                ...trip,
+                role: membership.role,
+                members,
+            };
         })
     );
 

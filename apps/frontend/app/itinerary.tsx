@@ -345,14 +345,26 @@ export default function ItineraryScreen() {
   }, [showPlanningInfoPopup]);
 
   // Load activities from API
+  // Load activities from API
   useEffect(() => {
     async function loadActivities() {
       if (!tripId || tripDays.length === 0) return;
-      if (activeState === "planning" && (!selectedDayId || !currentUserId)) {
+
+      if (activeState !== "final" && !selectedDayId) {
         return;
       }
 
-      const cacheKey = `${tripId}_${activeState}_${selectedDayId}`;
+      if (activeState === "planning" && !currentUserId) {
+        return;
+      }
+
+      const resolvedDayId =
+        selectedDayId || tripDays[0]?.id || itinerary.startDate;
+      const cacheKey =
+        activeState === "final"
+          ? `${tripId}_${activeState}`
+          : `${tripId}_${activeState}_${resolvedDayId}`;
+
       const cached = activitiesCache.get(cacheKey);
 
       if (cached) {
@@ -368,53 +380,53 @@ export default function ItineraryScreen() {
             tripId,
             currentUserId ?? undefined
           );
+
           const mapped = finalActivities.map((activity: any) =>
             mapBackendActivity(activity, {
-              dayId: selectedDayId || itinerary.startDate,
+              dayId: resolvedDayId,
               slotId: activity.slot_id ?? "",
             })
           );
+
           const hasChanged = JSON.stringify(cached) !== JSON.stringify(mapped);
+
           if (hasChanged) {
             activitiesCache.set(cacheKey, mapped);
             setApiActivities(mapped);
           }
+
           setIsLoadingActivities(false);
           return;
         }
 
-        const daysToLoad =
-          activeState === "voting"
-            ? tripDays.map((day) => day.id)
-            : [selectedDayId];
-
         const allActivities = (
           await Promise.all(
-            daysToLoad.flatMap((dayId) =>
-              slots.map(async (slot) => {
-                const slotIdWithDate = `${dayId}_${slot.id}`;
-                const slotActivities = await getActivitiesBySlot(
-                  tripId,
-                  slotIdWithDate,
-                  currentUserId ?? undefined
-                );
-                return slotActivities.map((activity: any) =>
-                  mapBackendActivity(activity, {
-                    dayId,
-                    slotId: slot.id,
-                  })
-                );
-              })
-            )
+            slots.map(async (slot) => {
+              const slotIdWithDate = `${resolvedDayId}_${slot.id}`;
+              const slotActivities = await getActivitiesBySlot(
+                tripId,
+                slotIdWithDate,
+                currentUserId ?? undefined
+              );
+
+              return slotActivities.map((activity: any) =>
+                mapBackendActivity(activity, {
+                  dayId: resolvedDayId,
+                  slotId: slot.id,
+                })
+              );
+            })
           )
         ).flat();
 
         const hasChanged =
           JSON.stringify(cached) !== JSON.stringify(allActivities);
+
         if (hasChanged) {
           activitiesCache.set(cacheKey, allActivities);
           setApiActivities(allActivities);
         }
+
         setIsLoadingActivities(false);
       } catch (error) {
         console.log("Could not load activities:", error);
@@ -434,7 +446,6 @@ export default function ItineraryScreen() {
     itinerary.startDate,
     activityRefreshKey,
   ]);
-
   function handlePlanningInfoPress() {
     if (showPlanningInfoPopup) {
       if (planningInfoTimeoutRef.current) {
@@ -568,7 +579,9 @@ export default function ItineraryScreen() {
     if (!currentUserId) return;
 
     if (itinerary.tripId === "trip-fallback") {
-      const nextState = shouldSkipVoting(tripMemberCount) ? "final" : "planning";
+      const nextState = shouldSkipVoting(tripMemberCount)
+        ? "final"
+        : "planning";
       setItinerary((current) => ({
         ...current,
         state: nextState,
