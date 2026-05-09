@@ -289,6 +289,25 @@ export async function markMemberPlanningDone(tripId: string, userId: string): Pr
     });
 }
 
+export async function resetPlanningDoneForTrip(tripId: string): Promise<void> {
+    const db = admin.firestore();
+
+    const snapshot = await db
+        .collection("trip_members")
+        .where("trip_id", "==", tripId)
+        .where("invite_status", "==", "accepted")
+        .get();
+
+    if (snapshot.empty) return;
+
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => {
+        batch.update(doc.ref, { planning_done: false });
+    });
+
+    await batch.commit();
+}
+
 export async function updateTripState(tripId: string, state: string): Promise<void> {
     const db = admin.firestore();
     await db.collection("trips").doc(tripId).update({ state });

@@ -7,7 +7,12 @@ import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
 import { colors, spacing, radius, typography, shadows } from "@/src/theme";
-import { fetchMyTrips, type Trip } from "@/src/api/trips";
+import {
+  fetchMyTrips,
+  getCachedMyTrips,
+  isMyTripsCacheFresh,
+  type Trip,
+} from "@/src/api/trips";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
@@ -136,6 +141,28 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     votingEndAt: trip.voting_end_at,
     rawState: trip.state,
   };
+}
+
+function mapTripsToCache(backendTrips: TripWithMembers[]): TripsCache {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const upcoming: TripCardItem[] = [];
+  const past: TripCardItem[] = [];
+
+  backendTrips.forEach((trip: TripWithMembers) => {
+    const mappedTrip = mapTripToCardTrip(trip);
+    const tripEndDate = new Date(trip.end_date);
+    tripEndDate.setHours(0, 0, 0, 0);
+
+    if (tripEndDate < today) {
+      past.push(mappedTrip);
+    } else {
+      upcoming.push(mappedTrip);
+    }
+  });
+
+  return { yourTrips: upcoming, pastTrips: past };
 }
 
 export default function HomeScreen() {
@@ -423,6 +450,8 @@ export default function HomeScreen() {
                       startDate: trip.rawStartDate,
                       endDate: trip.rawEndDate,
                       members: JSON.stringify(trip.members),
+                      planningEndAt: trip.planningEndAt ?? "",
+                      votingEndAt: trip.votingEndAt ?? "",
                     },
                   });
                 }}

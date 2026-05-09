@@ -3,6 +3,7 @@ import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { type Href } from "expo-router";
 import { spacing } from "@/src/theme";
 import Back from "@/assets/icons/back.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type BackLinkProps = {
   href?: Href;
@@ -13,8 +14,7 @@ export function BackLink({ href, onPress }: BackLinkProps) {
   // Decorative icon — hidden from accessibility tree in both variants
   const icon = (
     <View
-      accessible={false}
-      importantForAccessibility="no-hide-descendants"
+      {...hiddenFromAccessibility}
     >
       <Back width={20} height={20} />
     </View>
