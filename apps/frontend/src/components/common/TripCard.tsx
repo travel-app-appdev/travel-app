@@ -69,10 +69,7 @@ export function TripCard({
         role === "admin" ? "Opens trip itinerary" : "Opens trip itinerary"
       }
     >
-      <View
-        style={styles.titleRow}
-        {...hiddenFromAccessibility}
-      >
+      <View style={styles.titleRow}>
         <AppText variant="title" style={styles.title} numberOfLines={2}>
           {title}
         </AppText>
@@ -84,10 +81,7 @@ export function TripCard({
         </View>
       </View>
 
-      <View
-        style={styles.middleRow}
-        {...hiddenFromAccessibility}
-      >
+      <View style={styles.middleRow}>
         <AppText variant="caption" style={styles.destination} numberOfLines={1}>
           {destination}
         </AppText>
@@ -98,10 +92,7 @@ export function TripCard({
       </View>
 
       <View style={styles.bottomRow}>
-        <View
-          style={styles.avatars}
-          {...hiddenFromAccessibility}
-        >
+        <View style={styles.avatars}>
           {members.slice(0, 4).map((member, index) => (
             <View
               key={member.id}
@@ -123,7 +114,9 @@ export function TripCard({
         {Platform.OS === "web" ? (
           <View
             style={styles.iconButton}
-            accessibilityLabel={role === "admin" ? "Edit trip" : "Trip information"}
+            accessibilityLabel={
+              role === "admin" ? "Edit trip" : "Trip information"
+            }
             accessibilityHint={
               role === "admin"
                 ? "Opens trip settings"
@@ -149,7 +142,9 @@ export function TripCard({
               handleIconPress();
             }}
             accessibilityRole="button"
-            accessibilityLabel={role === "admin" ? "Edit trip" : "Trip information"}
+            accessibilityLabel={
+              role === "admin" ? "Edit trip" : "Trip information"
+            }
             accessibilityHint={
               role === "admin"
                 ? "Opens trip settings"
