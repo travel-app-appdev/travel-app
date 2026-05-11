@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity } from "@/src/types/itinerary";
 
 import LocationIcon from "@/assets/icons/location.svg";
@@ -16,11 +17,12 @@ type Props = {
 };
 
 export function VotingSlotCard({ activity, onAddVote, selected = false }: Props) {
+  const handleVote = useSinglePress(() => onAddVote(activity.id));
+
   return (
     <View style={styles.row}>
       <View style={styles.card}>
 
-        {/* Time label — icon is decorative */}
         <View
           style={styles.timeRow}
           {...hiddenFromAccessibility}
@@ -31,12 +33,10 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           </AppText>
         </View>
 
-        {/* Activity name */}
         <AppText variant="subtitle" style={styles.name}>
           {activity.name}
         </AppText>
 
-        {/* Address — icon is decorative */}
         <View
           style={styles.addressRow}
           accessible={true}
@@ -56,7 +56,6 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           </AppText>
         </View>
 
-        {/* Google Link — icon is decorative */}
         {activity.googleMapsUrl ? (
           <View
             style={styles.googleRow}
@@ -69,7 +68,6 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           </View>
         ) : null}
 
-        {/* Vote count — live region so screen readers announce changes */}
         <View
           accessibilityLiveRegion="polite"
           accessible={true}
@@ -81,9 +79,8 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
         </View>
       </View>
 
-      {/* Vote CTA */}
       <Pressable
-        onPress={() => onAddVote(activity.id)}
+        onPress={handleVote}
         style={({ pressed }) => [
           styles.cta,
           selected && styles.ctaSelected,

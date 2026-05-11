@@ -1,13 +1,14 @@
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 
 import LocationIcon from "@/assets/icons/location.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type TimeChip = {
   slotId: string;
-  label: string; // "06:00–08:00"
+  label: string;
 };
 
 type Props = {
@@ -15,6 +16,54 @@ type Props = {
   selectedSlotId: string;
   onSelectSlot: (slotId: string) => void;
 };
+
+type TimeChipButtonProps = {
+  chip: TimeChip;
+  isSelected: boolean;
+  onSelectSlot: (slotId: string) => void;
+};
+
+function TimeChipButton({ chip, isSelected, onSelectSlot }: TimeChipButtonProps) {
+  const handlePress = useSinglePress(() => onSelectSlot(chip.slotId));
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      style={({ pressed }) => [
+        styles.chip,
+        isSelected && styles.chipSelected,
+        pressed && styles.chipPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`Time slot ${chip.label}`}
+      accessibilityHint={
+        isSelected
+          ? "Currently selected"
+          : "Tap to filter activities for this time slot"
+      }
+      accessibilityState={{ selected: isSelected }}
+    >
+      <View
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+      >
+        <LocationIcon
+          width={14}
+          height={14}
+          color={isSelected ? colors.nightBlack : colors.textMuted}
+        />
+      </View>
+
+      <AppText
+        variant="caption"
+        style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}
+        accessible={false}
+      >
+        {chip.label}
+      </AppText>
+    </Pressable>
+  );
+}
 
 export function VotingTimeFilter({
   chips,
@@ -29,48 +78,14 @@ export function VotingTimeFilter({
       accessibilityRole="scrollbar"
       accessibilityLabel="Time slot filters, scroll horizontally to see more"
     >
-      {chips.map((chip) => {
-        const isSelected = chip.slotId === selectedSlotId;
-
-        return (
-          <Pressable
-            key={chip.slotId}
-            onPress={() => onSelectSlot(chip.slotId)}
-            style={({ pressed }) => [
-              styles.chip,
-              isSelected && styles.chipSelected,
-              pressed && styles.chipPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={`Time slot ${chip.label}`}
-            accessibilityHint={
-              isSelected
-                ? "Currently selected"
-                : "Tap to filter activities for this time slot"
-            }
-            accessibilityState={{ selected: isSelected }}
-          >
-            {/* Icon is decorative — label on Pressable carries the meaning */}
-            <View
-              {...hiddenFromAccessibility}
-            >
-              <LocationIcon
-                width={14}
-                height={14}
-                color={isSelected ? colors.nightBlack : colors.textMuted}
-              />
-            </View>
-
-            <AppText
-              variant="caption"
-              style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}
-              accessible={false}
-            >
-              {chip.label}
-            </AppText>
-          </Pressable>
-        );
-      })}
+      {chips.map((chip) => (
+        <TimeChipButton
+          key={chip.slotId}
+          chip={chip}
+          isSelected={chip.slotId === selectedSlotId}
+          onSelectSlot={onSelectSlot}
+        />
+      ))}
     </ScrollView>
   );
 }

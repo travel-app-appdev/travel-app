@@ -19,6 +19,7 @@ import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
 import { mapActivitiesToSlots } from "@/src/utils/itinerary/mapActivitiesToSlots";
 import { useAuth } from "@/src/context/AuthContext";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 
 import type {
   TripItinerary,
@@ -655,8 +656,6 @@ export default function ItineraryScreen() {
     }
   }, [showPlanningInfoPopup]);
 
-  // Load activities from API
-  // Load activities from API
   useEffect(() => {
     async function loadActivities() {
       if (!tripId || tripDays.length === 0) return;
@@ -1130,6 +1129,13 @@ export default function ItineraryScreen() {
     }
   }
 
+  const handleDismissPopup = useSinglePress(() => {
+    if (planningInfoTimeoutRef.current) {
+      clearTimeout(planningInfoTimeoutRef.current);
+    }
+    setShowPlanningInfoPopup(false);
+  });
+
   const safeAreaBg =
     activeState === "voting"
       ? colors.sunsetPink
@@ -1177,7 +1183,6 @@ export default function ItineraryScreen() {
               }
             />
 
-            {/* PLANNING */}
             {activeState === "planning" && (
               <View style={styles.planningContent}>
                 <View style={styles.slotList}>
@@ -1205,7 +1210,6 @@ export default function ItineraryScreen() {
               </View>
             )}
 
-            {/* VOTING */}
             {activeState === "voting" && (
               <View style={styles.votingSection}>
                 {isLoadingActivities ? (
@@ -1238,7 +1242,6 @@ export default function ItineraryScreen() {
               </View>
             )}
 
-            {/* FINAL */}
             {activeState === "final" && (
               <View style={styles.slotList}>
                 {isLoadingActivities
@@ -1264,12 +1267,7 @@ export default function ItineraryScreen() {
           <>
             <Pressable
               style={styles.popupDismissArea}
-              onPress={() => {
-                if (planningInfoTimeoutRef.current) {
-                  clearTimeout(planningInfoTimeoutRef.current);
-                }
-                setShowPlanningInfoPopup(false);
-              }}
+              onPress={handleDismissPopup}
               accessibilityRole="button"
               accessibilityLabel="Dismiss planning information"
             />
