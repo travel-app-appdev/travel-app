@@ -495,7 +495,13 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {trips.length > 0 ? (
+        {isLoading ? (
+          <View style={styles.tripList}>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
+        ) : trips.length > 0 ? (
           <View style={styles.tripList}>
             {trips.map((trip) => (
               <TripCard
