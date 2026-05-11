@@ -1785,7 +1785,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.seaBlue,
   },
   createButtonText: {
-    color: colors.nightBlack,
+    color: colors.lightWhite,
     fontFamily: typography.fontFamily.bodyBold,
   },
   curlyOrangeWrapper: {

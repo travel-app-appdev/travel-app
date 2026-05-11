@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.seaBlue,
   },
   loginButtonText: {
-    color: colors.nightBlack,
+    color: colors.lightWhite,
     fontFamily: typography.fontFamily.bodyBold,
   },
 });
