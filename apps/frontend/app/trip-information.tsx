@@ -28,6 +28,7 @@ import Hourglass0 from "@/assets/icons/hourglass_0.svg";
 import Hourglass1 from "@/assets/icons/hourglass_1.svg";
 import Timepoint from "@/assets/icons/timepoint.svg";
 import Exit from "@/assets/icons/exit.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 const PHASE_TEXT_COLORS: Record<string, string> = {
   planning: colors.nightBlack,
@@ -275,8 +276,7 @@ export default function TripInformationScreen() {
             <View style={styles.fieldGroup}>
               <View
                 style={styles.infoLabelRow}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+                {...hiddenFromAccessibility}
               >
                 <TripTitle width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
@@ -291,8 +291,7 @@ export default function TripInformationScreen() {
             <View style={styles.fieldGroup}>
               <View
                 style={styles.infoLabelRow}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+                {...hiddenFromAccessibility}
               >
                 <Calendar width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
@@ -308,8 +307,7 @@ export default function TripInformationScreen() {
             <View style={styles.fieldGroup}>
               <View
                 style={styles.infoLabelRow}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+                {...hiddenFromAccessibility}
               >
                 <Location width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
@@ -324,8 +322,7 @@ export default function TripInformationScreen() {
             <View style={styles.fieldGroup}>
               <View
                 style={styles.infoLabelRow}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+                {...hiddenFromAccessibility}
               >
                 <AddPeople width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>

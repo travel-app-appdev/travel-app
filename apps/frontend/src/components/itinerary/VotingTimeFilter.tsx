@@ -3,6 +3,7 @@ import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 
 import LocationIcon from "@/assets/icons/location.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type TimeChip = {
   slotId: string;
@@ -51,8 +52,7 @@ export function VotingTimeFilter({
           >
             {/* Icon is decorative — label on Pressable carries the meaning */}
             <View
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...hiddenFromAccessibility}
             >
               <LocationIcon
                 width={14}

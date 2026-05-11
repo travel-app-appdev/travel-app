@@ -42,6 +42,7 @@ import Timepoint from "@/assets/icons/timepoint.svg";
 import CheckMark from "@/assets/icons/check_mark.svg";
 import Timer from "@/assets/icons/timer.svg";
 import Info from "@/assets/icons/info.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 const PHASE_TEXT_COLORS: Record<string, string> = {
   planning: colors.nightBlack,
@@ -786,8 +787,7 @@ export default function CreateTripScreen() {
                 <BackLink onPress={() => setStep(2)} />
                 <View
                   style={styles.headerTitle}
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   <Plane width={25} height={25} />
                   <AppText variant="body" style={styles.headerLabel}>
@@ -833,8 +833,7 @@ export default function CreateTripScreen() {
                     >
                       <View
                         style={styles.phaseLeft}
-                        accessible={false}
-                        importantForAccessibility="no-hide-descendants"
+                        {...hiddenFromAccessibility}
                       >
                         <View
                           style={[
@@ -883,8 +882,7 @@ export default function CreateTripScreen() {
                       </View>
 
                       <View
-                        accessible={false}
-                        importantForAccessibility="no-hide-descendants"
+                        {...hiddenFromAccessibility}
                       >
                         {isOpen ? (
                           <ArrowUp width={20} height={20} />
@@ -918,8 +916,7 @@ export default function CreateTripScreen() {
                               {formatDateDisplay(dates.end)}
                             </AppText>
                             <View
-                              accessible={false}
-                              importantForAccessibility="no-hide-descendants"
+                              {...hiddenFromAccessibility}
                             >
                               <Calendar width={18} height={18} />
                             </View>
@@ -939,8 +936,7 @@ export default function CreateTripScreen() {
                               {dates.time}
                             </AppText>
                             <View
-                              accessible={false}
-                              importantForAccessibility="no-hide-descendants"
+                              {...hiddenFromAccessibility}
                             >
                               <Timer width={18} height={18} />
                             </View>
@@ -968,8 +964,7 @@ export default function CreateTripScreen() {
                         {phaseUpdated[phaseId] && (
                           <View
                             style={styles.successRow}
-                            accessible={false}
-                            importantForAccessibility="no-hide-descendants"
+                            {...hiddenFromAccessibility}
                           >
                             <CheckMark width={18} height={18} />
                             <AppText
@@ -989,8 +984,7 @@ export default function CreateTripScreen() {
 
               <View
                 style={styles.finalInfoBox}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+                {...hiddenFromAccessibility}
               >
                 <Info width={24} height={24} />
                 <AppText variant="body" style={styles.finalInfoText}>
@@ -1197,8 +1191,7 @@ export default function CreateTripScreen() {
           <View style={[styles.root, styles.bgStep1]}>
             <View
               style={[styles.curlyOrangeWrapper, { pointerEvents: "none" }]}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...hiddenFromAccessibility}
             >
               <CurlyOrange
                 width={SCREEN_WIDTH * 1.1}
@@ -1218,8 +1211,7 @@ export default function CreateTripScreen() {
               <View style={styles.header}>
                 <View
                   style={styles.headerTitle}
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   <Plane width={25} height={25} />
                   <AppText variant="body" style={styles.headerLabel}>
@@ -1239,8 +1231,7 @@ export default function CreateTripScreen() {
               <View style={styles.fieldGroup}>
                 <View
                   style={styles.fieldLabelRow}
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   <KeyFrame width={20} height={20} />
                   <AppText variant="body" style={styles.fieldLabel}>
@@ -1260,8 +1251,7 @@ export default function CreateTripScreen() {
                   </AppText>
                   <View
                     style={styles.copyActionArea}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <AppText variant="caption" style={styles.copiedText}>
                       {copied ? "✓ Copied!" : "Tap to copy"}
@@ -1322,8 +1312,7 @@ export default function CreateTripScreen() {
                     <BackLink href="/home" />
                     <View
                       style={styles.headerTitle}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <Plane width={25} height={25} />
                       <AppText variant="body" style={styles.headerLabel}>
@@ -1343,8 +1332,7 @@ export default function CreateTripScreen() {
                   <View style={[styles.fieldGroup, { marginTop: 20 }]}>
                     <View
                       style={styles.fieldLabelRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <Location width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
@@ -1385,8 +1373,7 @@ export default function CreateTripScreen() {
               {!isLandscape && (
                 <View
                   style={[styles.cityScapeWrapper, { pointerEvents: "none" }]}
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   <CityScape
                     width={SCREEN_WIDTH}
@@ -1399,8 +1386,7 @@ export default function CreateTripScreen() {
             <>
               <View
                 style={[styles.curlyWrapper, { pointerEvents: "none" }]}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+                {...hiddenFromAccessibility}
               >
                 <CurlyYellow
                   width={SCREEN_WIDTH * 1.1}
@@ -1421,8 +1407,7 @@ export default function CreateTripScreen() {
                     <BackLink onPress={() => setStep(1)} />
                     <View
                       style={styles.headerTitle}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <Plane width={25} height={25} />
                       <AppText variant="body" style={styles.headerLabel}>
@@ -1442,8 +1427,7 @@ export default function CreateTripScreen() {
                   <View style={styles.fieldGroup}>
                     <View
                       style={styles.fieldLabelRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <TripTitle width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
@@ -1464,8 +1448,7 @@ export default function CreateTripScreen() {
                   <View style={styles.fieldGroup}>
                     <View
                       style={styles.fieldLabelRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <Calendar width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
@@ -1484,8 +1467,7 @@ export default function CreateTripScreen() {
                         {formatDate(tripStart)} - {formatDate(tripEnd)}
                       </AppText>
                       <View
-                        accessible={false}
-                        importantForAccessibility="no-hide-descendants"
+                        {...hiddenFromAccessibility}
                       >
                         <Calendar width={20} height={20} />
                       </View>

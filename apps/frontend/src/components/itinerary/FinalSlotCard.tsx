@@ -8,6 +8,7 @@ import GoogleIcon from "@/assets/icons/google.svg";
 import MembersIcon from "@/assets/icons/members.svg";
 import JoinGroup from "@/assets/icons/join-group.svg";
 import CheckIcon from "@/assets/icons/check_mark.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
   slot: { id: string; label: string };
@@ -25,8 +26,7 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
           </AppText>
           <View
             style={styles.emptyContent}
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
+            {...hiddenFromAccessibility}
           >
             <LocationIcon width={20} height={20} color={colors.textMuted} />
             <AppText variant="subtitle" style={styles.emptyTitle}>
@@ -44,8 +44,7 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
         {/* Time label row — icon is decorative */}
         <View
           style={styles.timeRow}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          {...hiddenFromAccessibility}
         >
           <LocationIcon width={16} height={16} />
           <AppText variant="body" style={styles.timeLabel}>
@@ -61,8 +60,7 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
         {/* Address row — icon is decorative */}
         <View
           style={styles.addressRow}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          {...hiddenFromAccessibility}
         >
           <LocationIcon width={14} height={14} />
           <AppText variant="caption" style={styles.address}>
@@ -74,8 +72,7 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
         {activity.googleMapsUrl ? (
           <View
             style={styles.googleRow}
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
+            {...hiddenFromAccessibility}
           >
             <GoogleIcon width={14} height={14} />
             <AppText variant="caption" style={styles.googleLink}>
@@ -87,8 +84,7 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
         {/* Joined count row — icon is decorative */}
         <View
           style={styles.joinedRow}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          {...hiddenFromAccessibility}
         >
           <MembersIcon width={14} height={14} />
           <AppText variant="caption" style={styles.joinedCount}>
@@ -116,8 +112,7 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
       >
         <View
           style={styles.joinIcon}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          {...hiddenFromAccessibility}
         >
           {activity.hasCurrentUserJoined ? (
             <CheckIcon width={36} height={36} color={colors.nightBlack} />

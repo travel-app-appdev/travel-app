@@ -166,22 +166,42 @@ export async function getActivitiesBySlotId(
 
     if (tsaSnapshot.empty) return [];
 
-    const activityIds = tsaSnapshot.docs.map((doc) => doc.data().activity_id);
+    const activityIds = tsaSnapshot.docs
+        .map((doc) => doc.data().activity_id)
+        .filter(Boolean);
 
-    const activities = await Promise.all(
-        activityIds.map(async (activityId) => {
-            const activityDoc = await db.collection("activities").doc(activityId).get();
-            const activity = activityFromDoc(activityDoc, slotId);
-            if (!activity) return null;
+    if (activityIds.length === 0) return [];
 
-            // filter by trip_id!
-            if (activity.trip_id !== tripId) return null;
+    const chunkSize = 10;
+    const activityDocs = (
+        await Promise.all(
+            Array.from(
+                { length: Math.ceil(activityIds.length / chunkSize) },
+                (_, index) => {
+                    const chunk = activityIds.slice(
+                        index * chunkSize,
+                        index * chunkSize + chunkSize
+                    );
 
-            return activity;
-        })
-    );
+                    return db
+                        .collection("activities")
+                        .where(
+                            admin.firestore.FieldPath.documentId(),
+                            "in",
+                            chunk
+                        )
+                        .get();
+                }
+            )
+        )
+    ).flatMap((snapshot) => snapshot.docs);
 
-    let filtered = activities.filter((a): a is Activity => a !== null);
+    const activities = activityDocs
+        .map((doc) => activityFromDoc(doc, slotId))
+        .filter((a): a is Activity => a !== null)
+        .filter((activity) => activity.trip_id === tripId);
+
+    let filtered = activities;
 
     if (options.filterToUser && options.userId) {
         filtered = filtered.filter((a) => a.user_id === options.userId);

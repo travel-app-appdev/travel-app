@@ -18,6 +18,7 @@ import PalmLeaf from "@/assets/visuals/palm-leaf.svg";
 import PalmTree from "@/assets/visuals/palm-tree.svg";
 import Google from "@/assets/icons/google.svg";
 import Stars from "@/assets/visuals/stars.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -129,8 +130,7 @@ export default function StartPage() {
       {!isLandscape && (
         <View
           style={[styles.curlyGreenWrapper, { pointerEvents: "none" }]}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          {...hiddenFromAccessibility}
         >
           <CurlyGreen width={SCREEN_WIDTH * 1.1} height={SCREEN_WIDTH * 1.1} />
         </View>

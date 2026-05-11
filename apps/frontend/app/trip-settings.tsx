@@ -25,7 +25,12 @@ import {
   ACTION_CARD_HEIGHT,
 } from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
-import { deleteTrip, removeMember, updateTrip } from "@/src/api/trips";
+import {
+  deleteTrip,
+  removeMember,
+  updateTrip,
+  type Trip,
+} from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import Edit from "@/assets/icons/edit.svg";
@@ -44,6 +49,7 @@ import Trash from "@/assets/icons/trash.svg";
 import KeyFrame from "@/assets/icons/key_frame.svg";
 import Copy from "@/assets/icons/copy.svg";
 import Timer from "@/assets/icons/timer.svg";
+import { hiddenFromAccessibility, nativeImportantForAccessibility } from "@/src/utils/accessibility";
 
 const PHASE_TEXT_COLORS: Record<string, string> = {
   planning: colors.nightBlack,
@@ -149,6 +155,16 @@ function parseIsoToTimeString(value?: string): string {
   return parsed ? dateToTimeString(parsed) : "00:00";
 }
 
+function parseTripDate(value: string | undefined, fallback: Date): Date {
+  if (!value) return fallback;
+
+  const dateOnly = value.split("T")[0];
+  if (!dateOnly) return fallback;
+
+  const parsed = fromDateString(dateOnly);
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+}
+
 function isValidTimeString(value: string): boolean {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
 }
@@ -223,7 +239,7 @@ export default function TripSettingsScreen() {
   const endDate = String(raw.endDate ?? "");
   const membersParam = String(raw.members ?? "");
   const inviteCodeParam = String(raw.inviteCode ?? "");
-  const tripState = String(raw.state ?? "Planning");
+  const initialTripState = (raw.state ?? "Planning") as Trip["state"];
   const planningStartedAt = String(raw.planningStartedAt ?? "");
   const planningEndAt = String(raw.planningEndAt ?? "");
   const votingEndAt = String(raw.votingEndAt ?? "");
@@ -245,11 +261,21 @@ export default function TripSettingsScreen() {
   const deleteRef = useRef<View>(null);
 
   function skipToDelete() {
-    if (deleteRef.current) {
-      const node = findNodeHandle(deleteRef.current);
-      if (node) {
-        AccessibilityInfo.setAccessibilityFocus(node);
-      }
+    if (!deleteRef.current) {
+      return;
+    }
+
+    if (Platform.OS === "web") {
+      const deleteElement = deleteRef.current as unknown as {
+        focus?: () => void;
+      };
+      deleteElement?.focus?.();
+      return;
+    }
+
+    const node = findNodeHandle(deleteRef.current);
+    if (node) {
+      AccessibilityInfo.setAccessibilityFocus(node);
     }
   }
 
@@ -288,6 +314,7 @@ export default function TripSettingsScreen() {
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
   const [codeCopied, setCodeCopied] = useState(false);
+  const [tripState, setTripState] = useState<Trip["state"]>(initialTripState);
 
   const planningStartDate = parseIsoToDate(planningStartedAt);
   const planningEndDate = parseIsoToDate(planningEndAt);
@@ -334,6 +361,41 @@ export default function TripSettingsScreen() {
       time: parseIsoToTimeString(votingEndAt),
     },
   });
+
+  const syncTripResponse = (trip: Trip) => {
+    const nextTripStart = parseTripDate(trip.start_date, tripStart);
+    const nextTripEnd = parseTripDate(trip.end_date, tripEnd);
+    const nextPlanningStart =
+      parseIsoToDate(trip.planning_started_at) ?? nextTripStart;
+    const nextPlanningEnd =
+      parseIsoToDate(trip.planning_end_at) ?? nextTripStart;
+    const nextVotingEnd = parseIsoToDate(trip.voting_end_at) ?? nextTripEnd;
+
+    setTripState(trip.state);
+    setTripName(trip.title);
+    setTripNameInput(trip.title);
+    setDestination(trip.destination);
+    setDestinationInput(trip.destination);
+    setTripStart(nextTripStart);
+    setTripEnd(nextTripEnd);
+    setPhaseDates({
+      planning: {
+        start: nextPlanningStart,
+        end: nextPlanningEnd,
+        time: parseIsoToTimeString(trip.planning_end_at),
+      },
+      voting: {
+        start: nextPlanningEnd,
+        end: nextVotingEnd,
+        time: parseIsoToTimeString(trip.voting_end_at),
+      },
+      final: {
+        start: nextVotingEnd,
+        end: nextVotingEnd,
+        time: parseIsoToTimeString(trip.voting_end_at),
+      },
+    });
+  };
 
   const [tempPhaseTime, setTempPhaseTime] = useState("12:00");
 
@@ -434,21 +496,12 @@ export default function TripSettingsScreen() {
     if (!idToken) return;
     try {
       setIsUpdatingName(true);
-      await updateTrip({
+      const updatedTrip = await updateTrip({
         idToken,
         tripId,
-        start_date: toLocalDateString(tripStart),
-        end_date: toLocalDateString(tripEnd),
-        planning_end_at: combineDateAndTime(
-          phaseDates.planning.end,
-          phaseDates.planning.time
-        ),
-        voting_end_at: combineDateAndTime(
-          phaseDates.voting.end,
-          phaseDates.voting.time
-        ),
+        title: tripNameInput.trim(),
       });
-      setTripName(tripNameInput.trim());
+      syncTripResponse(updatedTrip);
       setTripNameUpdated(true);
       safeTimeout(() => {
         setTripNameUpdated(false);
@@ -469,8 +522,12 @@ export default function TripSettingsScreen() {
     if (!idToken) return;
     try {
       setIsUpdatingDestination(true);
-      await updateTrip({ idToken, tripId, destination: destinationInput.trim() });
-      setDestination(destinationInput.trim());
+      const updatedTrip = await updateTrip({
+        idToken,
+        tripId,
+        destination: destinationInput.trim(),
+      });
+      syncTripResponse(updatedTrip);
       setDestinationUpdated(true);
       safeTimeout(() => {
         setDestinationUpdated(false);
@@ -524,7 +581,7 @@ export default function TripSettingsScreen() {
       }
 
       setIsUpdatingDate(true);
-      await updateTrip({
+      const updatedTrip = await updateTrip({
         idToken,
         tripId,
         start_date: toLocalDateString(tripStart),
@@ -538,6 +595,7 @@ export default function TripSettingsScreen() {
           phaseDates.voting.time
         ),
       });
+      syncTripResponse(updatedTrip);
 
       setTripDateUpdated(true);
       safeTimeout(() => {
@@ -826,54 +884,26 @@ export default function TripSettingsScreen() {
           combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
         );
 
-        const safeVotingEnd =
-          currentVotingEnd < nextPlanningEnd
-            ? nextPlanningEnd
-            : currentVotingEnd;
+        if (nextPlanningEnd >= currentVotingEnd) {
+          Alert.alert(
+            "Invalid phase order",
+            "Voting end must be after planning end."
+          );
+          return;
+        }
 
-        const payload = {
+        const updatedTrip = await updateTrip({
           idToken,
           tripId,
           start_date: toLocalDateString(tripStart),
           end_date: toLocalDateString(tripEnd),
-          planning_end_at: combineDateAndTime(
-            phaseDates.planning.end,
-            phaseDates.planning.time
-          ),
+          planning_end_at: endAtIso,
           voting_end_at: combineDateAndTime(
             phaseDates.voting.end,
             phaseDates.voting.time
           ),
-        };
-
-        console.log("TRIP SETTINGS PATCH PAYLOAD", payload);
-
-        await updateTrip(payload);
-
-        await updateTrip({
-          idToken,
-          tripId,
-          planning_end_at: combineDateAndTime(phase.end, phase.time),
         });
-
-        setPhaseDates((prev: PhaseDates) => ({
-          ...prev,
-          planning: {
-            ...prev.planning,
-            end: phase.end,
-            time: phase.time,
-          },
-          voting: {
-            ...prev.voting,
-            start: phase.end,
-            end: safeVotingEnd,
-          },
-          final: {
-            ...prev.final,
-            start: safeVotingEnd,
-            end: safeVotingEnd,
-          },
-        }));
+        syncTripResponse(updatedTrip);
       }
 
       if (phaseId === "voting") {
@@ -894,21 +924,18 @@ export default function TripSettingsScreen() {
           );
           return;
         }
-        await updateTrip({
+        const updatedTrip = await updateTrip({
           idToken,
           tripId,
+          start_date: toLocalDateString(tripStart),
+          end_date: toLocalDateString(tripEnd),
+          planning_end_at: combineDateAndTime(
+            phaseDates.planning.end,
+            phaseDates.planning.time
+          ),
           voting_end_at: combineDateAndTime(phase.end, phase.time),
         });
-        setPhaseDates((prev: PhaseDates) => ({
-          ...prev,
-          voting: { ...prev.voting, end: phase.end, time: phase.time },
-          final: {
-            ...prev.final,
-            start: phase.end,
-            end: phase.end,
-            time: phase.time,
-          },
-        }));
+        syncTripResponse(updatedTrip);
       }
 
       setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
@@ -985,7 +1012,7 @@ export default function TripSettingsScreen() {
               accessibilityLabel="Skip to delete trip button"
               accessibilityHint="Moves focus directly to the delete trip action"
               style={styles.skipButton}
-              importantForAccessibility="yes"
+              {...nativeImportantForAccessibility}
             >
               <AppText variant="caption" style={styles.skipButtonText}>
                 Skip to delete trip
@@ -996,8 +1023,7 @@ export default function TripSettingsScreen() {
               <BackLink href="/home" />
               <View
                 style={styles.headerTitle}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+                {...hiddenFromAccessibility}
               >
                 <Edit width={22} height={22} />
                 <AppText variant="body" style={styles.headerLabel}>
@@ -1017,8 +1043,7 @@ export default function TripSettingsScreen() {
                 <View style={styles.infoLeft}>
                   <View
                     style={styles.infoLabelRow}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <TripTitle width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
@@ -1034,8 +1059,7 @@ export default function TripSettingsScreen() {
                   </AppText>
                 </View>
                 <View
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   {openField === "name" ? (
                     <ArrowUp width={20} height={20} />
@@ -1070,8 +1094,7 @@ export default function TripSettingsScreen() {
                   {tripNameUpdated && (
                     <View
                       style={styles.successRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <CheckMark width={18} height={18} />
                       <AppText
@@ -1098,8 +1121,7 @@ export default function TripSettingsScreen() {
                 <View style={styles.infoLeft}>
                   <View
                     style={styles.infoLabelRow}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <Calendar width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
@@ -1116,8 +1138,7 @@ export default function TripSettingsScreen() {
                   </AppText>
                 </View>
                 <View
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   {openField === "date" ? (
                     <ArrowUp width={20} height={20} />
@@ -1140,8 +1161,7 @@ export default function TripSettingsScreen() {
                       {formatDateDisplay(tripEnd)}
                     </AppText>
                     <View
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <Calendar width={20} height={20} />
                     </View>
@@ -1159,8 +1179,7 @@ export default function TripSettingsScreen() {
                   {tripDateUpdated && (
                     <View
                       style={styles.successRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <CheckMark width={18} height={18} />
                       <AppText
@@ -1187,8 +1206,7 @@ export default function TripSettingsScreen() {
                 <View style={styles.infoLeft}>
                   <View
                     style={styles.infoLabelRow}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <Location width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
@@ -1204,8 +1222,7 @@ export default function TripSettingsScreen() {
                   </AppText>
                 </View>
                 <View
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   {openField === "destination" ? (
                     <ArrowUp width={20} height={20} />
@@ -1240,8 +1257,7 @@ export default function TripSettingsScreen() {
                   {destinationUpdated && (
                     <View
                       style={styles.successRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <CheckMark width={18} height={18} />
                       <AppText
@@ -1268,8 +1284,7 @@ export default function TripSettingsScreen() {
                 <View style={styles.infoLeft}>
                   <View
                     style={styles.infoLabelRow}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <AddPeople width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
@@ -1285,8 +1300,7 @@ export default function TripSettingsScreen() {
                   </AppText>
                 </View>
                 <View
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   {openField === "members" ? (
                     <ArrowUp width={20} height={20} />
@@ -1323,8 +1337,7 @@ export default function TripSettingsScreen() {
                           }
                         >
                           <View
-                            accessible={false}
-                            importantForAccessibility="no-hide-descendants"
+                            {...hiddenFromAccessibility}
                           >
                             <RemovePerson width={22} height={22} />
                           </View>
@@ -1345,8 +1358,7 @@ export default function TripSettingsScreen() {
                 <View style={styles.infoLeft}>
                   <View
                     style={styles.infoLabelRow}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <KeyFrame width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
@@ -1371,8 +1383,7 @@ export default function TripSettingsScreen() {
                   accessibilityHint="Copies the invite code to your clipboard"
                 >
                   <View
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <Copy width={22} height={22} />
                   </View>
@@ -1426,8 +1437,7 @@ export default function TripSettingsScreen() {
                   >
                     <View
                       style={styles.phaseLeft}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <View
                         style={[
@@ -1489,8 +1499,7 @@ export default function TripSettingsScreen() {
 
                     {phaseId !== "final" && (
                       <View
-                        accessible={false}
-                        importantForAccessibility="no-hide-descendants"
+                        {...hiddenFromAccessibility}
                       >
                         {isOpen ? (
                           <ArrowUp width={20} height={20} />
@@ -1527,8 +1536,7 @@ export default function TripSettingsScreen() {
                             {formatDateDisplay(dates.end)}
                           </AppText>
                           <View
-                            accessible={false}
-                            importantForAccessibility="no-hide-descendants"
+                            {...hiddenFromAccessibility}
                           >
                             <Calendar width={18} height={18} />
                           </View>
@@ -1548,8 +1556,7 @@ export default function TripSettingsScreen() {
                             {dates.time}
                           </AppText>
                           <View
-                            accessible={false}
-                            importantForAccessibility="no-hide-descendants"
+                            {...hiddenFromAccessibility}
                           >
                             <Timer width={20} height={20} />
                           </View>
@@ -1572,8 +1579,7 @@ export default function TripSettingsScreen() {
                       {phaseUpdated[phaseId] && (
                         <View
                           style={styles.successRow}
-                          accessible={false}
-                          importantForAccessibility="no-hide-descendants"
+                          {...hiddenFromAccessibility}
                         >
                           <CheckMark width={18} height={18} />
                           <AppText
@@ -1594,8 +1600,12 @@ export default function TripSettingsScreen() {
 
           <SafeAreaView
             edges={["bottom"]}
-            style={styles.deleteSafeArea}
+            style={[
+              styles.deleteSafeArea,
+              Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : null,
+            ]}
             ref={deleteRef}
+            {...(Platform.OS === "web" ? ({ tabIndex: -1 } as any) : {})}
           >
             <View style={styles.deleteWrapper}>
               <ActionCard
