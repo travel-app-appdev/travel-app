@@ -1,22 +1,22 @@
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
-import { Animated, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  Animated,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
-import { colors, spacing, radius, typography, shadows } from "@/src/theme";
-import {
-  fetchMyTrips,
-  getCachedMyTrips,
-  isMyTripsCacheFresh,
-  type Trip,
-} from "@/src/api/trips";
+import { colors, spacing, radius, typography } from "@/src/theme";
+import { fetchMyTrips, type Trip } from "@/src/api/trips";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
-import { useEffect, useRef } from "react";
 
 type Tab = "your" | "past";
 
@@ -86,9 +86,11 @@ function getInitials(name: string): string {
 function getCardColor(tripId: string): string {
   const palette = [colors.plantGreen, colors.sunsetOrange, colors.seaBlue];
   let hash = 0;
+
   for (let i = 0; i < tripId.length; i++) {
     hash = tripId.charCodeAt(i) + ((hash << 5) - hash);
   }
+
   return palette[Math.abs(hash) % palette.length];
 }
 
@@ -144,12 +146,33 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
   };
 }
 
-// Skeleton shimmer animation
+function mapTripsToLists(backendTrips: TripWithMembers[]) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const upcoming: TripCardItem[] = [];
+  const past: TripCardItem[] = [];
+
+  backendTrips.forEach((trip) => {
+    const mappedTrip = mapTripToCardTrip(trip);
+    const tripEndDate = new Date(trip.end_date);
+    tripEndDate.setHours(0, 0, 0, 0);
+
+    if (tripEndDate < today) {
+      past.push(mappedTrip);
+    } else {
+      upcoming.push(mappedTrip);
+    }
+  });
+
+  return { upcoming, past };
+}
+
 function SkeletonCard() {
   const shimmer = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(shimmer, {
           toValue: 1,
@@ -162,7 +185,13 @@ function SkeletonCard() {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
   }, [shimmer]);
 
   const opacity = shimmer.interpolate({
@@ -176,10 +205,12 @@ function SkeletonCard() {
         <View style={styles.skeletonTitle} />
         <View style={styles.skeletonBadge} />
       </View>
+
       <View style={styles.skeletonMiddleRow}>
         <View style={styles.skeletonDestination} />
         <View style={styles.skeletonDate} />
       </View>
+
       <View style={styles.skeletonBottomRow}>
         <View style={styles.skeletonAvatars}>
           <View style={styles.skeletonAvatar} />
@@ -189,30 +220,12 @@ function SkeletonCard() {
       </View>
     </Animated.View>
   );
-function mapTripsToCache(backendTrips: TripWithMembers[]): TripsCache {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const upcoming: TripCardItem[] = [];
-  const past: TripCardItem[] = [];
-
-  backendTrips.forEach((trip: TripWithMembers) => {
-    const mappedTrip = mapTripToCardTrip(trip);
-    const tripEndDate = new Date(trip.end_date);
-    tripEndDate.setHours(0, 0, 0, 0);
-
-    if (tripEndDate < today) {
-      past.push(mappedTrip);
-    } else {
-      upcoming.push(mappedTrip);
-    }
-  });
-
-  return { yourTrips: upcoming, pastTrips: past };
 }
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const router = useRouter();
+
   const [activeTab, setActiveTab] = useState<Tab>("your");
   const [yourTrips, setYourTrips] = useState<TripCardItem[]>(
     tripsCache?.yourTrips ?? []
@@ -221,12 +234,9 @@ export default function HomeScreen() {
     tripsCache?.pastTrips ?? []
   );
   const [isLoading, setIsLoading] = useState(!tripsCache);
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState<Tab>("your");
-  const [yourTrips, setYourTrips] = useState<TripCardItem[]>([]);
-  const [pastTrips, setPastTrips] = useState<TripCardItem[]>([]);
-  const lastFetchRef = useRef<number>(0);
-  const latestUserIdRef = useRef<string | null>(null);
+
+  const lastFetchRef = useRef<number>(tripsCache?.fetchedAt ?? 0);
+  const latestUserIdRef = useRef<string | null>(user?.uid ?? null);
 
   useEffect(() => {
     const newUserId = user?.uid ?? null;
@@ -235,6 +245,7 @@ export default function HomeScreen() {
     if (!newUserId) {
       setYourTrips([]);
       setPastTrips([]);
+      setIsLoading(false);
       tripsCache = null;
       lastFetchRef.current = 0;
       return;
@@ -243,12 +254,14 @@ export default function HomeScreen() {
     if (!tripsCache || tripsCache.userId !== newUserId) {
       setYourTrips([]);
       setPastTrips([]);
+      setIsLoading(true);
       lastFetchRef.current = 0;
       return;
     }
 
     setYourTrips(tripsCache.yourTrips);
     setPastTrips(tripsCache.pastTrips);
+    setIsLoading(false);
     lastFetchRef.current = tripsCache.fetchedAt;
   }, [user?.uid]);
 
@@ -259,72 +272,48 @@ export default function HomeScreen() {
       if (!userId) {
         setYourTrips([]);
         setPastTrips([]);
-        tripsCache = null;
         setIsLoading(false);
+        tripsCache = null;
         lastFetchRef.current = 0;
         return;
       }
 
+      const now = Date.now();
+      const cachedTrips = tripsCache;
+
+      const hasFreshCache =
+        !force &&
+        cachedTrips !== null &&
+        cachedTrips.userId === userId &&
+        now - cachedTrips.fetchedAt < TRIPS_STALE_TIME_MS;
+
+      if (hasFreshCache) {
+        setYourTrips(cachedTrips.yourTrips);
+        setPastTrips(cachedTrips.pastTrips);
+        setIsLoading(false);
+        lastFetchRef.current = cachedTrips.fetchedAt;
+        return;
+      }
+
+      if (
+        !force &&
+        lastFetchRef.current > 0 &&
+        now - lastFetchRef.current < TRIPS_STALE_TIME_MS
+      ) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+
       try {
-        const now = Date.now();
-        const cachedTrips = tripsCache;
-
-        const hasFreshCache =
-          !force &&
-          cachedTrips !== null &&
-          cachedTrips.userId === userId &&
-          now - cachedTrips.fetchedAt < TRIPS_STALE_TIME_MS;
-
-        if (hasFreshCache) {
-          setYourTrips(cachedTrips.yourTrips);
-          setPastTrips(cachedTrips.pastTrips);
-          lastFetchRef.current = cachedTrips.fetchedAt;
-          return;
-        }
-
-        if (
-          !force &&
-          lastFetchRef.current > 0 &&
-          now - lastFetchRef.current < TRIPS_STALE_TIME_MS
-        ) {
-          return;
-        }
-
-        const backendTrips = await fetchMyTrips(userId);
+        const backendTrips = (await fetchMyTrips(userId)) as TripWithMembers[];
 
         if (latestUserIdRef.current !== userId) {
           return;
         }
 
-      tripsCache = { yourTrips: upcoming, pastTrips: past };
-      setYourTrips(upcoming);
-      setPastTrips(past);
-    } catch (error) {
-      console.error("Error loading trips:", error);
-      setYourTrips([]);
-      setPastTrips([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const upcoming: TripCardItem[] = [];
-        const past: TripCardItem[] = [];
-
-        (backendTrips as TripWithMembers[]).forEach((trip: TripWithMembers) => {
-          const mappedTrip = mapTripToCardTrip(trip);
-          const tripEndDate = new Date(trip.end_date);
-          tripEndDate.setHours(0, 0, 0, 0);
-
-          if (tripEndDate < today) {
-            past.push(mappedTrip);
-          } else {
-            upcoming.push(mappedTrip);
-          }
-        });
-
+        const { upcoming, past } = mapTripsToLists(backendTrips);
         const fetchedAt = Date.now();
 
         tripsCache = {
@@ -344,6 +333,10 @@ export default function HomeScreen() {
           setYourTrips([]);
           setPastTrips([]);
         }
+      } finally {
+        if (latestUserIdRef.current === userId) {
+          setIsLoading(false);
+        }
       }
     },
     [user?.uid]
@@ -352,23 +345,24 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       const userId = user?.uid ?? null;
+      latestUserIdRef.current = userId;
 
       if (!userId) {
         setYourTrips([]);
         setPastTrips([]);
+        setIsLoading(false);
         return;
       }
 
       if (tripsCache && tripsCache.userId === userId) {
         setYourTrips(tripsCache.yourTrips);
         setPastTrips(tripsCache.pastTrips);
-        
         setIsLoading(false);
       } else {
-        setIsLoading(true);
-            setYourTrips([]);
+        setYourTrips([]);
         setPastTrips([]);
-      } 
+        setIsLoading(true);
+      }
 
       void loadTrips(false);
     }, [loadTrips, user?.uid])
@@ -403,10 +397,12 @@ export default function HomeScreen() {
           <AppText variant="title" style={styles.helloText}>
             Helloooo
           </AppText>
+
           <View style={styles.subtitleRow}>
             <AppText variant="body" style={styles.subtitle}>
               where is the{" "}
             </AppText>
+
             <View>
               <AppText variant="body" style={styles.subtitleBold}>
                 squad going?
@@ -494,7 +490,6 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Trip Cards, Skeletons, or Empty State */}
         {isLoading ? (
           <View style={styles.tripList}>
             <SkeletonCard />
@@ -503,7 +498,7 @@ export default function HomeScreen() {
           </View>
         ) : trips.length > 0 ? (
           <View style={styles.tripList}>
-            {trips.map((trip: TripCardItem) => (
+            {trips.map((trip) => (
               <TripCard
                 key={trip.id}
                 tripId={trip.id}
@@ -705,8 +700,6 @@ const styles = StyleSheet.create({
     maxWidth: 260,
     lineHeight: typography.lineHeight.md,
   },
-
-  // Skeleton styles — match TripCard dimensions
   skeletonCard: {
     borderRadius: radius.xl,
     padding: spacing.xl,
