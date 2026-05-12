@@ -18,6 +18,7 @@ import { colors, spacing } from "@/src/theme";
 import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
 import { mapActivitiesToSlots } from "@/src/utils/itinerary/mapActivitiesToSlots";
+import { getActiveTripTimerText } from "@/src/utils/tripTimer";
 import { useAuth } from "@/src/context/AuthContext";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 
@@ -252,37 +253,6 @@ function getIntroText(state: ItineraryState): string {
   }
 }
 
-function getTimerText(deadline?: string): string {
-  if (!deadline) return "0 days";
-
-  const deadlineDate = new Date(deadline);
-  if (Number.isNaN(deadlineDate.getTime())) return "0 days";
-
-  const msLeft = deadlineDate.getTime() - Date.now();
-  if (msLeft <= 0) return "0 hours";
-
-  const hourMs = 1000 * 60 * 60;
-  const dayMs = hourMs * 24;
-
-  if (msLeft < dayMs) {
-    const hours = Math.max(1, Math.ceil(msLeft / hourMs));
-    return hours === 1 ? "1 hour" : `${hours} hours`;
-  }
-
-  const days = Math.ceil(msLeft / dayMs);
-  return days === 1 ? "1 day" : `${days} days`;
-}
-
-function getActiveTimerText(
-  state: ItineraryState,
-  planningEndAt?: string,
-  votingEndAt?: string
-): string {
-  if (state === "planning") return getTimerText(planningEndAt);
-  if (state === "voting") return getTimerText(votingEndAt);
-  return "0 days";
-}
-
 type TransitionOverlayProps = {
   title: string;
   text: string;
@@ -425,7 +395,7 @@ export default function ItineraryScreen() {
   }));
 
   const [timerText, setTimerText] = useState(() =>
-    getActiveTimerText(activeState, planningEndAt, votingEndAt)
+    getActiveTripTimerText(activeState, planningEndAt, votingEndAt)
   );
 
   const tripDays = useMemo(
@@ -608,7 +578,7 @@ export default function ItineraryScreen() {
   useEffect(() => {
     const updateTimer = () => {
       setTimerText(
-        getActiveTimerText(
+        getActiveTripTimerText(
           activeState,
           timerDeadlines.planningEndAt,
           timerDeadlines.votingEndAt

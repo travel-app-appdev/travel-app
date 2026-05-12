@@ -35,6 +35,10 @@ import { auth } from "@/src/lib/firebase";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { PressLock } from "@/src/utils/PressLock";
+import {
+  formatTripDurationText,
+  formatTripTimerText,
+} from "@/src/utils/tripTimer";
 import Edit from "@/assets/icons/edit.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
 import Calendar from "@/assets/icons/calendar.svg";
@@ -104,29 +108,6 @@ function fromDateString(dateString: string): Date {
   return new Date(year, month - 1, day);
 }
 
-function calcCalendarDays(start: Date, end: Date): number {
-  const startOnly = new Date(start);
-  startOnly.setHours(0, 0, 0, 0);
-  const endOnly = new Date(end);
-  endOnly.setHours(0, 0, 0, 0);
-  const ms = endOnly.getTime() - startOnly.getTime();
-  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
-}
-
-function calcDaysLeft(end: Date): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const endOnly = new Date(end);
-  endOnly.setHours(0, 0, 0, 0);
-  const ms = endOnly.getTime() - today.getTime();
-  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
-}
-
-function dayLabel(days: number, active: boolean): string {
-  if (active) return days === 1 ? "1 day left" : `${days} days left`;
-  return days === 1 ? "1 day" : `${days} days`;
-}
-
 function dateToTimeString(date: Date): string {
   const h = date.getHours().toString().padStart(2, "0");
   const m = date.getMinutes().toString().padStart(2, "0");
@@ -138,6 +119,24 @@ function combineDateAndTime(date: Date, timeStr: string): string {
   const combined = new Date(date);
   combined.setHours(hours, minutes, 0, 0);
   return combined.toISOString();
+}
+
+function combineDateAndTimeToDate(date: Date, timeStr: string): Date {
+  return new Date(combineDateAndTime(date, timeStr));
+}
+
+function formatPhaseTimerText(
+  phase: PhaseValue,
+  isActive: boolean,
+  now: number
+): string {
+  const phaseEnd = combineDateAndTimeToDate(phase.end, phase.time);
+
+  if (isActive) {
+    return formatTripTimerText(phaseEnd, now);
+  }
+
+  return formatTripDurationText(phase.start, phaseEnd);
 }
 
 function endOfDay(date: Date): Date {
@@ -283,6 +282,7 @@ export default function TripSettingsScreen() {
   const { height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenHeight < 700;
   const [isDeleting, setIsDeleting] = useState(false);
+  const [timerNow, setTimerNow] = useState(() => Date.now());
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const safeTimeout = (fn: () => void, delay: number) => {
     const id = setTimeout(fn, delay);
@@ -292,6 +292,11 @@ export default function TripSettingsScreen() {
 
   useEffect(() => {
     return () => timeoutRefs.current.forEach(clearTimeout);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTimerNow(Date.now()), 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const deleteRef = useRef<View>(null);
@@ -765,8 +770,9 @@ export default function TripSettingsScreen() {
         planning: { ...prev.planning, end: selectedDate },
         voting: {
           ...prev.voting,
-          start: selectedDate,
-          end: prev.voting.end < selectedDate ? selectedDate : prev.voting.end,
+          start: combineDateAndTimeToDate(selectedDate, prev.planning.time),
+          end:
+            prev.voting.end < selectedDate ? selectedDate : prev.voting.end,
         },
         final: {
           ...prev.final,
@@ -838,6 +844,14 @@ export default function TripSettingsScreen() {
         ...prev[showPhaseTimePicker],
         time: tempPhaseTime,
       },
+      ...(showPhaseTimePicker === "planning"
+        ? {
+            voting: {
+              ...prev.voting,
+              start: combineDateAndTimeToDate(prev.planning.end, tempPhaseTime),
+            },
+          }
+        : {}),
     }));
     setShowPhaseTimePicker(null);
   };
@@ -872,7 +886,11 @@ export default function TripSettingsScreen() {
         setPhaseDates((prev: PhaseDates) => ({
           ...prev,
           planning: { ...prev.planning, end: phase.end, time: phase.time },
-          voting: { ...prev.voting, start: phase.end, end: safeVotingEnd },
+          voting: {
+            ...prev.voting,
+            start: nextPlanningEnd,
+            end: safeVotingEnd,
+          },
           final: { ...prev.final, start: safeVotingEnd, end: safeVotingEnd },
         }));
       }
@@ -1348,9 +1366,11 @@ export default function TripSettingsScreen() {
               const phaseId = phase.id as PhaseKey;
               const isOpen = openPhase === phaseId;
               const dates = phaseDates[phaseId];
-              const days = phase.active
-                ? calcDaysLeft(dates.end)
-                : calcCalendarDays(dates.start, dates.end);
+              const timerText = formatPhaseTimerText(
+                dates,
+                phase.active,
+                timerNow
+              );
 
               return (
                 <View key={phaseId} style={styles.fieldGroup}>
@@ -1368,7 +1388,7 @@ export default function TripSettingsScreen() {
                     accessibilityLabel={
                       phaseId === "final"
                         ? `Final phase, itinerary shown on ${formatDateDisplay(dates.end)} at ${dates.time}`
-                        : `${phase.label} phase, ${dayLabel(days, phase.active)}`
+                        : `${phase.label} phase, ${timerText}${phase.active ? " remaining" : ""}`
                     }
                     accessibilityHint={
                       phaseId === "final"
@@ -1421,7 +1441,7 @@ export default function TripSettingsScreen() {
                           <View style={styles.phaseTextCol}>
                             <View style={styles.daysRow}>
                               <AppText variant="body" style={styles.phaseDays}>
-                                {dayLabel(days, phase.active)}
+                                {timerText}
                               </AppText>
                               {phase.active && (
                                 <View style={styles.timepointWrapper}>

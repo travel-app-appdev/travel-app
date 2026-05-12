@@ -1,4 +1,4 @@
-import { ReactNode, useCallback } from "react";
+import { ReactNode, useCallback, useRef } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { AppText } from "./AppText";
-import { PressLock } from "@/src/utils/PressLock";
 
 type AppButtonProps = {
   title: string;
@@ -37,13 +36,27 @@ export function AppButton({
   accessibilityHint,
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
+  const isPressLockedRef = useRef(false);
 
   const handlePress = useCallback(() => {
     if (isDisabled) return;
-    if (!PressLock.acquire()) return;
-    Promise.resolve()
-      .then(() => onPress())
-      .finally(() => setTimeout(() => PressLock.release(), 500));
+    if (isPressLockedRef.current) return;
+    isPressLockedRef.current = true;
+
+    const release = () => {
+      const timeout = setTimeout(() => {
+        isPressLockedRef.current = false;
+      }, 500) as ReturnType<typeof setTimeout> & { unref?: () => void };
+      timeout.unref?.();
+    };
+
+    try {
+      const result = onPress();
+      Promise.resolve(result).finally(release);
+    } catch (error) {
+      release();
+      throw error;
+    }
   }, [onPress, isDisabled]);
 
   return (
