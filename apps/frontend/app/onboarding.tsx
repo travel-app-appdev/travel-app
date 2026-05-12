@@ -17,6 +17,8 @@ import { colors, spacing, radius, typography } from "@/src/theme";
 import { AppButton } from "@/src/components/common/AppButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { navigate } from "expo-router/build/global-state/routing";
+import Back from "@/assets/icons/back.svg";
+import Forward from "@/assets/icons/forward.svg";
 
 
 
@@ -43,15 +45,7 @@ export default function Onboarding() {
                                 <Plane width={25} height={25} />
                                 <Text style={Styles.headerLabel}>Onboarding</Text>
                             </View>
-
-                            <AppButton
-                                title="Skip"
-                                onPress={() => navigate("/home")}
-                                style={Styles.skipButton}
-                                textStyle={Styles.skipButtonText}
-                                accessibilityLabel="Skip onboarding"
-                                accessibilityHint="Skips the onboarding process and navigates to the home screen"
-                            />
+                            <View style={Styles.headerSide} />
 
                         </View>
 
@@ -67,14 +61,27 @@ export default function Onboarding() {
                             </Text>
                         </View>
 
+                        <View style={[Styles. ArrowWrapper, { pointerEvents: "box-none" }]}>
+                            <View style={Styles.arrowSide} /> 
+
+                            <Text>
+                                {step}/3
+                            </Text>
+
+                            <Pressable onPress={() => setStep(2)}>
+                                <Forward width={20} height={20} style={Styles.FowardButton}/>
+                            </Pressable>
+                            
+                        </View>
+
                         <View style={[Styles.continueWrapper, { pointerEvents: "box-none" }]}>
                             <AppButton
-                                title="Continue"
-                                onPress={() => setStep(2)}
+                                title="Skip"
+                               onPress={() => navigate("/home")}
                                 style={Styles.continueButton}
                                 textStyle={Styles.continueButtonText}
-                                accessibilityLabel="Continue to next step"
-                                accessibilityHint="Moves to the next step of onboarding"
+                               accessibilityLabel="Skip onboarding"
+                                accessibilityHint="Skips the onboarding process and navigates to the home screen"
                                         />
                         </View>
                     </>
@@ -109,23 +116,32 @@ export default function Onboarding() {
                             </Text>
                         </View>
 
+                        
+
+                        <View style={[Styles.ArrowWrapper, { pointerEvents: "box-none" }]}>
+                            <Pressable onPress={() => setStep(1)}>
+                                <Back width={20} height={20} />
+                            </Pressable>
+
+                            <Text>
+                                {step}/3
+                            </Text>
+
+                            <Pressable onPress={() => setStep(3)}>
+                                <Forward width={20} height={20} style={Styles.FowardButton}/>
+                            </Pressable>
+                            
+                        </View>
+
                         <View style={[Styles.continueWrapper, { pointerEvents: "box-none" }]}>
                             <AppButton
-                                title="Previous"
-                                onPress={() => setStep(1)}
+                                title="Skip"
+                               onPress={() => navigate("/home")}
                                 style={Styles.continueButton}
                                 textStyle={Styles.continueButtonText}
-                                accessibilityLabel="Go to Previous step"
-                                accessibilityHint="Moves to the previous step of onboarding"
-                            />
-                            <AppButton
-                                title="Continue"
-                                onPress={() => setStep(3)}
-                                style={Styles.continueButton}
-                                textStyle={Styles.continueButtonText}
-                                accessibilityLabel="Continue to next step"
-                                accessibilityHint="Moves to the next step of onboarding"
-                            />
+                               accessibilityLabel="Skip onboarding"
+                                accessibilityHint="Skips the onboarding process and navigates to the home screen"
+                                        />
                         </View>
                     </>
 
@@ -157,23 +173,26 @@ export default function Onboarding() {
                             </Text>
                         </View>
 
+                        <View style={[Styles.ArrowWrapper, { pointerEvents: "box-none" }]}>
+                            <Pressable onPress={() => setStep(2)}>
+                                <Back width={20} height={20} />
+                            </Pressable>
+                            <Text>
+                                {step}/3
+                            </Text>
+                             <View style={Styles.arrowSide} /> 
+
+                        </View>
+
                         <View style={[Styles.continueWrapper, { pointerEvents: "box-none" }]}>
                             <AppButton
-                                title="Previous"
-                                onPress={() => setStep(2)}
-                                style={Styles.continueButton}
-                                textStyle={Styles.continueButtonText}
-                                accessibilityLabel="Go to Previous step"
-                                accessibilityHint="Moves to the previous step of onboarding"
-                            />
-                            <AppButton
                                 title="Finish"
-                                onPress={() => navigate("/home")}
+                               onPress={() => navigate("/home")}
                                 style={Styles.continueButton}
                                 textStyle={Styles.continueButtonText}
-                                accessibilityLabel="Finish onboarding"
+                               accessibilityLabel="Finish onboarding"
                                 accessibilityHint="Completes the onboarding process and navigates to the home screen"
-                            />
+                                        />
                         </View>
                     </>
                     )
@@ -207,6 +226,10 @@ const Styles = StyleSheet.create({
 
 headerSide: {
   width: 80, // MUST match Skip button width
+},
+
+arrowSide: {
+    width: 20, 
 },
 
 headerTitle: {
@@ -267,6 +290,17 @@ headerLabel: {
     justifyContent: "space-between",
     alignItems: "center",
     },
+
+    ArrowWrapper: {
+        position: "absolute",
+        bottom: SCREEN_WIDTH * (210 / 393),
+        left: spacing.xl,
+        right: spacing.xl,
+        zIndex: 10,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
   continueButton: {
     backgroundColor: colors.sunsetOrange,
     flex: 1, 
@@ -307,4 +341,9 @@ skipButtonText: {
     marginTop: spacing.xxxxl2,
     fontWeight: "bold",
   },
+  FowardButton: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+}, 
 });
