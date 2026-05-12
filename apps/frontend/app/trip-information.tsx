@@ -1,4 +1,3 @@
-// app/trip-information.tsx
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ScrollView,
