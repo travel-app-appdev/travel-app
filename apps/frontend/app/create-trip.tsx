@@ -1,4 +1,3 @@
-// app/create-trip.tsx
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
