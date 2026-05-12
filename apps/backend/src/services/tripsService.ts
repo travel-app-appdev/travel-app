@@ -39,8 +39,13 @@ export async function getTripsForUser(userId: string): Promise<Trip[]> {
 
     const tripResults = await Promise.all(
         memberships.map(async (membership): Promise<Trip | null> => {
-            const trip = await findTripById(membership.trip_id);
-            if (!trip) return null;
+            let trip: Trip;
+            try {
+                trip = await advanceTripStateIfNeeded(membership.trip_id);
+            } catch (error: any) {
+                if (error.status === 404) return null;
+                throw error;
+            }
 
             const tripMembers = await findAcceptedMembersByTripId(membership.trip_id);
 
@@ -75,6 +80,7 @@ export async function createTripForAuthenticatedUser(
         planning_end_at: input.planning_end_at,
         voting_end_at: input.voting_end_at,
     });
+    ensurePlanningEndIsFuture(input.planning_end_at);
 
     return createTripWithInviteCode({
         userId: decoded.uid,
@@ -98,6 +104,7 @@ export async function createTripForUserWithoutAuth(
         planning_end_at: input.planning_end_at,
         voting_end_at: input.voting_end_at,
     });
+    ensurePlanningEndIsFuture(input.planning_end_at);
 
     return createTripWithAdminMembership({
         userId: input.userId,
@@ -398,6 +405,17 @@ function ensureValidTripTimeline(input: {
     }
 }
 
+function ensurePlanningEndIsFuture(planningEndAt?: string) {
+    const planningEnd = parseIsoDate(planningEndAt);
+
+    if (planningEnd && isPast(planningEnd)) {
+        throw {
+            status: 400,
+            message: "Planning end must be in the future",
+        };
+    }
+}
+
 export async function advanceTripStateIfNeeded(tripId: string): Promise<Trip> {
     const trip = await findTripById(tripId);
 
@@ -534,15 +552,10 @@ export async function transitionVotingToFinalIfNeeded(tripId: string): Promise<T
         return trip;
     }
 
-    const members = await findAcceptedMembersByTripId(tripId);
     const votingEnd = parseIsoDate(trip.voting_end_at);
     const votingEnded = votingEnd ? isPast(votingEnd) : false;
-    const completion = await getVotingCompletionStatus(
-        tripId,
-        members.map((member) => member.user_id)
-    );
 
-    if (!completion.isComplete && !votingEnded) {
+    if (!votingEnded) {
         return trip;
     }
 

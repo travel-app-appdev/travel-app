@@ -45,6 +45,8 @@ import {
 } from "@/src/services/activityService";
 
 const DEV_FORCE_STATE: ItineraryState | null = null;
+const TRANSITION_OVERLAY_MS = 1800;
+const TRIP_STATE_POLL_INTERVAL_MS = 10 * 1000;
 
 const activitiesCache = new Map<string, Activity[]>();
 
@@ -388,6 +390,8 @@ export default function ItineraryScreen() {
 
   const activeState: ItineraryState =
     DEV_FORCE_STATE ?? routeState ?? itinerary.state;
+  const activeStateRef = useRef<ItineraryState>(activeState);
+  const transitionTargetStateRef = useRef<ItineraryState | null>(null);
 
   const [timerDeadlines, setTimerDeadlines] = useState(() => ({
     planningEndAt,
@@ -456,6 +460,10 @@ export default function ItineraryScreen() {
     });
   }, [planningEndAt, votingEndAt]);
 
+  useEffect(() => {
+    activeStateRef.current = activeState;
+  }, [activeState]);
+
   const refreshTripTimerFields = useCallback(
     async (options: { forceRefresh?: boolean } = {}) => {
       if (!currentUserId || !tripId) return;
@@ -475,40 +483,85 @@ export default function ItineraryScreen() {
         const nextState = toUiState(currentTrip.state);
         const nextPlanningEndAt = currentTrip.planning_end_at ?? planningEndAt;
         const nextVotingEndAt = currentTrip.voting_end_at ?? votingEndAt;
+        const currentState = activeStateRef.current;
 
         setTimerDeadlines({
           planningEndAt: nextPlanningEndAt,
           votingEndAt: nextVotingEndAt,
         });
 
-        setItinerary((current) => ({
-          ...current,
-          title: currentTrip.title ?? current.title,
-          destination: currentTrip.destination ?? current.destination,
-          startDate: currentTrip.start_date ?? current.startDate,
-          endDate: currentTrip.end_date ?? current.endDate,
-          state: nextState,
-          planningStatus:
-            refreshedPlanningStatus ??
-            (nextState === "planning" &&
-            nextPlanningEndAt &&
-            nextPlanningEndAt !== timerDeadlines.planningEndAt
-              ? resetPlanningStatus(current.planningStatus)
-              : current.planningStatus),
-        }));
+        const applyRefreshedTrip = (stateToApply: ItineraryState) => {
+          setItinerary((current) => ({
+            ...current,
+            title: currentTrip.title ?? current.title,
+            destination: currentTrip.destination ?? current.destination,
+            startDate: currentTrip.start_date ?? current.startDate,
+            endDate: currentTrip.end_date ?? current.endDate,
+            state: stateToApply,
+            planningStatus:
+              refreshedPlanningStatus ??
+              (stateToApply === "planning" &&
+              nextPlanningEndAt &&
+              nextPlanningEndAt !== timerDeadlines.planningEndAt
+                ? resetPlanningStatus(current.planningStatus)
+                : current.planningStatus),
+          }));
 
-        router.setParams({
-          state: nextState,
-          title: currentTrip.title,
-          destination: currentTrip.destination,
-          startDate: currentTrip.start_date,
-          endDate: currentTrip.end_date,
-          planningEndAt: nextPlanningEndAt ?? "",
-          votingEndAt: nextVotingEndAt ?? "",
-          members: refreshedPlanningStatus
-            ? JSON.stringify(refreshedPlanningStatus)
-            : members,
-        });
+          router.setParams({
+            state: stateToApply,
+            title: currentTrip.title,
+            destination: currentTrip.destination,
+            startDate: currentTrip.start_date,
+            endDate: currentTrip.end_date,
+            planningEndAt: nextPlanningEndAt ?? "",
+            votingEndAt: nextVotingEndAt ?? "",
+            members: refreshedPlanningStatus
+              ? JSON.stringify(refreshedPlanningStatus)
+              : members,
+          });
+        };
+
+        const shouldShowTransitionOverlay =
+          currentState !== nextState &&
+          ((currentState === "planning" &&
+            (nextState === "voting" || nextState === "final")) ||
+            (currentState === "voting" && nextState === "final"));
+
+        if (shouldShowTransitionOverlay) {
+          if (transitionTargetStateRef.current === nextState) return;
+
+          transitionTargetStateRef.current = nextState;
+
+          const finishTransition = () => {
+            applyRefreshedTrip(nextState);
+            setActivityRefreshKey((value) => value + 1);
+            transitionTargetStateRef.current = null;
+          };
+
+          if (nextState === "voting") {
+            setIsPreparingVoting(true);
+            if (votingTransitionTimeoutRef.current) {
+              clearTimeout(votingTransitionTimeoutRef.current);
+            }
+            votingTransitionTimeoutRef.current = setTimeout(() => {
+              finishTransition();
+              setIsPreparingVoting(false);
+            }, TRANSITION_OVERLAY_MS);
+            return;
+          }
+
+          setIsPreparingFinalItinerary(true);
+          if (finalizingTimeoutRef.current) {
+            clearTimeout(finalizingTimeoutRef.current);
+          }
+          finalizingTimeoutRef.current = setTimeout(() => {
+            finishTransition();
+            setIsPreparingFinalItinerary(false);
+          }, TRANSITION_OVERLAY_MS);
+          return;
+        }
+
+        applyRefreshedTrip(nextState);
       } catch (error) {
         console.log("Could not refresh trip timer:", error);
       }
@@ -574,6 +627,22 @@ export default function ItineraryScreen() {
     timerDeadlines.planningEndAt,
     timerDeadlines.votingEndAt,
   ]);
+
+  useEffect(() => {
+    if (
+      !currentUserId ||
+      !tripId ||
+      (activeState !== "planning" && activeState !== "voting")
+    ) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      void refreshTripTimerFields({ forceRefresh: true });
+    }, TRIP_STATE_POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [activeState, currentUserId, refreshTripTimerFields, tripId]);
 
   useEffect(() => {
     const updateTimer = () => {
@@ -899,57 +968,20 @@ export default function ItineraryScreen() {
     setIsSubmittingPlanning(true);
 
     try {
-      const result = await finishPlanning({
+      await finishPlanning({
         idToken: authToken,
         tripId: itinerary.tripId,
       });
-      const backendState = toUiState(result.tripState);
-      const nextState =
-        backendState === "voting" &&
-        shouldSkipVoting(result.totalMembers || tripMemberCount)
-          ? "final"
-          : backendState;
 
       setItinerary((current) => ({
         ...current,
-        state:
-          nextState === "voting" || nextState === "final"
-            ? current.state
-            : nextState,
         planningStatus: markPlanningDoneForUser(
           current.planningStatus,
           currentUserId
         ),
       }));
 
-      if (nextState === "voting") {
-        setIsPreparingVoting(true);
-        if (votingTransitionTimeoutRef.current) {
-          clearTimeout(votingTransitionTimeoutRef.current);
-        }
-        votingTransitionTimeoutRef.current = setTimeout(() => {
-          setItinerary((current) => ({ ...current, state: "voting" }));
-          setIsPreparingVoting(false);
-          setActivityRefreshKey((value) => value + 1);
-          router.setParams({ state: "voting" });
-          void refreshTripTimerFields({ forceRefresh: true });
-        }, 1800);
-      } else if (nextState === "final") {
-        setIsPreparingFinalItinerary(true);
-        if (finalizingTimeoutRef.current) {
-          clearTimeout(finalizingTimeoutRef.current);
-        }
-        finalizingTimeoutRef.current = setTimeout(() => {
-          setItinerary((current) => ({ ...current, state: "final" }));
-          setIsPreparingFinalItinerary(false);
-          setActivityRefreshKey((value) => value + 1);
-          router.setParams({ state: "final" });
-          void refreshTripTimerFields({ forceRefresh: true });
-        }, 1800);
-      } else {
-        router.setParams({ state: nextState });
-        void refreshTripTimerFields({ forceRefresh: true });
-      }
+      void refreshTripTimerFields({ forceRefresh: true });
     } catch (error) {
       Alert.alert(
         "Could not finish planning",
