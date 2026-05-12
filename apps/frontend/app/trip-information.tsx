@@ -1,3 +1,4 @@
+// app/trip-information.tsx
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ScrollView,
@@ -18,6 +19,7 @@ import {
 import { BackLink } from "@/src/components/common/BackLink";
 import { leaveTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
+import { invalidateTripsCache } from "./home";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import InfoIcon from "@/assets/icons/info.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
@@ -143,11 +145,6 @@ export default function TripInformationScreen() {
   const [isLeaving, setIsLeaving] = useState(false);
 
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
-  // If you later push timeouts into timeoutRefs.current, this will still clean them up.
-  // Right now it's harmless but safe to keep.
-  // useEffect(() => {
-  //   return () => timeoutRefs.current.forEach(clearTimeout);
-  // }, []);
 
   const members: MemberParam[] = useMemo(() => {
     try {
@@ -231,6 +228,7 @@ export default function TripInformationScreen() {
             }
             const idToken = await currentUser.getIdToken();
             await leaveTrip({ idToken, tripId });
+            invalidateTripsCache();
             router.replace("/home");
           } catch (error) {
             const message =
