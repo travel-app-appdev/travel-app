@@ -43,6 +43,7 @@ jest.mock("../repositories/activityRepository", () => ({
 
 import {
     findAcceptedMembersByTripId,
+    findAcceptedMembershipsByUserId,
     findMembership,
     findTripById,
     markMemberPlanningDone,
@@ -57,6 +58,7 @@ import {
 import { voteForActivity } from "../services/activityService";
 import {
     finishPlanningForMember,
+    getTripsForUser,
     transitionPlanningToNextState,
     transitionVotingToFinalIfNeeded,
 } from "../services/tripsService";
@@ -96,18 +98,10 @@ describe("voting timer transition", () => {
         };
 
         mocked(findTripById).mockResolvedValue(trip);
-        mocked(findAcceptedMembersByTripId).mockResolvedValue([
-            { user_id: "user-a", trip_id: TRIP_ID, role: "admin", invite_status: "accepted" },
-            { user_id: "user-b", trip_id: TRIP_ID, role: "member", invite_status: "accepted" },
-        ]);
-        mocked(getVotingCompletionStatus).mockResolvedValue({
-            isComplete: false,
-            requiredSlotIds: [SLOT_ID],
-            completedUserIds: ["user-a"],
-        });
-
         await expect(transitionVotingToFinalIfNeeded(TRIP_ID)).resolves.toBe(trip);
 
+        expect(findAcceptedMembersByTripId).not.toHaveBeenCalled();
+        expect(getVotingCompletionStatus).not.toHaveBeenCalled();
         expect(createFinalItineraryForTrip).not.toHaveBeenCalled();
         expect(updateTripState).not.toHaveBeenCalled();
     });
@@ -127,23 +121,15 @@ describe("voting timer transition", () => {
         mocked(findTripById)
             .mockResolvedValueOnce(votingTrip)
             .mockResolvedValueOnce(finalTrip);
-        mocked(findAcceptedMembersByTripId).mockResolvedValue([
-            { user_id: "user-a", trip_id: TRIP_ID, role: "admin", invite_status: "accepted" },
-            { user_id: "user-b", trip_id: TRIP_ID, role: "member", invite_status: "accepted" },
-        ]);
-        mocked(getVotingCompletionStatus).mockResolvedValue({
-            isComplete: false,
-            requiredSlotIds: [SLOT_ID],
-            completedUserIds: ["user-a"],
-        });
-
         await expect(transitionVotingToFinalIfNeeded(TRIP_ID)).resolves.toEqual(finalTrip);
 
+        expect(findAcceptedMembersByTripId).not.toHaveBeenCalled();
+        expect(getVotingCompletionStatus).not.toHaveBeenCalled();
         expect(createFinalItineraryForTrip).toHaveBeenCalledWith(TRIP_ID);
         expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Final");
     });
 
-    it("still finalizes before the deadline when voting is complete", async () => {
+    it("keeps a complete voting trip in Voting until the deadline", async () => {
         const votingTrip = {
             trip_id: TRIP_ID,
             title: "Vienna",
@@ -153,24 +139,15 @@ describe("voting timer transition", () => {
             state: "Voting" as const,
             voting_end_at: FUTURE_DEADLINE,
         };
-        const finalTrip = { ...votingTrip, state: "Final" as const };
 
-        mocked(findTripById)
-            .mockResolvedValueOnce(votingTrip)
-            .mockResolvedValueOnce(finalTrip);
-        mocked(findAcceptedMembersByTripId).mockResolvedValue([
-            { user_id: USER_ID, trip_id: TRIP_ID, role: "admin", invite_status: "accepted" },
-        ]);
-        mocked(getVotingCompletionStatus).mockResolvedValue({
-            isComplete: true,
-            requiredSlotIds: [SLOT_ID],
-            completedUserIds: [USER_ID],
-        });
+        mocked(findTripById).mockResolvedValue(votingTrip);
 
-        await expect(transitionVotingToFinalIfNeeded(TRIP_ID)).resolves.toEqual(finalTrip);
+        await expect(transitionVotingToFinalIfNeeded(TRIP_ID)).resolves.toBe(votingTrip);
 
-        expect(createFinalItineraryForTrip).toHaveBeenCalledWith(TRIP_ID);
-        expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Final");
+        expect(findAcceptedMembersByTripId).not.toHaveBeenCalled();
+        expect(getVotingCompletionStatus).not.toHaveBeenCalled();
+        expect(createFinalItineraryForTrip).not.toHaveBeenCalled();
+        expect(updateTripState).not.toHaveBeenCalled();
     });
 
     it("does not count a vote submitted after the voting deadline", async () => {
@@ -211,7 +188,7 @@ describe("voting timer transition", () => {
         expect(upsertActivityVote).not.toHaveBeenCalled();
     });
 
-    it("counts an on-time vote and can finalize when it completes voting", async () => {
+    it("counts an on-time vote and stays in Voting until the deadline", async () => {
         mocked(mockVerifyIdToken).mockResolvedValue({ uid: USER_ID });
         mocked(findTripById).mockResolvedValue({
             trip_id: TRIP_ID,
@@ -238,14 +215,6 @@ describe("voting timer transition", () => {
                 source_type: "manual",
             },
         ]);
-        mocked(findAcceptedMembersByTripId).mockResolvedValue([
-            { user_id: USER_ID, trip_id: TRIP_ID, role: "member", invite_status: "accepted" },
-        ]);
-        mocked(getVotingCompletionStatus).mockResolvedValue({
-            isComplete: true,
-            requiredSlotIds: [SLOT_ID],
-            completedUserIds: [USER_ID],
-        });
 
         await expect(
             voteForActivity({
@@ -257,7 +226,7 @@ describe("voting timer transition", () => {
         ).resolves.toEqual({
             activityId: ACTIVITY_ID,
             slotId: SLOT_ID,
-            tripState: "Final",
+            tripState: "Voting",
             voteAccepted: true,
         });
 
@@ -267,8 +236,64 @@ describe("voting timer transition", () => {
             userId: USER_ID,
             activityId: ACTIVITY_ID,
         });
-        expect(createFinalItineraryForTrip).toHaveBeenCalledWith(TRIP_ID);
-        expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Final");
+        expect(findAcceptedMembersByTripId).not.toHaveBeenCalled();
+        expect(getVotingCompletionStatus).not.toHaveBeenCalled();
+        expect(createFinalItineraryForTrip).not.toHaveBeenCalled();
+        expect(updateTripState).not.toHaveBeenCalled();
+    });
+});
+
+describe("trip list state repair", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        jest.spyOn(Date, "now").mockReturnValue(new Date(NOW).getTime());
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
+    it("advances trips before returning them from the user trip list", async () => {
+        const planningTrip = {
+            trip_id: TRIP_ID,
+            title: "Vienna",
+            destination: "Vienna",
+            start_date: "2026-06-01",
+            end_date: "2026-06-03",
+            state: "Planning" as const,
+            planning_end_at: PAST_DEADLINE,
+        };
+        const votingTrip = { ...planningTrip, state: "Voting" as const };
+
+        mocked(findAcceptedMembershipsByUserId).mockResolvedValue([
+            { user_id: USER_ID, trip_id: TRIP_ID, role: "member", invite_status: "accepted" },
+        ]);
+        mocked(findTripById)
+            .mockResolvedValueOnce(planningTrip)
+            .mockResolvedValueOnce(planningTrip)
+            .mockResolvedValueOnce(votingTrip);
+        mocked(findAcceptedMembersByTripId).mockResolvedValue([
+            { user_id: "user-a", trip_id: TRIP_ID, role: "admin", invite_status: "accepted", planning_done: false },
+            { user_id: USER_ID, trip_id: TRIP_ID, role: "member", invite_status: "accepted", planning_done: false },
+        ]);
+        mocked(getVotingCompletionStatus).mockResolvedValue({
+            isComplete: false,
+            requiredSlotIds: [SLOT_ID],
+            completedUserIds: [],
+        });
+
+        await expect(getTripsForUser(USER_ID)).resolves.toEqual([
+            {
+                ...votingTrip,
+                role: "member",
+                members: [
+                    { id: "user-a", name: "Unknown User", role: "admin", planning_done: false },
+                    { id: USER_ID, name: "Unknown User", role: "member", planning_done: false },
+                ],
+            },
+        ]);
+
+        expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Voting");
     });
 });
 
