@@ -283,7 +283,7 @@ skipButton: {
 },
 skipButtonText: {
    textAlign: "center",
-   color: colors.nightBlack,
+   color: colors.white,
    lineHeight: typography.size.sm,
 },
   continueButtonText: {
