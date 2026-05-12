@@ -435,7 +435,7 @@ useEffect(() => {
 
 const progressAnim = progress.interpolate({
   inputRange: [1, TOTAL_STEPS],
-  outputRange: ["0%", "100%"],
+  outputRange: ["25%", "100%"],
 });
 
 
