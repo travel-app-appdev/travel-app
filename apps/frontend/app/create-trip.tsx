@@ -1,3 +1,4 @@
+// app/create-trip.tsx
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
@@ -27,6 +28,7 @@ import { BackLink } from "@/src/components/common/BackLink";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { PressLock } from "@/src/utils/PressLock";
+import { invalidateTripsCache } from "./home";
 import Plane from "@/assets/icons/plane.svg";
 import CityScape from "@/assets/visuals/city_scape.svg";
 import CurlyYellow from "@/assets/visuals/curly-yellow.svg";
@@ -688,6 +690,7 @@ export default function CreateTripScreen() {
         ),
       });
 
+      invalidateTripsCache();
       setTripCode(result.invite_code ?? "");
       setStep(4);
     } catch (error) {
