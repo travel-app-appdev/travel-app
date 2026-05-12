@@ -1,4 +1,3 @@
-// app/trip-settings.tsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
