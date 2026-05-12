@@ -50,7 +50,8 @@ export default function Onboarding() {
                         </View>
 
                         <View style={Styles.container}>
-                            <Text style={[Styles.title, Styles.titleBg1]}>Plan Together</Text>
+                            <Text style={[Styles.title]}>Plan Together</Text>
+                            <View style={Styles.TitleHighlight1} />
                         </View>
 
                         <View>
@@ -105,7 +106,8 @@ export default function Onboarding() {
                         </View>
 
                         <View style={Styles.container}>
-                            <Text style={[Styles.title, Styles.titleBg2]}>Decide Together</Text>
+                            <Text style={[Styles.title]}>Decide Together</Text>
+                            <View style={Styles.TitleHighlight2} />
                         </View>
 
                         <View>
@@ -162,7 +164,8 @@ export default function Onboarding() {
                         </View>
 
                         <View style={Styles.container}>
-                            <Text style={[Styles.title, Styles.titleBg3]}>Travel Together</Text>
+                            <Text style={[Styles.title]}>Travel Together</Text>
+                            <View style={Styles.TitleHighlight3} />
                         </View>
 
                         <View>
@@ -231,6 +234,33 @@ headerSide: {
 arrowSide: {
     width: 20, 
 },
+
+TitleHighlight1: {
+    height: 5,
+    backgroundColor: colors.beachYellow,
+    borderRadius: radius.pill,
+    marginTop: -4,
+    width: "75%",
+    alignSelf: "center",
+  },
+
+  TitleHighlight2: {
+    height: 4,
+    backgroundColor: colors.sunsetPink,
+    borderRadius: radius.pill,
+    marginTop: -4,
+    width: "75%",
+    alignSelf: "center",
+  },
+
+  TitleHighlight3: {
+    height: 4,
+    backgroundColor: colors.neonGreen,
+    borderRadius: radius.pill,
+    marginTop: -4,
+    width: "75%",
+    alignSelf: "center",
+  },
 
 headerTitle: {
   flexDirection: "row",
