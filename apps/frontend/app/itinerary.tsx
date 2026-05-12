@@ -870,14 +870,23 @@ export default function ItineraryScreen() {
         : "planning";
       setItinerary((current) => ({
         ...current,
-        state: nextState,
+        state: nextState === "final" ? current.state : nextState,
         planningStatus: markPlanningDoneForUser(
           current.planningStatus,
           currentUserId
         ),
       }));
       if (nextState === "final") {
-        router.setParams({ state: "final" });
+        setIsPreparingFinalItinerary(true);
+        if (finalizingTimeoutRef.current) {
+          clearTimeout(finalizingTimeoutRef.current);
+        }
+        finalizingTimeoutRef.current = setTimeout(() => {
+          setItinerary((current) => ({ ...current, state: "final" }));
+          setIsPreparingFinalItinerary(false);
+          setActivityRefreshKey((value) => value + 1);
+          router.setParams({ state: "final" });
+        }, 1800);
       }
       return;
     }
@@ -903,7 +912,10 @@ export default function ItineraryScreen() {
 
       setItinerary((current) => ({
         ...current,
-        state: nextState === "voting" ? current.state : nextState,
+        state:
+          nextState === "voting" || nextState === "final"
+            ? current.state
+            : nextState,
         planningStatus: markPlanningDoneForUser(
           current.planningStatus,
           currentUserId
@@ -920,6 +932,18 @@ export default function ItineraryScreen() {
           setIsPreparingVoting(false);
           setActivityRefreshKey((value) => value + 1);
           router.setParams({ state: "voting" });
+          void refreshTripTimerFields({ forceRefresh: true });
+        }, 1800);
+      } else if (nextState === "final") {
+        setIsPreparingFinalItinerary(true);
+        if (finalizingTimeoutRef.current) {
+          clearTimeout(finalizingTimeoutRef.current);
+        }
+        finalizingTimeoutRef.current = setTimeout(() => {
+          setItinerary((current) => ({ ...current, state: "final" }));
+          setIsPreparingFinalItinerary(false);
+          setActivityRefreshKey((value) => value + 1);
+          router.setParams({ state: "final" });
           void refreshTripTimerFields({ forceRefresh: true });
         }, 1800);
       } else {
@@ -1272,7 +1296,11 @@ export default function ItineraryScreen() {
         {activeState === "planning" && (
           <PlanningDoneBar
             checked={hasCurrentUserFinished}
-            disabled={isSubmittingPlanning}
+            disabled={
+              isSubmittingPlanning ||
+              isPreparingFinalItinerary ||
+              isPreparingVoting
+            }
             onPress={handleFinishPlanning}
             onInfoPress={handlePlanningInfoPress}
           />
