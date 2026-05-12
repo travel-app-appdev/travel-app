@@ -65,7 +65,7 @@ export default function Onboarding() {
                         <View style={[Styles. ArrowWrapper, { pointerEvents: "box-none" }]}>
                             <View style={Styles.arrowSide} /> 
 
-                            <Text>
+                            <Text style={Styles.StepIndicator}>
                                 {step}/3
                             </Text>
 
@@ -125,7 +125,7 @@ export default function Onboarding() {
                                 <Back width={20} height={20} />
                             </Pressable>
 
-                            <Text>
+                            <Text style={Styles.StepIndicator}>
                                 {step}/3
                             </Text>
 
@@ -180,7 +180,7 @@ export default function Onboarding() {
                             <Pressable onPress={() => setStep(2)}>
                                 <Back width={20} height={20} />
                             </Pressable>
-                            <Text>
+                            <Text style={Styles.StepIndicator}>
                                 {step}/3
                             </Text>
                              <View style={Styles.arrowSide} /> 
@@ -336,22 +336,8 @@ headerLabel: {
     flex: 1, 
     marginRight: spacing.sm
   },
-skipButton: {
-  backgroundColor: colors.grayedOut,
-  maxWidth: 80,
-  height: 36,               
-  alignItems: "center",    
-  justifyContent: "center", 
-  paddingHorizontal: spacing.sm,
-  borderRadius: 25,         
-},
-skipButtonText: {
-   textAlign: "center",
-   color: colors.white,
-   lineHeight: typography.size.sm,
-},
   continueButtonText: {
-    color: colors.nightBlack,
+    color: colors.white,
     fontFamily: typography.fontFamily.bodyBold,
   },
   InfoText: {
@@ -370,6 +356,12 @@ skipButtonText: {
     textAlign: "center",
     marginTop: spacing.xxxxl2,
     fontWeight: "bold",
+  },
+  StepIndicator: {
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
+    color: colors.textPrimary,
+    textAlign: "center",
   },
   FowardButton: {
     flex: 1,
