@@ -45,6 +45,7 @@ import {
     findAcceptedMembersByTripId,
     findMembership,
     findTripById,
+    markMemberPlanningDone,
     updateTripState,
 } from "../repositories/tripsRepository";
 import {
@@ -54,7 +55,11 @@ import {
     upsertActivityVote,
 } from "../repositories/activityRepository";
 import { voteForActivity } from "../services/activityService";
-import { transitionVotingToFinalIfNeeded } from "../services/tripsService";
+import {
+    finishPlanningForMember,
+    transitionPlanningToNextState,
+    transitionVotingToFinalIfNeeded,
+} from "../services/tripsService";
 
 const TRIP_ID = "trip-123";
 const SLOT_ID = "2026-06-01_06:00-08:00";
@@ -262,6 +267,156 @@ describe("voting timer transition", () => {
             userId: USER_ID,
             activityId: ACTIVITY_ID,
         });
+        expect(createFinalItineraryForTrip).toHaveBeenCalledWith(TRIP_ID);
+        expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Final");
+    });
+});
+
+describe("planning collision transition", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mocked(mockVerifyIdToken).mockResolvedValue({ uid: USER_ID });
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
+    it("moves a multi-person trip directly to Final when planning is done without collisions", async () => {
+        mocked(findTripById).mockResolvedValue({
+            trip_id: TRIP_ID,
+            title: "Vienna",
+            destination: "Vienna",
+            start_date: "2026-06-01",
+            end_date: "2026-06-03",
+            state: "Planning",
+        });
+        mocked(findMembership).mockResolvedValue({
+            user_id: USER_ID,
+            trip_id: TRIP_ID,
+            role: "member",
+            invite_status: "accepted",
+            planning_done: false,
+        });
+        mocked(findAcceptedMembersByTripId).mockResolvedValue([
+            { user_id: "user-a", trip_id: TRIP_ID, role: "admin", invite_status: "accepted", planning_done: true },
+            { user_id: USER_ID, trip_id: TRIP_ID, role: "member", invite_status: "accepted", planning_done: false },
+        ]);
+        mocked(getVotingCompletionStatus).mockResolvedValue({
+            isComplete: true,
+            requiredSlotIds: [],
+            completedUserIds: ["user-a", USER_ID],
+        });
+
+        await expect(finishPlanningForMember(TRIP_ID, TOKEN)).resolves.toEqual({
+            allDone: true,
+            tripState: "Final",
+            completedMembers: 2,
+            totalMembers: 2,
+        });
+
+        expect(markMemberPlanningDone).toHaveBeenCalledWith(TRIP_ID, USER_ID);
+        expect(getVotingCompletionStatus).toHaveBeenCalledWith(TRIP_ID, ["user-a", USER_ID]);
+        expect(createFinalItineraryForTrip).toHaveBeenCalledWith(TRIP_ID);
+        expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Final");
+    });
+
+    it("moves a multi-person trip to Voting when planning is done with collisions", async () => {
+        mocked(findTripById).mockResolvedValue({
+            trip_id: TRIP_ID,
+            title: "Vienna",
+            destination: "Vienna",
+            start_date: "2026-06-01",
+            end_date: "2026-06-03",
+            state: "Planning",
+        });
+        mocked(findMembership).mockResolvedValue({
+            user_id: USER_ID,
+            trip_id: TRIP_ID,
+            role: "member",
+            invite_status: "accepted",
+            planning_done: false,
+        });
+        mocked(findAcceptedMembersByTripId).mockResolvedValue([
+            { user_id: "user-a", trip_id: TRIP_ID, role: "admin", invite_status: "accepted", planning_done: true },
+            { user_id: USER_ID, trip_id: TRIP_ID, role: "member", invite_status: "accepted", planning_done: false },
+        ]);
+        mocked(getVotingCompletionStatus).mockResolvedValue({
+            isComplete: false,
+            requiredSlotIds: [SLOT_ID],
+            completedUserIds: [],
+        });
+
+        await expect(finishPlanningForMember(TRIP_ID, TOKEN)).resolves.toEqual({
+            allDone: true,
+            tripState: "Voting",
+            completedMembers: 2,
+            totalMembers: 2,
+        });
+
+        expect(createFinalItineraryForTrip).not.toHaveBeenCalled();
+        expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Voting");
+    });
+
+    it("keeps a single-person trip moving directly to Final", async () => {
+        mocked(findTripById).mockResolvedValue({
+            trip_id: TRIP_ID,
+            title: "Vienna",
+            destination: "Vienna",
+            start_date: "2026-06-01",
+            end_date: "2026-06-03",
+            state: "Planning",
+        });
+        mocked(findMembership).mockResolvedValue({
+            user_id: USER_ID,
+            trip_id: TRIP_ID,
+            role: "admin",
+            invite_status: "accepted",
+            planning_done: false,
+        });
+        mocked(findAcceptedMembersByTripId).mockResolvedValue([
+            { user_id: USER_ID, trip_id: TRIP_ID, role: "admin", invite_status: "accepted", planning_done: false },
+        ]);
+
+        await expect(finishPlanningForMember(TRIP_ID, TOKEN)).resolves.toEqual({
+            allDone: true,
+            tripState: "Final",
+            completedMembers: 1,
+            totalMembers: 1,
+        });
+
+        expect(getVotingCompletionStatus).not.toHaveBeenCalled();
+        expect(createFinalItineraryForTrip).toHaveBeenCalledWith(TRIP_ID);
+        expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Final");
+    });
+
+    it("uses the same no-collision rule for timer-based planning transitions", async () => {
+        const planningTrip = {
+            trip_id: TRIP_ID,
+            title: "Vienna",
+            destination: "Vienna",
+            start_date: "2026-06-01",
+            end_date: "2026-06-03",
+            state: "Planning" as const,
+            planning_end_at: PAST_DEADLINE,
+        };
+        const finalTrip = { ...planningTrip, state: "Final" as const };
+
+        mocked(findTripById)
+            .mockResolvedValueOnce(planningTrip)
+            .mockResolvedValueOnce(finalTrip);
+        mocked(findAcceptedMembersByTripId).mockResolvedValue([
+            { user_id: "user-a", trip_id: TRIP_ID, role: "admin", invite_status: "accepted", planning_done: true },
+            { user_id: USER_ID, trip_id: TRIP_ID, role: "member", invite_status: "accepted", planning_done: true },
+        ]);
+        mocked(getVotingCompletionStatus).mockResolvedValue({
+            isComplete: true,
+            requiredSlotIds: [],
+            completedUserIds: ["user-a", USER_ID],
+        });
+
+        await expect(transitionPlanningToNextState(TRIP_ID)).resolves.toEqual(finalTrip);
+
         expect(createFinalItineraryForTrip).toHaveBeenCalledWith(TRIP_ID);
         expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Final");
     });

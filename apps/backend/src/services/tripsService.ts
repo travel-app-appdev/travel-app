@@ -198,7 +198,7 @@ export async function removeMemberForAdmin(input: {
 export async function finishPlanningForMember(
     tripId: string,
     idToken: string
-): Promise<{ allDone: boolean; tripState: string; completedMembers: number; totalMembers: number }> {
+): Promise<{ allDone: boolean; tripState: TripState; completedMembers: number; totalMembers: number }> {
     
     const decoded = await admin.auth().verifyIdToken(idToken);
     const userId = decoded.uid;
@@ -232,18 +232,11 @@ export async function finishPlanningForMember(
     const totalMembers = allMembers.length;
     const allDone = completedMembers === totalMembers;
 
-    // if all done → switch trip state to Voting
-    let nextState = "Planning";
+    // If all members are done, skip Voting when there are no collisions.
+    let nextState: TripState = "Planning";
 
     if (allDone) {
-        if (totalMembers <= 1) {
-            await createFinalItineraryForTrip(tripId);
-            await updateTripState(tripId, "Final");
-            nextState = "Final";
-        } else {
-            await updateTripState(tripId, "Voting");
-            nextState = "Voting";
-        }
+        nextState = await moveCompletedPlanningToNextState(tripId, allMembers);
     }
 
     return {
@@ -481,12 +474,7 @@ export async function transitionPlanningToNextState(tripId: string): Promise<Tri
         return trip;
     }
 
-    if (members.length <= 1) {
-        await createFinalItineraryForTrip(tripId);
-        await updateTripState(tripId, "Final");
-    } else {
-        await updateTripState(tripId, "Voting");
-    }
+    await moveCompletedPlanningToNextState(tripId, members);
 
     const updatedTrip = await findTripById(tripId);
 
@@ -498,6 +486,31 @@ export async function transitionPlanningToNextState(tripId: string): Promise<Tri
 }
 
 // State transitions 'Planning Voting Final' logic
+
+async function moveCompletedPlanningToNextState(
+    tripId: string,
+    members: { user_id: string }[]
+): Promise<TripState> {
+    if (members.length <= 1) {
+        await createFinalItineraryForTrip(tripId);
+        await updateTripState(tripId, "Final");
+        return "Final";
+    }
+
+    const completion = await getVotingCompletionStatus(
+        tripId,
+        members.map((member) => member.user_id)
+    );
+
+    if (completion.requiredSlotIds.length === 0) {
+        await createFinalItineraryForTrip(tripId);
+        await updateTripState(tripId, "Final");
+        return "Final";
+    }
+
+    await updateTripState(tripId, "Voting");
+    return "Voting";
+}
 
 function parseIsoDate(value?: string): Date | null {
     if (!value) return null;
