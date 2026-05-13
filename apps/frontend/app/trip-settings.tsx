@@ -35,6 +35,7 @@ import { auth } from "@/src/lib/firebase";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { PressLock } from "@/src/utils/PressLock";
+import { invalidateTripsCache } from "./home";
 import {
   formatTripDurationText,
   formatTripTimerText,
@@ -907,7 +908,7 @@ export default function TripSettingsScreen() {
           Alert.alert("Invalid voting end", "Voting end cannot be after the trip end date.");
           return;
         }
-        const updatedTrip = await updateTrip({
+        await updateTrip({
           idToken,
           tripId,
           start_date: toLocalDateString(tripStart),
@@ -956,6 +957,7 @@ export default function TripSettingsScreen() {
               const idToken = await getIdToken();
               if (!idToken) return;
               await deleteTrip({ idToken, tripId });
+              invalidateTripsCache();
               router.replace("/home");
             } catch (error) {
               const message =

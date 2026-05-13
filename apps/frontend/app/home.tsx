@@ -69,6 +69,10 @@ type TripsCache = {
 const TRIPS_STALE_TIME_MS = 30_000;
 let tripsCache: TripsCache | null = null;
 
+export function invalidateTripsCache() {
+  tripsCache = null;
+}
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString("en-US", {
