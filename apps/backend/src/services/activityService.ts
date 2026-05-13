@@ -5,13 +5,11 @@ import {
     getActivityById,
     getActivitiesBySlotId,
     getFinalActivitiesByTripId,
-    getVotingCompletionStatus,
     toggleActivityAttendance,
     updateActivityById,
     upsertActivityVote,
 } from "../repositories/activityRepository";
 import {
-    findAcceptedMembersByTripId,
     findTripById,
     findMembership,
     updateTripState,
@@ -182,23 +180,10 @@ export async function voteForActivity(input: {
         activityId: input.activityId,
     });
 
-    let tripState: TripState = "Voting";
-    const members = await findAcceptedMembersByTripId(input.tripId);
-    const completion = await getVotingCompletionStatus(
-        input.tripId,
-        members.map((member) => member.user_id)
-    );
-
-    if (completion.isComplete) {
-        await createFinalItineraryForTrip(input.tripId);
-        await updateTripState(input.tripId, "Final");
-        tripState = "Final";
-    }
-
     return {
         activityId: input.activityId,
         slotId: input.slotId,
-        tripState,
+        tripState: "Voting",
         voteAccepted: true,
     };
 }

@@ -120,6 +120,41 @@ function combineDateAndTime(date: Date, timeStr: string): string {
   return combined.toISOString();
 }
 
+function addMinutesFromNow(minutes: number): Date {
+  const next = new Date();
+  next.setSeconds(0, 0);
+  next.setMinutes(next.getMinutes() + minutes);
+  return next;
+}
+
+function formatTimeValue(date: Date): string {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function isSameLocalDate(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function getFutureTimeForDate(
+  date: Date,
+  preferredTime: string,
+  minutesAhead: number
+): string {
+  const preferredEnd = new Date(combineDateAndTime(date, preferredTime));
+  if (preferredEnd > new Date()) return preferredTime;
+
+  const fallback = addMinutesFromNow(minutesAhead);
+  return isSameLocalDate(date, fallback)
+    ? formatTimeValue(fallback)
+    : preferredTime;
+}
+
 function endOfDay(date: Date): Date {
   const next = new Date(date);
   next.setHours(23, 59, 59, 999);
@@ -247,10 +282,23 @@ export default function CreateTripScreen() {
     },
   ];
 
-  const [phaseDates, setPhaseDates] = useState<PhaseDates>({
-    planning: { start: new Date(), end: new Date(), time: "12:00" },
-    voting: { start: new Date(), end: new Date(), time: "18:00" },
-    final: { start: new Date(), end: new Date(), time: "00:00" },
+  const [phaseDates, setPhaseDates] = useState<PhaseDates>(() => {
+    const planningEnd = addMinutesFromNow(60);
+    const votingEnd = addMinutesFromNow(120);
+
+    return {
+      planning: {
+        start: new Date(),
+        end: planningEnd,
+        time: formatTimeValue(planningEnd),
+      },
+      voting: {
+        start: planningEnd,
+        end: votingEnd,
+        time: formatTimeValue(votingEnd),
+      },
+      final: { start: votingEnd, end: votingEnd, time: "00:00" },
+    };
   });
 
   const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
@@ -317,23 +365,45 @@ export default function CreateTripScreen() {
     const votingStart = planningEnd;
     const votingEnd = planningEnd;
 
-    setPhaseDates((prev) => ({
+    setPhaseDates((prev) => {
+      const planningTime = getFutureTimeForDate(
+        planningEnd,
+        prev.planning.time || "12:00",
+        60
+      );
+      const planningEndAt = new Date(
+        combineDateAndTime(planningEnd, planningTime)
+      );
+      const preferredVotingTime = prev.voting.time || "18:00";
+      const preferredVotingEnd = new Date(
+        combineDateAndTime(votingEnd, preferredVotingTime)
+      );
+      const votingFallback = new Date(planningEndAt);
+      votingFallback.setMinutes(votingFallback.getMinutes() + 60);
+      const votingTime =
+        preferredVotingEnd > planningEndAt ||
+        !isSameLocalDate(votingEnd, votingFallback)
+          ? preferredVotingTime
+          : formatTimeValue(votingFallback);
+
+      return {
       planning: {
         start: planningStart,
         end: planningEnd,
-        time: prev.planning.time || "12:00",
+        time: planningTime,
       },
       voting: {
         start: votingStart,
         end: votingEnd,
-        time: prev.voting.time || "18:00",
+        time: votingTime,
       },
       final: {
         start: votingEnd,
         end: votingEnd,
         time: "00:00",
       },
-    }));
+      };
+    });
   };
 
   const openTripCalendar = () => {
@@ -510,6 +580,13 @@ export default function CreateTripScreen() {
         const currentVotingEnd = new Date(
           combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
         );
+        if (nextEnd <= new Date()) {
+          Alert.alert(
+            "Invalid planning end",
+            "Planning end must be in the future."
+          );
+          return;
+        }
         if (nextEnd > tripEndBoundary) {
           Alert.alert(
             "Invalid planning end",
@@ -639,6 +716,14 @@ export default function CreateTripScreen() {
         combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
       );
       const tripEndBoundary = endOfDay(tripEnd);
+
+      if (planningEnd <= new Date()) {
+        Alert.alert(
+          "Invalid planning end",
+          "Planning end must be in the future."
+        );
+        return;
+      }
 
       if (planningEnd > tripEndBoundary) {
         Alert.alert(
