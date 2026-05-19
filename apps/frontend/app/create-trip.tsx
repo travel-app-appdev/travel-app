@@ -215,9 +215,9 @@ function normalizeTimeInput(value: string): string {
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const CalendarModalWrapper = ({
-  children,
-  isLandscape,
-}: {
+                                children,
+                                isLandscape,
+                              }: {
   children: React.ReactNode;
   isLandscape: boolean;
 }) => (
@@ -387,21 +387,21 @@ export default function CreateTripScreen() {
           : formatTimeValue(votingFallback);
 
       return {
-      planning: {
-        start: planningStart,
-        end: planningEnd,
-        time: planningTime,
-      },
-      voting: {
-        start: votingStart,
-        end: votingEnd,
-        time: votingTime,
-      },
-      final: {
-        start: votingEnd,
-        end: votingEnd,
-        time: "00:00",
-      },
+        planning: {
+          start: planningStart,
+          end: planningEnd,
+          time: planningTime,
+        },
+        voting: {
+          start: votingStart,
+          end: votingEnd,
+          time: votingTime,
+        },
+        final: {
+          start: votingEnd,
+          end: votingEnd,
+          time: "00:00",
+        },
       };
     });
   };
@@ -799,8 +799,9 @@ export default function CreateTripScreen() {
 
   const progressAnim = progress.interpolate({
     inputRange: [1, TOTAL_STEPS],
-    outputRange: ["0%", "100%"],
+    outputRange: ["25%", "100%"],
   });
+
 
   type ProgressBarProps = {
     progressWidth: Animated.AnimatedInterpolation<string>;
@@ -849,7 +850,7 @@ export default function CreateTripScreen() {
     );
   };
 
-  // Step 3 — timer setup
+  // Step 3 â€” timer setup
   if (step === 3) {
     return (
       <View style={[styles.fullScreen, styles.bgStep3]}>
@@ -1113,7 +1114,7 @@ export default function CreateTripScreen() {
                   firstDay={1}
                   renderArrow={(direction) => (
                     <AppText variant="body" style={styles.calendarArrow}>
-                      {direction === "left" ? "‹" : "›"}
+                      {direction === "left" ? "â€¹" : "â€º"}
                     </AppText>
                   )}
                   theme={{
@@ -1261,7 +1262,7 @@ export default function CreateTripScreen() {
     );
   }
 
-  // Step 4 — share code
+  // Step 4 â€” share code
   if (step === 4) {
     return (
       <View style={[styles.fullScreen, styles.bgStep1]}>
@@ -1342,7 +1343,7 @@ export default function CreateTripScreen() {
                     {...hiddenFromAccessibility}
                   >
                     <AppText variant="caption" style={styles.copiedText}>
-                      {copied ? "✓ Copied!" : "Tap to copy"}
+                      {copied ? "âœ“ Copied!" : "Tap to copy"}
                     </AppText>
                     <Copy width={20} height={20} />
                   </View>
@@ -1626,7 +1627,7 @@ export default function CreateTripScreen() {
                 firstDay={1}
                 renderArrow={(direction) => (
                   <AppText variant="body" style={styles.calendarArrow}>
-                    {direction === "left" ? "‹" : "›"}
+                    {direction === "left" ? "â€¹" : "â€º"}
                   </AppText>
                 )}
                 theme={{
@@ -1672,467 +1673,467 @@ export default function CreateTripScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  fullScreen: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  root: {
-    flex: 1,
-    overflow: "hidden",
-  },
-  bgStep1: {
-    backgroundColor: colors.beachYellow,
-  },
-  bgStep2: {
-    backgroundColor: colors.sunsetOrange,
-  },
-  bgStep3: {
-    backgroundColor: colors.lightWhite,
-  },
-  scroll: {
-    flex: 1,
-  },
-  containerStep1: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: SCREEN_HEIGHT * 0.28,
-    gap: spacing.sm,
-  },
-  containerStep2: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: SCREEN_HEIGHT * 0.18,
-    gap: spacing.sm,
-  },
-  containerStep3: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
-    gap: spacing.sm,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  headerTitle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  headerLabel: {
-    fontSize: typography.size.xxl,
-    lineHeight: typography.lineHeight.xxl,
-    fontFamily: typography.fontFamily.bodyBold,
-    color: colors.textPrimary,
-  },
-  titleStep1: {
-    fontSize: typography.size.displaySm,
-    lineHeight: typography.lineHeight.displayLg,
-    color: colors.textPrimary,
-    textAlign: "left",
-    alignSelf: "stretch",
-  },
-  titleStep2: {
-    fontSize: typography.size.displaySm,
-    lineHeight: typography.lineHeight.displayLg,
-    color: colors.textPrimary,
-    textAlign: "left",
-    alignSelf: "stretch",
-  },
-  titleStep3: {
-    fontSize: typography.size.displaySm,
-    lineHeight: typography.lineHeight.displayLg,
-    color: colors.textPrimary,
-    textAlign: "left",
-    alignSelf: "stretch",
-  },
-  fieldGroup: {
-    gap: spacing.sm,
-  },
-  fieldLabelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-  fieldLabel: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.xl,
-    lineHeight: typography.lineHeight.xl,
-  },
-  inputBlackStroke: {
-    borderWidth: 2,
-    borderColor: colors.nightBlack,
-  },
-  dateTimeRow: {
-    flexDirection: "row",
-    gap: spacing.md,
-  },
-  dateTimeHalf: {
-    flex: 1,
-  },
-  dateInput: {
-    backgroundColor: colors.white,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: colors.nightBlack,
-    minHeight: 48,
-  },
-  dateText: {
-    fontSize: typography.size.md,
-    lineHeight: typography.lineHeight.md,
-    color: colors.textPrimary,
-  },
-  codeInput: {
-    backgroundColor: colors.white,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: colors.nightBlack,
-    minHeight: 48,
-  },
-  codeText: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.xl,
-    lineHeight: typography.lineHeight.xl,
-    letterSpacing: 3,
-  },
-  copyActionArea: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-  copiedText: {
-    color: colors.nightBlack,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-  },
-  codeCaption: {
-    color: colors.nightBlack,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-    fontFamily: typography.fontFamily.body,
-  },
-  continueWrapper: {
-    position: "absolute",
-    left: spacing.xl,
-    right: spacing.xl,
-    zIndex: 10,
-  },
-  continueButton: {
-    backgroundColor: colors.sunsetOrange,
-  },
-  continueButtonText: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-  },
-  backToLandingButton: {
-    backgroundColor: colors.sunsetOrange,
-  },
-  backToLandingText: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-  },
-  cityScapeWrapper: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    width: SCREEN_WIDTH,
-    height: SCREEN_WIDTH * (221 / 393),
-    zIndex: 5,
-  },
-  curlyWrapper: {
-    position: "absolute",
-    bottom: -SCREEN_WIDTH * 0.3,
-    left: -SCREEN_WIDTH * 0.1,
-    zIndex: 0,
-  },
-  createWrapper: {
-    position: "absolute",
-    left: spacing.xl,
-    right: spacing.xl,
-    zIndex: 10,
-  },
-  createButton: {
-    backgroundColor: colors.seaBlue,
-  },
-  createButtonText: {
-    color: colors.lightWhite,
-    fontFamily: typography.fontFamily.bodyBold,
-  },
-  curlyOrangeWrapper: {
-    position: "absolute",
-    bottom: -SCREEN_WIDTH * 0.3,
-    left: -SCREEN_WIDTH * 0.1,
-    zIndex: 0,
-  },
-  setupText: {
-    fontSize: 18,
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-  },
-  phaseRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  phaseLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    flex: 1,
-  },
-  phaseBadge: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-  },
-  phaseBadgeText: {
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-  },
-  phaseTimerBlock: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-  hourglassCol: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  phaseTextCol: {
-    flexDirection: "column",
-    justifyContent: "center",
-  },
-  daysRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 3,
-  },
-  phaseDays: {
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-    color: colors.textPrimary,
-  },
-  timepointWrapper: {
-    marginTop: 1,
-  },
-  timerLabel: {
-    color: colors.textMuted,
-    fontSize: typography.size.xs,
-    lineHeight: typography.lineHeight.xs,
-  },
-  phaseDateLabel: {
-    color: colors.nightBlack,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-    paddingLeft: 4,
-  },
-  phaseEndLabel: {
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.md,
-    color: colors.textPrimary,
-  },
-  expandedField: {
-    gap: spacing.md,
-  },
-  updateButtonVoting: {
-    backgroundColor: colors.sunsetPink,
-  },
-  updateButtonPlanning: {
-    backgroundColor: colors.beachYellow,
-  },
-  updateButtonText: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-  },
-  successRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-  successText: {
-    color: colors.textPrimary,
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-  },
-  step3Footer: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
-    backgroundColor: colors.lightWhite,
-  },
-  nextButton: {
-    backgroundColor: colors.sunsetOrange,
-  },
-  nextButtonText: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-  },
-  finalInfoBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  finalInfoText: {
-    flex: 1,
-    color: colors.nightBlack,
-    fontSize: typography.size.lg,
-    lineHeight: typography.lineHeight.lg,
-    fontFamily: typography.fontFamily.body,
-  },
-  calendarOverlay: {
-    flex: 1,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
-  },
-  calendarModal: {
-    backgroundColor: colors.lightWhite,
-    borderRadius: radius.xl,
-    padding: spacing.xl,
-    gap: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.nightBlack,
-  },
-  calendarTitle: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.xl,
-    lineHeight: typography.lineHeight.xl,
-  },
-  calendarCard: {
-    paddingBottom: spacing.sm,
-  },
-  calendarArrow: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.xl,
-    lineHeight: typography.lineHeight.xl,
-    paddingHorizontal: spacing.sm,
-  },
-  calendarLegend: {
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: spacing.md,
-    marginTop: spacing.sm,
-  },
-  legendRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-  legendSwatch: {
-    width: 16,
-    height: 16,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.nightBlack,
-  },
-  legendLabel: {
-    color: colors.nightBlack,
-    fontSize: typography.size.xs,
-    lineHeight: typography.lineHeight.xs,
-    fontFamily: typography.fontFamily.body,
-  },
-  calendarActions: {
-    flexDirection: "row",
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  calendarCancelButton: {
-    flex: 1,
-    backgroundColor: colors.beachYellow,
-  },
-  calendarCancelButtonText: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-  },
-  calendarApplyButton: {
-    flex: 1,
-    backgroundColor: colors.sunsetOrange,
-  },
-  calendarApplyButtonText: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-  },
-  timeModalContent: {
-    gap: spacing.md,
-  },
-  timeModalHint: {
-    color: colors.textMuted,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-    fontFamily: typography.fontFamily.body,
-  },
-  timeInputModalBox: {
-    backgroundColor: colors.white,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: colors.nightBlack,
-    minHeight: 64,
-  },
-  timeInputModal: {
-    flex: 1,
-    minHeight: 44,
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.xxl,
-    lineHeight: typography.lineHeight.xxl,
-    paddingVertical: 0,
-    paddingHorizontal: 0,
-    includeFontPadding: false,
-    textAlignVertical: "center",
-    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
-  },
-  quickTimeWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-  },
-  quickTimeChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: colors.white,
-    borderWidth: 2,
-    borderColor: colors.nightBlack,
-  },
-  quickTimeChipActive: {
-    backgroundColor: colors.beachYellow,
-  },
-  quickTimeChipText: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-  },
-  quickTimeChipTextActive: {
-    color: colors.nightBlack,
-  },
-});
+  const styles = StyleSheet.create({
+    fullScreen: {
+      flex: 1,
+    },
+    safeArea: {
+      flex: 1,
+    },
+    root: {
+      flex: 1,
+      overflow: "hidden",
+    },
+    bgStep1: {
+      backgroundColor: colors.beachYellow,
+    },
+    bgStep2: {
+      backgroundColor: colors.sunsetOrange,
+    },
+    bgStep3: {
+      backgroundColor: colors.lightWhite,
+    },
+    scroll: {
+      flex: 1,
+    },
+    containerStep1: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.lg,
+      paddingBottom: SCREEN_HEIGHT * 0.28,
+      gap: spacing.sm,
+    },
+    containerStep2: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.lg,
+      paddingBottom: SCREEN_HEIGHT * 0.18,
+      gap: spacing.sm,
+    },
+    containerStep3: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.lg,
+      paddingBottom: spacing.xl,
+      gap: spacing.sm,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      position: "relative",
+    },
+    headerTitle: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+    },
+    headerLabel: {
+      fontSize: typography.size.xxl,
+      lineHeight: typography.lineHeight.xxl,
+      fontFamily: typography.fontFamily.bodyBold,
+      color: colors.textPrimary,
+    },
+    titleStep1: {
+      fontSize: typography.size.displaySm,
+      lineHeight: typography.lineHeight.displayLg,
+      color: colors.textPrimary,
+      textAlign: "left",
+      alignSelf: "stretch",
+    },
+    titleStep2: {
+      fontSize: typography.size.displaySm,
+      lineHeight: typography.lineHeight.displayLg,
+      color: colors.textPrimary,
+      textAlign: "left",
+      alignSelf: "stretch",
+    },
+    titleStep3: {
+      fontSize: typography.size.displaySm,
+      lineHeight: typography.lineHeight.displayLg,
+      color: colors.textPrimary,
+      textAlign: "left",
+      alignSelf: "stretch",
+    },
+    fieldGroup: {
+      gap: spacing.sm,
+    },
+    fieldLabelRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+    },
+    fieldLabel: {
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+      fontSize: typography.size.xl,
+      lineHeight: typography.lineHeight.xl,
+    },
+    inputBlackStroke: {
+      borderWidth: 2,
+      borderColor: colors.nightBlack,
+    },
+    dateTimeRow: {
+      flexDirection: "row",
+      gap: spacing.md,
+    },
+    dateTimeHalf: {
+      flex: 1,
+    },
+    dateInput: {
+      backgroundColor: colors.white,
+      borderRadius: radius.sm,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: colors.nightBlack,
+      minHeight: 48,
+    },
+    dateText: {
+      fontSize: typography.size.md,
+      lineHeight: typography.lineHeight.md,
+      color: colors.textPrimary,
+    },
+    codeInput: {
+      backgroundColor: colors.white,
+      borderRadius: radius.sm,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: colors.nightBlack,
+      minHeight: 48,
+    },
+    codeText: {
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+      fontSize: typography.size.xl,
+      lineHeight: typography.lineHeight.xl,
+      letterSpacing: 3,
+    },
+    copyActionArea: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+    },
+    copiedText: {
+      color: colors.nightBlack,
+      fontSize: typography.size.sm,
+      lineHeight: typography.lineHeight.sm,
+    },
+    codeCaption: {
+      color: colors.nightBlack,
+      fontSize: typography.size.sm,
+      lineHeight: typography.lineHeight.sm,
+      fontFamily: typography.fontFamily.body,
+    },
+    continueWrapper: {
+      position: "absolute",
+      left: spacing.xl,
+      right: spacing.xl,
+      zIndex: 10,
+    },
+    continueButton: {
+      backgroundColor: colors.sunsetOrange,
+    },
+    continueButtonText: {
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+    },
+    backToLandingButton: {
+      backgroundColor: colors.sunsetOrange,
+    },
+    backToLandingText: {
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+    },
+    cityScapeWrapper: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      width: SCREEN_WIDTH,
+      height: SCREEN_WIDTH * (221 / 393),
+      zIndex: 5,
+    },
+    curlyWrapper: {
+      position: "absolute",
+      bottom: -SCREEN_WIDTH * 0.3,
+      left: -SCREEN_WIDTH * 0.1,
+      zIndex: 0,
+    },
+    createWrapper: {
+      position: "absolute",
+      left: spacing.xl,
+      right: spacing.xl,
+      zIndex: 10,
+    },
+    createButton: {
+      backgroundColor: colors.seaBlue,
+    },
+    createButtonText: {
+      color: colors.lightWhite,
+      fontFamily: typography.fontFamily.bodyBold,
+    },
+    curlyOrangeWrapper: {
+      position: "absolute",
+      bottom: -SCREEN_WIDTH * 0.3,
+      left: -SCREEN_WIDTH * 0.1,
+      zIndex: 0,
+    },
+    setupText: {
+      fontSize: 18,
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+    },
+    phaseRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    phaseLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.md,
+      flex: 1,
+    },
+    phaseBadge: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.md,
+    },
+    phaseBadgeText: {
+      fontFamily: typography.fontFamily.bodyBold,
+      fontSize: typography.size.sm,
+      lineHeight: typography.lineHeight.sm,
+    },
+    phaseTimerBlock: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+    },
+    hourglassCol: {
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    phaseTextCol: {
+      flexDirection: "column",
+      justifyContent: "center",
+    },
+    daysRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 3,
+    },
+    phaseDays: {
+      fontFamily: typography.fontFamily.bodyBold,
+      fontSize: typography.size.sm,
+      lineHeight: typography.lineHeight.sm,
+      color: colors.textPrimary,
+    },
+    timepointWrapper: {
+      marginTop: 1,
+    },
+    timerLabel: {
+      color: colors.textMuted,
+      fontSize: typography.size.xs,
+      lineHeight: typography.lineHeight.xs,
+    },
+    phaseDateLabel: {
+      color: colors.nightBlack,
+      fontSize: typography.size.sm,
+      lineHeight: typography.lineHeight.sm,
+      paddingLeft: 4,
+    },
+    phaseEndLabel: {
+      fontFamily: typography.fontFamily.bodyBold,
+      fontSize: typography.size.md,
+      color: colors.textPrimary,
+    },
+    expandedField: {
+      gap: spacing.md,
+    },
+    updateButtonVoting: {
+      backgroundColor: colors.sunsetPink,
+    },
+    updateButtonPlanning: {
+      backgroundColor: colors.beachYellow,
+    },
+    updateButtonText: {
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+    },
+    successRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+    },
+    successText: {
+      color: colors.textPrimary,
+      fontFamily: typography.fontFamily.bodyBold,
+      fontSize: typography.size.sm,
+      lineHeight: typography.lineHeight.sm,
+    },
+    step3Footer: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.xl,
+      backgroundColor: colors.lightWhite,
+    },
+    nextButton: {
+      backgroundColor: colors.sunsetOrange,
+    },
+    nextButtonText: {
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+    },
+    finalInfoBox: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: spacing.md,
+      marginTop: spacing.md,
+    },
+    finalInfoText: {
+      flex: 1,
+      color: colors.nightBlack,
+      fontSize: typography.size.lg,
+      lineHeight: typography.lineHeight.lg,
+      fontFamily: typography.fontFamily.body,
+    },
+    calendarOverlay: {
+      flex: 1,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.xl,
+    },
+    calendarModal: {
+      backgroundColor: colors.lightWhite,
+      borderRadius: radius.xl,
+      padding: spacing.xl,
+      gap: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.nightBlack,
+    },
+    calendarTitle: {
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+      fontSize: typography.size.xl,
+      lineHeight: typography.lineHeight.xl,
+    },
+    calendarCard: {
+      paddingBottom: spacing.sm,
+    },
+    calendarArrow: {
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+      fontSize: typography.size.xl,
+      lineHeight: typography.lineHeight.xl,
+      paddingHorizontal: spacing.sm,
+    },
+    calendarLegend: {
+      flexDirection: "row",
+      justifyContent: "flex-start",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: spacing.md,
+      marginTop: spacing.sm,
+    },
+    legendRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+    },
+    legendSwatch: {
+      width: 16,
+      height: 16,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: colors.nightBlack,
+    },
+    legendLabel: {
+      color: colors.nightBlack,
+      fontSize: typography.size.xs,
+      lineHeight: typography.lineHeight.xs,
+      fontFamily: typography.fontFamily.body,
+    },
+    calendarActions: {
+      flexDirection: "row",
+      gap: spacing.md,
+      marginTop: spacing.md,
+    },
+    calendarCancelButton: {
+      flex: 1,
+      backgroundColor: colors.beachYellow,
+    },
+    calendarCancelButtonText: {
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+    },
+    calendarApplyButton: {
+      flex: 1,
+      backgroundColor: colors.sunsetOrange,
+    },
+    calendarApplyButtonText: {
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+    },
+    timeModalContent: {
+      gap: spacing.md,
+    },
+    timeModalHint: {
+      color: colors.textMuted,
+      fontSize: typography.size.sm,
+      lineHeight: typography.lineHeight.sm,
+      fontFamily: typography.fontFamily.body,
+    },
+    timeInputModalBox: {
+      backgroundColor: colors.white,
+      borderRadius: radius.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: colors.nightBlack,
+      minHeight: 64,
+    },
+    timeInputModal: {
+      flex: 1,
+      minHeight: 44,
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+      fontSize: typography.size.xxl,
+      lineHeight: typography.lineHeight.xxl,
+      paddingVertical: 0,
+      paddingHorizontal: 0,
+      includeFontPadding: false,
+      textAlignVertical: "center",
+      ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
+    },
+    quickTimeWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.sm,
+    },
+    quickTimeChip: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.md,
+      backgroundColor: colors.white,
+      borderWidth: 2,
+      borderColor: colors.nightBlack,
+    },
+    quickTimeChipActive: {
+      backgroundColor: colors.beachYellow,
+    },
+    quickTimeChipText: {
+      color: colors.nightBlack,
+      fontFamily: typography.fontFamily.bodyBold,
+      fontSize: typography.size.sm,
+      lineHeight: typography.lineHeight.sm,
+    },
+    quickTimeChipTextActive: {
+      color: colors.nightBlack,
+    },
+  });
