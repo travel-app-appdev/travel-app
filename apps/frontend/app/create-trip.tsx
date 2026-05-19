@@ -803,11 +803,6 @@ const progressAnim = progress.interpolate({
 });
 
 
-type ProgressBarProps = {
-  progressWidth: Animated.AnimatedInterpolation<string>;
-  currentStep: number;
-  totalSteps: number;
-
   type ProgressBarProps = {
     progressWidth: Animated.AnimatedInterpolation<string>;
     currentStep: number;
@@ -854,7 +849,6 @@ type ProgressBarProps = {
       </View>
     );
   };
-
   // Step 3 — timer setup
   if (step === 3) {
     return (
