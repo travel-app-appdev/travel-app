@@ -1,3 +1,5 @@
+import { invalidateMyTripsCache } from "@/src/api/trips";
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export type CreateActivityPayload = {
@@ -17,6 +19,13 @@ export type UpdateActivityPayload = {
   description?: string;
   address?: string;
   googleMapsUrl?: string;
+};
+
+export type VoteForActivityResponse = {
+  activityId: string;
+  slotId: string;
+  tripState: "Planning" | "Voting" | "Final";
+  voteAccepted?: boolean;
 };
 
 export async function createActivity(payload: CreateActivityPayload) {
@@ -70,7 +79,7 @@ export async function voteForActivity(payload: {
   tripId: string;
   slotId: string;
   activityId: string;
-}) {
+}): Promise<VoteForActivityResponse> {
   const response = await fetch(
     `${API_URL}/itinerary/${payload.tripId}/slots/${payload.slotId}/votes`,
     {
@@ -91,7 +100,8 @@ export async function voteForActivity(payload: {
     throw new Error(data.error || "Could not add vote");
   }
 
-  return data;
+  invalidateMyTripsCache();
+  return data as VoteForActivityResponse;
 }
 
 export async function getFinalItineraryActivities(

@@ -5,18 +5,30 @@ import {
     getActivityById,
     getActivitiesBySlotId,
     getFinalActivitiesByTripId,
-    getVotingCompletionStatus,
     toggleActivityAttendance,
     updateActivityById,
     upsertActivityVote,
 } from "../repositories/activityRepository";
 import {
-    findAcceptedMembersByTripId,
     findTripById,
     findMembership,
     updateTripState,
 } from "../repositories/tripsRepository";
 import { Activity, CreateActivityInput, TripState } from "../types/trip";
+
+type VoteForActivityResponse = {
+    activityId: string;
+    slotId: string;
+    tripState: TripState;
+    voteAccepted: boolean;
+};
+
+function isPastDeadline(deadline?: string): boolean {
+    if (!deadline) return false;
+
+    const parsed = new Date(deadline);
+    return !Number.isNaN(parsed.getTime()) && parsed.getTime() <= Date.now();
+}
 
 export async function suggestActivity(
     tripId: string,
@@ -116,7 +128,7 @@ export async function voteForActivity(input: {
     slotId: string;
     idToken: string;
     activityId: string;
-}): Promise<{ activityId: string; slotId: string; tripState: TripState }> {
+}): Promise<VoteForActivityResponse> {
     const decoded = await admin.auth().verifyIdToken(input.idToken);
     const userId = decoded.uid;
 
@@ -125,13 +137,34 @@ export async function voteForActivity(input: {
         throw { status: 404, message: "Trip not found" };
     }
 
+    const membership = await findMembership(input.tripId, userId);
+    if (!membership) {
+        throw { status: 404, message: "User is not a member of this trip" };
+    }
+
+    if (trip.state === "Final") {
+        return {
+            activityId: input.activityId,
+            slotId: input.slotId,
+            tripState: "Final",
+            voteAccepted: false,
+        };
+    }
+
     if (trip.state !== "Voting") {
         throw { status: 400, message: "Trip is not in Voting state" };
     }
 
-    const membership = await findMembership(input.tripId, userId);
-    if (!membership) {
-        throw { status: 404, message: "User is not a member of this trip" };
+    if (isPastDeadline(trip.voting_end_at)) {
+        await createFinalItineraryForTrip(input.tripId);
+        await updateTripState(input.tripId, "Final");
+
+        return {
+            activityId: input.activityId,
+            slotId: input.slotId,
+            tripState: "Final",
+            voteAccepted: false,
+        };
     }
 
     const activities = await getActivitiesBySlotId(input.slotId, input.tripId);
@@ -147,23 +180,11 @@ export async function voteForActivity(input: {
         activityId: input.activityId,
     });
 
-    let tripState: TripState = "Voting";
-    const members = await findAcceptedMembersByTripId(input.tripId);
-    const completion = await getVotingCompletionStatus(
-        input.tripId,
-        members.map((member) => member.user_id)
-    );
-
-    if (completion.isComplete) {
-        await createFinalItineraryForTrip(input.tripId);
-        await updateTripState(input.tripId, "Final");
-        tripState = "Final";
-    }
-
     return {
         activityId: input.activityId,
         slotId: input.slotId,
-        tripState,
+        tripState: "Voting",
+        voteAccepted: true,
     };
 }
 

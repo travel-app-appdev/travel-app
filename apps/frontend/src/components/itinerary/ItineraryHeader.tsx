@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { formatTripDateRange } from "@/src/utils/itinerary/formatTripToDateRange";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { ItineraryState } from "@/src/types/itinerary";
 
 import Back from "@/assets/icons/back.svg";
@@ -11,6 +12,7 @@ import MascotFinal from "@/assets/mascots/mascot-final.svg";
 import CalendarIcon from "@/assets/icons/calendar.svg";
 import HourglassIcon from "@/assets/icons/hourglass.svg";
 import LocationPin from "@/assets/icons/location-pin.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
   title: string;
@@ -53,21 +55,21 @@ export function ItineraryHeader({
   startDate,
   endDate,
   introText,
-  daysLeftText = "73 days",
+  daysLeftText = "0 days",
   onBackPress,
   state = "planning",
 }: Props) {
   const heroColor = getHeroColor(state);
   const Mascot = getMascotByState(state);
+  const handleBack = useSinglePress(onBackPress);
 
   return (
     <View style={styles.wrapper}>
       <View style={[styles.hero, { backgroundColor: heroColor }]}>
         <View style={styles.topRow}>
 
-          {/* Back button — now a Pressable wired to onBackPress */}
           <Pressable
-            onPress={onBackPress}
+            onPress={handleBack}
             accessibilityRole="button"
             accessibilityLabel="Go back"
             style={styles.backButton}
@@ -75,7 +77,6 @@ export function ItineraryHeader({
             <Back width={20} height={20} />
           </Pressable>
 
-          {/* Timer — decorative icon hidden, text grouped */}
           <View
             style={styles.timerBox}
             accessible={true}
@@ -84,8 +85,7 @@ export function ItineraryHeader({
             <HourglassIcon
               width={18}
               height={18}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...hiddenFromAccessibility}
             />
             <View accessible={false}>
               <AppText variant="body" style={styles.timerValue}>
@@ -100,21 +100,17 @@ export function ItineraryHeader({
 
         <View style={styles.heroContent}>
 
-          {/* Mascot — purely decorative */}
           <Mascot
             width={64}
             height={64}
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
+            {...hiddenFromAccessibility}
           />
 
-          {/* Trip title and destination */}
           <View style={styles.textBlock}>
             <AppText variant="title" style={styles.title}>
               {title}
             </AppText>
 
-            {/* LocationPin is decorative — destination text carries the meaning */}
             <View
               style={styles.destinationRow}
               accessible={true}
@@ -123,8 +119,7 @@ export function ItineraryHeader({
               <LocationPin
                 width={18}
                 height={18}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+                {...hiddenFromAccessibility}
               />
               <AppText variant="subtitle" style={styles.destination}>
                 {destination}
@@ -132,7 +127,6 @@ export function ItineraryHeader({
             </View>
           </View>
 
-          {/* Date badge — calendar icon is decorative */}
           <View
             style={styles.dateBadge}
             accessible={true}
@@ -141,8 +135,7 @@ export function ItineraryHeader({
             <CalendarIcon
               width={18}
               height={18}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              {...hiddenFromAccessibility}
             />
             <AppText variant="body" style={styles.dateText}>
               {formatTripDateRange(startDate, endDate)}

@@ -1,13 +1,20 @@
 import { Link, useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  Animated,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
-import { colors, spacing, radius, typography, shadows } from "@/src/theme";
+import { colors, spacing, radius, typography } from "@/src/theme";
 import { fetchMyTrips, type Trip } from "@/src/api/trips";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
@@ -53,10 +60,18 @@ type TripCardItem = {
 };
 
 type TripsCache = {
+  userId: string;
   yourTrips: TripCardItem[];
   pastTrips: TripCardItem[];
+  fetchedAt: number;
 };
+
+const TRIPS_STALE_TIME_MS = 30_000;
 let tripsCache: TripsCache | null = null;
+
+export function invalidateTripsCache() {
+  tripsCache = null;
+}
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -76,9 +91,11 @@ function getInitials(name: string): string {
 function getCardColor(tripId: string): string {
   const palette = [colors.plantGreen, colors.sunsetOrange, colors.seaBlue];
   let hash = 0;
+
   for (let i = 0; i < tripId.length; i++) {
     hash = tripId.charCodeAt(i) + ((hash << 5) - hash);
   }
+
   return palette[Math.abs(hash) % palette.length];
 }
 
@@ -134,8 +151,86 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
   };
 }
 
+function mapTripsToLists(backendTrips: TripWithMembers[]) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const upcoming: TripCardItem[] = [];
+  const past: TripCardItem[] = [];
+
+  backendTrips.forEach((trip) => {
+    const mappedTrip = mapTripToCardTrip(trip);
+    const tripEndDate = new Date(trip.end_date);
+    tripEndDate.setHours(0, 0, 0, 0);
+
+    if (tripEndDate < today) {
+      past.push(mappedTrip);
+    } else {
+      upcoming.push(mappedTrip);
+    }
+  });
+
+  return { upcoming, past };
+}
+
+function SkeletonCard() {
+  const shimmer = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmer, {
+          toValue: 0,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [shimmer]);
+
+  const opacity = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 0.7],
+  });
+
+  return (
+    <Animated.View style={[styles.skeletonCard, { opacity }]}>
+      <View style={styles.skeletonTitleRow}>
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonBadge} />
+      </View>
+
+      <View style={styles.skeletonMiddleRow}>
+        <View style={styles.skeletonDestination} />
+        <View style={styles.skeletonDate} />
+      </View>
+
+      <View style={styles.skeletonBottomRow}>
+        <View style={styles.skeletonAvatars}>
+          <View style={styles.skeletonAvatar} />
+          <View style={[styles.skeletonAvatar, { marginLeft: -10 }]} />
+          <View style={[styles.skeletonAvatar, { marginLeft: -10 }]} />
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen() {
   const { user } = useAuth();
+  const router = useRouter();
+
   const [activeTab, setActiveTab] = useState<Tab>("your");
   const [yourTrips, setYourTrips] = useState<TripCardItem[]>(
     tripsCache?.yourTrips ?? []
@@ -143,58 +238,146 @@ export default function HomeScreen() {
   const [pastTrips, setPastTrips] = useState<TripCardItem[]>(
     tripsCache?.pastTrips ?? []
   );
-  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(!tripsCache);
 
-  const loadTrips = useCallback(async () => {
-    try {
-      if (!user) {
+  const lastFetchRef = useRef<number>(tripsCache?.fetchedAt ?? 0);
+  const latestUserIdRef = useRef<string | null>(user?.uid ?? null);
+
+  useEffect(() => {
+    const newUserId = user?.uid ?? null;
+    latestUserIdRef.current = newUserId;
+
+    if (!newUserId) {
+      setYourTrips([]);
+      setPastTrips([]);
+      setIsLoading(false);
+      tripsCache = null;
+      lastFetchRef.current = 0;
+      return;
+    }
+
+    if (!tripsCache || tripsCache.userId !== newUserId) {
+      setYourTrips([]);
+      setPastTrips([]);
+      setIsLoading(true);
+      lastFetchRef.current = 0;
+      return;
+    }
+
+    setYourTrips(tripsCache.yourTrips);
+    setPastTrips(tripsCache.pastTrips);
+    setIsLoading(false);
+    lastFetchRef.current = tripsCache.fetchedAt;
+  }, [user?.uid]);
+
+  const loadTrips = useCallback(
+    async (force = false) => {
+      const userId = user?.uid ?? null;
+
+      if (!userId) {
         setYourTrips([]);
         setPastTrips([]);
+        setIsLoading(false);
         tripsCache = null;
+        lastFetchRef.current = 0;
         return;
       }
 
-      const backendTrips = await fetchMyTrips(user.uid);
+      const now = Date.now();
+      const cachedTrips = tripsCache;
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const hasFreshCache =
+        !force &&
+        cachedTrips !== null &&
+        cachedTrips.userId === userId &&
+        now - cachedTrips.fetchedAt < TRIPS_STALE_TIME_MS;
 
-      const upcoming: TripCardItem[] = [];
-      const past: TripCardItem[] = [];
+      if (hasFreshCache) {
+        setYourTrips(cachedTrips.yourTrips);
+        setPastTrips(cachedTrips.pastTrips);
+        setIsLoading(false);
+        lastFetchRef.current = cachedTrips.fetchedAt;
+        return;
+      }
 
-      (backendTrips as TripWithMembers[]).forEach((trip: TripWithMembers) => {
-        const mappedTrip = mapTripToCardTrip(trip);
-        const tripEndDate = new Date(trip.end_date);
-        tripEndDate.setHours(0, 0, 0, 0);
+      if (
+        !force &&
+        lastFetchRef.current > 0 &&
+        now - lastFetchRef.current < TRIPS_STALE_TIME_MS
+      ) {
+        setIsLoading(false);
+        return;
+      }
 
-        if (tripEndDate < today) {
-          past.push(mappedTrip);
-        } else {
-          upcoming.push(mappedTrip);
+      setIsLoading(true);
+
+      try {
+        const backendTrips = (await fetchMyTrips(userId)) as TripWithMembers[];
+
+        if (latestUserIdRef.current !== userId) {
+          return;
         }
-      });
 
-      tripsCache = { yourTrips: upcoming, pastTrips: past };
-      setYourTrips(upcoming);
-      setPastTrips(past);
-    } catch (error) {
-      console.error("Error loading trips:", error);
-      setYourTrips([]);
-      setPastTrips([]);
-    }
-  }, [user]);
+        const { upcoming, past } = mapTripsToLists(backendTrips);
+        const fetchedAt = Date.now();
+
+        tripsCache = {
+          userId,
+          yourTrips: upcoming,
+          pastTrips: past,
+          fetchedAt,
+        };
+
+        lastFetchRef.current = fetchedAt;
+        setYourTrips(upcoming);
+        setPastTrips(past);
+      } catch (error) {
+        console.error("Error loading trips:", error);
+
+        if (latestUserIdRef.current === userId) {
+          setYourTrips([]);
+          setPastTrips([]);
+        }
+      } finally {
+        if (latestUserIdRef.current === userId) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [user?.uid]
+  );
 
   useFocusEffect(
     useCallback(() => {
-      if (tripsCache) {
+      const userId = user?.uid ?? null;
+      latestUserIdRef.current = userId;
+
+      if (!userId) {
+        setYourTrips([]);
+        setPastTrips([]);
+        setIsLoading(false);
+        return;
+      }
+
+      if (tripsCache && tripsCache.userId === userId) {
         setYourTrips(tripsCache.yourTrips);
         setPastTrips(tripsCache.pastTrips);
+        setIsLoading(false);
+      } else {
+        setYourTrips([]);
+        setPastTrips([]);
+        setIsLoading(true);
       }
-      void loadTrips();
-    }, [loadTrips])
+
+      void loadTrips(false);
+    }, [loadTrips, user?.uid])
   );
 
   const trips = activeTab === "your" ? yourTrips : pastTrips;
+
+  const handleProfile = useSinglePress(() => router.push("/profile"));
+  const handleYourTab = useSinglePress(() => setActiveTab("your"));
+  const handlePastTab = useSinglePress(() => setActiveTab("past"));
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -204,11 +387,10 @@ export default function HomeScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Row */}
         <View style={styles.headerRow}>
           <Pressable
             style={styles.profileButton}
-            onPress={() => router.push("/profile")}
+            onPress={handleProfile}
             accessibilityRole="button"
             accessibilityLabel="Go to profile"
             accessibilityHint="Opens your profile screen"
@@ -220,15 +402,16 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Title */}
         <View style={styles.titleBlock}>
           <AppText variant="title" style={styles.helloText}>
             Helloooo
           </AppText>
+
           <View style={styles.subtitleRow}>
             <AppText variant="body" style={styles.subtitle}>
               where is the{" "}
             </AppText>
+
             <View>
               <AppText variant="body" style={styles.subtitleBold}>
                 squad going?
@@ -238,7 +421,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Action Cards */}
         <View style={styles.actionRow}>
           <Link href="/create-trip" asChild>
             <Pressable
@@ -273,10 +455,9 @@ export default function HomeScreen() {
           </Link>
         </View>
 
-        {/* Tabs */}
         <View style={styles.tabRow}>
           <Pressable
-            onPress={() => setActiveTab("your")}
+            onPress={handleYourTab}
             style={styles.tabItem}
             accessibilityRole="button"
             accessibilityLabel="Show your trips"
@@ -297,7 +478,7 @@ export default function HomeScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => setActiveTab("past")}
+            onPress={handlePastTab}
             style={styles.tabItem}
             accessibilityRole="button"
             accessibilityLabel="Show past trips"
@@ -318,10 +499,15 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Trip Cards or Empty State */}
-        {trips.length > 0 ? (
+        {isLoading ? (
           <View style={styles.tripList}>
-            {trips.map((trip: TripCardItem) => (
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
+        ) : trips.length > 0 ? (
+          <View style={styles.tripList}>
+            {trips.map((trip) => (
               <TripCard
                 key={trip.id}
                 tripId={trip.id}
@@ -344,6 +530,8 @@ export default function HomeScreen() {
                       startDate: trip.rawStartDate,
                       endDate: trip.rawEndDate,
                       members: JSON.stringify(trip.members),
+                      planningEndAt: trip.planningEndAt ?? "",
+                      votingEndAt: trip.votingEndAt ?? "",
                     },
                   });
                 }}
@@ -440,7 +628,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.displayMd,
     color: colors.sunsetOrange,
     textAlign: "center",
-    ...shadows.displayTitle,
   },
   subtitleRow: {
     flexDirection: "row",
@@ -521,5 +708,72 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 260,
     lineHeight: typography.lineHeight.md,
+  },
+  skeletonCard: {
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.sm,
+    minHeight: 148,
+    backgroundColor: colors.grayedOut,
+  },
+  skeletonTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  skeletonTitle: {
+    flex: 1,
+    height: 20,
+    borderRadius: radius.sm,
+    backgroundColor: colors.textMuted,
+    opacity: 0.4,
+    maxWidth: "60%",
+  },
+  skeletonBadge: {
+    width: 64,
+    height: 22,
+    borderRadius: radius.pill,
+    backgroundColor: colors.textMuted,
+    opacity: 0.4,
+  },
+  skeletonMiddleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  skeletonDestination: {
+    flex: 1,
+    height: 14,
+    borderRadius: radius.sm,
+    backgroundColor: colors.textMuted,
+    opacity: 0.3,
+    maxWidth: "45%",
+  },
+  skeletonDate: {
+    width: 80,
+    height: 14,
+    borderRadius: radius.sm,
+    backgroundColor: colors.textMuted,
+    opacity: 0.3,
+  },
+  skeletonBottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing.xs,
+  },
+  skeletonAvatars: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  skeletonAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.textMuted,
+    opacity: 0.35,
+    borderWidth: 2,
+    borderColor: colors.lightWhite,
   },
 });

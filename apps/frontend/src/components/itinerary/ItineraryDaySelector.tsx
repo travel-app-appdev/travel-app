@@ -1,7 +1,9 @@
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { TripDay } from "@/src/types/itinerary";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
   days: TripDay[];
@@ -9,6 +11,69 @@ type Props = {
   onSelectDay: (dayId: string) => void;
   enabledDayIds?: Set<string>;
 };
+
+type DayChipProps = {
+  day: TripDay;
+  isSelected: boolean;
+  isDisabled: boolean;
+  onSelectDay: (dayId: string) => void;
+};
+
+function DayChip({ day, isSelected, isDisabled, onSelectDay }: DayChipProps) {
+  const handlePress = useSinglePress(() => {
+    if (!isDisabled) onSelectDay(day.id);
+  });
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      style={[
+        styles.dayChip,
+        isSelected && styles.dayChipSelected,
+        isDisabled && styles.dayChipDisabled,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`Day ${day.dayNumber}, ${day.weekdayShort}${isDisabled ? ", no activities" : ""}`}
+      accessibilityHint={
+        isDisabled
+          ? undefined
+          : isSelected
+            ? "Currently selected"
+            : "Tap to view this day"
+      }
+      accessibilityState={{ selected: isSelected, disabled: isDisabled }}
+      disabled={isDisabled}
+    >
+      <View
+        style={styles.dayChipInner}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+      >
+        <AppText
+          variant="body"
+          style={[
+            styles.dayNumber,
+            isSelected && styles.dayNumberSelected,
+            isDisabled && styles.dayTextDisabled,
+          ]}
+        >
+          {day.dayNumber}
+        </AppText>
+
+        <AppText
+          variant="caption"
+          style={[
+            styles.weekday,
+            isSelected && styles.weekdaySelected,
+            isDisabled && styles.dayTextDisabled,
+          ]}
+        >
+          {day.weekdayShort}
+        </AppText>
+      </View>
+    </Pressable>
+  );
+}
 
 export function ItineraryDaySelector({
   days,
@@ -34,54 +99,13 @@ export function ItineraryDaySelector({
           enabledDayIds !== undefined && !enabledDayIds.has(day.id);
 
         return (
-          <Pressable
+          <DayChip
             key={day.id}
-            onPress={() => !isDisabled && onSelectDay(day.id)}
-            style={[
-              styles.dayChip,
-              isSelected && styles.dayChipSelected,
-              isDisabled && styles.dayChipDisabled,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={`Day ${day.dayNumber}, ${day.weekdayShort}${isDisabled ? ", no activities" : ""}`}
-            accessibilityHint={
-              isDisabled
-                ? undefined
-                : isSelected
-                  ? "Currently selected"
-                  : "Tap to view this day"
-            }
-            accessibilityState={{ selected: isSelected, disabled: isDisabled }}
-            disabled={isDisabled}
-          >
-            <View
-              style={styles.dayChipInner}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
-            >
-              <AppText
-                variant="body"
-                style={[
-                  styles.dayNumber,
-                  isSelected && styles.dayNumberSelected,
-                  isDisabled && styles.dayTextDisabled,
-                ]}
-              >
-                {day.dayNumber}
-              </AppText>
-
-              <AppText
-                variant="caption"
-                style={[
-                  styles.weekday,
-                  isSelected && styles.weekdaySelected,
-                  isDisabled && styles.dayTextDisabled,
-                ]}
-              >
-                {day.weekdayShort}
-              </AppText>
-            </View>
-          </Pressable>
+            day={day}
+            isSelected={isSelected}
+            isDisabled={isDisabled}
+            onSelectDay={onSelectDay}
+          />
         );
       })}
     </ScrollView>

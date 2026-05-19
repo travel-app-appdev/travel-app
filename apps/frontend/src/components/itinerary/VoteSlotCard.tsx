@@ -1,12 +1,14 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity } from "@/src/types/itinerary";
 
 import LocationIcon from "@/assets/icons/location.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import VoteIcon from "@/assets/icons/voting.svg";
 import CheckIcon from "@/assets/icons/check_mark.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
   activity: Activity;
@@ -15,15 +17,15 @@ type Props = {
 };
 
 export function VotingSlotCard({ activity, onAddVote, selected = false }: Props) {
+  const handleVote = useSinglePress(() => onAddVote(activity.id));
+
   return (
     <View style={styles.row}>
       <View style={styles.card}>
 
-        {/* Time label — icon is decorative */}
         <View
           style={styles.timeRow}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          {...hiddenFromAccessibility}
         >
           <LocationIcon width={16} height={16} />
           <AppText variant="body" style={styles.timeLabel}>
@@ -31,12 +33,10 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           </AppText>
         </View>
 
-        {/* Activity name */}
         <AppText variant="subtitle" style={styles.name}>
           {activity.name}
         </AppText>
 
-        {/* Address — icon is decorative */}
         <View
           style={styles.addressRow}
           accessible={true}
@@ -45,8 +45,7 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           <LocationIcon
             width={14}
             height={14}
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
+            {...hiddenFromAccessibility}
           />
           <AppText
             variant="caption"
@@ -57,12 +56,10 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           </AppText>
         </View>
 
-        {/* Google Link — icon is decorative */}
         {activity.googleMapsUrl ? (
           <View
             style={styles.googleRow}
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
+            {...hiddenFromAccessibility}
           >
             <GoogleIcon width={14} height={14} />
             <AppText variant="caption" style={styles.googleLink}>
@@ -71,7 +68,6 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           </View>
         ) : null}
 
-        {/* Vote count — live region so screen readers announce changes */}
         <View
           accessibilityLiveRegion="polite"
           accessible={true}
@@ -83,9 +79,8 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
         </View>
       </View>
 
-      {/* Vote CTA */}
       <Pressable
-        onPress={() => onAddVote(activity.id)}
+        onPress={handleVote}
         style={({ pressed }) => [
           styles.cta,
           selected && styles.ctaSelected,
@@ -97,8 +92,7 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
         accessibilityState={{ selected }}
       >
         <View
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          {...hiddenFromAccessibility}
         >
           {selected ? (
             <CheckIcon width={28} height={28} color={colors.nightBlack} />

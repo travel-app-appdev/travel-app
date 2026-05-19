@@ -12,6 +12,7 @@ import {
     deleteTripById,
     removeTripMember,
     markMemberPlanningDone,
+    resetPlanningDoneForTrip,
     updateTripState,
     updateTripById,
 } from "../repositories/tripsRepository";
@@ -38,24 +39,28 @@ export async function getTripsForUser(userId: string): Promise<Trip[]> {
 
     const tripResults = await Promise.all(
         memberships.map(async (membership): Promise<Trip | null> => {
-            const trip = await findTripById(membership.trip_id);
-            if (!trip) return null;
+            let trip: Trip;
+            try {
+                trip = await advanceTripStateIfNeeded(membership.trip_id);
+            } catch (error: any) {
+                if (error.status === 404) return null;
+                throw error;
+            }
 
-            const updatedTrip = await advanceTripStateIfNeeded(membership.trip_id);
             const tripMembers = await findAcceptedMembersByTripId(membership.trip_id);
 
-            const members = await Promise.all(
-                tripMembers.map(async (member) => {
-                    const user = await findUserById(member.user_id);
-                    return {
-                        id: member.user_id,
-                        name: user?.name ?? "Unknown User",
-                        role: member.role,
-                        planning_done: member.planning_done ?? false,
-                    };
-                })
-            );
-            return { ...updatedTrip, role: membership.role, members };
+            const members = tripMembers.map((member) => ({
+                id: member.user_id,
+                name: (member as any).user_name ?? "Unknown User",
+                role: member.role,
+                planning_done: member.planning_done ?? false,
+            }));
+
+            return {
+                ...trip,
+                role: membership.role,
+                members,
+            };
         })
     );
 
@@ -75,6 +80,7 @@ export async function createTripForAuthenticatedUser(
         planning_end_at: input.planning_end_at,
         voting_end_at: input.voting_end_at,
     });
+    ensurePlanningEndIsFuture(input.planning_end_at);
 
     return createTripWithInviteCode({
         userId: decoded.uid,
@@ -98,6 +104,7 @@ export async function createTripForUserWithoutAuth(
         planning_end_at: input.planning_end_at,
         voting_end_at: input.voting_end_at,
     });
+    ensurePlanningEndIsFuture(input.planning_end_at);
 
     return createTripWithAdminMembership({
         userId: input.userId,
@@ -198,7 +205,7 @@ export async function removeMemberForAdmin(input: {
 export async function finishPlanningForMember(
     tripId: string,
     idToken: string
-): Promise<{ allDone: boolean; tripState: string; completedMembers: number; totalMembers: number }> {
+): Promise<{ allDone: boolean; tripState: TripState; completedMembers: number; totalMembers: number }> {
     
     const decoded = await admin.auth().verifyIdToken(idToken);
     const userId = decoded.uid;
@@ -232,18 +239,11 @@ export async function finishPlanningForMember(
     const totalMembers = allMembers.length;
     const allDone = completedMembers === totalMembers;
 
-    // if all done → switch trip state to Voting
-    let nextState = "Planning";
+    // If all members are done, skip Voting when there are no collisions.
+    let nextState: TripState = "Planning";
 
     if (allDone) {
-        if (totalMembers <= 1) {
-            await createFinalItineraryForTrip(tripId);
-            await updateTripState(tripId, "Final");
-            nextState = "Final";
-        } else {
-            await updateTripState(tripId, "Voting");
-            nextState = "Voting";
-        }
+        nextState = await moveCompletedPlanningToNextState(tripId, allMembers);
     }
 
     return {
@@ -286,7 +286,35 @@ export async function updateTripForAdmin(input: {
     };
 
     ensureValidTripTimeline(effectiveTimeline);
-    const nextState = deriveTripStateFromTimeline(effectiveTimeline);
+
+    const nextPlanningEnd = input.planning_end_at
+        ? parseIsoDate(input.planning_end_at)
+        : null;
+    const currentPlanningEnd = current.planning_end_at
+        ? parseIsoDate(current.planning_end_at)
+        : null;
+    const planningEndChanged =
+        nextPlanningEnd !== null &&
+        (currentPlanningEnd === null ||
+            nextPlanningEnd.getTime() !== currentPlanningEnd.getTime());
+
+    const members = planningEndChanged
+        ? await findAcceptedMembersByTripId(input.tripId)
+        : [];
+    const allMembersFinishedPlanning =
+        members.length > 0 && members.every((member) => member.planning_done);
+    const shouldReopenPlanning =
+        planningEndChanged &&
+        nextPlanningEnd !== null &&
+        !isPast(nextPlanningEnd) &&
+        (current.state !== "Planning" || allMembersFinishedPlanning);
+    const shouldDeriveStateFromTimeline =
+        current.state === "Planning" || planningEndChanged;
+    const nextState = shouldReopenPlanning
+        ? "Planning"
+        : shouldDeriveStateFromTimeline
+            ? deriveTripStateFromTimeline(effectiveTimeline)
+            : current.state;
 
     const updates: Partial<TripDocument> = {};
     if (input.title !== undefined)       updates.title = input.title;
@@ -299,6 +327,10 @@ export async function updateTripForAdmin(input: {
     updates.state = nextState;
 
     await updateTripById(input.tripId, updates);
+
+    if (shouldReopenPlanning) {
+        await resetPlanningDoneForTrip(input.tripId);
+    }
 
     const trip = await findTripById(input.tripId);
     if (!trip) throw { status: 404, message: "Trip not found after update" };
@@ -315,11 +347,11 @@ function deriveTripStateFromTimeline(input: {
     const planningEnd = input.planning_end_at ? new Date(input.planning_end_at) : null;
     const votingEnd = input.voting_end_at ? new Date(input.voting_end_at) : null;
 
-    if (planningEnd && now <= planningEnd) {
+    if (planningEnd && now < planningEnd) {
         return "Planning";
     }
 
-    if (votingEnd && now <= votingEnd) {
+    if (votingEnd && now < votingEnd) {
         return "Voting";
     }
 
@@ -356,11 +388,11 @@ function ensureValidTripTimeline(input: {
         };
     }
 
-    // Rule 2: voting_end_at cannot be before planning_end_at
-    if (votingEnd && planningEnd && votingEnd < planningEnd) {
+    // Rule 2: voting_end_at must be after planning_end_at
+    if (votingEnd && planningEnd && votingEnd <= planningEnd) {
         throw {
             status: 400,
-            message: "Voting end cannot be before planning end",
+            message: "Voting end must be after planning end",
         };
     }
 
@@ -373,6 +405,17 @@ function ensureValidTripTimeline(input: {
     }
 }
 
+function ensurePlanningEndIsFuture(planningEndAt?: string) {
+    const planningEnd = parseIsoDate(planningEndAt);
+
+    if (planningEnd && isPast(planningEnd)) {
+        throw {
+            status: 400,
+            message: "Planning end must be in the future",
+        };
+    }
+}
+
 export async function advanceTripStateIfNeeded(tripId: string): Promise<Trip> {
     const trip = await findTripById(tripId);
 
@@ -381,7 +424,7 @@ export async function advanceTripStateIfNeeded(tripId: string): Promise<Trip> {
     }
 
     if (trip.state === "Planning") {
-        return trip;
+        return transitionPlanningToNextState(tripId);
     }
 
     if (trip.state === "Voting" || trip.state === "Final") {
@@ -410,9 +453,11 @@ async function repairAdvancedTripWithoutFinishedPlanning(
         return trip;
     }
 
+    const planningEnd = parseIsoDate(trip.planning_end_at);
+    const planningEnded = planningEnd ? isPast(planningEnd) : false;
     const allMembersFinished = members.every((member) => member.planning_done);
 
-    if (allMembersFinished) {
+    if (allMembersFinished || planningEnded) {
         return trip;
     }
 
@@ -437,10 +482,53 @@ export async function transitionPlanningToNextState(tripId: string): Promise<Tri
         return trip;
     }
 
-    return trip;
+    const members = await findAcceptedMembersByTripId(tripId);
+    const planningEnd = parseIsoDate(trip.planning_end_at);
+    const planningEnded = planningEnd ? isPast(planningEnd) : false;
+    const allMembersFinished =
+        members.length > 0 && members.every((member) => member.planning_done);
+
+    if (members.length === 0 || (!planningEnded && !allMembersFinished)) {
+        return trip;
+    }
+
+    await moveCompletedPlanningToNextState(tripId, members);
+
+    const updatedTrip = await findTripById(tripId);
+
+    if (!updatedTrip) {
+        throw { status: 404, message: "Trip not found after Planning transition" };
+    }
+
+    return updatedTrip;
 }
 
 // State transitions 'Planning Voting Final' logic
+
+async function moveCompletedPlanningToNextState(
+    tripId: string,
+    members: { user_id: string }[]
+): Promise<TripState> {
+    if (members.length <= 1) {
+        await createFinalItineraryForTrip(tripId);
+        await updateTripState(tripId, "Final");
+        return "Final";
+    }
+
+    const completion = await getVotingCompletionStatus(
+        tripId,
+        members.map((member) => member.user_id)
+    );
+
+    if (completion.requiredSlotIds.length === 0) {
+        await createFinalItineraryForTrip(tripId);
+        await updateTripState(tripId, "Final");
+        return "Final";
+    }
+
+    await updateTripState(tripId, "Voting");
+    return "Voting";
+}
 
 function parseIsoDate(value?: string): Date | null {
     if (!value) return null;
@@ -464,13 +552,10 @@ export async function transitionVotingToFinalIfNeeded(tripId: string): Promise<T
         return trip;
     }
 
-    const members = await findAcceptedMembersByTripId(tripId);
-    const completion = await getVotingCompletionStatus(
-        tripId,
-        members.map((member) => member.user_id)
-    );
+    const votingEnd = parseIsoDate(trip.voting_end_at);
+    const votingEnded = votingEnd ? isPast(votingEnd) : false;
 
-    if (!completion.isComplete) {
+    if (!votingEnded) {
         return trip;
     }
 

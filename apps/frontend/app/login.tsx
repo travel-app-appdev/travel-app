@@ -65,12 +65,27 @@ export default function LoginScreen() {
 
       const authResponse = await loginUser(email.trim(), password);
       setUser(authResponse);
-      setIdToken(authResponse.idToken); 
+      setIdToken(authResponse.idToken);
       router.replace("/home");
+    } catch (error: any) {
+      const rawMessage = error?.message ?? "";
+      const code = error?.code ?? "";
 
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Something went wrong";
+      let message = "Something went wrong. Please try again.";
+
+      if (
+        code.includes("auth/invalid-credential") ||
+        code.includes("auth/wrong-password") ||
+        code.includes("auth/user-not-found") ||
+        rawMessage.includes("Incorrect email or password")
+      ) {
+        message = "Incorrect email or password.";
+      } else if (code.includes("auth/too-many-requests")) {
+        message = "Too many attempts. Please try again later.";
+      } else if (code.includes("auth/user-disabled")) {
+        message = "This account has been disabled.";
+      }
+
       setErrors((prev) => ({ ...prev, general: message }));
     } finally {
       setIsSubmitting(false);
@@ -92,7 +107,7 @@ export default function LoginScreen() {
           {
             paddingTop: headerTop,
             paddingBottom: headerBottom,
-            pointerEvents:"box-none",
+            pointerEvents: "box-none",
           },
         ]}
       >
@@ -356,7 +371,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontFamily: typography.fontFamily.title,
   },
-
   keyboardArea: {
     flex: 1,
     zIndex: 2,
@@ -398,7 +412,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.seaBlue,
   },
   loginButtonText: {
-    color: colors.nightBlack,
+    color: colors.lightWhite,
     fontFamily: typography.fontFamily.bodyBold,
   },
 });

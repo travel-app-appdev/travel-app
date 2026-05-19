@@ -27,19 +27,120 @@ type ApiErrorResponse = {
   error?: string;
 };
 
-export async function fetchMyTrips(userId: string): Promise<Trip[]> {
-  const response = await fetch(
-    `${API_URL}/trips/my?userId=${encodeURIComponent(userId)}`
-  );
+type FetchMyTripsOptions = {
+  forceRefresh?: boolean;
+  allowStaleOnError?: boolean;
+  maxAgeMs?: number;
+};
 
-  const data: Trip[] | ApiErrorResponse = await response.json();
+type TripsCacheEntry = {
+  trips: Trip[];
+  fetchedAt: number;
+};
 
-  if (!response.ok) {
-    throw new Error((data as ApiErrorResponse).error || "Failed to load trips");
+const DEFAULT_TRIPS_CACHE_MAX_AGE_MS = 60 * 1000;
+const tripsCache = new Map<string, TripsCacheEntry>();
+const inFlightTripsRequests = new Map<string, Promise<Trip[]>>();
+
+export function getCachedMyTrips(userId: string): Trip[] | null {
+  return tripsCache.get(userId)?.trips ?? null;
+}
+
+export function isMyTripsCacheFresh(
+  userId: string,
+  maxAgeMs = DEFAULT_TRIPS_CACHE_MAX_AGE_MS
+): boolean {
+  const cached = tripsCache.get(userId);
+  return cached ? Date.now() - cached.fetchedAt < maxAgeMs : false;
+}
+
+export function invalidateMyTripsCache(userId?: string): void {
+  if (userId) {
+    tripsCache.delete(userId);
+    inFlightTripsRequests.delete(userId);
+    return;
   }
 
-  return data as Trip[];
+  tripsCache.clear();
+  inFlightTripsRequests.clear();
 }
+
+async function readApiJson<T>(response: Response): Promise<T | ApiErrorResponse> {
+  try {
+    return (await response.json()) as T | ApiErrorResponse;
+  } catch {
+    return {};
+  }
+}
+
+export async function fetchMyTrips(
+  userId: string,
+  options: FetchMyTripsOptions = {}
+): Promise<Trip[]> {
+  const {
+    forceRefresh = false,
+    allowStaleOnError = true,
+    maxAgeMs = DEFAULT_TRIPS_CACHE_MAX_AGE_MS,
+  } = options;
+
+  const cached = tripsCache.get(userId);
+  if (!forceRefresh && cached && Date.now() - cached.fetchedAt < maxAgeMs) {
+    return cached.trips;
+  }
+
+  const existingRequest = inFlightTripsRequests.get(userId);
+  if (!forceRefresh && existingRequest) {
+    return existingRequest;
+  }
+
+  let request: Promise<Trip[]>;
+  request = (async () => {
+    try {
+      const response = await fetch(
+        `${API_URL}/trips/my?userId=${encodeURIComponent(userId)}`
+      );
+
+      const data = await readApiJson<Trip[]>(response);
+
+      if (!response.ok) {
+        throw new Error(
+          (data as ApiErrorResponse).error || "Failed to load trips"
+        );
+      }
+
+      const trips = data as Trip[];
+      tripsCache.set(userId, {
+        trips,
+        fetchedAt: Date.now(),
+      });
+
+      return trips;
+    } catch (error) {
+      if (allowStaleOnError && cached) {
+        console.warn("Using cached trips after refresh failed:", error);
+        return cached.trips;
+      }
+
+      throw error;
+    }
+  })();
+
+  inFlightTripsRequests.set(userId, request);
+  const clearInFlightRequest = () => {
+    if (inFlightTripsRequests.get(userId) === request) {
+      inFlightTripsRequests.delete(userId);
+    }
+  };
+  request.then(clearInFlightRequest, clearInFlightRequest);
+
+  return request;
+}
+
+function invalidateTripsAfterMutation(): void {
+  invalidateMyTripsCache();
+}
+
+export const TRIPS_CACHE_MAX_AGE_MS = DEFAULT_TRIPS_CACHE_MAX_AGE_MS;
 
 type CreateTripPayload = {
   idToken: string;
@@ -66,6 +167,7 @@ export async function createTrip(payload: CreateTripPayload): Promise<Trip> {
     );
   }
 
+  invalidateTripsAfterMutation();
   return data as Trip;
 }
 
@@ -87,6 +189,7 @@ export async function joinTrip(payload: JoinTripPayload): Promise<Trip> {
     throw new Error((data as ApiErrorResponse).error || "Failed to join trip");
   }
 
+  invalidateTripsAfterMutation();
   return data as Trip;
 }
 
@@ -106,6 +209,8 @@ export async function deleteTrip(payload: DeleteTripPayload): Promise<void> {
     const data: ApiErrorResponse = await response.json();
     throw new Error(data.error || "Failed to delete trip");
   }
+
+  invalidateTripsAfterMutation();
 }
 
 type LeaveTripPayload = {
@@ -124,6 +229,8 @@ export async function leaveTrip(payload: LeaveTripPayload): Promise<void> {
     const data: ApiErrorResponse = await response.json();
     throw new Error(data.error || "Failed to leave trip");
   }
+
+  invalidateTripsAfterMutation();
 }
 
 type RemoveMemberPayload = {
@@ -148,6 +255,8 @@ export async function removeMember(
     const data: ApiErrorResponse = await response.json();
     throw new Error(data.error || "Failed to remove member");
   }
+
+  invalidateTripsAfterMutation();
 }
 
 type UpdateTripPayload = {
@@ -163,19 +272,25 @@ type UpdateTripPayload = {
 };
 
 export async function updateTrip(payload: UpdateTripPayload): Promise<Trip> {
+  const requestBody = {
+    idToken: payload.idToken,
+    tripId: payload.tripId,
+    title: payload.title,
+    destination: payload.destination,
+    start_date: payload.start_date,
+    end_date: payload.end_date,
+    planning_end_at: payload.planning_end_at,
+    voting_end_at: payload.voting_end_at,
+    state: payload.state,
+  };
+
   const response = await fetch(`${API_URL}/trips/${payload.tripId}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      idToken: payload.idToken,
-      title: payload.title,
-      destination: payload.destination,
-      start_date: payload.start_date,
-      end_date: payload.end_date,
-      planning_end_at: payload.planning_end_at,
-      voting_end_at: payload.voting_end_at,
-      state: payload.state,
-    }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${payload.idToken}`,
+    },
+    body: JSON.stringify(requestBody),
   });
 
   const data: Trip | ApiErrorResponse = await response.json();
@@ -186,6 +301,7 @@ export async function updateTrip(payload: UpdateTripPayload): Promise<Trip> {
     );
   }
 
+  invalidateTripsAfterMutation();
   return data as Trip;
 }
 
@@ -200,6 +316,7 @@ type FinishPlanningPayload = {
   idToken: string;
   tripId: string;
 };
+
 
 export async function finishPlanning(
   payload: FinishPlanningPayload
@@ -221,5 +338,6 @@ export async function finishPlanning(
     );
   }
 
+  invalidateTripsAfterMutation();
   return data as FinishPlanningResponse;
 }

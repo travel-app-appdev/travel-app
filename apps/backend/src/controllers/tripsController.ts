@@ -80,9 +80,13 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
         });
 
         res.status(201).json(trip);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error creating trip:", error);
-        res.status(401).json({ error: "Invalid token or failed to create trip" });
+        if (error.status === 400) {
+            res.status(400).json({ error: error.message });
+        } else {
+            res.status(401).json({ error: "Invalid token or failed to create trip" });
+        }
     }
 };
 
@@ -161,9 +165,13 @@ export const createTripWithoutAuth = async (
         });
 
         res.status(201).json(trip);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error creating trip without auth:", error);
-        res.status(500).json({ error: "Failed to create trip" });
+        if (error.status === 400) {
+            res.status(400).json({ error: error.message });
+        } else {
+            res.status(500).json({ error: "Failed to create trip" });
+        }
     }
 };
 
@@ -335,6 +343,8 @@ export const updateTrip = async (req: Request, res: Response): Promise<void> => 
             res.status(403).json({ error: error.message });
         } else if (error.status === 404) {
             res.status(404).json({ error: error.message });
+        } else if (error.status === 400) {
+            res.status(400).json({ error: error.message });
         } else {
             res.status(401).json({ error: "Invalid token or failed to update trip" });
         }

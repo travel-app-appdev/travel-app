@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
   Alert,
   findNodeHandle,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,7 +18,9 @@ import { colors, spacing } from "@/src/theme";
 import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
 import { mapActivitiesToSlots } from "@/src/utils/itinerary/mapActivitiesToSlots";
+import { getActiveTripTimerText } from "@/src/utils/tripTimer";
 import { useAuth } from "@/src/context/AuthContext";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 
 import type {
   TripItinerary,
@@ -33,7 +36,7 @@ import { PlanningDoneBar } from "@/src/components/itinerary/PlanningDoneBar";
 import { VotingSlotCard } from "@/src/components/itinerary/VoteSlotCard";
 import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
-import { finishPlanning } from "@/src/api/trips";
+import { fetchMyTrips, finishPlanning, type Trip } from "@/src/api/trips";
 import {
   getActivitiesBySlot,
   getFinalItineraryActivities,
@@ -42,6 +45,8 @@ import {
 } from "@/src/services/activityService";
 
 const DEV_FORCE_STATE: ItineraryState | null = null;
+const TRANSITION_OVERLAY_MS = 1800;
+const TRIP_STATE_POLL_INTERVAL_MS = 10 * 1000;
 
 const activitiesCache = new Map<string, Activity[]>();
 
@@ -61,6 +66,47 @@ function splitBackendSlotId(slotId: string) {
     dayId,
     slotId: slotParts.length > 0 ? slotParts.join("_") : slotId,
   };
+}
+
+function formatSlotLabel(slotId: string) {
+  return slotId.replace(/_/g, ":");
+}
+
+function selectVoteForActivity(
+  activities: Activity[],
+  dayId: string,
+  slotId: string,
+  activityId: string
+) {
+  return activities.map((activity) => {
+    if (activity.dayId !== dayId || activity.slotId !== slotId) {
+      return activity;
+    }
+
+    const wasSelected = activity.hasCurrentUserVote === true;
+    const isSelected = activity.id === activityId;
+    const voteDelta =
+      isSelected && !wasSelected ? 1 : !isSelected && wasSelected ? -1 : 0;
+
+    return {
+      ...activity,
+      hasCurrentUserVote: isSelected,
+      voteCount: Math.max(0, (activity.voteCount ?? 0) + voteDelta),
+    };
+  });
+}
+
+function updateCachedActivities(
+  tripId: string,
+  updater: (activities: Activity[]) => Activity[]
+) {
+  const prefix = `${tripId}_`;
+
+  activitiesCache.forEach((activities, key) => {
+    if (key.startsWith(prefix)) {
+      activitiesCache.set(key, updater(activities));
+    }
+  });
 }
 
 function mapBackendActivity(
@@ -137,6 +183,35 @@ function markPlanningDoneForUser(
   );
 }
 
+function resetPlanningStatus(
+  planningStatus: TripItinerary["planningStatus"]
+): TripItinerary["planningStatus"] {
+  return planningStatus.map((member) => ({
+    ...member,
+    hasFinishedPlanning: false,
+  }));
+}
+
+function mapTripMembersToPlanningStatus(
+  members?: Trip["members"]
+): TripItinerary["planningStatus"] | undefined {
+  if (!members || members.length === 0) return undefined;
+
+  return members
+    .map((member) => ({
+      userId: member.id,
+      hasFinishedPlanning: member.planning_done ?? false,
+    }))
+    .filter((member) => member.userId);
+}
+
+function isDeadlinePast(deadline?: string): boolean {
+  if (!deadline) return false;
+
+  const parsed = new Date(deadline);
+  return !Number.isNaN(parsed.getTime()) && parsed.getTime() <= Date.now();
+}
+
 function shouldSkipVoting(memberCount: number) {
   return memberCount <= 1;
 }
@@ -180,16 +255,39 @@ function getIntroText(state: ItineraryState): string {
   }
 }
 
-function getDaysLeftText(state: ItineraryState): string {
-  switch (state) {
-    case "voting":
-      return "3 days";
-    case "final":
-      return "0 days";
-    case "planning":
-    default:
-      return "73 days";
-  }
+type TransitionOverlayProps = {
+  title: string;
+  text: string;
+};
+
+function TransitionOverlay({ title, text }: TransitionOverlayProps) {
+  return (
+    <View
+      style={styles.finalizingOverlay}
+      accessibilityViewIsModal={true}
+      accessible={true}
+      accessibilityLiveRegion="assertive"
+      accessibilityLabel={`${title}. ${text}`}
+    >
+      <View style={styles.finalizingCard}>
+        <ActivityIndicator color={colors.nightBlack} />
+        <AppText
+          variant="subtitle"
+          style={styles.finalizingTitle}
+          accessible={false}
+        >
+          {title}
+        </AppText>
+        <AppText
+          variant="caption"
+          style={styles.finalizingText}
+          accessible={false}
+        >
+          {text}
+        </AppText>
+      </View>
+    </View>
+  );
 }
 
 export default function ItineraryScreen() {
@@ -212,6 +310,9 @@ export default function ItineraryScreen() {
     newActivityDescription,
     newActivityAddress,
     newActivityGoogleMapsUrl,
+    planningEndAt,
+    votingEndAt,
+    selectedDay,
   } = useLocalSearchParams<{
     tripId?: string;
     state?: "planning" | "voting" | "final";
@@ -228,6 +329,9 @@ export default function ItineraryScreen() {
     newActivityDescription?: string;
     newActivityAddress?: string;
     newActivityGoogleMapsUrl?: string;
+    planningEndAt?: string;
+    votingEndAt?: string;
+    selectedDay?: string;
   }>();
 
   const routeState: ItineraryState | undefined =
@@ -272,16 +376,31 @@ export default function ItineraryScreen() {
   const finalizingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const votingTransitionTimeoutRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const initialTripRefreshKeyRef = useRef<string | null>(null);
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
+  const [isPreparingVoting, setIsPreparingVoting] = useState(false);
 
-  // Ref for moving focus into the popup when it appears — Fix 3
   const popupRef = useRef<View>(null);
 
   const slots = useMemo(() => generateTimeSlots(), []);
 
   const activeState: ItineraryState =
     DEV_FORCE_STATE ?? routeState ?? itinerary.state;
+  const activeStateRef = useRef<ItineraryState>(activeState);
+  const transitionTargetStateRef = useRef<ItineraryState | null>(null);
+
+  const [timerDeadlines, setTimerDeadlines] = useState(() => ({
+    planningEndAt,
+    votingEndAt,
+  }));
+
+  const [timerText, setTimerText] = useState(() =>
+    getActiveTripTimerText(activeState, planningEndAt, votingEndAt)
+  );
 
   const tripDays = useMemo(
     () => generateTripDays(itinerary.startDate, itinerary.endDate),
@@ -289,14 +408,23 @@ export default function ItineraryScreen() {
   );
 
   const [selectedDayId, setSelectedDayId] = useState<string>("");
+  const requestedSelectedDayId = newActivityDayId ?? selectedDay;
 
   useEffect(() => {
+    if (
+      requestedSelectedDayId &&
+      tripDays.some((day) => day.id === requestedSelectedDayId)
+    ) {
+      setSelectedDayId(requestedSelectedDayId);
+      return;
+    }
+
     if (tripDays.length > 0) {
       setSelectedDayId(tripDays[0].id);
     } else {
       setSelectedDayId(itinerary.startDate);
     }
-  }, [tripDays, itinerary.startDate]);
+  }, [tripDays, itinerary.startDate, requestedSelectedDayId]);
 
   useEffect(() => {
     setItinerary((current) => ({
@@ -326,6 +454,213 @@ export default function ItineraryScreen() {
   ]);
 
   useEffect(() => {
+    setTimerDeadlines({
+      planningEndAt,
+      votingEndAt,
+    });
+  }, [planningEndAt, votingEndAt]);
+
+  useEffect(() => {
+    activeStateRef.current = activeState;
+  }, [activeState]);
+
+  const refreshTripTimerFields = useCallback(
+    async (options: { forceRefresh?: boolean } = {}) => {
+      if (!currentUserId || !tripId) return;
+
+      try {
+        const trips = await fetchMyTrips(currentUserId, {
+          forceRefresh: options.forceRefresh,
+          allowStaleOnError: true,
+        });
+
+        const currentTrip = trips.find((trip) => trip.trip_id === tripId);
+        if (!currentTrip) return;
+
+        const refreshedPlanningStatus = mapTripMembersToPlanningStatus(
+          currentTrip.members
+        );
+        const nextState = toUiState(currentTrip.state);
+        const nextPlanningEndAt = currentTrip.planning_end_at ?? planningEndAt;
+        const nextVotingEndAt = currentTrip.voting_end_at ?? votingEndAt;
+        const currentState = activeStateRef.current;
+
+        setTimerDeadlines({
+          planningEndAt: nextPlanningEndAt,
+          votingEndAt: nextVotingEndAt,
+        });
+
+        const applyRefreshedTrip = (stateToApply: ItineraryState) => {
+          setItinerary((current) => ({
+            ...current,
+            title: currentTrip.title ?? current.title,
+            destination: currentTrip.destination ?? current.destination,
+            startDate: currentTrip.start_date ?? current.startDate,
+            endDate: currentTrip.end_date ?? current.endDate,
+            state: stateToApply,
+            planningStatus:
+              refreshedPlanningStatus ??
+              (stateToApply === "planning" &&
+              nextPlanningEndAt &&
+              nextPlanningEndAt !== timerDeadlines.planningEndAt
+                ? resetPlanningStatus(current.planningStatus)
+                : current.planningStatus),
+          }));
+
+          router.setParams({
+            state: stateToApply,
+            title: currentTrip.title,
+            destination: currentTrip.destination,
+            startDate: currentTrip.start_date,
+            endDate: currentTrip.end_date,
+            planningEndAt: nextPlanningEndAt ?? "",
+            votingEndAt: nextVotingEndAt ?? "",
+            members: refreshedPlanningStatus
+              ? JSON.stringify(refreshedPlanningStatus)
+              : members,
+          });
+        };
+
+        const shouldShowTransitionOverlay =
+          currentState !== nextState &&
+          ((currentState === "planning" &&
+            (nextState === "voting" || nextState === "final")) ||
+            (currentState === "voting" && nextState === "final"));
+
+        if (shouldShowTransitionOverlay) {
+          if (transitionTargetStateRef.current === nextState) return;
+
+          transitionTargetStateRef.current = nextState;
+
+          const finishTransition = () => {
+            applyRefreshedTrip(nextState);
+            setActivityRefreshKey((value) => value + 1);
+            transitionTargetStateRef.current = null;
+          };
+
+          if (nextState === "voting") {
+            setIsPreparingVoting(true);
+            if (votingTransitionTimeoutRef.current) {
+              clearTimeout(votingTransitionTimeoutRef.current);
+            }
+            votingTransitionTimeoutRef.current = setTimeout(() => {
+              finishTransition();
+              setIsPreparingVoting(false);
+            }, TRANSITION_OVERLAY_MS);
+            return;
+          }
+
+          setIsPreparingFinalItinerary(true);
+          if (finalizingTimeoutRef.current) {
+            clearTimeout(finalizingTimeoutRef.current);
+          }
+          finalizingTimeoutRef.current = setTimeout(() => {
+            finishTransition();
+            setIsPreparingFinalItinerary(false);
+          }, TRANSITION_OVERLAY_MS);
+          return;
+        }
+
+        applyRefreshedTrip(nextState);
+      } catch (error) {
+        console.log("Could not refresh trip timer:", error);
+      }
+    },
+    [
+      currentUserId,
+      members,
+      planningEndAt,
+      timerDeadlines.planningEndAt,
+      tripId,
+      votingEndAt,
+    ]
+  );
+
+  useEffect(() => {
+    if (!currentUserId || !tripId) return;
+
+    let deadlineTimeout: ReturnType<typeof setTimeout> | null = null;
+    const refreshKey = `${currentUserId}:${tripId}`;
+
+    if (initialTripRefreshKeyRef.current !== refreshKey) {
+      initialTripRefreshKeyRef.current = refreshKey;
+      void refreshTripTimerFields();
+    }
+
+    const activeDeadline =
+      activeState === "planning"
+        ? timerDeadlines.planningEndAt
+        : activeState === "voting"
+          ? timerDeadlines.votingEndAt
+          : undefined;
+
+    if (
+      (activeState === "planning" || activeState === "voting") &&
+      activeDeadline
+    ) {
+      if (isDeadlinePast(activeDeadline)) {
+        void refreshTripTimerFields({ forceRefresh: true });
+      } else {
+        const delay = Math.max(
+          0,
+          new Date(activeDeadline).getTime() - Date.now() + 1000
+        );
+        deadlineTimeout = setTimeout(() => {
+          void refreshTripTimerFields({ forceRefresh: true });
+        }, delay);
+      }
+    }
+
+    return () => {
+      if (deadlineTimeout) {
+        clearTimeout(deadlineTimeout);
+      }
+    };
+  }, [
+    activeState,
+    currentUserId,
+    tripId,
+    planningEndAt,
+    votingEndAt,
+    members,
+    refreshTripTimerFields,
+    timerDeadlines.planningEndAt,
+    timerDeadlines.votingEndAt,
+  ]);
+
+  useEffect(() => {
+    if (
+      !currentUserId ||
+      !tripId ||
+      (activeState !== "planning" && activeState !== "voting")
+    ) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      void refreshTripTimerFields({ forceRefresh: true });
+    }, TRIP_STATE_POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [activeState, currentUserId, refreshTripTimerFields, tripId]);
+
+  useEffect(() => {
+    const updateTimer = () => {
+      setTimerText(
+        getActiveTripTimerText(
+          activeState,
+          timerDeadlines.planningEndAt,
+          timerDeadlines.votingEndAt
+        )
+      );
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [activeState, timerDeadlines]);
+
+  useEffect(() => {
     return () => {
       if (planningInfoTimeoutRef.current) {
         clearTimeout(planningInfoTimeoutRef.current);
@@ -333,28 +668,52 @@ export default function ItineraryScreen() {
       if (finalizingTimeoutRef.current) {
         clearTimeout(finalizingTimeoutRef.current);
       }
+      if (votingTransitionTimeoutRef.current) {
+        clearTimeout(votingTransitionTimeoutRef.current);
+      }
     };
   }, []);
 
-  // Move focus into the popup when it appears — Fix 3
   useEffect(() => {
-    if (showPlanningInfoPopup && popupRef.current) {
-      const node = findNodeHandle(popupRef.current);
-      if (node) {
-        AccessibilityInfo.setAccessibilityFocus(node);
-      }
+    if (!showPlanningInfoPopup || !popupRef.current) {
+      return;
+    }
+
+    if (Platform.OS === "web") {
+      requestAnimationFrame(() => {
+        const popupElement = popupRef.current as unknown as {
+          focus?: () => void;
+        };
+        popupElement?.focus?.();
+      });
+      return;
+    }
+
+    const node = findNodeHandle(popupRef.current);
+    if (node) {
+      AccessibilityInfo.setAccessibilityFocus(node);
     }
   }, [showPlanningInfoPopup]);
 
-  // Load activities from API
   useEffect(() => {
     async function loadActivities() {
       if (!tripId || tripDays.length === 0) return;
-      if (activeState === "planning" && (!selectedDayId || !currentUserId)) {
+
+      if (activeState !== "final" && !selectedDayId) {
         return;
       }
 
-      const cacheKey = `${tripId}_${activeState}_${selectedDayId}`;
+      if (activeState === "planning" && !currentUserId) {
+        return;
+      }
+
+      const resolvedDayId =
+        selectedDayId || tripDays[0]?.id || itinerary.startDate;
+      const cacheKey =
+        activeState === "final"
+          ? `${tripId}_${activeState}`
+          : `${tripId}_${activeState}_${resolvedDayId}`;
+
       const cached = activitiesCache.get(cacheKey);
 
       if (cached) {
@@ -370,53 +729,53 @@ export default function ItineraryScreen() {
             tripId,
             currentUserId ?? undefined
           );
+
           const mapped = finalActivities.map((activity: any) =>
             mapBackendActivity(activity, {
-              dayId: selectedDayId || itinerary.startDate,
+              dayId: resolvedDayId,
               slotId: activity.slot_id ?? "",
             })
           );
+
           const hasChanged = JSON.stringify(cached) !== JSON.stringify(mapped);
+
           if (hasChanged) {
             activitiesCache.set(cacheKey, mapped);
             setApiActivities(mapped);
           }
+
           setIsLoadingActivities(false);
           return;
         }
 
-        const daysToLoad =
-          activeState === "voting"
-            ? tripDays.map((day) => day.id)
-            : [selectedDayId];
-
         const allActivities = (
           await Promise.all(
-            daysToLoad.flatMap((dayId) =>
-              slots.map(async (slot) => {
-                const slotIdWithDate = `${dayId}_${slot.id}`;
-                const slotActivities = await getActivitiesBySlot(
-                  tripId,
-                  slotIdWithDate,
-                  currentUserId ?? undefined
-                );
-                return slotActivities.map((activity: any) =>
-                  mapBackendActivity(activity, {
-                    dayId,
-                    slotId: slot.id,
-                  })
-                );
-              })
-            )
+            slots.map(async (slot) => {
+              const slotIdWithDate = `${resolvedDayId}_${slot.id}`;
+              const slotActivities = await getActivitiesBySlot(
+                tripId,
+                slotIdWithDate,
+                currentUserId ?? undefined
+              );
+
+              return slotActivities.map((activity: any) =>
+                mapBackendActivity(activity, {
+                  dayId: resolvedDayId,
+                  slotId: slot.id,
+                })
+              );
+            })
           )
         ).flat();
 
         const hasChanged =
           JSON.stringify(cached) !== JSON.stringify(allActivities);
+
         if (hasChanged) {
           activitiesCache.set(cacheKey, allActivities);
           setApiActivities(allActivities);
         }
+
         setIsLoadingActivities(false);
       } catch (error) {
         console.log("Could not load activities:", error);
@@ -436,7 +795,6 @@ export default function ItineraryScreen() {
     itinerary.startDate,
     activityRefreshKey,
   ]);
-
   function handlePlanningInfoPress() {
     if (showPlanningInfoPopup) {
       if (planningInfoTimeoutRef.current) {
@@ -521,7 +879,7 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
-    router.push({
+    router.replace({
       pathname: "/add-activity",
       params: {
         tripId: itinerary.tripId,
@@ -533,7 +891,10 @@ export default function ItineraryScreen() {
         members: planningStatusParam,
         dayId: selectedDayId,
         slotId: `${selectedDayId}_${slotId}`,
+        selectedDay: selectedDayId,
         activitiesJson: JSON.stringify(itinerary.activities),
+        planningEndAt: timerDeadlines.planningEndAt ?? "",
+        votingEndAt: timerDeadlines.votingEndAt ?? "",
       },
     });
   }
@@ -543,7 +904,7 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
-    router.push({
+    router.replace({
       pathname: "/add-activity",
       params: {
         tripId: itinerary.tripId,
@@ -555,12 +916,15 @@ export default function ItineraryScreen() {
         members: planningStatusParam,
         dayId: activity.dayId,
         slotId: activity.slotId,
+        selectedDay: activity.dayId,
         activityId: activity.id,
         initialName: activity.name,
         initialDescription: activity.description ?? "",
         initialAddress: activity.address ?? "",
         initialGoogleMapsUrl: activity.googleMapsUrl ?? "",
         activitiesJson: JSON.stringify(itinerary.activities),
+        planningEndAt: timerDeadlines.planningEndAt ?? "",
+        votingEndAt: timerDeadlines.votingEndAt ?? "",
       },
     });
   }
@@ -570,17 +934,28 @@ export default function ItineraryScreen() {
     if (!currentUserId) return;
 
     if (itinerary.tripId === "trip-fallback") {
-      const nextState = shouldSkipVoting(tripMemberCount) ? "final" : "planning";
+      const nextState = shouldSkipVoting(tripMemberCount)
+        ? "final"
+        : "planning";
       setItinerary((current) => ({
         ...current,
-        state: nextState,
+        state: nextState === "final" ? current.state : nextState,
         planningStatus: markPlanningDoneForUser(
           current.planningStatus,
           currentUserId
         ),
       }));
       if (nextState === "final") {
-        router.setParams({ state: "final" });
+        setIsPreparingFinalItinerary(true);
+        if (finalizingTimeoutRef.current) {
+          clearTimeout(finalizingTimeoutRef.current);
+        }
+        finalizingTimeoutRef.current = setTimeout(() => {
+          setItinerary((current) => ({ ...current, state: "final" }));
+          setIsPreparingFinalItinerary(false);
+          setActivityRefreshKey((value) => value + 1);
+          router.setParams({ state: "final" });
+        }, 1800);
       }
       return;
     }
@@ -593,26 +968,20 @@ export default function ItineraryScreen() {
     setIsSubmittingPlanning(true);
 
     try {
-      const result = await finishPlanning({
+      await finishPlanning({
         idToken: authToken,
         tripId: itinerary.tripId,
       });
-      const backendState = toUiState(result.tripState);
-      const nextState =
-        backendState === "voting" &&
-        shouldSkipVoting(result.totalMembers || tripMemberCount)
-          ? "final"
-          : backendState;
 
       setItinerary((current) => ({
         ...current,
-        state: nextState,
         planningStatus: markPlanningDoneForUser(
           current.planningStatus,
           currentUserId
         ),
       }));
-      router.setParams({ state: nextState });
+
+      void refreshTripTimerFields({ forceRefresh: true });
     } catch (error) {
       Alert.alert(
         "Could not finish planning",
@@ -623,10 +992,17 @@ export default function ItineraryScreen() {
     }
   }
 
-  const votingActivities = useMemo(
-    () => (apiActivities.length > 0 ? apiActivities : itinerary.activities),
-    [apiActivities, itinerary.activities]
-  );
+  const votingActivities = useMemo(() => {
+    const all = apiActivities.length > 0 ? apiActivities : itinerary.activities;
+    const groups = new Map<string, Activity[]>();
+    all.forEach((a) => {
+      const key = `${a.dayId}_${a.slotId}`;
+      groups.set(key, [...(groups.get(key) ?? []), a]);
+    });
+    return Array.from(groups.values())
+      .filter((group) => group.length > 1)
+      .flat();
+  }, [apiActivities, itinerary.activities]);
 
   const daysWithVotingActivities = useMemo(() => {
     const set = new Set<string>();
@@ -640,10 +1016,7 @@ export default function ItineraryScreen() {
       .filter((a) => a.dayId === selectedDayId)
       .forEach((a) => {
         if (!seen.has(a.slotId)) {
-          const formatted = a.slotId
-            .replace(/_/g, ":")
-            .replace(/:(\d{2})$/, "–$1:00");
-          seen.set(a.slotId, formatted);
+          seen.set(a.slotId, formatSlotLabel(a.slotId));
         }
       });
     return Array.from(seen.entries()).map(([slotId, label]) => ({
@@ -688,30 +1061,18 @@ export default function ItineraryScreen() {
         activityId,
       });
 
-      setApiActivities((current) =>
-        current.map((activity) => {
-          if (
-            activity.dayId !== selectedDayId ||
-            activity.slotId !== selectedVotingSlotId
-          ) {
-            return activity;
-          }
-          const wasSelected = activity.hasCurrentUserVote === true;
-          const isSelected = activity.id === activityId;
-          const voteDelta =
-            isSelected && !wasSelected
-              ? 1
-              : !isSelected && wasSelected
-                ? -1
-                : 0;
-          return {
-            ...activity,
-            hasCurrentUserVote: isSelected,
-            voteCount: Math.max(0, (activity.voteCount ?? 0) + voteDelta),
-          };
-        })
-      );
-      setActivityRefreshKey((value) => value + 1);
+      const applyVote = (activities: Activity[]) =>
+        selectVoteForActivity(
+          activities,
+          selectedDayId,
+          selectedVotingSlotId,
+          activityId
+        );
+
+      if (result.voteAccepted !== false) {
+        updateCachedActivities(tripId, applyVote);
+        setApiActivities((current) => applyVote(current));
+      }
 
       if (result.tripState === "Final") {
         setIsPreparingFinalItinerary(true);
@@ -794,6 +1155,13 @@ export default function ItineraryScreen() {
     }
   }
 
+  const handleDismissPopup = useSinglePress(() => {
+    if (planningInfoTimeoutRef.current) {
+      clearTimeout(planningInfoTimeoutRef.current);
+    }
+    setShowPlanningInfoPopup(false);
+  });
+
   const safeAreaBg =
     activeState === "voting"
       ? colors.sunsetPink
@@ -820,8 +1188,14 @@ export default function ItineraryScreen() {
             startDate={itinerary.startDate}
             endDate={itinerary.endDate}
             introText={getIntroText(activeState)}
-            daysLeftText={getDaysLeftText(activeState)}
-            onBackPress={() => router.back()}
+            daysLeftText={timerText}
+            onBackPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace("/home");
+              }
+            }}
             state={activeState}
           />
 
@@ -835,7 +1209,6 @@ export default function ItineraryScreen() {
               }
             />
 
-            {/* PLANNING */}
             {activeState === "planning" && (
               <View style={styles.planningContent}>
                 <View style={styles.slotList}>
@@ -863,7 +1236,6 @@ export default function ItineraryScreen() {
               </View>
             )}
 
-            {/* VOTING */}
             {activeState === "voting" && (
               <View style={styles.votingSection}>
                 {isLoadingActivities ? (
@@ -896,7 +1268,6 @@ export default function ItineraryScreen() {
               </View>
             )}
 
-            {/* FINAL */}
             {activeState === "final" && (
               <View style={styles.slotList}>
                 {isLoadingActivities
@@ -918,30 +1289,28 @@ export default function ItineraryScreen() {
           <View style={[styles.footerBackground, { pointerEvents: "none" }]} />
         )}
 
-        {/* Planning info popup — Fix 3: modal focus trap */}
         {showPlanningInfoPopup && (
           <>
-            {/* Full-screen dismiss area sits behind the popup */}
             <Pressable
               style={styles.popupDismissArea}
-              onPress={() => {
-                if (planningInfoTimeoutRef.current) {
-                  clearTimeout(planningInfoTimeoutRef.current);
-                }
-                setShowPlanningInfoPopup(false);
-              }}
+              onPress={handleDismissPopup}
               accessibilityRole="button"
               accessibilityLabel="Dismiss planning information"
             />
 
-            {/* Popup — accessibilityViewIsModal traps focus inside */}
             <View
               ref={popupRef}
-              style={styles.popupWrapper}
+              style={[
+                styles.popupWrapper,
+                Platform.OS === "web"
+                  ? ({ outlineStyle: "none" } as any)
+                  : null,
+              ]}
               accessibilityViewIsModal={true}
               accessible={true}
               accessibilityLiveRegion="assertive"
               accessibilityLabel="You can no longer add activities after submitting."
+              {...(Platform.OS === "web" ? ({ tabIndex: -1 } as any) : {})}
             >
               <View style={styles.popup}>
                 <AppText
@@ -959,39 +1328,28 @@ export default function ItineraryScreen() {
         {activeState === "planning" && (
           <PlanningDoneBar
             checked={hasCurrentUserFinished}
-            disabled={isSubmittingPlanning}
+            disabled={
+              isSubmittingPlanning ||
+              isPreparingFinalItinerary ||
+              isPreparingVoting
+            }
             onPress={handleFinishPlanning}
             onInfoPress={handlePlanningInfoPress}
           />
         )}
 
-        {/* Finalizing overlay — Fix 3 also applies here */}
         {isPreparingFinalItinerary && (
-          <View
-            style={styles.finalizingOverlay}
-            accessibilityViewIsModal={true}
-            accessible={true}
-            accessibilityLiveRegion="assertive"
-            accessibilityLabel="Making your itinerary ready. We are choosing the group favorites for each time slot."
-          >
-            <View style={styles.finalizingCard}>
-              <ActivityIndicator color={colors.nightBlack} />
-              <AppText
-                variant="subtitle"
-                style={styles.finalizingTitle}
-                accessible={false}
-              >
-                Making your itinerary ready
-              </AppText>
-              <AppText
-                variant="caption"
-                style={styles.finalizingText}
-                accessible={false}
-              >
-                We are choosing the group favorites for each time slot.
-              </AppText>
-            </View>
-          </View>
+          <TransitionOverlay
+            title="Making your itinerary ready"
+            text="We are choosing the group favorites for each time slot."
+          />
+        )}
+
+        {isPreparingVoting && (
+          <TransitionOverlay
+            title="Getting voting ready"
+            text="We are preparing the activities your group can vote on."
+          />
         )}
       </View>
     </SafeAreaView>

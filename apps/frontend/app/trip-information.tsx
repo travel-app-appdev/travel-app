@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { AppText } from "@/src/components/common/AppText";
 import {
   ActionCard,
@@ -18,6 +18,7 @@ import {
 import { BackLink } from "@/src/components/common/BackLink";
 import { leaveTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
+import { invalidateTripsCache } from "./home";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import InfoIcon from "@/assets/icons/info.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
@@ -28,6 +29,7 @@ import Hourglass0 from "@/assets/icons/hourglass_0.svg";
 import Hourglass1 from "@/assets/icons/hourglass_1.svg";
 import Timepoint from "@/assets/icons/timepoint.svg";
 import Exit from "@/assets/icons/exit.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 const PHASE_TEXT_COLORS: Record<string, string> = {
   planning: colors.nightBlack,
@@ -142,27 +144,24 @@ export default function TripInformationScreen() {
   const [isLeaving, setIsLeaving] = useState(false);
 
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
-  useEffect(() => {
-    return () => timeoutRefs.current.forEach(clearTimeout);
-  }, []);
 
-  const members: MemberParam[] = (() => {
+  const members: MemberParam[] = useMemo(() => {
     try {
       return membersParam ? JSON.parse(membersParam) : [];
     } catch {
       return [];
     }
-  })();
+  }, [membersParam]);
 
-  const tripStart = startDate ? new Date(startDate) : new Date();
-  const tripEnd = endDate ? new Date(endDate) : new Date();
+  const tripStart = useMemo(
+    () => (startDate ? new Date(startDate) : new Date()),
+    [startDate]
+  );
 
-  const planningStartDate = parseIsoToDate(planningStartedAt);
-  const planningEndDate = parseIsoToDate(planningEndAt);
-  const votingEndDate = parseIsoToDate(votingEndAt);
-
-  const votingStartDate = planningEndDate ?? tripStart;
-  const finalDisplayDate = votingEndDate ?? tripEnd;
+  const tripEnd = useMemo(
+    () => (endDate ? new Date(endDate) : new Date()),
+    [endDate]
+  );
 
   const phases = [
     {
@@ -185,47 +184,31 @@ export default function TripInformationScreen() {
     },
   ];
 
-  const [phaseDates, setPhaseDates] = useState<PhaseDates>({
-    planning: {
-      start: planningStartDate ?? tripStart,
-      end: planningEndDate ?? tripStart,
-      time: parseIsoToTimeString(planningEndAt),
-    },
-    voting: {
-      start: votingStartDate,
-      end: votingEndDate ?? tripStart,
-      time: parseIsoToTimeString(votingEndAt),
-    },
-    final: {
-      start: finalDisplayDate,
-      end: finalDisplayDate,
-      time: "00:00",
-    },
-  });
+  const phaseDates: PhaseDates = useMemo(() => {
+    const planningStartDate = parseIsoToDate(planningStartedAt);
+    const planningEndDate = parseIsoToDate(planningEndAt);
+    const votingEndDate = parseIsoToDate(votingEndAt);
 
-  useEffect(() => {
-    const nextPlanningStart = parseIsoToDate(planningStartedAt);
-    const nextPlanningEnd = parseIsoToDate(planningEndAt);
-    const nextVotingEnd = parseIsoToDate(votingEndAt);
-    const nextFinalDisplay = nextVotingEnd ?? tripEnd;
+    const votingStartDate = planningEndDate ?? tripStart;
+    const finalDisplayDate = votingEndDate ?? tripEnd;
 
-    setPhaseDates({
+    return {
       planning: {
-        start: nextPlanningStart ?? tripStart,
-        end: nextPlanningEnd ?? tripStart,
+        start: planningStartDate ?? tripStart,
+        end: planningEndDate ?? tripStart,
         time: parseIsoToTimeString(planningEndAt),
       },
       voting: {
-        start: nextPlanningEnd ?? tripStart,
-        end: nextVotingEnd ?? tripStart,
+        start: votingStartDate,
+        end: votingEndDate ?? tripStart,
         time: parseIsoToTimeString(votingEndAt),
       },
       final: {
-        start: nextFinalDisplay ?? tripEnd,
-        end: nextFinalDisplay ?? tripEnd,
+        start: finalDisplayDate,
+        end: finalDisplayDate,
         time: "00:00",
       },
-    });
+    };
   }, [planningStartedAt, planningEndAt, votingEndAt, tripStart, tripEnd]);
 
   const handleLeaveTrip = () => {
@@ -244,6 +227,7 @@ export default function TripInformationScreen() {
             }
             const idToken = await currentUser.getIdToken();
             await leaveTrip({ idToken, tripId });
+            invalidateTripsCache();
             router.replace("/home");
           } catch (error) {
             const message =
@@ -287,9 +271,9 @@ export default function TripInformationScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.infoLabelRow}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+              <View
+                style={styles.infoLabelRow}
+                {...hiddenFromAccessibility}
               >
                 <TripTitle width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
@@ -302,9 +286,9 @@ export default function TripInformationScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.infoLabelRow}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+              <View
+                style={styles.infoLabelRow}
+                {...hiddenFromAccessibility}
               >
                 <Calendar width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
@@ -318,9 +302,9 @@ export default function TripInformationScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.infoLabelRow}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+              <View
+                style={styles.infoLabelRow}
+                {...hiddenFromAccessibility}
               >
                 <Location width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
@@ -333,9 +317,9 @@ export default function TripInformationScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.infoLabelRow}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+              <View
+                style={styles.infoLabelRow}
+                {...hiddenFromAccessibility}
               >
                 <AddPeople width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>

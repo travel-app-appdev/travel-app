@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   AccessibilityInfo,
   Alert,
@@ -30,6 +30,7 @@ import {
 } from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
 import { colors, spacing, radius, typography } from "@/src/theme";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import Profile from "@/assets/icons/profile.svg";
 import IdCard from "@/assets/icons/id_card.svg";
 import Email from "@/assets/icons/email.svg";
@@ -40,6 +41,7 @@ import CheckMark from "@/assets/icons/check_mark.svg";
 import VisibilityOn from "@/assets/icons/visibility_on.svg";
 import VisibilityOff from "@/assets/icons/visibility_off.svg";
 import Exit from "@/assets/icons/exit.svg";
+import { hiddenFromAccessibility, nativeImportantForAccessibility } from "@/src/utils/accessibility";
 
 export default function ProfileScreen() {
   const { user, setUser } = useAuth();
@@ -60,15 +62,24 @@ export default function ProfileScreen() {
     };
   }, []);
 
-  // Ref for skip-to-logout focus jump — Fix 8
   const logoutRef = useRef<View>(null);
 
   function skipToLogout() {
-    if (logoutRef.current) {
-      const node = findNodeHandle(logoutRef.current);
-      if (node) {
-        AccessibilityInfo.setAccessibilityFocus(node);
-      }
+    if (!logoutRef.current) {
+      return;
+    }
+
+    if (Platform.OS === "web") {
+      const logoutElement = logoutRef.current as unknown as {
+        focus?: () => void;
+      };
+      logoutElement?.focus?.();
+      return;
+    }
+
+    const node = findNodeHandle(logoutRef.current);
+    if (node) {
+      AccessibilityInfo.setAccessibilityFocus(node);
     }
   }
 
@@ -97,20 +108,16 @@ export default function ProfileScreen() {
 
   const handleUpdateName = async () => {
     if (isUpdatingName) return;
-
     try {
       setIsUpdatingName(true);
       setNameError(null);
-
       const currentUser = auth.currentUser;
       if (!currentUser) {
         Alert.alert("Not logged in", "Please log in again.");
         return;
       }
-
       const idToken = await currentUser.getIdToken();
       const updatedUser = await updateProfile({ idToken, name: nameInput });
-
       setName(updatedUser.name ?? nameInput);
       setUser(user ? { ...user, name: updatedUser.name } : null);
       setNameUpdated(true);
@@ -127,20 +134,16 @@ export default function ProfileScreen() {
 
   const handleUpdateEmail = async () => {
     if (isUpdatingEmail) return;
-
     try {
       setIsUpdatingEmail(true);
       setEmailError(null);
-
       const currentUser = auth.currentUser;
       if (!currentUser) {
         Alert.alert("Not logged in", "Please log in again.");
         return;
       }
-
       const idToken = await currentUser.getIdToken();
       await updateProfile({ idToken, email: emailInput });
-
       setEmailUpdated(true);
       safeTimeout(() => {
         Alert.alert(
@@ -170,29 +173,24 @@ export default function ProfileScreen() {
 
   const handleUpdatePassword = async () => {
     if (isUpdatingPassword) return;
-
     if (passwordInput.length < 6) {
       setPasswordError("New password must be at least 6 characters.");
       return;
     }
-
     try {
       setIsUpdatingPassword(true);
       setPasswordError(null);
-
       const currentUser = auth.currentUser;
       if (!currentUser || !currentUser.email) {
         Alert.alert("Not logged in", "Please log in again.");
         return;
       }
-
       const credential = EmailAuthProvider.credential(
         currentUser.email,
         currentPasswordInput
       );
       await reauthenticateWithCredential(currentUser, credential);
       await updatePassword(currentUser, passwordInput);
-
       setPasswordUpdated(true);
       safeTimeout(() => {
         setPasswordUpdated(false);
@@ -225,6 +223,36 @@ export default function ProfileScreen() {
     router.replace("/");
   };
 
+  const handleNameRow = useSinglePress(() => {
+    setNameOpen(!nameOpen);
+    setNameUpdated(false);
+    setNameError(null);
+    setNameInput(name);
+  });
+
+  const handleEmailRow = useSinglePress(() => {
+    setEmailOpen(!emailOpen);
+    setEmailUpdated(false);
+    setEmailError(null);
+    setEmailInput(email);
+  });
+
+  const handlePasswordRow = useSinglePress(() => {
+    setPasswordOpen(!passwordOpen);
+    setPasswordUpdated(false);
+    setPasswordInput("");
+    setCurrentPasswordInput("");
+    setPasswordError(null);
+  });
+
+  const handleCurrentPasswordVisible = useSinglePress(() =>
+    setCurrentPasswordVisible((v) => !v)
+  );
+
+  const handlePasswordVisible = useSinglePress(() =>
+    setPasswordVisible((v) => !v)
+  );
+
   return (
     <View style={styles.fullScreen}>
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
@@ -245,27 +273,24 @@ export default function ProfileScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Skip to logout — visually hidden, screen reader only — Fix 8 */}
             <Pressable
               onPress={skipToLogout}
               accessibilityRole="button"
               accessibilityLabel="Skip to logout button"
               accessibilityHint="Moves focus directly to the logout action"
               style={styles.skipButton}
-              importantForAccessibility="yes"
+              {...nativeImportantForAccessibility}
             >
               <AppText variant="caption" style={styles.skipButtonText}>
                 Skip to logout
               </AppText>
             </Pressable>
 
-            {/* Header */}
             <View style={styles.header}>
               <BackLink href="/home" />
               <View
                 style={styles.headerTitle}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
+                {...hiddenFromAccessibility}
               >
                 <Profile width={20} height={20} />
                 <AppText variant="body" style={styles.headerLabel}>
@@ -278,12 +303,7 @@ export default function ProfileScreen() {
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
-                onPress={() => {
-                  setNameOpen(!nameOpen);
-                  setNameUpdated(false);
-                  setNameError(null);
-                  setNameInput(name);
-                }}
+                onPress={handleNameRow}
                 accessibilityRole="button"
                 accessibilityLabel={`Edit name, current value: ${name || "not set"}`}
                 accessibilityState={{ expanded: nameOpen }}
@@ -291,8 +311,7 @@ export default function ProfileScreen() {
                 <View style={styles.infoLeft}>
                   <View
                     style={styles.infoLabelRow}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <IdCard width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
@@ -308,8 +327,7 @@ export default function ProfileScreen() {
                   </AppText>
                 </View>
                 <View
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   {nameOpen ? (
                     <ArrowUp width={20} height={20} />
@@ -355,8 +373,7 @@ export default function ProfileScreen() {
                   {nameUpdated && (
                     <View
                       style={styles.successRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <CheckMark width={18} height={18} />
                       <AppText
@@ -376,12 +393,7 @@ export default function ProfileScreen() {
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
-                onPress={() => {
-                  setEmailOpen(!emailOpen);
-                  setEmailUpdated(false);
-                  setEmailError(null);
-                  setEmailInput(email);
-                }}
+                onPress={handleEmailRow}
                 accessibilityRole="button"
                 accessibilityLabel={`Edit email, current value: ${email || "not set"}`}
                 accessibilityState={{ expanded: emailOpen }}
@@ -389,8 +401,7 @@ export default function ProfileScreen() {
                 <View style={styles.infoLeft}>
                   <View
                     style={styles.infoLabelRow}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <Email width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
@@ -406,8 +417,7 @@ export default function ProfileScreen() {
                   </AppText>
                 </View>
                 <View
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   {emailOpen ? (
                     <ArrowUp width={20} height={20} />
@@ -459,8 +469,7 @@ export default function ProfileScreen() {
                   {emailUpdated && (
                     <View
                       style={styles.successRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <CheckMark width={18} height={18} />
                       <AppText
@@ -480,13 +489,7 @@ export default function ProfileScreen() {
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
-                onPress={() => {
-                  setPasswordOpen(!passwordOpen);
-                  setPasswordUpdated(false);
-                  setPasswordInput("");
-                  setCurrentPasswordInput("");
-                  setPasswordError(null);
-                }}
+                onPress={handlePasswordRow}
                 accessibilityRole="button"
                 accessibilityLabel="Edit password"
                 accessibilityState={{ expanded: passwordOpen }}
@@ -494,8 +497,7 @@ export default function ProfileScreen() {
                 <View style={styles.infoLeft}>
                   <View
                     style={styles.infoLabelRow}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
+                    {...hiddenFromAccessibility}
                   >
                     <KeyFrame width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
@@ -511,8 +513,7 @@ export default function ProfileScreen() {
                   </AppText>
                 </View>
                 <View
-                  accessible={false}
-                  importantForAccessibility="no-hide-descendants"
+                  {...hiddenFromAccessibility}
                 >
                   {passwordOpen ? (
                     <ArrowUp width={20} height={20} />
@@ -544,9 +545,7 @@ export default function ProfileScreen() {
                     />
                     <Pressable
                       style={styles.visibilityIcon}
-                      onPress={() =>
-                        setCurrentPasswordVisible(!currentPasswordVisible)
-                      }
+                      onPress={handleCurrentPasswordVisible}
                       accessibilityRole="button"
                       accessibilityLabel={
                         currentPasswordVisible
@@ -555,8 +554,7 @@ export default function ProfileScreen() {
                       }
                     >
                       <View
-                        accessible={false}
-                        importantForAccessibility="no-hide-descendants"
+                        {...hiddenFromAccessibility}
                       >
                         {currentPasswordVisible ? (
                           <VisibilityOff width={24} height={24} />
@@ -586,7 +584,7 @@ export default function ProfileScreen() {
                     />
                     <Pressable
                       style={styles.visibilityIcon}
-                      onPress={() => setPasswordVisible(!passwordVisible)}
+                      onPress={handlePasswordVisible}
                       accessibilityRole="button"
                       accessibilityLabel={
                         passwordVisible
@@ -595,8 +593,7 @@ export default function ProfileScreen() {
                       }
                     >
                       <View
-                        accessible={false}
-                        importantForAccessibility="no-hide-descendants"
+                        {...hiddenFromAccessibility}
                       >
                         {passwordVisible ? (
                           <VisibilityOff width={24} height={24} />
@@ -633,8 +630,7 @@ export default function ProfileScreen() {
                   {passwordUpdated && (
                     <View
                       style={styles.successRow}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
+                      {...hiddenFromAccessibility}
                     >
                       <CheckMark width={18} height={18} />
                       <AppText
@@ -651,11 +647,14 @@ export default function ProfileScreen() {
             </View>
           </ScrollView>
 
-          {/* Logout — pinned to bottom, ref attached for skip-to focus — Fix 8 */}
           <SafeAreaView
             edges={["bottom"]}
-            style={styles.logoutSafeArea}
+            style={[
+              styles.logoutSafeArea,
+              Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : null,
+            ]}
             ref={logoutRef}
+            {...(Platform.OS === "web" ? ({ tabIndex: -1 } as any) : {})}
           >
             <View style={styles.logoutWrapper}>
               <ActionCard
@@ -688,7 +687,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     gap: spacing.xl,
   },
-  // Visually hidden skip button — screen readers only — Fix 8
   skipButton: {
     opacity: 0,
     height: 1,

@@ -1,5 +1,4 @@
-// components/common/AppButton.tsx
-import { ReactNode } from "react";
+import { ReactNode, useCallback, useRef } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -37,6 +36,28 @@ export function AppButton({
   accessibilityHint,
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
+  const isPressLockedRef = useRef(false);
+
+  const handlePress = useCallback(() => {
+    if (isDisabled) return;
+    if (isPressLockedRef.current) return;
+    isPressLockedRef.current = true;
+
+    const release = () => {
+      const timeout = setTimeout(() => {
+        isPressLockedRef.current = false;
+      }, 500) as ReturnType<typeof setTimeout> & { unref?: () => void };
+      timeout.unref?.();
+    };
+
+    try {
+      const result = onPress();
+      Promise.resolve(result).finally(release);
+    } catch (error) {
+      release();
+      throw error;
+    }
+  }, [onPress, isDisabled]);
 
   return (
     <Pressable
@@ -47,7 +68,7 @@ export function AppButton({
         pressed && !isDisabled && styles.pressedButton,
         style,
       ]}
-      onPress={onPress}
+      onPress={handlePress}
       disabled={isDisabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}

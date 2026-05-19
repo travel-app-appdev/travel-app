@@ -1,6 +1,6 @@
 export const colors = {
   neonGreen: "#98FB82",
-  seaBlue: "#4A47E0",
+  seaBlue: "#716FE7",
   sunsetPink: "#E582FB",
   beachYellow: "#F7CE46",
   sunsetOrange: "#F77646",
@@ -26,6 +26,6 @@ export const colors = {
 
   background: "#FFFEF5",
   surface: "#FFFFFF",
-  primary: "#4A47E0",
+  primary: "#716FE7",
   accent: "#F77646",
 };

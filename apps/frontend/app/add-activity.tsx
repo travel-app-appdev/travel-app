@@ -13,6 +13,7 @@ import { StatusBar } from "expo-status-bar";
 
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 
 import LocationHeartIcon from "@/assets/icons/location-heart.svg";
 import EditIcon from "@/assets/icons/edit.svg";
@@ -24,6 +25,7 @@ import Back from "@/assets/icons/back.svg";
 import { createActivity, updateActivity } from "@/src/services/activityService";
 import { useAuth } from "@/src/context/AuthContext";
 import { auth } from "@/src/lib/firebase";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 function splitSlotId(value?: string) {
   if (!value) return { dayId: undefined, slotId: undefined };
@@ -59,6 +61,9 @@ export default function AddActivityScreen() {
     initialDescription,
     initialAddress,
     initialGoogleMapsUrl,
+    planningEndAt,
+    votingEndAt,
+    selectedDay,
   } = useLocalSearchParams<{
     tripId?: string;
     title?: string;
@@ -75,6 +80,9 @@ export default function AddActivityScreen() {
     initialDescription?: string;
     initialAddress?: string;
     initialGoogleMapsUrl?: string;
+    planningEndAt?: string;
+    votingEndAt?: string;
+    selectedDay?: string;
   }>();
 
   const isEditMode = useMemo(() => Boolean(activityId), [activityId]);
@@ -135,6 +143,9 @@ export default function AddActivityScreen() {
         newActivityDescription: nextActivity.description,
         newActivityAddress: nextActivity.address,
         newActivityGoogleMapsUrl: nextActivity.googleMapsUrl,
+        planningEndAt,
+        votingEndAt,
+        selectedDay: nextActivity.dayId ?? selectedDay,
       },
     });
   }
@@ -158,8 +169,6 @@ export default function AddActivityScreen() {
     }
 
     try {
-      let savedActivityId = activityId;
-
       if (isEditMode && activityId) {
         await updateActivity(activityId, {
           idToken: token,
@@ -191,6 +200,24 @@ export default function AddActivityScreen() {
     }
   }
 
+  const handleBack = useSinglePress(() =>
+    router.replace({
+      pathname: "/itinerary",
+      params: {
+        tripId,
+        title,
+        destination,
+        startDate,
+        endDate,
+        state,
+        members,
+        activitiesJson,
+      },
+    })
+  );
+
+  const handleSave = useSinglePress(handleSaveActivity);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <StatusBar style="dark" />
@@ -202,21 +229,7 @@ export default function AddActivityScreen() {
       >
         <View style={styles.header}>
           <Pressable
-            onPress={() =>
-              router.replace({
-                pathname: "/itinerary",
-                params: {
-                  tripId,
-                  title,
-                  destination,
-                  startDate,
-                  endDate,
-                  state,
-                  members,
-                  activitiesJson,
-                },
-              })
-            }
+            onPress={handleBack}
             style={styles.backButton}
             accessibilityRole="button"
             accessibilityLabel="Go back"
@@ -237,9 +250,10 @@ export default function AddActivityScreen() {
         <View style={styles.form}>
           <View style={styles.fields}>
             <View style={styles.fieldGroup}>
-              <View style={styles.labelRow}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              <View
+                style={styles.labelRow}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
               >
                 <TextStyle width={24} height={24} />
                 <AppText variant="body" style={styles.label}>
@@ -259,9 +273,10 @@ export default function AddActivityScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.labelRow}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              <View
+                style={styles.labelRow}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
               >
                 <EditIcon width={24} height={24} />
                 <AppText variant="body" style={styles.label}>
@@ -283,9 +298,10 @@ export default function AddActivityScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.labelRow}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              <View
+                style={styles.labelRow}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
               >
                 <LocationIcon width={24} height={24} />
                 <AppText variant="body" style={styles.label}>
@@ -303,11 +319,12 @@ export default function AddActivityScreen() {
                 accessibilityHint="Enter the location of the activity"
               />
             </View>
- 
+
             <View style={styles.fieldGroup}>
-              <View style={styles.labelRow}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
+              <View
+                style={styles.labelRow}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
               >
                 <GoogleIcon width={24} height={24} />
                 <AppText variant="body" style={styles.label}>
@@ -330,7 +347,7 @@ export default function AddActivityScreen() {
           </View>
 
           <Pressable
-            onPress={handleSaveActivity}
+            onPress={handleSave}
             style={({ pressed }) => [
               styles.saveButton,
               pressed && styles.saveButtonPressed,

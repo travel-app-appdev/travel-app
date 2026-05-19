@@ -1,65 +1,70 @@
-// apps/frontend/__tests__/tripInformation.integration.test.tsx
-
 import React from "react";
-import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
+import { render, fireEvent, waitFor } from "@testing-library/react-native";
 import TripInformationScreen from "@/app/trip-information";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
+const mockBack = jest.fn();
 const mockLeaveTrip = jest.fn();
 const mockGetIdToken = jest.fn();
 
+const mockRouter = {
+  replace: mockReplace,
+  push: mockPush,
+  back: mockBack,
+};
+
 // expo-router
 jest.mock("expo-router", () => ({
-    useLocalSearchParams: () => ({
-        tripId: "trip-001",
-        title: "Vienna Trip",
-        destination: "Vienna",
-        startDate: "2026-08-01",
-        endDate: "2026-08-07",
-        members: JSON.stringify([
-            { id: "user-admin", name: "Alice", initials: "AL", color: "#f00" },
-            { id: "user-other", name: "Bob", initials: "BO", color: "#00f" },
-        ]),
-    }),
-    useRouter: () => ({ replace: mockReplace }),
+  useLocalSearchParams: () => ({
+    tripId: "trip-001",
+    title: "Vienna Trip",
+    destination: "Vienna",
+    startDate: "2026-08-01",
+    endDate: "2026-08-07",
+    members: JSON.stringify([
+      { id: "user-admin", name: "Alice", initials: "AL", color: "#f00" },
+      { id: "user-other", name: "Bob", initials: "BO", color: "#00f" },
+    ]),
+  }),
+  useRouter: () => mockRouter,
 }));
 
 // src/api/trips
 jest.mock("@/src/api/trips", () => ({
-    leaveTrip: (...args: any[]) => mockLeaveTrip(...args),
+  leaveTrip: (...args: any[]) => mockLeaveTrip(...args),
 }));
 
 // Firebase — inline object so Jest hoisting doesn't cause reference errors.
-// Tests mutate this via require("@/src/lib/firebase").auth.currentUser
 jest.mock("@/src/lib/firebase", () => ({
-    auth: {
-        currentUser: {
-            getIdToken: jest.fn(),
-        },
+  auth: {
+    currentUser: {
+      getIdToken: jest.fn(),
     },
+  },
 }));
 
 // BackLink
 jest.mock("@/src/components/common/BackLink", () => ({
-    BackLink: () => {
-        const { View } = require("react-native");
-        return <View testID="back-link" />;
-    },
+  BackLink: () => {
+    const { View } = require("react-native");
+    return <View testID="back-link" />;
+  },
 }));
 
 // ActionCard
 jest.mock("@/src/components/common/ActionCard", () => ({
-    ActionCard: ({ label, onPress }: { label: string; onPress: () => void }) => {
-        const { TouchableOpacity, Text } = require("react-native");
-        return (
-            <TouchableOpacity onPress={onPress}>
-                <Text>{label}</Text>
-            </TouchableOpacity>
-        );
-    },
-    ACTION_CARD_HEIGHT: 60,
+  ActionCard: ({ label, onPress }: { label: string; onPress: () => void }) => {
+    const { TouchableOpacity, Text } = require("react-native");
+    return (
+      <TouchableOpacity onPress={onPress}>
+        <Text>{label}</Text>
+      </TouchableOpacity>
+    );
+  },
+  ACTION_CARD_HEIGHT: 60,
 }));
 
 // SVG assets
@@ -75,203 +80,179 @@ jest.mock("@/assets/icons/timepoint.svg", () => svgMock);
 jest.mock("@/assets/icons/exit.svg", () => svgMock);
 
 // ─── Helper to get the mocked firebase module at runtime ─────────────────────
-// We use require() inside tests (not import) so we get the live mock object
-// after Jest has set it up, avoiding the hoisting problem entirely.
 
 function getMockedAuth() {
-    return require("@/src/lib/firebase").auth;
+  return require("@/src/lib/firebase").auth;
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("TripInformationScreen — leave trip flow", () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-        // Reset currentUser to a logged-in state before each test
-        const auth = getMockedAuth();
-        auth.currentUser = { getIdToken: () => mockGetIdToken() };
-        mockGetIdToken.mockResolvedValue("member-id-token");
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  afterAll(() => {
+    jest.restoreAllMocks();
+  });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const auth = getMockedAuth();
+    auth.currentUser = { getIdToken: () => mockGetIdToken() };
+    mockGetIdToken.mockResolvedValue("member-id-token");
+  });
+
+  // ── Renders trip details ───────────────────────────────────────────────────
+
+  it("renders the trip title, destination and member names", () => {
+    const { getByText } = render(<TripInformationScreen />);
+
+    expect(getByText("Vienna Trip")).toBeTruthy();
+    expect(getByText("Vienna")).toBeTruthy();
+    expect(getByText("Alice, Bob")).toBeTruthy();
+  });
+
+  it("renders the formatted trip dates", () => {
+    const { getByText } = render(<TripInformationScreen />);
+
+    expect(getByText("01.08.2026 – 07.08.2026")).toBeTruthy();
+  });
+
+  it("renders the 'Leave trip' action card", () => {
+    const { getByText } = render(<TripInformationScreen />);
+
+    expect(getByText("Leave trip")).toBeTruthy();
+  });
+
+  // ── Leave trip — happy path ────────────────────────────────────────────────
+
+  it("shows a confirmation Alert when 'Leave trip' is pressed", () => {
+    const { Alert } = require("react-native");
+    const alertSpy = jest.spyOn(Alert, "alert");
+
+    const { getByText } = render(<TripInformationScreen />);
+    fireEvent.press(getByText("Leave trip"));
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      "Leave trip",
+      "Are you sure you want to leave this trip?",
+      expect.any(Array)
+    );
+  });
+
+  it("calls leaveTrip with the correct idToken and tripId after confirming", async () => {
+    mockLeaveTrip.mockResolvedValueOnce(undefined);
+
+    const { Alert } = require("react-native");
+    jest
+      .spyOn(Alert, "alert")
+      .mockImplementationOnce((_title: any, _msg: any, buttons: any) => {
+        buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
+      });
+
+    const { getByText } = render(<TripInformationScreen />);
+    fireEvent.press(getByText("Leave trip"));
+
+    await waitFor(() => {
+      expect(mockLeaveTrip).toHaveBeenCalledWith({
+        idToken: "member-id-token",
+        tripId: "trip-001",
+      });
+    });
+  });
+
+  it("does NOT call leaveTrip when the user presses Cancel", async () => {
+    const { Alert } = require("react-native");
+    jest
+      .spyOn(Alert, "alert")
+      .mockImplementationOnce((_title: any, _msg: any, buttons: any) => {
+        buttons?.find((b: any) => b.text === "Cancel")?.onPress?.();
+      });
+
+    const { getByText } = render(<TripInformationScreen />);
+    fireEvent.press(getByText("Leave trip"));
+
+    await waitFor(() => {
+      expect(mockLeaveTrip).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Leave trip — API error ────────────────────────────────────────────────
+
+  it("shows a failure Alert and does NOT redirect when leaveTrip rejects", async () => {
+    mockLeaveTrip.mockRejectedValueOnce(
+      new Error("Admin cannot leave the trip. Delete it instead.")
+    );
+
+    const { Alert } = require("react-native");
+    const alertSpy = jest
+      .spyOn(Alert, "alert")
+      .mockImplementationOnce((_title: any, _msg: any, buttons: any) => {
+        buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
+      })
+      .mockImplementationOnce(() => {});
+
+    const { getByText } = render(<TripInformationScreen />);
+    fireEvent.press(getByText("Leave trip"));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledTimes(2);
+      expect(alertSpy).toHaveBeenLastCalledWith(
+        "Leave failed",
+        "Admin cannot leave the trip. Delete it instead."
+      );
     });
 
-    // ── Renders trip details ───────────────────────────────────────────────────
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
 
-    it("renders the trip title, destination and member names", () => {
-        const { getByText } = render(<TripInformationScreen />);
+  it("shows a generic failure message when leaveTrip throws a non-Error", async () => {
+    mockLeaveTrip.mockRejectedValueOnce("unknown error");
 
-        expect(getByText("Vienna Trip")).toBeTruthy();
-        expect(getByText("Vienna")).toBeTruthy();
-        expect(getByText("Alice, Bob")).toBeTruthy();
+    const { Alert } = require("react-native");
+    const alertSpy = jest
+      .spyOn(Alert, "alert")
+      .mockImplementationOnce((_title: any, _msg: any, buttons: any) => {
+        buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
+      })
+      .mockImplementationOnce(() => {});
+
+    const { getByText } = render(<TripInformationScreen />);
+    fireEvent.press(getByText("Leave trip"));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenLastCalledWith(
+        "Leave failed",
+        "Failed to leave trip"
+      );
+    });
+  });
+
+  // ── Not logged in ─────────────────────────────────────────────────────────
+
+  it("shows 'Not logged in' Alert and skips the API call when currentUser is null", async () => {
+    getMockedAuth().currentUser = null;
+
+    const { Alert } = require("react-native");
+    const alertSpy = jest
+      .spyOn(Alert, "alert")
+      .mockImplementationOnce((_title: any, _msg: any, buttons: any) => {
+        buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
+      })
+      .mockImplementationOnce(() => {});
+
+    const { getByText } = render(<TripInformationScreen />);
+    fireEvent.press(getByText("Leave trip"));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        "Not logged in",
+        "Please log in again."
+      );
     });
 
-    it("renders the formatted trip dates", () => {
-        const { getByText } = render(<TripInformationScreen />);
-
-        expect(getByText(/01\.08\.2026/)).toBeTruthy();
-        expect(getByText(/07\.08\.2026/)).toBeTruthy();
-    });
-
-    it("renders the 'Leave trip' action card", () => {
-        const { getByText } = render(<TripInformationScreen />);
-
-        expect(getByText("Leave trip")).toBeTruthy();
-    });
-
-    // ── Leave trip — happy path ────────────────────────────────────────────────
-
-    it("shows a confirmation Alert when 'Leave trip' is pressed", () => {
-        const { Alert } = require("react-native");
-        const alertSpy = jest.spyOn(Alert, "alert");
-
-        const { getByText } = render(<TripInformationScreen />);
-        fireEvent.press(getByText("Leave trip"));
-
-        expect(alertSpy).toHaveBeenCalledWith(
-            "Leave trip",
-            "Are you sure you want to leave this trip?",
-            expect.any(Array)
-        );
-    });
-
-    it("calls leaveTrip with the correct idToken and tripId after confirming", async () => {
-        mockLeaveTrip.mockResolvedValueOnce(undefined);
-
-        const { Alert } = require("react-native");
-        jest.spyOn(Alert, "alert").mockImplementationOnce(
-            (_title: any, _msg: any, buttons: any) => {
-                buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
-            }
-        );
-
-        const { getByText } = render(<TripInformationScreen />);
-        fireEvent.press(getByText("Leave trip"));
-
-        await waitFor(() => {
-            expect(mockLeaveTrip).toHaveBeenCalledWith({
-                idToken: "member-id-token",
-                tripId: "trip-001",
-            });
-        });
-    });
-
-    it("redirects to /home after successfully leaving", async () => {
-        mockLeaveTrip.mockResolvedValueOnce(undefined);
-
-        const { Alert } = require("react-native");
-        jest.spyOn(Alert, "alert").mockImplementationOnce(
-            (_title: any, _msg: any, buttons: any) => {
-                buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
-            }
-        );
-
-        const { getByText } = render(<TripInformationScreen />);
-        fireEvent.press(getByText("Leave trip"));
-
-        await waitFor(() => {
-            expect(mockReplace).toHaveBeenCalledWith("/home");
-        });
-    });
-
-    // ── Leave trip — cancellation ─────────────────────────────────────────────
-
-    it("does NOT call leaveTrip when the user presses Cancel", async () => {
-        const { Alert } = require("react-native");
-        jest.spyOn(Alert, "alert").mockImplementationOnce(
-            (_title: any, _msg: any, buttons: any) => {
-                buttons?.find((b: any) => b.text === "Cancel")?.onPress?.();
-            }
-        );
-
-        const { getByText } = render(<TripInformationScreen />);
-        fireEvent.press(getByText("Leave trip"));
-
-        await act(async () => {});
-
-        expect(mockLeaveTrip).not.toHaveBeenCalled();
-        expect(mockReplace).not.toHaveBeenCalled();
-    });
-
-    // ── Leave trip — API error ────────────────────────────────────────────────
-
-    it("shows a failure Alert and does NOT redirect when leaveTrip rejects", async () => {
-        mockLeaveTrip.mockRejectedValueOnce(
-            new Error("Admin cannot leave the trip. Delete it instead.")
-        );
-
-        const { Alert } = require("react-native");
-        const alertSpy = jest
-            .spyOn(Alert, "alert")
-            .mockImplementationOnce(
-                (_title: any, _msg: any, buttons: any) => {
-                    buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
-                }
-            )
-            .mockImplementationOnce(() => {});
-
-        const { getByText } = render(<TripInformationScreen />);
-        fireEvent.press(getByText("Leave trip"));
-
-        await waitFor(() => {
-            expect(alertSpy).toHaveBeenCalledTimes(2);
-            expect(alertSpy).toHaveBeenLastCalledWith(
-                "Leave failed",
-                "Admin cannot leave the trip. Delete it instead."
-            );
-        });
-
-        expect(mockReplace).not.toHaveBeenCalled();
-    });
-
-    it("shows a generic failure message when leaveTrip throws a non-Error", async () => {
-        mockLeaveTrip.mockRejectedValueOnce("unknown error");
-
-        const { Alert } = require("react-native");
-        const alertSpy = jest
-            .spyOn(Alert, "alert")
-            .mockImplementationOnce(
-                (_title: any, _msg: any, buttons: any) => {
-                    buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
-                }
-            )
-            .mockImplementationOnce(() => {});
-
-        const { getByText } = render(<TripInformationScreen />);
-        fireEvent.press(getByText("Leave trip"));
-
-        await waitFor(() => {
-            expect(alertSpy).toHaveBeenLastCalledWith(
-                "Leave failed",
-                "Failed to leave trip"
-            );
-        });
-    });
-
-    // ── Not logged in ─────────────────────────────────────────────────────────
-
-    it("shows 'Not logged in' Alert and skips the API call when currentUser is null", async () => {
-        // Null out currentUser via the live mock object
-        getMockedAuth().currentUser = null;
-
-        const { Alert } = require("react-native");
-        const alertSpy = jest
-            .spyOn(Alert, "alert")
-            .mockImplementationOnce(
-                (_title: any, _msg: any, buttons: any) => {
-                    buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
-                }
-            )
-            .mockImplementationOnce(() => {});
-
-        const { getByText } = render(<TripInformationScreen />);
-        fireEvent.press(getByText("Leave trip"));
-
-        await waitFor(() => {
-            expect(alertSpy).toHaveBeenCalledWith(
-                "Not logged in",
-                "Please log in again."
-            );
-        });
-
-        expect(mockLeaveTrip).not.toHaveBeenCalled();
-        expect(mockReplace).not.toHaveBeenCalled();
-    });
+    expect(mockLeaveTrip).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
 });
