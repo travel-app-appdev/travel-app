@@ -76,7 +76,8 @@ export default function RegisterScreen() {
       );
 
       setUser(authResponse);
-      router.replace("/onboarding");
+      setIdToken(authResponse.idToken);
+      router.replace("/home");
     } catch (error: any) {
       const status = error?.response?.status;
       const backendCode = error?.response?.data?.code ?? "";
