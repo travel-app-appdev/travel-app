@@ -789,19 +789,18 @@ export default function CreateTripScreen() {
   const TOTAL_STEPS = 4;
   const progress = useRef(new Animated.Value(1)).current;
 
-useEffect(() => {
-  Animated.timing(progress, {
-    toValue: step,
-    duration: 300,
-    useNativeDriver: false,
-  }).start();
-}, [step]);
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: step,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [step]);
 
-const progressAnim = progress.interpolate({
-  inputRange: [1, TOTAL_STEPS],
-  outputRange: ["25%", "100%"],
-});
-
+  const progressAnim = progress.interpolate({
+    inputRange: [1, TOTAL_STEPS],
+    outputRange: ["0%", "100%"],
+  });
 
   type ProgressBarProps = {
     progressWidth: Animated.AnimatedInterpolation<string>;
@@ -849,6 +848,7 @@ const progressAnim = progress.interpolate({
       </View>
     );
   };
+
   // Step 3 — timer setup
   if (step === 3) {
     return (
