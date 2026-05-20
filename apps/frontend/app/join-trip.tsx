@@ -16,6 +16,7 @@ import { AppButton } from "@/src/components/common/AppButton";
 import { BackLink } from "@/src/components/common/BackLink";
 import { joinTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
+import { invalidateTripsCache } from "./home";
 import { colors, spacing, typography } from "@/src/theme";
 import LinkIcon from "@/assets/icons/link.svg";
 import KeyFrame from "@/assets/icons/key_frame.svg";
@@ -40,6 +41,7 @@ export default function JoinTripScreen() {
       }
       const idToken = await currentUser.getIdToken();
       await joinTrip({ idToken, inviteCode: code.trim() });
+      invalidateTripsCache();
       router.replace("/home");
     } catch (error) {
       const message =
@@ -92,7 +94,8 @@ export default function JoinTripScreen() {
             </AppText>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.fieldLabelRow}
+              <View
+                style={styles.fieldLabelRow}
                 {...hiddenFromAccessibility}
               >
                 <KeyFrame width={20} height={20} />
