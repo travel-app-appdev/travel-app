@@ -43,6 +43,9 @@ import request from 'supertest';
 import app from '../index';
 import * as activityService from '../services/activityService';
 
+const SLOT_ID = '2026-06-01_Morning Activity';
+const ENCODED_SLOT_ID = encodeURIComponent(SLOT_ID);
+
 describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
     afterEach(() => {
         jest.clearAllMocks();
@@ -50,7 +53,7 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
 
     it('should return 400 if name is missing', async () => {
         const res = await request(app)
-            .post('/itinerary/trip-123/slots/06:00-08:00/activities')
+            .post(`/itinerary/trip-123/slots/${ENCODED_SLOT_ID}/activities`)
             .send({ idToken: 'valid-token' });
 
         expect(res.status).toBe(400);
@@ -59,7 +62,7 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
 
     it('should return 400 if idToken is missing', async () => {
         const res = await request(app)
-            .post('/itinerary/trip-123/slots/06:00-08:00/activities')
+            .post(`/itinerary/trip-123/slots/${ENCODED_SLOT_ID}/activities`)
             .send({ name: 'Visit Palace' });
 
         expect(res.status).toBe(400);
@@ -73,7 +76,7 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
         });
 
         const res = await request(app)
-            .post('/itinerary/trip-123/slots/06:00-08:00/activities')
+            .post(`/itinerary/trip-123/slots/${ENCODED_SLOT_ID}/activities`)
             .send({
                 idToken: 'valid-token',
                 name: 'Visit Palace',
@@ -90,7 +93,7 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
         });
 
         const res = await request(app)
-            .post('/itinerary/trip-123/slots/06:00-08:00/activities')
+            .post(`/itinerary/trip-123/slots/${ENCODED_SLOT_ID}/activities`)
             .send({
                 idToken: 'valid-token',
                 name: 'Visit Palace',
@@ -105,7 +108,7 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
             activity_id: 'activity-123',
             trip_id: 'trip-123',
             user_id: 'user-123',
-            slot_id: '06:00-08:00',
+            slot_id: SLOT_ID,
             name: 'Visit Schönbrunn Palace',
             description: 'Beautiful palace',
             address: 'Schönbrunner Schloßstraße 47',
@@ -114,7 +117,7 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
         });
 
         const res = await request(app)
-            .post('/itinerary/trip-123/slots/06:00-08:00/activities')
+            .post(`/itinerary/trip-123/slots/${ENCODED_SLOT_ID}/activities`)
             .send({
                 idToken: 'valid-token',
                 name: 'Visit Schönbrunn Palace',
@@ -125,7 +128,7 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
 
         expect(activityService.suggestActivity).toHaveBeenCalledWith(
             'trip-123',
-            '06:00-08:00',
+            SLOT_ID,
             {
                 idToken: 'valid-token',
                 name: 'Visit Schönbrunn Palace',
@@ -154,18 +157,18 @@ describe('GET /itinerary/:tripId/slots/:slotId/activities', () => {
                 activity_id: 'activity-123',
                 trip_id: 'trip-123',
                 user_id: 'user-123',
-                slot_id: '06:00-08:00',
+                slot_id: SLOT_ID,
                 name: 'Visit Schönbrunn Palace',
                 source_type: 'manual',
             },
         ]);
 
         const res = await request(app)
-            .get('/itinerary/trip-123/slots/06:00-08:00/activities');
+            .get(`/itinerary/trip-123/slots/${ENCODED_SLOT_ID}/activities`);
 
         expect(activityService.getCandidateActivities).toHaveBeenCalledWith(
             'trip-123',
-            '06:00-08:00',
+            SLOT_ID,
             undefined
         );
         expect(res.status).toBe(200);

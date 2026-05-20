@@ -2,6 +2,10 @@ import { invalidateMyTripsCache } from "@/src/api/trips";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+function encodePathSegment(value: string) {
+  return encodeURIComponent(value);
+}
+
 export type CreateActivityPayload = {
   idToken: string;
   tripId: string;
@@ -29,8 +33,9 @@ export type VoteForActivityResponse = {
 };
 
 export async function createActivity(payload: CreateActivityPayload) {
+  const encodedSlotId = encodePathSegment(payload.slotId);
   const response = await fetch(
-    `${API_URL}/itinerary/${payload.tripId}/slots/${payload.slotId}/activities`,
+    `${API_URL}/itinerary/${payload.tripId}/slots/${encodedSlotId}/activities`,
     {
       method: "POST",
       headers: {
@@ -61,8 +66,9 @@ export async function getActivitiesBySlot(
   userId?: string
 ) {
   const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  const encodedSlotId = encodePathSegment(slotId);
   const response = await fetch(
-    `${API_URL}/itinerary/${tripId}/slots/${slotId}/activities${query}`
+    `${API_URL}/itinerary/${tripId}/slots/${encodedSlotId}/activities${query}`
   );
 
   const data = await response.json();
@@ -80,8 +86,9 @@ export async function voteForActivity(payload: {
   slotId: string;
   activityId: string;
 }): Promise<VoteForActivityResponse> {
+  const encodedSlotId = encodePathSegment(payload.slotId);
   const response = await fetch(
-    `${API_URL}/itinerary/${payload.tripId}/slots/${payload.slotId}/votes`,
+    `${API_URL}/itinerary/${payload.tripId}/slots/${encodedSlotId}/votes`,
     {
       method: "POST",
       headers: {
@@ -126,8 +133,9 @@ export async function toggleActivityAttendance(payload: {
   slotId: string;
   activityId: string;
 }) {
+  const encodedSlotId = encodePathSegment(payload.slotId);
   const response = await fetch(
-    `${API_URL}/itinerary/${payload.tripId}/slots/${payload.slotId}/attendance`,
+    `${API_URL}/itinerary/${payload.tripId}/slots/${encodedSlotId}/attendance`,
     {
       method: "POST",
       headers: {
