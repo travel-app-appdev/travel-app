@@ -522,12 +522,17 @@ export default function TripOverviewMemberScreen() {
 
             {/* Checklist section */}
             <View style={styles.checklistSection}>
-              <View style={styles.checklistHeader}>
+              <View
+                style={styles.checklistHeader}
+                accessible={true}
+                accessibilityRole="header"
+                accessibilityLabel={`Checklist. ${getChecklistSubtitle(tripState)}`}
+              >
                 <View style={styles.checklistTitleBlock}>
-                  <AppText variant="title" style={styles.checklistTitle}>
+                  <AppText variant="title" style={styles.checklistTitle} accessible={false}>
                     Checklist
                   </AppText>
-                  <AppText variant="body" style={styles.checklistSubtitle}>
+                  <AppText variant="body" style={styles.checklistSubtitle} accessible={false}>
                     {getChecklistSubtitle(tripState)}
                   </AppText>
                 </View>
@@ -559,8 +564,8 @@ export default function TripOverviewMemberScreen() {
                           : `${phase.label} phase, ${timerText}${isActive ? " remaining" : ""}, ${isPast ? "completed" : isFuture ? "upcoming" : "in progress"}`
                       }
                     >
-                      {/* Left: checkbox + line */}
-                      <View style={styles.timelineLeft}>
+                      {/* Left: checkbox + line — hidden, parent has full label */}
+                      <View style={styles.timelineLeft} {...hiddenFromAccessibility}>
                         <View style={styles.checkboxAligner}>
                           <PhaseCheckbox status={phase.status} />
                         </View>
@@ -576,8 +581,8 @@ export default function TripOverviewMemberScreen() {
                         )}
                       </View>
 
-                      {/* Right: phase info */}
-                      <View style={styles.timelineContent}>
+                      {/* Right: phase info — hidden, parent has full label */}
+                      <View style={styles.timelineContent} {...hiddenFromAccessibility}>
                         <View style={styles.phaseRow}>
                           <View style={styles.phaseRowInner}>
                             <View

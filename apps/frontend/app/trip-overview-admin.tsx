@@ -1165,12 +1165,17 @@ export default function TripOverviewAdminScreen() {
 
             {/* Checklist section */}
             <View style={styles.checklistSection}>
-              <View style={styles.checklistHeader}>
+              <View
+                style={styles.checklistHeader}
+                accessible={true}
+                accessibilityRole="header"
+                accessibilityLabel={`Checklist. ${getChecklistSubtitle(tripState)}`}
+              >
                 <View style={styles.checklistTitleBlock}>
-                  <AppText variant="title" style={styles.checklistTitle}>
+                  <AppText variant="title" style={styles.checklistTitle} accessible={false}>
                     Checklist
                   </AppText>
-                  <AppText variant="body" style={styles.checklistSubtitle}>
+                  <AppText variant="body" style={styles.checklistSubtitle} accessible={false}>
                     {getChecklistSubtitle(tripState)}
                   </AppText>
                 </View>
@@ -1198,8 +1203,8 @@ export default function TripOverviewAdminScreen() {
 
                   return (
                     <View key={phaseId} style={styles.timelineItem}>
-                      {/* Left column: checkbox + vertical line, aligned with badge center */}
-                      <View style={styles.timelineLeft}>
+                      {/* Left column: checkbox + vertical line — hidden, Pressable has full label */}
+                      <View style={styles.timelineLeft} {...hiddenFromAccessibility}>
                         <View style={styles.checkboxAligner}>
                           <PhaseCheckbox status={phase.status} />
                         </View>
@@ -1219,7 +1224,8 @@ export default function TripOverviewAdminScreen() {
                           style={styles.phaseRow}
                           onPress={canExpand ? (phaseId === "planning" ? handlePlanningPhase : handleVotingPhase) : undefined}
                           disabled={!canExpand}
-                          accessibilityRole={canExpand ? "button" : undefined}
+                          accessible={true}
+                          accessibilityRole={canExpand ? "button" : "text"}
                           accessibilityLabel={
                             phaseId === "final"
                               ? `Final phase, starts ${formatDateDisplay(dates.start)}`
@@ -1420,7 +1426,9 @@ export default function TripOverviewAdminScreen() {
                       textAlign="center"
                       accessibilityLabel="Enter time in HH colon MM format"
                     />
-                    <Timer width={20} height={20} />
+                    <View {...hiddenFromAccessibility}>
+                      <Timer width={20} height={20} />
+                    </View>
                   </View>
                 </View>
                 <View style={styles.calendarActions}>
