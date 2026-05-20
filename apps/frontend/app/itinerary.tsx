@@ -1229,8 +1229,8 @@ export default function ItineraryScreen() {
         activityId,
       });
 
-      setApiActivities((current) =>
-        current.map((item) =>
+      const applyAttendanceUpdate = (activities: Activity[]) =>
+        activities.map((item) =>
           item.id === activityId &&
           item.dayId === activity.dayId &&
           item.slotId === activity.slotId
@@ -1238,10 +1238,13 @@ export default function ItineraryScreen() {
                 ...item,
                 hasCurrentUserJoined: result.joined,
                 joinedCount: result.joinedCount,
+                joinedMembers: item.joinedMembers,
               }
             : item
-        )
-      );
+        );
+
+      updateCachedActivities(tripId, applyAttendanceUpdate);
+      setApiActivities((current) => applyAttendanceUpdate(current));
 
       setSelectedActivity((current) =>
         current &&
@@ -1255,8 +1258,6 @@ export default function ItineraryScreen() {
             }
           : current
       );
-
-      setActivityRefreshKey((value) => value + 1);
     } catch (error) {
       Alert.alert(
         "Could not update group",
