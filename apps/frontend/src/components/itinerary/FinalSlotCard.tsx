@@ -4,7 +4,7 @@ import { colors, radius, spacing, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity } from "@/src/types/itinerary";
 
-import LocationIcon from "@/assets/icons/location.svg";
+import LocationHeartIcon from "@/assets/icons/location-heart.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import MembersIcon from "@/assets/icons/members.svg";
 import JoinGroup from "@/assets/icons/join-group.svg";
@@ -39,7 +39,11 @@ export function FinalSlotCard({
             {slot.label}
           </AppText>
           <View style={styles.emptyContent} {...hiddenFromAccessibility}>
-            <LocationIcon width={20} height={20} color={colors.textMuted} />
+            <LocationHeartIcon
+              width={20}
+              height={20}
+              color={colors.textMuted}
+            />
             <AppText variant="subtitle" style={styles.emptyTitle}>
               Empty Activity
             </AppText>
@@ -59,7 +63,7 @@ export function FinalSlotCard({
         accessibilityHint="Shows more information about this activity"
       >
         <View style={styles.timeRow} {...hiddenFromAccessibility}>
-          <LocationIcon width={16} height={16} />
+          <LocationHeartIcon width={16} height={16} />
           <AppText variant="body" style={styles.timeLabel}>
             {slot.label}
           </AppText>
@@ -70,7 +74,7 @@ export function FinalSlotCard({
         </AppText>
 
         <View style={styles.addressRow} {...hiddenFromAccessibility}>
-          <LocationIcon width={14} height={14} />
+          <LocationHeartIcon width={14} height={14} />
           <AppText variant="caption" style={styles.address}>
             {activity.address}
           </AppText>

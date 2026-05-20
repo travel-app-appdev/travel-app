@@ -91,53 +91,47 @@ export function ActivityDetailModal({
               </AppText>
             )}
 
-            <View style={styles.infoGrid}>
-              <View style={styles.infoColumn}>
-                <View style={styles.infoRow}>
-                  <LocationIcon width={20} height={20} />
-                  <AppText variant="body" style={styles.infoText}>
-                    {activity.address || "No address available"}
-                  </AppText>
-                </View>
-
-                {activity.googleMapsUrl ? (
-                  <Pressable
-                    onPress={handleOpenGoogleMaps}
-                    style={styles.infoRow}
-                    accessibilityRole="link"
-                    accessibilityLabel="Open Google Maps link"
-                  >
-                    <View {...hiddenFromAccessibility} style={styles.googleRow}>
-                      <GoogleIcon width={20} height={20} />
-                      <AppText variant="body" style={styles.linkText}>
-                        Google-Link
-                      </AppText>
-                    </View>
-                  </Pressable>
-                ) : null}
+            <View style={styles.infoList}>
+              <View style={styles.infoRow}>
+                <LocationIcon width={20} height={20} />
+                <AppText variant="body" style={styles.infoText}>
+                  {activity.address || "No address available"}
+                </AppText>
               </View>
 
-              <View style={styles.infoColumn}>
-                <View style={styles.infoRow}>
-                  <Timer width={20} height={20} />
-                  <AppText variant="body" style={styles.infoText}>
-                    --:-- --:--
-                  </AppText>
-                </View>
+              <View style={styles.infoRow}>
+                <Timer width={20} height={20} />
+                <AppText variant="body" style={styles.infoText}>
+                  {slotLabel || "No time available"}
+                </AppText>
+              </View>
 
-                {showMembers ? (
-                  <View style={styles.infoRow}>
-                    <MembersIcon width={20} height={20} />
-                    <AppText variant="body" style={styles.infoText}>
-                      {activity.joinedMembers?.length
-                        ? activity.joinedMembers
-                            .map((member) => member.name)
-                            .join(", ")
-                        : "No members joined yet"}
+              {activity.googleMapsUrl ? (
+                <Pressable
+                  onPress={handleOpenGoogleMaps}
+                  style={styles.infoRow}
+                  accessibilityRole="link"
+                  accessibilityLabel="Open Google Maps link"
+                >
+                  <View {...hiddenFromAccessibility} style={styles.googleRow}>
+                    <GoogleIcon width={20} height={20} />
+                    <AppText variant="body" style={styles.linkText}>
+                      Google-Link
                     </AppText>
                   </View>
-                ) : null}
-              </View>
+                </Pressable>
+              ) : null}
+
+              {showMembers ? (
+                <View style={styles.infoRow}>
+                  <MembersIcon width={20} height={20} />
+                  <AppText variant="body" style={styles.infoText}>
+                    {activity.joinedMembers?.length
+                      ? activity.joinedMembers.map((member) => member.name).join(", ")
+                      : "No members joined yet"}
+                  </AppText>
+                </View>
+              ) : null}
             </View>
           </View>
         </View>
@@ -192,15 +186,10 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.lg,
     paddingRight: spacing.md,
   },
-  infoGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: spacing.lg,
-    marginTop: spacing.xs,
-  },
-  infoColumn: {
-    flex: 1,
+
+  infoList: {
     gap: spacing.md,
+    marginTop: spacing.xs,
   },
   infoRow: {
     flexDirection: "row",
