@@ -25,6 +25,8 @@ import PalmLeaf from "@/assets/visuals/palm-leaf.svg";
 import CurlyGreen from "@/assets/visuals/curly-green.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 import YellowVotey from "@/assets/mascots/Votey_Yellow.svg";
+import PinkVotey from "@/assets/mascots/Votey_Pink.svg";
+import GreenVotey from "@/assets/mascots/Votey_Green.svg";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -65,6 +67,7 @@ export default function Onboarding() {
   const palmLeafTop2 = lerp(50 * svgSh +330 , (50 * svgSh - 600) +330, svgWideProgress);
   
   const mascotSize = Math.round(Math.min(100 * scale, isSmallPhone ? 78 : 100));
+   const mascotSize2 = Math.round(Math.min(80 * scale, isSmallPhone ? 78 : 100));
 
   const [isLandscape, setIsLandscape] = useState(() => {
     const { width, height } = Dimensions.get("window");
@@ -136,8 +139,8 @@ export default function Onboarding() {
             style={[
               Styles.mascotWrapper,
               {
-                top: isSmallPhone ? 50 : 270,
-                right: 60,
+                bottom: isSmallPhone ? 50 : 195,
+                left: 40,
               },
             ]}
             {...(Platform.OS !== "web" ? { accessible: false } : {})}
@@ -197,33 +200,44 @@ export default function Onboarding() {
               </View>
 
               <View
-        style={[
-          Styles.palmLeafWrapper,
-          {
-            top: palmLeafTop2,
-            left: palmLeafLeft,
-            pointerEvents: "none",
-          },
-        ]}
-      >
-        <PalmLeaf width={palmLeafSize} height={palmLeafSize} />
-      </View>
+                style={[
+                Styles.palmLeafWrapper,
+                {
+                    top: palmLeafTop2,
+                    left: palmLeafLeft,
+                    pointerEvents: "none",
+                },
+                ]}
+            >
+                <PalmLeaf width={palmLeafSize} height={palmLeafSize} />
+                </View>
 
-      <View
-        style={[
-          Styles.palmLeafWrapper,
-          {
-            top: palmLeafTop,
-            left: palmLeafRight,
-            pointerEvents: "none",
-            transform: [{ scaleX: -1 }],
-          },
-        ]}
-      >
-        <PalmLeaf width={palmLeafSize} height={palmLeafSize} />
-      </View>
+                <View
+                    style={[
+                    Styles.palmLeafWrapper,
+                    {
+                        top: palmLeafTop,
+                        left: palmLeafRight,
+                        pointerEvents: "none",
+                        transform: [{ scaleX: -1 }],
+                    },
+                    ]}
+                >
+                    <PalmLeaf width={palmLeafSize} height={palmLeafSize} />
+                </View>
 
-     
+                <View
+                style={[
+                Styles.mascotWrapper,
+                {
+                    bottom: isSmallPhone ? 50 : 202,
+                    right: 50,
+                },
+                ]}
+                {...(Platform.OS !== "web" ? { accessible: false } : {})}
+                >
+                <PinkVotey width={mascotSize2} height={mascotSize2} />
+                </View>
 
               <View style={Styles.container}>
                 <Text style={[Styles.title]}>Decide Together</Text>
@@ -294,7 +308,18 @@ export default function Onboarding() {
                 <View style={Styles.headerSide} />
               </View>
 
-              
+               <View
+                style={[
+                Styles.mascotWrapper,
+                {
+                    top: isSmallPhone ? 50 : 270,
+                   right: 50,
+                },
+                ]}
+                {...(Platform.OS !== "web" ? { accessible: false } : {})}
+                >
+                <GreenVotey width={mascotSize2} height={mascotSize2} />
+                </View>
 
               <View style={Styles.container}>
                 <Text style={[Styles.title]}>Travel Together</Text>
