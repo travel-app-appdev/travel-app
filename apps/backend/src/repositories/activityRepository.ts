@@ -1,5 +1,6 @@
 import admin from "../config/firebase";
 import { Activity } from "../types/trip";
+import { findUserById } from "./tripsRepository";
 
 function normalizeDateTime(value: any): string | undefined {
     if (!value) return undefined;
@@ -420,16 +421,34 @@ async function getJoinedMetadata(input: {
         .get();
 
     let hasCurrentUserJoined = false;
-    snapshot.docs.forEach((doc) => {
+
+    const joinedUserIds = snapshot.docs.map((doc) => {
         const data = doc.data();
+
         if (input.currentUserId && data.user_id === input.currentUserId) {
             hasCurrentUserJoined = true;
         }
+
+        return data.user_id as string;
     });
+
+    const uniqueUserIds = [...new Set(joinedUserIds)];
+
+    const joinedMembers = await Promise.all(
+        uniqueUserIds.map(async (userId) => {
+            const user = await findUserById(userId);
+
+            return {
+                user_id: userId,
+                name: user?.name ?? "Unknown User",
+            };
+        })
+    );
 
     return {
         joinedCount: snapshot.size,
         hasCurrentUserJoined,
+        joinedMembers,
     };
 }
 
@@ -467,6 +486,7 @@ export async function getFinalActivitiesByTripId(
                 voteCount: finalData.vote_count ?? 0,
                 joinedCount: joined.joinedCount,
                 hasCurrentUserJoined: joined.hasCurrentUserJoined,
+                joinedMembers: joined.joinedMembers,
             } as Activity;
         })
     );

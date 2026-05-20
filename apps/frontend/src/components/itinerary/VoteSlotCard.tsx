@@ -13,20 +13,29 @@ import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 type Props = {
   activity: Activity;
   onAddVote: (activityId: string) => void;
+  onPressDetails?: (activity: Activity) => void;
   selected?: boolean;
 };
 
-export function VotingSlotCard({ activity, onAddVote, selected = false }: Props) {
+export function VotingSlotCard({
+  activity,
+  onAddVote,
+  onPressDetails,
+  selected = false,
+}: Props) {
   const handleVote = useSinglePress(() => onAddVote(activity.id));
+  const handleOpenDetails = useSinglePress(() => onPressDetails?.(activity));
 
   return (
     <View style={styles.row}>
-      <View style={styles.card}>
-
-        <View
-          style={styles.timeRow}
-          {...hiddenFromAccessibility}
-        >
+      <Pressable
+        onPress={handleOpenDetails}
+        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+        accessibilityRole="button"
+        accessibilityLabel={`Open details for ${activity.name}`}
+        accessibilityHint="Shows more information about this activity"
+      >
+        <View style={styles.timeRow} {...hiddenFromAccessibility}>
           <LocationIcon width={16} height={16} />
           <AppText variant="body" style={styles.timeLabel}>
             {activity.slotId}
@@ -42,25 +51,14 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           accessible={true}
           accessibilityLabel={`Address: ${activity.address}`}
         >
-          <LocationIcon
-            width={14}
-            height={14}
-            {...hiddenFromAccessibility}
-          />
-          <AppText
-            variant="caption"
-            style={styles.address}
-            accessible={false}
-          >
+          <LocationIcon width={14} height={14} {...hiddenFromAccessibility} />
+          <AppText variant="caption" style={styles.address} accessible={false}>
             {activity.address}
           </AppText>
         </View>
 
         {activity.googleMapsUrl ? (
-          <View
-            style={styles.googleRow}
-            {...hiddenFromAccessibility}
-          >
+          <View style={styles.googleRow} {...hiddenFromAccessibility}>
             <GoogleIcon width={14} height={14} />
             <AppText variant="caption" style={styles.googleLink}>
               Google Maps link
@@ -74,10 +72,11 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           accessibilityLabel={`${activity.voteCount ?? 0} ${activity.voteCount === 1 ? "vote" : "votes"}`}
         >
           <AppText variant="caption" style={styles.voteCount}>
-            {activity.voteCount ?? 0} {activity.voteCount === 1 ? "vote" : "votes"}
+            {activity.voteCount ?? 0}{" "}
+            {activity.voteCount === 1 ? "vote" : "votes"}
           </AppText>
         </View>
-      </View>
+      </Pressable>
 
       <Pressable
         onPress={handleVote}
@@ -87,24 +86,27 @@ export function VotingSlotCard({ activity, onAddVote, selected = false }: Props)
           pressed && styles.ctaPressed,
         ]}
         accessibilityRole="button"
-        accessibilityLabel={selected ? `Remove vote for ${activity.name}` : `Vote for ${activity.name}`}
-        accessibilityHint={selected ? "Removes your vote for this activity" : "Adds your vote for this activity"}
+        accessibilityLabel={
+          selected
+            ? `Remove vote for ${activity.name}`
+            : `Vote for ${activity.name}`
+        }
+        accessibilityHint={
+          selected
+            ? "Removes your vote for this activity"
+            : "Adds your vote for this activity"
+        }
         accessibilityState={{ selected }}
       >
-        <View
-          {...hiddenFromAccessibility}
-        >
+        <View {...hiddenFromAccessibility}>
           {selected ? (
             <CheckIcon width={28} height={28} color={colors.nightBlack} />
           ) : (
             <VoteIcon width={28} height={28} color={colors.nightBlack} />
           )}
         </View>
-        <AppText
-          variant="body"
-          style={styles.ctaText}
-          accessible={false}
-        >
+
+        <AppText variant="body" style={styles.ctaText} accessible={false}>
           {selected ? "Added\nvote" : "Add\nvote"}
         </AppText>
       </Pressable>
@@ -127,6 +129,9 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.xs,
     justifyContent: "center",
+  },
+  cardPressed: {
+    opacity: 0.9,
   },
   timeRow: {
     flexDirection: "row",

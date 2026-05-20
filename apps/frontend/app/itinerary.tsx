@@ -36,6 +36,7 @@ import { PlanningDoneBar } from "@/src/components/itinerary/PlanningDoneBar";
 import { VotingSlotCard } from "@/src/components/itinerary/VoteSlotCard";
 import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
+import { ActivityDetailModal } from "@/src/components/itinerary/ActivityDetailModal";
 import { fetchMyTrips, finishPlanning, type Trip } from "@/src/api/trips";
 import {
   getActivitiesBySlot,
@@ -129,6 +130,7 @@ function mapBackendActivity(
     hasCurrentUserVote: activity.hasCurrentUserVote ?? false,
     joinedCount: activity.joinedCount ?? 0,
     hasCurrentUserJoined: activity.hasCurrentUserJoined ?? false,
+    joinedMembers: activity.joinedMembers ?? [],
   };
 }
 
@@ -338,6 +340,7 @@ export default function ItineraryScreen() {
     state === "planning" || state === "voting" || state === "final"
       ? state
       : undefined;
+
   const routePlanningStatus = useMemo(
     () => parsePlanningStatusJson(members),
     [members]
@@ -361,6 +364,7 @@ export default function ItineraryScreen() {
     const matchingKey = keys.find((k) => k.startsWith(`${tripId}_`));
     return matchingKey ? (activitiesCache.get(matchingKey) ?? []) : [];
   });
+
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   const [isLoadingActivities, setIsLoadingActivities] = useState(() => {
@@ -370,6 +374,14 @@ export default function ItineraryScreen() {
 
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
   const [isSubmittingPlanning, setIsSubmittingPlanning] = useState(false);
+
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
+    null
+  );
+  const [selectedActivitySlotLabel, setSelectedActivitySlotLabel] =
+    useState("");
+  const [showActivityDetailModal, setShowActivityDetailModal] = useState(false);
+
   const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -380,6 +392,7 @@ export default function ItineraryScreen() {
     typeof setTimeout
   > | null>(null);
   const initialTripRefreshKeyRef = useRef<string | null>(null);
+
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
   const [isPreparingVoting, setIsPreparingVoting] = useState(false);
@@ -709,12 +722,13 @@ export default function ItineraryScreen() {
 
       const resolvedDayId =
         selectedDayId || tripDays[0]?.id || itinerary.startDate;
+
       const cacheKey =
         activeState === "final"
           ? `${tripId}_${activeState}`
           : activeState === "voting"
             ? `${tripId}_${activeState}`
-          : `${tripId}_${activeState}_${resolvedDayId}`;
+            : `${tripId}_${activeState}_${resolvedDayId}`;
 
       const cached = activitiesCache.get(cacheKey);
 
@@ -832,6 +846,7 @@ export default function ItineraryScreen() {
     itinerary.startDate,
     activityRefreshKey,
   ]);
+
   function handlePlanningInfoPress() {
     if (showPlanningInfoPopup) {
       if (planningInfoTimeoutRef.current) {
@@ -916,6 +931,7 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
+
     router.replace({
       pathname: "/add-activity",
       params: {
@@ -941,6 +957,7 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
+
     router.replace({
       pathname: "/add-activity",
       params: {
@@ -974,6 +991,7 @@ export default function ItineraryScreen() {
       const nextState = shouldSkipVoting(tripMemberCount)
         ? "final"
         : "planning";
+
       setItinerary((current) => ({
         ...current,
         state: nextState === "final" ? current.state : nextState,
@@ -982,6 +1000,7 @@ export default function ItineraryScreen() {
           currentUserId
         ),
       }));
+
       if (nextState === "final") {
         setIsPreparingFinalItinerary(true);
         if (finalizingTimeoutRef.current) {
@@ -1032,10 +1051,12 @@ export default function ItineraryScreen() {
   const votingActivities = useMemo(() => {
     const all = apiActivities.length > 0 ? apiActivities : itinerary.activities;
     const groups = new Map<string, Activity[]>();
+
     all.forEach((a) => {
       const key = `${a.dayId}_${a.slotId}`;
       groups.set(key, [...(groups.get(key) ?? []), a]);
     });
+
     return Array.from(groups.values())
       .filter((group) => group.length > 1)
       .flat();
@@ -1056,6 +1077,7 @@ export default function ItineraryScreen() {
           seen.set(a.slotId, formatSlotLabel(a.slotId));
         }
       });
+
     return Array.from(seen.entries()).map(([slotId, label]) => ({
       slotId,
       label,
@@ -1069,9 +1091,11 @@ export default function ItineraryScreen() {
       setSelectedVotingSlotId("");
       return;
     }
+
     const selectedSlotStillExists = votingTimeChips.some(
       (chip) => chip.slotId === selectedVotingSlotId
     );
+
     if (!selectedSlotStillExists) {
       setSelectedVotingSlotId(votingTimeChips[0].slotId);
     }
@@ -1082,6 +1106,36 @@ export default function ItineraryScreen() {
       (a) => a.dayId === selectedDayId && a.slotId === selectedVotingSlotId
     );
   }, [votingActivities, selectedDayId, selectedVotingSlotId]);
+
+  const handleOpenVotingActivityDetails = useCallback(
+    (activity: Activity) => {
+      const slotChip = votingTimeChips.find(
+        (chip) => chip.slotId === activity.slotId
+      );
+
+      setSelectedActivity(activity);
+      setSelectedActivitySlotLabel(
+        slotChip?.label ?? formatSlotLabel(activity.slotId)
+      );
+      setShowActivityDetailModal(true);
+    },
+    [votingTimeChips]
+  );
+
+  const handleOpenFinalActivityDetails = useCallback(
+    (activity: Activity, slotLabel: string) => {
+      setSelectedActivity(activity);
+      setSelectedActivitySlotLabel(slotLabel);
+      setShowActivityDetailModal(true);
+    },
+    []
+  );
+
+  const handleCloseActivityDetails = useCallback(() => {
+    setShowActivityDetailModal(false);
+    setSelectedActivity(null);
+    setSelectedActivitySlotLabel("");
+  }, []);
 
   async function handleAddVote(activityId: string) {
     if (!authToken || !tripId || !selectedVotingSlotId) {
@@ -1138,6 +1192,7 @@ export default function ItineraryScreen() {
       );
       const selectedDayStillHasVotingActivities =
         daysWithVotingActivities.has(selectedDayId);
+
       if (firstVotingDay && !selectedDayStillHasVotingActivities) {
         setSelectedDayId(firstVotingDay.id);
       }
@@ -1159,10 +1214,12 @@ export default function ItineraryScreen() {
 
   async function handleJoinGroup(activityId: string) {
     const activity = finalActivities.find((item) => item.id === activityId);
+
     if (!authToken || !tripId || !activity) {
       Alert.alert("Could not update group", "Please log in again.");
       return;
     }
+
     try {
       const fullSlotId = `${activity.dayId}_${activity.slotId}`;
       const result = await toggleActivityAttendance({
@@ -1171,8 +1228,9 @@ export default function ItineraryScreen() {
         slotId: fullSlotId,
         activityId,
       });
-      setApiActivities((current) =>
-        current.map((item) =>
+
+      const applyAttendanceUpdate = (activities: Activity[]) =>
+        activities.map((item) =>
           item.id === activityId &&
           item.dayId === activity.dayId &&
           item.slotId === activity.slotId
@@ -1180,9 +1238,25 @@ export default function ItineraryScreen() {
                 ...item,
                 hasCurrentUserJoined: result.joined,
                 joinedCount: result.joinedCount,
+                joinedMembers: item.joinedMembers,
               }
             : item
-        )
+        );
+
+      updateCachedActivities(tripId, applyAttendanceUpdate);
+      setApiActivities((current) => applyAttendanceUpdate(current));
+
+      setSelectedActivity((current) =>
+        current &&
+        current.id === activityId &&
+        current.dayId === activity.dayId &&
+        current.slotId === activity.slotId
+          ? {
+              ...current,
+              hasCurrentUserJoined: result.joined,
+              joinedCount: result.joinedCount,
+            }
+          : current
       );
     } catch (error) {
       Alert.alert(
@@ -1262,6 +1336,7 @@ export default function ItineraryScreen() {
                         />
                       ))}
                 </View>
+
                 {hasCurrentUserFinished && (
                   <View
                     style={[
@@ -1288,12 +1363,14 @@ export default function ItineraryScreen() {
                       selectedSlotId={selectedVotingSlotId}
                       onSelectSlot={setSelectedVotingSlotId}
                     />
+
                     <View style={styles.slotList}>
                       {votingSlotActivities.map((activity) => (
                         <VotingSlotCard
                           key={activity.id}
                           activity={activity}
                           onAddVote={handleAddVote}
+                          onPressDetails={handleOpenVotingActivityDetails}
                           selected={activity.hasCurrentUserVote === true}
                         />
                       ))}
@@ -1315,6 +1392,7 @@ export default function ItineraryScreen() {
                         slot={slot}
                         activity={finalActivityMap.get(slot.id)}
                         onJoinGroup={handleJoinGroup}
+                        onPressDetails={handleOpenFinalActivityDetails}
                       />
                     ))}
               </View>
@@ -1325,6 +1403,14 @@ export default function ItineraryScreen() {
         {activeState === "planning" && (
           <View style={[styles.footerBackground, { pointerEvents: "none" }]} />
         )}
+
+        <ActivityDetailModal
+          visible={showActivityDetailModal}
+          activity={selectedActivity}
+          slotLabel={selectedActivitySlotLabel}
+          state={activeState}
+          onClose={handleCloseActivityDetails}
+        />
 
         {showPlanningInfoPopup && (
           <>

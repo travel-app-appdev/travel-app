@@ -14,6 +14,11 @@ export type TripDay = {
   weekdayShort: string; // "Tue"
 };
 
+export type ActivityJoinedMember = {
+  user_id: string;
+  name: string;
+};
+
 export type Activity = {
   id: string;
   slotId: string; // matches TimeSlot.id
@@ -23,6 +28,7 @@ export type Activity = {
   googleMapsUrl?: string;
   joinedCount?: number; // for final state
   hasCurrentUserJoined?: boolean;
+  joinedMembers?: ActivityJoinedMember[];
   voteCount?: number;
   hasCurrentUserVote?: boolean;
   description?: string;
