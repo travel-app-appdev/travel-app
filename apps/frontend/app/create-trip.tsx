@@ -16,6 +16,7 @@ import {
   TextInput,
   Animated,
   Text,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
@@ -212,8 +213,6 @@ function normalizeTimeInput(value: string): string {
   return `${digits.slice(0, 2)}:${digits.slice(2)}`;
 }
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
 const CalendarModalWrapper = ({
                                 children,
                                 isLandscape,
@@ -313,17 +312,11 @@ export default function CreateTripScreen() {
   const { user } = useAuth();
   const router = useRouter();
 
-  const [isLandscape, setIsLandscape] = useState(() => {
-    const { width, height } = Dimensions.get("window");
-    return width > height;
-  });
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
 
-  useEffect(() => {
-    const subscription = Dimensions.addEventListener("change", ({ window }) => {
-      setIsLandscape(window.width > window.height);
-    });
-    return () => subscription.remove();
-  }, []);
+  const cityScapeHeight = width * (221 / 393);
+  const curlySize = width * 1.1;
 
   const TIMER_PHASES = phases.filter(
     (phase) => phase.id === "planning" || phase.id === "voting"
@@ -524,12 +517,14 @@ export default function CreateTripScreen() {
         ? disabledTripOrange
         : colors.sunsetOrange
     );
+
     const planningRange = getMarkedRange(
       toLocalDateString(phaseDates.planning.start),
       toLocalDateString(phaseDates.planning.end),
       isVotingEditor ? disabledPlanningYellow : colors.beachYellow,
       isVotingEditor ? disabledPlanningYellow : colors.beachYellow
     );
+
     const votingRange = getMarkedRange(
       toLocalDateString(phaseDates.voting.start),
       toLocalDateString(phaseDates.voting.end),
@@ -795,13 +790,12 @@ export default function CreateTripScreen() {
       duration: 300,
       useNativeDriver: false,
     }).start();
-  }, [step]);
+  }, [step, progress]);
 
   const progressAnim = progress.interpolate({
     inputRange: [1, TOTAL_STEPS],
     outputRange: ["25%", "100%"],
   });
-
 
   type ProgressBarProps = {
     progressWidth: Animated.AnimatedInterpolation<string>;
@@ -810,10 +804,10 @@ export default function CreateTripScreen() {
   };
 
   const ProgressBar: React.FC<ProgressBarProps> = ({
-    progressWidth,
-    currentStep,
-    totalSteps,
-  }) => {
+                                                     progressWidth,
+                                                     currentStep,
+                                                     totalSteps,
+                                                   }) => {
     return (
       <View style={{ width: "100%" }}>
         <View
@@ -850,7 +844,6 @@ export default function CreateTripScreen() {
     );
   };
 
-  // Step 3 â€” timer setup
   if (step === 3) {
     return (
       <View style={[styles.fullScreen, styles.bgStep3]}>
@@ -866,10 +859,7 @@ export default function CreateTripScreen() {
             >
               <View style={styles.header}>
                 <BackLink onPress={() => setStep(2)} />
-                <View
-                  style={styles.headerTitle}
-                  {...hiddenFromAccessibility}
-                >
+                <View style={styles.headerTitle} {...hiddenFromAccessibility}>
                   <Plane width={25} height={25} />
                   <AppText variant="body" style={styles.headerLabel}>
                     Create trip
@@ -890,8 +880,7 @@ export default function CreateTripScreen() {
               </AppText>
 
               <AppText variant="body" style={styles.setupText}>
-                Set an end time for each state so the next one starts
-                automatically.
+                Set an end time for each state so the next one starts automatically.
               </AppText>
 
               {TIMER_PHASES.map((phase) => {
@@ -912,10 +901,7 @@ export default function CreateTripScreen() {
                       accessibilityHint={`Tap to edit ${phase.label} end date and time`}
                       accessibilityState={{ expanded: isOpen }}
                     >
-                      <View
-                        style={styles.phaseLeft}
-                        {...hiddenFromAccessibility}
-                      >
+                      <View style={styles.phaseLeft} {...hiddenFromAccessibility}>
                         <View
                           style={[
                             styles.phaseBadge,
@@ -952,19 +938,14 @@ export default function CreateTripScreen() {
                                 </View>
                               )}
                             </View>
-                            <AppText
-                              variant="caption"
-                              style={styles.timerLabel}
-                            >
+                            <AppText variant="caption" style={styles.timerLabel}>
                               Timer
                             </AppText>
                           </View>
                         </View>
                       </View>
 
-                      <View
-                        {...hiddenFromAccessibility}
-                      >
+                      <View {...hiddenFromAccessibility}>
                         {isOpen ? (
                           <ArrowUp width={20} height={20} />
                         ) : (
@@ -996,9 +977,7 @@ export default function CreateTripScreen() {
                             <AppText variant="body" style={styles.dateText}>
                               {formatDateDisplay(dates.end)}
                             </AppText>
-                            <View
-                              {...hiddenFromAccessibility}
-                            >
+                            <View {...hiddenFromAccessibility}>
                               <Calendar width={18} height={18} />
                             </View>
                           </Pressable>
@@ -1016,9 +995,7 @@ export default function CreateTripScreen() {
                             <AppText variant="body" style={styles.dateText}>
                               {dates.time}
                             </AppText>
-                            <View
-                              {...hiddenFromAccessibility}
-                            >
+                            <View {...hiddenFromAccessibility}>
                               <Timer width={18} height={18} />
                             </View>
                           </Pressable>
@@ -1043,10 +1020,7 @@ export default function CreateTripScreen() {
                         )}
 
                         {phaseUpdated[phaseId] && (
-                          <View
-                            style={styles.successRow}
-                            {...hiddenFromAccessibility}
-                          >
+                          <View style={styles.successRow} {...hiddenFromAccessibility}>
                             <CheckMark width={18} height={18} />
                             <AppText
                               variant="caption"
@@ -1063,10 +1037,7 @@ export default function CreateTripScreen() {
                 );
               })}
 
-              <View
-                style={styles.finalInfoBox}
-                {...hiddenFromAccessibility}
-              >
+              <View style={styles.finalInfoBox} {...hiddenFromAccessibility}>
                 <Info width={24} height={24} />
                 <AppText variant="body" style={styles.finalInfoText}>
                   Final itinerary is shown automatically after Voting ends.
@@ -1117,7 +1088,6 @@ export default function CreateTripScreen() {
                       {direction === "left" ? "‹" : "›"}
                     </AppText>
                   )}
-
                   theme={{
                     backgroundColor: colors.lightWhite,
                     calendarBackground: colors.lightWhite,
@@ -1263,36 +1233,38 @@ export default function CreateTripScreen() {
     );
   }
 
-  // Step 4 â€” share code
   if (step === 4) {
     return (
       <View style={[styles.fullScreen, styles.bgStep1]}>
         <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
           <View style={[styles.root, styles.bgStep1]}>
             <View
-              style={[styles.curlyOrangeWrapper, { pointerEvents: "none" }]}
+              style={[
+                styles.curlyOrangeWrapper,
+                {
+                  width: curlySize,
+                  height: curlySize,
+                  bottom: -width * 0.3,
+                  left: -width * 0.1,
+                  pointerEvents: "none",
+                },
+              ]}
               {...hiddenFromAccessibility}
             >
-              <CurlyOrange
-                width={SCREEN_WIDTH * 1.1}
-                height={SCREEN_WIDTH * 1.1}
-              />
+              <CurlyOrange width={curlySize} height={curlySize} />
             </View>
 
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={[
-                styles.containerStep3,
-                isLandscape && { paddingBottom: 80 },
+                styles.containerStep4,
+                { paddingBottom: isLandscape ? spacing.xxxl : spacing.xl },
               ]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.header}>
-                <View
-                  style={styles.headerTitle}
-                  {...hiddenFromAccessibility}
-                >
+                <View style={styles.headerTitle} {...hiddenFromAccessibility}>
                   <Plane width={25} height={25} />
                   <AppText variant="body" style={styles.headerLabel}>
                     Create trip
@@ -1313,10 +1285,7 @@ export default function CreateTripScreen() {
               </AppText>
 
               <View style={styles.fieldGroup}>
-                <View
-                  style={styles.fieldLabelRow}
-                  {...hiddenFromAccessibility}
-                >
+                <View style={styles.fieldLabelRow} {...hiddenFromAccessibility}>
                   <KeyFrame width={20} height={20} />
                   <AppText variant="body" style={styles.fieldLabel}>
                     Code
@@ -1327,9 +1296,7 @@ export default function CreateTripScreen() {
                   style={styles.codeInput}
                   onPress={handleCopyCode}
                   accessibilityRole="button"
-                  accessibilityLabel={
-                    copied ? "Trip code copied" : "Copy trip code"
-                  }
+                  accessibilityLabel={copied ? "Trip code copied" : "Copy trip code"}
                   accessibilityHint="Copies the trip invite code to your clipboard"
                 >
                   <AppText
@@ -1339,12 +1306,9 @@ export default function CreateTripScreen() {
                   >
                     {tripCode}
                   </AppText>
-                  <View
-                    style={styles.copyActionArea}
-                    {...hiddenFromAccessibility}
-                  >
+                  <View style={styles.copyActionArea} {...hiddenFromAccessibility}>
                     <AppText variant="caption" style={styles.copiedText}>
-                      {copied ? "âœ“ Copied!" : "Tap to copy"}
+                      {copied ? "✓ Copied!" : "Tap to copy"}
                     </AppText>
                     <Copy width={20} height={20} />
                   </View>
@@ -1354,43 +1318,30 @@ export default function CreateTripScreen() {
                   Copy this code to share the trip.
                 </AppText>
               </View>
-            </ScrollView>
 
-            <View
-              style={[
-                styles.continueWrapper,
-                {
-                  bottom: isLandscape
-                    ? 20
-                    : SCREEN_WIDTH * (221 / 393) + 47,
-                },
-                { pointerEvents: "box-none" },
-              ]}
-            >
-              <AppButton
-                title="Back to Landing Page"
-                onPress={() => router.replace("/home")}
-                style={styles.backToLandingButton}
-                textStyle={styles.backToLandingText}
-                accessibilityLabel="Back to landing page"
-                accessibilityHint="Goes back to the home screen"
-              />
-            </View>
+              <View style={styles.inlineButtonWrapper}>
+                <AppButton
+                  title="Back to Landing Page"
+                  onPress={() => router.replace("/home")}
+                  style={styles.backToLandingButton}
+                  textStyle={styles.backToLandingText}
+                  accessibilityLabel="Back to landing page"
+                  accessibilityHint="Goes back to the home screen"
+                />
+              </View>
+            </ScrollView>
           </View>
         </SafeAreaView>
       </View>
     );
   }
 
-  // Steps 1 and 2
   return (
     <View
       style={[styles.fullScreen, step === 1 ? styles.bgStep1 : styles.bgStep2]}
     >
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-        <View
-          style={[styles.root, step === 1 ? styles.bgStep1 : styles.bgStep2]}
-        >
+        <View style={[styles.root, step === 1 ? styles.bgStep1 : styles.bgStep2]}>
           {step === 1 ? (
             <>
               <KeyboardAvoidingView
@@ -1398,16 +1349,16 @@ export default function CreateTripScreen() {
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
               >
                 <ScrollView
-                  contentContainerStyle={styles.containerStep1}
+                  contentContainerStyle={[
+                    styles.containerStep1,
+                    { paddingBottom: cityScapeHeight + spacing.xxxl },
+                  ]}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
                   <View style={styles.header}>
                     <BackLink href="/home" />
-                    <View
-                      style={styles.headerTitle}
-                      {...hiddenFromAccessibility}
-                    >
+                    <View style={styles.headerTitle} {...hiddenFromAccessibility}>
                       <Plane width={25} height={25} />
                       <AppText variant="body" style={styles.headerLabel}>
                         Create trip
@@ -1428,10 +1379,7 @@ export default function CreateTripScreen() {
                   </AppText>
 
                   <View style={[styles.fieldGroup, { marginTop: 20 }]}>
-                    <View
-                      style={styles.fieldLabelRow}
-                      {...hiddenFromAccessibility}
-                    >
+                    <View style={styles.fieldLabelRow} {...hiddenFromAccessibility}>
                       <Location width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Destination
@@ -1447,51 +1395,49 @@ export default function CreateTripScreen() {
                       style={styles.inputBlackStroke}
                     />
                   </View>
+
+                  <View style={styles.inlineButtonWrapper}>
+                    <AppButton
+                      title="Continue"
+                      onPress={handleContinueFromDestination}
+                      disabled={!destination.trim()}
+                      style={styles.continueButton}
+                      textStyle={styles.continueButtonText}
+                      accessibilityLabel="Continue to next step"
+                      accessibilityHint="Moves to trip name and date step"
+                    />
+                  </View>
                 </ScrollView>
               </KeyboardAvoidingView>
 
-              <View
-                style={[
-                  styles.continueWrapper,
-                  {
-                    bottom: isLandscape ? 20 : SCREEN_WIDTH * (221 / 393) + 47,
-                  },
-                  { pointerEvents: "box-none" },
-                ]}
-              >
-                <AppButton
-                  title="Continue"
-                  onPress={handleContinueFromDestination}
-                  disabled={!destination.trim()}
-                  style={styles.continueButton}
-                  textStyle={styles.continueButtonText}
-                  accessibilityLabel="Continue to next step"
-                  accessibilityHint="Moves to trip name and date step"
-                />
-              </View>
-
               {!isLandscape && (
                 <View
-                  style={[styles.cityScapeWrapper, { pointerEvents: "none" }]}
+                  style={[
+                    styles.cityScapeWrapper,
+                    { width, height: cityScapeHeight, bottom: 0, left: 0, pointerEvents: "none" },
+                  ]}
                   {...hiddenFromAccessibility}
                 >
-                  <CityScape
-                    width={SCREEN_WIDTH}
-                    height={SCREEN_WIDTH * (221 / 393)}
-                  />
+                  <CityScape width={width} height={cityScapeHeight} />
                 </View>
               )}
             </>
           ) : (
             <>
               <View
-                style={[styles.curlyWrapper, { pointerEvents: "none" }]}
+                style={[
+                  styles.curlyWrapper,
+                  {
+                    width: curlySize,
+                    height: curlySize,
+                    bottom: -width * 0.3,
+                    left: -width * 0.1,
+                    pointerEvents: "none",
+                  },
+                ]}
                 {...hiddenFromAccessibility}
               >
-                <CurlyYellow
-                  width={SCREEN_WIDTH * 1.1}
-                  height={SCREEN_WIDTH * 1.1}
-                />
+                <CurlyYellow width={curlySize} height={curlySize} />
               </View>
 
               <KeyboardAvoidingView
@@ -1499,16 +1445,16 @@ export default function CreateTripScreen() {
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
               >
                 <ScrollView
-                  contentContainerStyle={styles.containerStep2}
+                  contentContainerStyle={[
+                    styles.containerStep2,
+                    { paddingBottom: spacing.xxxl + width * 0.18 },
+                  ]}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
                   <View style={styles.header}>
                     <BackLink onPress={() => setStep(1)} />
-                    <View
-                      style={styles.headerTitle}
-                      {...hiddenFromAccessibility}
-                    >
+                    <View style={styles.headerTitle} {...hiddenFromAccessibility}>
                       <Plane width={25} height={25} />
                       <AppText variant="body" style={styles.headerLabel}>
                         Create trip
@@ -1529,10 +1475,7 @@ export default function CreateTripScreen() {
                   </AppText>
 
                   <View style={styles.fieldGroup}>
-                    <View
-                      style={styles.fieldLabelRow}
-                      {...hiddenFromAccessibility}
-                    >
+                    <View style={styles.fieldLabelRow} {...hiddenFromAccessibility}>
                       <TripTitle width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Trip name
@@ -1550,10 +1493,7 @@ export default function CreateTripScreen() {
                   </View>
 
                   <View style={styles.fieldGroup}>
-                    <View
-                      style={styles.fieldLabelRow}
-                      {...hiddenFromAccessibility}
-                    >
+                    <View style={styles.fieldLabelRow} {...hiddenFromAccessibility}>
                       <Calendar width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Trip date
@@ -1575,26 +1515,19 @@ export default function CreateTripScreen() {
                       </View>
                     </Pressable>
                   </View>
+
+                  <View style={styles.inlineButtonWrapper}>
+                    <AppButton
+                      title="Continue"
+                      onPress={handleContinueToTimers}
+                      disabled={!tripName.trim()}
+                      style={styles.createButton}
+                      textStyle={styles.createButtonText}
+                      accessibilityLabel="Continue to timer setup"
+                    />
+                  </View>
                 </ScrollView>
               </KeyboardAvoidingView>
-
-              <View
-                style={[
-                  styles.createWrapper,
-                  {
-                    bottom: isLandscape ? 20 : SCREEN_WIDTH * (221 / 393) + 5,
-                  },
-                ]}
-              >
-                <AppButton
-                  title="Continue"
-                  onPress={handleContinueToTimers}
-                  disabled={!tripName.trim()}
-                  style={styles.createButton}
-                  textStyle={styles.createButtonText}
-                  accessibilityLabel="Continue to timer setup"
-                />
-              </View>
             </>
           )}
 
@@ -1664,468 +1597,467 @@ export default function CreateTripScreen() {
     </View>
   );
 }
+const styles = StyleSheet.create({
+  fullScreen: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  root: {
+    flex: 1,
+    overflow: "hidden",
+  },
+  bgStep1: {
+    backgroundColor: colors.beachYellow,
+  },
+  bgStep2: {
+    backgroundColor: colors.sunsetOrange,
+  },
+  bgStep3: {
+    backgroundColor: colors.lightWhite,
+  },
+  scroll: {
+    flex: 1,
+  },
+  containerStep1: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  containerStep2: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  containerStep3: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.sm,
+  },
+  containerStep4: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  headerTitle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  headerLabel: {
+    fontSize: typography.size.xxl,
+    lineHeight: typography.lineHeight.xxl,
+    fontFamily: typography.fontFamily.bodyBold,
+    color: colors.textPrimary,
+  },
+  titleStep1: {
+    fontSize: typography.size.displaySm,
+    lineHeight: typography.lineHeight.displayLg,
+    color: colors.textPrimary,
+    textAlign: "left",
+    alignSelf: "stretch",
+  },
+  titleStep2: {
+    fontSize: typography.size.displaySm,
+    lineHeight: typography.lineHeight.displayLg,
+    color: colors.textPrimary,
+    textAlign: "left",
+    alignSelf: "stretch",
+  },
+  titleStep3: {
+    fontSize: typography.size.displaySm,
+    lineHeight: typography.lineHeight.displayLg,
+    color: colors.textPrimary,
+    textAlign: "left",
+    alignSelf: "stretch",
+  },
 
-  const styles = StyleSheet.create({
-    fullScreen: {
-      flex: 1,
-    },
-    safeArea: {
-      flex: 1,
-    },
-    root: {
-      flex: 1,
-      overflow: "hidden",
-    },
-    bgStep1: {
-      backgroundColor: colors.beachYellow,
-    },
-    bgStep2: {
-      backgroundColor: colors.sunsetOrange,
-    },
-    bgStep3: {
-      backgroundColor: colors.lightWhite,
-    },
-    scroll: {
-      flex: 1,
-    },
-    containerStep1: {
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.lg,
-      paddingBottom: SCREEN_HEIGHT * 0.28,
-      gap: spacing.sm,
-    },
-    containerStep2: {
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.lg,
-      paddingBottom: SCREEN_HEIGHT * 0.18,
-      gap: spacing.sm,
-    },
-    containerStep3: {
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.lg,
-      paddingBottom: spacing.xl,
-      gap: spacing.sm,
-    },
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      position: "relative",
-    },
-    headerTitle: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.sm,
-    },
-    headerLabel: {
-      fontSize: typography.size.xxl,
-      lineHeight: typography.lineHeight.xxl,
-      fontFamily: typography.fontFamily.bodyBold,
-      color: colors.textPrimary,
-    },
-    titleStep1: {
-      fontSize: typography.size.displaySm,
-      lineHeight: typography.lineHeight.displayLg,
-      color: colors.textPrimary,
-      textAlign: "left",
-      alignSelf: "stretch",
-    },
-    titleStep2: {
-      fontSize: typography.size.displaySm,
-      lineHeight: typography.lineHeight.displayLg,
-      color: colors.textPrimary,
-      textAlign: "left",
-      alignSelf: "stretch",
-    },
-    titleStep3: {
-      fontSize: typography.size.displaySm,
-      lineHeight: typography.lineHeight.displayLg,
-      color: colors.textPrimary,
-      textAlign: "left",
-      alignSelf: "stretch",
-    },
-    fieldGroup: {
-      gap: spacing.sm,
-    },
-    fieldLabelRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-    },
-    fieldLabel: {
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-      fontSize: typography.size.xl,
-      lineHeight: typography.lineHeight.xl,
-    },
-    inputBlackStroke: {
-      borderWidth: 2,
-      borderColor: colors.nightBlack,
-    },
-    dateTimeRow: {
-      flexDirection: "row",
-      gap: spacing.md,
-    },
-    dateTimeHalf: {
-      flex: 1,
-    },
-    dateInput: {
-      backgroundColor: colors.white,
-      borderRadius: radius.sm,
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.lg,
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      borderWidth: 2,
-      borderColor: colors.nightBlack,
-      minHeight: 48,
-    },
-    dateText: {
-      fontSize: typography.size.md,
-      lineHeight: typography.lineHeight.md,
-      color: colors.textPrimary,
-    },
-    codeInput: {
-      backgroundColor: colors.white,
-      borderRadius: radius.sm,
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.lg,
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      borderWidth: 2,
-      borderColor: colors.nightBlack,
-      minHeight: 48,
-    },
-    codeText: {
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-      fontSize: typography.size.xl,
-      lineHeight: typography.lineHeight.xl,
-      letterSpacing: 3,
-    },
-    copyActionArea: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-    },
-    copiedText: {
-      color: colors.nightBlack,
-      fontSize: typography.size.sm,
-      lineHeight: typography.lineHeight.sm,
-    },
-    codeCaption: {
-      color: colors.nightBlack,
-      fontSize: typography.size.sm,
-      lineHeight: typography.lineHeight.sm,
-      fontFamily: typography.fontFamily.body,
-    },
-    continueWrapper: {
-      position: "absolute",
-      left: spacing.xl,
-      right: spacing.xl,
-      zIndex: 10,
-    },
-    continueButton: {
-      backgroundColor: colors.sunsetOrange,
-    },
-    continueButtonText: {
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-    },
-    backToLandingButton: {
-      backgroundColor: colors.sunsetOrange,
-    },
-    backToLandingText: {
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-    },
-    cityScapeWrapper: {
-      position: "absolute",
-      bottom: 0,
-      left: 0,
-      width: SCREEN_WIDTH,
-      height: SCREEN_WIDTH * (221 / 393),
-      zIndex: 5,
-    },
-    curlyWrapper: {
-      position: "absolute",
-      bottom: -SCREEN_WIDTH * 0.3,
-      left: -SCREEN_WIDTH * 0.1,
-      zIndex: 0,
-    },
-    createWrapper: {
-      position: "absolute",
-      left: spacing.xl,
-      right: spacing.xl,
-      zIndex: 10,
-    },
-    createButton: {
-      backgroundColor: colors.seaBlue,
-    },
-    createButtonText: {
-      color: colors.lightWhite,
-      fontFamily: typography.fontFamily.bodyBold,
-    },
-    curlyOrangeWrapper: {
-      position: "absolute",
-      bottom: -SCREEN_WIDTH * 0.3,
-      left: -SCREEN_WIDTH * 0.1,
-      zIndex: 0,
-    },
-    setupText: {
-      fontSize: 18,
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-    },
-    phaseRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-    },
-    phaseLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.md,
-      flex: 1,
-    },
-    phaseBadge: {
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.sm,
-      borderRadius: radius.md,
-    },
-    phaseBadgeText: {
-      fontFamily: typography.fontFamily.bodyBold,
-      fontSize: typography.size.sm,
-      lineHeight: typography.lineHeight.sm,
-    },
-    phaseTimerBlock: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-    },
-    hourglassCol: {
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    phaseTextCol: {
-      flexDirection: "column",
-      justifyContent: "center",
-    },
-    daysRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: 3,
-    },
-    phaseDays: {
-      fontFamily: typography.fontFamily.bodyBold,
-      fontSize: typography.size.sm,
-      lineHeight: typography.lineHeight.sm,
-      color: colors.textPrimary,
-    },
-    timepointWrapper: {
-      marginTop: 1,
-    },
-    timerLabel: {
-      color: colors.textMuted,
-      fontSize: typography.size.xs,
-      lineHeight: typography.lineHeight.xs,
-    },
-    phaseDateLabel: {
-      color: colors.nightBlack,
-      fontSize: typography.size.sm,
-      lineHeight: typography.lineHeight.sm,
-      paddingLeft: 4,
-    },
-    phaseEndLabel: {
-      fontFamily: typography.fontFamily.bodyBold,
-      fontSize: typography.size.md,
-      color: colors.textPrimary,
-    },
-    expandedField: {
-      gap: spacing.md,
-    },
-    updateButtonVoting: {
-      backgroundColor: colors.sunsetPink,
-    },
-    updateButtonPlanning: {
-      backgroundColor: colors.beachYellow,
-    },
-    updateButtonText: {
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-    },
-    successRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-    },
-    successText: {
-      color: colors.textPrimary,
-      fontFamily: typography.fontFamily.bodyBold,
-      fontSize: typography.size.sm,
-      lineHeight: typography.lineHeight.sm,
-    },
-    step3Footer: {
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.md,
-      paddingBottom: spacing.xl,
-      backgroundColor: colors.lightWhite,
-    },
-    nextButton: {
-      backgroundColor: colors.sunsetOrange,
-    },
-    nextButtonText: {
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-    },
-    finalInfoBox: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: spacing.md,
-      marginTop: spacing.md,
-    },
-    finalInfoText: {
-      flex: 1,
-      color: colors.nightBlack,
-      fontSize: typography.size.lg,
-      lineHeight: typography.lineHeight.lg,
-      fontFamily: typography.fontFamily.body,
-    },
-    calendarOverlay: {
-      flex: 1,
-      paddingHorizontal: spacing.xl,
-      paddingVertical: spacing.xl,
-    },
-    calendarModal: {
-      backgroundColor: colors.lightWhite,
-      borderRadius: radius.xl,
-      padding: spacing.xl,
-      gap: spacing.md,
-      borderWidth: 1,
-      borderColor: colors.nightBlack,
-    },
-    calendarTitle: {
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-      fontSize: typography.size.xl,
-      lineHeight: typography.lineHeight.xl,
-    },
-    calendarCard: {
-      paddingBottom: spacing.sm,
-    },
-    calendarArrow: {
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-      fontSize: typography.size.xl,
-      lineHeight: typography.lineHeight.xl,
-      paddingHorizontal: spacing.sm,
-    },
-    calendarLegend: {
-      flexDirection: "row",
-      justifyContent: "flex-start",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: spacing.md,
-      marginTop: spacing.sm,
-    },
-    legendRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-    },
-    legendSwatch: {
-      width: 16,
-      height: 16,
-      borderRadius: radius.sm,
-      borderWidth: 1,
-      borderColor: colors.nightBlack,
-    },
-    legendLabel: {
-      color: colors.nightBlack,
-      fontSize: typography.size.xs,
-      lineHeight: typography.lineHeight.xs,
-      fontFamily: typography.fontFamily.body,
-    },
-    calendarActions: {
-      flexDirection: "row",
-      gap: spacing.md,
-      marginTop: spacing.md,
-    },
-    calendarCancelButton: {
-      flex: 1,
-      backgroundColor: colors.beachYellow,
-    },
-    calendarCancelButtonText: {
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-    },
-    calendarApplyButton: {
-      flex: 1,
-      backgroundColor: colors.sunsetOrange,
-    },
-    calendarApplyButtonText: {
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-    },
-    timeModalContent: {
-      gap: spacing.md,
-    },
-    timeModalHint: {
-      color: colors.textMuted,
-      fontSize: typography.size.sm,
-      lineHeight: typography.lineHeight.sm,
-      fontFamily: typography.fontFamily.body,
-    },
-    timeInputModalBox: {
-      backgroundColor: colors.white,
-      borderRadius: radius.md,
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.lg,
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      borderWidth: 2,
-      borderColor: colors.nightBlack,
-      minHeight: 64,
-    },
-    timeInputModal: {
-      flex: 1,
-      minHeight: 44,
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-      fontSize: typography.size.xxl,
-      lineHeight: typography.lineHeight.xxl,
-      paddingVertical: 0,
-      paddingHorizontal: 0,
-      includeFontPadding: false,
-      textAlignVertical: "center",
-      ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
-    },
-    quickTimeWrap: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: spacing.sm,
-    },
-    quickTimeChip: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      borderRadius: radius.md,
-      backgroundColor: colors.white,
-      borderWidth: 2,
-      borderColor: colors.nightBlack,
-    },
-    quickTimeChipActive: {
-      backgroundColor: colors.beachYellow,
-    },
-    quickTimeChipText: {
-      color: colors.nightBlack,
-      fontFamily: typography.fontFamily.bodyBold,
-      fontSize: typography.size.sm,
-      lineHeight: typography.lineHeight.sm,
-    },
-    quickTimeChipTextActive: {
-      color: colors.nightBlack,
-    },
-  });
+  fieldGroup: {
+    gap: spacing.sm,
+  },
+
+  fieldLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  fieldLabel: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+  },
+  inputBlackStroke: {
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+  },
+  dateTimeRow: {
+    flexDirection: "row",
+    gap: spacing.md,
+  },
+  dateTimeHalf: {
+    flex: 1,
+  },
+  dateInput: {
+    backgroundColor: colors.white,
+    borderRadius: radius.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+    minHeight: 48,
+  },
+  dateText: {
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
+    color: colors.textPrimary,
+  },
+  codeInput: {
+    backgroundColor: colors.white,
+    borderRadius: radius.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+    minHeight: 48,
+  },
+  codeText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+    letterSpacing: 3,
+  },
+  copyActionArea: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  copiedText: {
+    color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+  },
+
+  codeCaption: {
+    color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.body,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+
+  inlineButtonWrapper: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+
+  continueButton: {
+    backgroundColor: colors.sunsetOrange,
+  },
+  continueButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  backToLandingButton: {
+    backgroundColor: colors.sunsetOrange,
+  },
+  backToLandingText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  cityScapeWrapper: {
+    position: "absolute",
+    zIndex: 0,
+  },
+  curlyWrapper: {
+    position: "absolute",
+    zIndex: 0,
+  },
+  createButton: {
+    backgroundColor: colors.seaBlue,
+  },
+  createButtonText: {
+    color: colors.lightWhite,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  curlyOrangeWrapper: {
+    position: "absolute",
+    zIndex: 0,
+  },
+
+  setupText: {
+    fontSize: 18,
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    marginBottom: spacing.xl,
+  },
+
+  phaseRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  phaseLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    flex: 1,
+  },
+  phaseBadge: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+  },
+  phaseBadgeText: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+  },
+  phaseTimerBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  hourglassCol: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  phaseTextCol: {
+    flexDirection: "column",
+    justifyContent: "center",
+  },
+  daysRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 3,
+  },
+  phaseDays: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    color: colors.textPrimary,
+  },
+  timepointWrapper: {
+    marginTop: 1,
+  },
+  timerLabel: {
+    color: colors.textMuted,
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+  },
+  phaseDateLabel: {
+    color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    paddingLeft: 4,
+  },
+  phaseEndLabel: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    color: colors.textPrimary,
+  },
+  expandedField: {
+    gap: spacing.md,
+  },
+  updateButtonVoting: {
+    backgroundColor: colors.sunsetPink,
+  },
+  updateButtonPlanning: {
+    backgroundColor: colors.beachYellow,
+  },
+  updateButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  successRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  successText: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+  },
+
+  step3Footer: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+    backgroundColor: colors.lightWhite,
+  },
+
+  nextButton: {
+    backgroundColor: colors.sunsetOrange,
+  },
+  nextButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  finalInfoBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  finalInfoText: {
+    flex: 1,
+    color: colors.nightBlack,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
+    fontFamily: typography.fontFamily.body,
+  },
+
+  calendarOverlay: {
+    flex: 1,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+  },
+  calendarModal: {
+    backgroundColor: colors.lightWhite,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+  },
+  calendarTitle: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+  },
+  calendarCard: {
+    paddingBottom: spacing.sm,
+  },
+  calendarArrow: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+    paddingHorizontal: spacing.sm,
+  },
+  calendarLegend: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
+  legendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  legendSwatch: {
+    width: 16,
+    height: 16,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+  },
+  legendLabel: {
+    color: colors.nightBlack,
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+    fontFamily: typography.fontFamily.body,
+  },
+  calendarActions: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  calendarCancelButton: {
+    flex: 1,
+    backgroundColor: colors.beachYellow,
+  },
+  calendarCancelButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  calendarApplyButton: {
+    flex: 1,
+    backgroundColor: colors.sunsetOrange,
+  },
+  calendarApplyButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  timeModalContent: {
+    gap: spacing.md,
+  },
+  timeModalHint: {
+    color: colors.textMuted,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.body,
+  },
+  timeInputModalBox: {
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+    minHeight: 64,
+  },
+  timeInputModal: {
+    flex: 1,
+    minHeight: 44,
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xxl,
+    lineHeight: typography.lineHeight.xxl,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    includeFontPadding: false,
+    textAlignVertical: "center",
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
+  },
+  quickTimeWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  quickTimeChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.white,
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+  },
+  quickTimeChipActive: {
+    backgroundColor: colors.beachYellow,
+  },
+  quickTimeChipText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+  },
+  quickTimeChipTextActive: {
+    color: colors.nightBlack,
+  },
+});
