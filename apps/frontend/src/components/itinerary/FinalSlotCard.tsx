@@ -15,10 +15,21 @@ type Props = {
   slot: { id: string; label: string };
   activity?: Activity;
   onJoinGroup?: (activityId: string) => void;
+  onPressDetails?: (activity: Activity, slotLabel: string) => void;
 };
 
-export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
+export function FinalSlotCard({
+  slot,
+  activity,
+  onJoinGroup,
+  onPressDetails,
+}: Props) {
   const handleJoin = useSinglePress(() => onJoinGroup?.(activity!.id));
+  const handleOpenDetails = useSinglePress(() => {
+    if (activity) {
+      onPressDetails?.(activity, slot.label);
+    }
+  });
 
   if (!activity) {
     return (
@@ -27,10 +38,7 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
           <AppText variant="body" style={styles.emptyTimeLabel}>
             {slot.label}
           </AppText>
-          <View
-            style={styles.emptyContent}
-            {...hiddenFromAccessibility}
-          >
+          <View style={styles.emptyContent} {...hiddenFromAccessibility}>
             <LocationIcon width={20} height={20} color={colors.textMuted} />
             <AppText variant="subtitle" style={styles.emptyTitle}>
               Empty Activity
@@ -43,11 +51,14 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
 
   return (
     <View style={styles.row}>
-      <View style={styles.card}>
-        <View
-          style={styles.timeRow}
-          {...hiddenFromAccessibility}
-        >
+      <Pressable
+        onPress={handleOpenDetails}
+        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+        accessibilityRole="button"
+        accessibilityLabel={`Open details for ${activity.name}`}
+        accessibilityHint="Shows more information about this activity"
+      >
+        <View style={styles.timeRow} {...hiddenFromAccessibility}>
           <LocationIcon width={16} height={16} />
           <AppText variant="body" style={styles.timeLabel}>
             {slot.label}
@@ -58,10 +69,7 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
           {activity.name}
         </AppText>
 
-        <View
-          style={styles.addressRow}
-          {...hiddenFromAccessibility}
-        >
+        <View style={styles.addressRow} {...hiddenFromAccessibility}>
           <LocationIcon width={14} height={14} />
           <AppText variant="caption" style={styles.address}>
             {activity.address}
@@ -69,10 +77,7 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
         </View>
 
         {activity.googleMapsUrl ? (
-          <View
-            style={styles.googleRow}
-            {...hiddenFromAccessibility}
-          >
+          <View style={styles.googleRow} {...hiddenFromAccessibility}>
             <GoogleIcon width={14} height={14} />
             <AppText variant="caption" style={styles.googleLink}>
               Google Maps link
@@ -80,16 +85,13 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
           </View>
         ) : null}
 
-        <View
-          style={styles.joinedRow}
-          {...hiddenFromAccessibility}
-        >
+        <View style={styles.joinedRow} {...hiddenFromAccessibility}>
           <MembersIcon width={14} height={14} />
           <AppText variant="caption" style={styles.joinedCount}>
             {activity.joinedCount ?? 0} joined
           </AppText>
         </View>
-      </View>
+      </Pressable>
 
       <Pressable
         onPress={handleJoin}
@@ -107,21 +109,14 @@ export function FinalSlotCard({ slot, activity, onJoinGroup }: Props) {
         }
         accessibilityState={{ checked: activity.hasCurrentUserJoined }}
       >
-        <View
-          style={styles.joinIcon}
-          {...hiddenFromAccessibility}
-        >
+        <View style={styles.joinIcon} {...hiddenFromAccessibility}>
           {activity.hasCurrentUserJoined ? (
             <CheckIcon width={36} height={36} color={colors.nightBlack} />
           ) : (
             <JoinGroup width={36} height={36} />
           )}
         </View>
-        <AppText
-          variant="body"
-          style={styles.ctaText}
-          accessible={false}
-        >
+        <AppText variant="body" style={styles.ctaText} accessible={false}>
           {activity.hasCurrentUserJoined ? "Joined\ngroup" : "Join\ngroup"}
         </AppText>
       </Pressable>
@@ -172,6 +167,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: spacing.lg,
     gap: spacing.xs,
+  },
+  cardPressed: {
+    opacity: 0.9,
   },
   timeRow: {
     flexDirection: "row",
