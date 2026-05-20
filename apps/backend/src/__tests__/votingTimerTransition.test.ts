@@ -64,7 +64,7 @@ import {
 } from "../services/tripsService";
 
 const TRIP_ID = "trip-123";
-const SLOT_ID = "2026-06-01_06:00-08:00";
+const SLOT_ID = "2026-06-01_Morning Activity";
 const ACTIVITY_ID = "activity-123";
 const USER_ID = "user-123";
 const TOKEN = "token-123";

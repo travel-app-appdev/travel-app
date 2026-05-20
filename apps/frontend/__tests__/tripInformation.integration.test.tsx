@@ -37,6 +37,10 @@ jest.mock("@/src/api/trips", () => ({
   leaveTrip: (...args: any[]) => mockLeaveTrip(...args),
 }));
 
+jest.mock("@/app/home", () => ({
+  invalidateTripsCache: jest.fn(),
+}));
+
 // Firebase — inline object so Jest hoisting doesn't cause reference errors.
 jest.mock("@/src/lib/firebase", () => ({
   auth: {

@@ -13,8 +13,10 @@ const mockGetActivitiesBySlot = jest.fn();
 const mockGetFinalItineraryActivities = jest.fn();
 const mockToggleActivityAttendance = jest.fn();
 const mockVoteForActivity = jest.fn();
+const mockDaySelectorProps = jest.fn();
 
 let mockParams: Record<string, string | undefined> = {};
+let mockTripDays = [{ id: "2026-06-01", label: "1 Jun" }];
 
 jest.mock("expo-router", () => ({
   router: {
@@ -53,16 +55,16 @@ jest.mock("@/src/services/activityService", () => ({
 }));
 
 jest.mock("@/src/utils/itinerary/generateTimeSlots", () => ({
-  generateTimeSlots: () => [{ id: "06:00-08:00", label: "06:00-08:00" }],
+  generateTimeSlots: () => [{ id: "Breakfast", label: "Breakfast" }],
 }));
 
 jest.mock("@/src/utils/itinerary/generateTripDays", () => ({
-  generateTripDays: () => [{ id: "2026-06-01", label: "1 Jun" }],
+  generateTripDays: () => mockTripDays,
 }));
 
 jest.mock("@/src/utils/itinerary/mapActivitiesToSlots", () => ({
   mapActivitiesToSlots: () => [
-    { slot: { id: "06:00-08:00", label: "06:00-08:00" }, activity: undefined },
+    { slot: { id: "Breakfast", label: "Breakfast" }, activity: undefined },
   ],
 }));
 
@@ -81,7 +83,10 @@ jest.mock("@/src/components/itinerary/ItineraryHeader", () => ({
 }));
 
 jest.mock("@/src/components/itinerary/ItineraryDaySelector", () => ({
-  ItineraryDaySelector: () => null,
+  ItineraryDaySelector: (props: unknown) => {
+    mockDaySelectorProps(props);
+    return null;
+  },
 }));
 
 jest.mock("@/src/components/itinerary/PlanningSlotCard", () => ({
@@ -120,8 +125,8 @@ function setBaseParams(state: "planning" | "voting" | "final") {
       { userId: "user-123", hasFinishedPlanning: true },
       { userId: "user-456", hasFinishedPlanning: true },
     ]),
-    planningEndAt: "2026-05-13T10:00:00.000Z",
-    votingEndAt: "2026-05-13T11:00:00.000Z",
+    planningEndAt: "2026-06-13T10:00:00.000Z",
+    votingEndAt: "2026-06-13T11:00:00.000Z",
   };
 }
 
@@ -134,8 +139,8 @@ function backendTrip(state: "Planning" | "Voting" | "Final") {
     end_date: "2026-06-03",
     state,
     role: "member",
-    planning_end_at: "2026-05-13T10:00:00.000Z",
-    voting_end_at: "2026-05-13T11:00:00.000Z",
+    planning_end_at: "2026-06-13T10:00:00.000Z",
+    voting_end_at: "2026-06-13T11:00:00.000Z",
     members: [
       {
         id: "user-123",
@@ -156,6 +161,7 @@ function backendTrip(state: "Planning" | "Voting" | "Final") {
 describe("ItineraryScreen transition overlays", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTripDays = [{ id: "2026-06-01", label: "1 Jun" }];
     mockGetActivitiesBySlot.mockResolvedValue([]);
     mockGetFinalItineraryActivities.mockResolvedValue([]);
   });
@@ -202,6 +208,65 @@ describe("ItineraryScreen transition overlays", () => {
         expect.objectContaining({ state: "final" })
       );
     }, { timeout: 2500 });
+
+    unmount();
+  });
+
+  it("enables voting days that have collisions beyond the first day", async () => {
+    mockTripDays = [
+      { id: "2026-06-01", label: "1 Jun" },
+      { id: "2026-06-02", label: "2 Jun" },
+    ];
+    setBaseParams("voting");
+    mockFetchMyTrips.mockResolvedValue([backendTrip("Voting")]);
+    mockGetActivitiesBySlot.mockImplementation(
+      (_tripId: unknown, slotId: unknown) => {
+        if (slotId === "2026-06-02_Breakfast") {
+          return Promise.resolve([
+            {
+              activity_id: "activity-1",
+              slot_id: "2026-06-02_Breakfast",
+              name: "Museum",
+            },
+            {
+              activity_id: "activity-2",
+              slot_id: "2026-06-02_Breakfast",
+              name: "Market",
+            },
+          ]);
+        }
+
+        return Promise.resolve([]);
+      }
+    );
+
+    const { unmount } = render(<ItineraryScreen />);
+
+    await waitFor(() => {
+      expect(mockGetActivitiesBySlot).toHaveBeenCalledWith(
+        "trip-123",
+        "2026-06-01_Breakfast",
+        "user-123"
+      );
+      expect(mockGetActivitiesBySlot).toHaveBeenCalledWith(
+        "trip-123",
+        "2026-06-02_Breakfast",
+        "user-123"
+      );
+    });
+
+    await waitFor(() => {
+      const calls = mockDaySelectorProps.mock.calls;
+      expect(
+        calls.some(([props]) => {
+          const enabledDayIds = (props as any).enabledDayIds as Set<string>;
+          return (
+            enabledDayIds?.has("2026-06-02") &&
+            !enabledDayIds.has("2026-06-01")
+          );
+        })
+      ).toBe(true);
+    });
 
     unmount();
   });

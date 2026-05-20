@@ -4,7 +4,7 @@ export type ItineraryState = "planning" | "voting" | "final";
 
 export type TimeSlot = {
   id: string;
-  label: string; // e.g. "06:00-08:00"
+  label: string; // e.g. "Morning Activity"
   startHour: number;
 };
 

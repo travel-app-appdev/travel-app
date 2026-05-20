@@ -712,6 +712,8 @@ export default function ItineraryScreen() {
       const cacheKey =
         activeState === "final"
           ? `${tripId}_${activeState}`
+          : activeState === "voting"
+            ? `${tripId}_${activeState}`
           : `${tripId}_${activeState}_${resolvedDayId}`;
 
       const cached = activitiesCache.get(cacheKey);
@@ -742,6 +744,41 @@ export default function ItineraryScreen() {
           if (hasChanged) {
             activitiesCache.set(cacheKey, mapped);
             setApiActivities(mapped);
+          }
+
+          setIsLoadingActivities(false);
+          return;
+        }
+
+        if (activeState === "voting") {
+          const allActivities = (
+            await Promise.all(
+              tripDays.flatMap((day) =>
+                slots.map(async (slot) => {
+                  const slotIdWithDate = `${day.id}_${slot.id}`;
+                  const slotActivities = await getActivitiesBySlot(
+                    tripId,
+                    slotIdWithDate,
+                    currentUserId ?? undefined
+                  );
+
+                  return slotActivities.map((activity: any) =>
+                    mapBackendActivity(activity, {
+                      dayId: day.id,
+                      slotId: slot.id,
+                    })
+                  );
+                })
+              )
+            )
+          ).flat();
+
+          const hasChanged =
+            JSON.stringify(cached) !== JSON.stringify(allActivities);
+
+          if (hasChanged) {
+            activitiesCache.set(cacheKey, allActivities);
+            setApiActivities(allActivities);
           }
 
           setIsLoadingActivities(false);
