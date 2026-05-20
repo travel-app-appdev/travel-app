@@ -89,6 +89,11 @@ export type Itinerary = {
     days: ItineraryDay[];
 };
 
+export type ActivityJoinedMember = {
+    user_id: string;
+    name: string;
+};
+
 export type Activity = {
     activity_id: string;
     trip_id: string;
@@ -103,6 +108,7 @@ export type Activity = {
     hasCurrentUserVote?: boolean;
     joinedCount?: number;
     hasCurrentUserJoined?: boolean;
+    joinedMembers?: ActivityJoinedMember[];
     source_type: "manual";
 };
 

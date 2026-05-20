@@ -129,7 +129,11 @@ export function ActivityDetailModal({
                   <View style={styles.infoRow}>
                     <MembersIcon width={20} height={20} />
                     <AppText variant="body" style={styles.infoText}>
-                      {activity.joinedCount ?? 0} joined
+                      {activity.joinedMembers?.length
+                        ? activity.joinedMembers
+                            .map((member) => member.name)
+                            .join(", ")
+                        : "No members joined yet"}
                     </AppText>
                   </View>
                 ) : null}

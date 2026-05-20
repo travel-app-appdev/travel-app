@@ -130,6 +130,7 @@ function mapBackendActivity(
     hasCurrentUserVote: activity.hasCurrentUserVote ?? false,
     joinedCount: activity.joinedCount ?? 0,
     hasCurrentUserJoined: activity.hasCurrentUserJoined ?? false,
+    joinedMembers: activity.joinedMembers ?? [],
   };
 }
 
@@ -956,6 +957,7 @@ export default function ItineraryScreen() {
       handlePlanningInfoPress();
       return;
     }
+
     router.replace({
       pathname: "/add-activity",
       params: {
@@ -989,6 +991,7 @@ export default function ItineraryScreen() {
       const nextState = shouldSkipVoting(tripMemberCount)
         ? "final"
         : "planning";
+
       setItinerary((current) => ({
         ...current,
         state: nextState === "final" ? current.state : nextState,
@@ -997,6 +1000,7 @@ export default function ItineraryScreen() {
           currentUserId
         ),
       }));
+
       if (nextState === "final") {
         setIsPreparingFinalItinerary(true);
         if (finalizingTimeoutRef.current) {
@@ -1047,10 +1051,12 @@ export default function ItineraryScreen() {
   const votingActivities = useMemo(() => {
     const all = apiActivities.length > 0 ? apiActivities : itinerary.activities;
     const groups = new Map<string, Activity[]>();
+
     all.forEach((a) => {
       const key = `${a.dayId}_${a.slotId}`;
       groups.set(key, [...(groups.get(key) ?? []), a]);
     });
+
     return Array.from(groups.values())
       .filter((group) => group.length > 1)
       .flat();
@@ -1071,6 +1077,7 @@ export default function ItineraryScreen() {
           seen.set(a.slotId, formatSlotLabel(a.slotId));
         }
       });
+
     return Array.from(seen.entries()).map(([slotId, label]) => ({
       slotId,
       label,
@@ -1185,6 +1192,7 @@ export default function ItineraryScreen() {
       );
       const selectedDayStillHasVotingActivities =
         daysWithVotingActivities.has(selectedDayId);
+
       if (firstVotingDay && !selectedDayStillHasVotingActivities) {
         setSelectedDayId(firstVotingDay.id);
       }
@@ -1211,6 +1219,7 @@ export default function ItineraryScreen() {
       Alert.alert("Could not update group", "Please log in again.");
       return;
     }
+
     try {
       const fullSlotId = `${activity.dayId}_${activity.slotId}`;
       const result = await toggleActivityAttendance({
@@ -1219,6 +1228,7 @@ export default function ItineraryScreen() {
         slotId: fullSlotId,
         activityId,
       });
+
       setApiActivities((current) =>
         current.map((item) =>
           item.id === activityId &&
@@ -1245,6 +1255,8 @@ export default function ItineraryScreen() {
             }
           : current
       );
+
+      setActivityRefreshKey((value) => value + 1);
     } catch (error) {
       Alert.alert(
         "Could not update group",
