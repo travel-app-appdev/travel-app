@@ -1114,9 +1114,10 @@ export default function CreateTripScreen() {
                   firstDay={1}
                   renderArrow={(direction) => (
                     <AppText variant="body" style={styles.calendarArrow}>
-                      {direction === "left" ? "â€¹" : "â€º"}
+                      {direction === "left" ? "‹" : "›"}
                     </AppText>
                   )}
+
                   theme={{
                     backgroundColor: colors.lightWhite,
                     calendarBackground: colors.lightWhite,
@@ -1384,10 +1385,7 @@ export default function CreateTripScreen() {
   // Steps 1 and 2
   return (
     <View
-      style={[
-        styles.fullScreen,
-        step === 1 ? styles.bgStep1 : styles.bgStep2,
-      ]}
+      style={[styles.fullScreen, step === 1 ? styles.bgStep1 : styles.bgStep2]}
     >
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <View
@@ -1456,9 +1454,7 @@ export default function CreateTripScreen() {
                 style={[
                   styles.continueWrapper,
                   {
-                    bottom: isLandscape
-                      ? 20
-                      : SCREEN_WIDTH * (221 / 393) + 47,
+                    bottom: isLandscape ? 20 : SCREEN_WIDTH * (221 / 393) + 47,
                   },
                   { pointerEvents: "box-none" },
                 ]}
@@ -1574,9 +1570,7 @@ export default function CreateTripScreen() {
                       <AppText variant="body" style={styles.dateText}>
                         {formatDate(tripStart)} - {formatDate(tripEnd)}
                       </AppText>
-                      <View
-                        {...hiddenFromAccessibility}
-                      >
+                      <View {...hiddenFromAccessibility}>
                         <Calendar width={20} height={20} />
                       </View>
                     </Pressable>
@@ -1588,9 +1582,7 @@ export default function CreateTripScreen() {
                 style={[
                   styles.createWrapper,
                   {
-                    bottom: isLandscape
-                      ? 20
-                      : SCREEN_WIDTH * (221 / 393) + 5,
+                    bottom: isLandscape ? 20 : SCREEN_WIDTH * (221 / 393) + 5,
                   },
                 ]}
               >
@@ -1627,7 +1619,7 @@ export default function CreateTripScreen() {
                 firstDay={1}
                 renderArrow={(direction) => (
                   <AppText variant="body" style={styles.calendarArrow}>
-                    {direction === "left" ? "â€¹" : "â€º"}
+                    {direction === "left" ? "‹" : "›"}
                   </AppText>
                 )}
                 theme={{
