@@ -520,25 +520,9 @@ export default function HomeScreen() {
                 members={trip.members}
                 role={trip.role}
                 onPress={() => {
-                  router.push({
-                    pathname: "/itinerary",
-                    params: {
-                      tripId: trip.id,
-                      state: trip.status,
-                      title: trip.title,
-                      destination: trip.destination,
-                      startDate: trip.rawStartDate,
-                      endDate: trip.rawEndDate,
-                      members: JSON.stringify(trip.members),
-                      planningEndAt: trip.planningEndAt ?? "",
-                      votingEndAt: trip.votingEndAt ?? "",
-                    },
-                  });
-                }}
-                onIconPress={() => {
                   if (trip.role === "admin") {
                     router.push({
-                      pathname: "/trip-settings",
+                      pathname: "/trip-overview-admin",
                       params: {
                         tripId: trip.id,
                         title: trip.title,
@@ -555,7 +539,7 @@ export default function HomeScreen() {
                     });
                   } else {
                     router.push({
-                      pathname: "/trip-information",
+                      pathname: "/trip-overview-member",
                       params: {
                         tripId: trip.id,
                         title: trip.title,
@@ -563,6 +547,7 @@ export default function HomeScreen() {
                         startDate: trip.rawStartDate,
                         endDate: trip.rawEndDate,
                         members: JSON.stringify(trip.members),
+                        inviteCode: trip.inviteCode,
                         state: trip.rawState,
                         planningStartedAt: trip.planningStartedAt ?? "",
                         planningEndAt: trip.planningEndAt ?? "",
@@ -570,6 +555,22 @@ export default function HomeScreen() {
                       },
                     });
                   }
+                }}
+                onStatusPress={(status) => {
+                  router.push({
+                    pathname: "/itinerary",
+                    params: {
+                      tripId: trip.id,
+                      state: status,
+                      title: trip.title,
+                      destination: trip.destination,
+                      startDate: trip.rawStartDate,
+                      endDate: trip.rawEndDate,
+                      members: JSON.stringify(trip.members),
+                      planningEndAt: trip.planningEndAt ?? "",
+                      votingEndAt: trip.votingEndAt ?? "",
+                    },
+                  });
                 }}
               />
             ))}
