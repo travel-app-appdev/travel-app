@@ -2,8 +2,6 @@ import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "./AppText";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
-import Edit from "@/assets/icons/edit.svg";
-import InfoIcon from "@/assets/icons/info.svg";
 
 type TripStatus = "planning" | "voting" | "final";
 type TripRole = "admin" | "member";
@@ -25,7 +23,7 @@ type TripCardProps = {
   cardColor: string;
   role: TripRole;
   onPress?: () => void;
-  onIconPress?: () => void;
+  onStatusPress?: (status: TripStatus) => void;
 };
 
 const STATUS_COLORS: Record<TripStatus, { bg: string; text: string }> = {
@@ -51,13 +49,13 @@ export function TripCard({
   cardColor,
   role,
   onPress,
-  onIconPress,
+  onStatusPress,
 }: TripCardProps) {
   const statusStyle = STATUS_COLORS[status];
   const statusLabel = STATUS_LABELS[status];
 
   const handleCardPress = useSinglePress(onPress ?? (() => {}));
-  const handleIconPress = useSinglePress(onIconPress ?? (() => {}));
+  const handleStatusPress = useSinglePress(() => onStatusPress?.(status));
 
   return (
     <Pressable
@@ -65,29 +63,51 @@ export function TripCard({
       onPress={handleCardPress}
       accessibilityRole="button"
       accessibilityLabel={`${title}, ${destination}, ${startDate} to ${endDate}, ${statusLabel}`}
-      accessibilityHint={
-        role === "admin" ? "Opens trip itinerary" : "Opens trip itinerary"
-      }
+      accessibilityHint="Opens trip itinerary"
     >
       <View style={styles.titleRow}>
         <AppText variant="title" style={styles.title} numberOfLines={2}>
           {title}
         </AppText>
 
-        <View style={[styles.badge, { backgroundColor: statusStyle.bg }]}>
-          <AppText variant="caption" style={styles.badgeText}>
-            {statusLabel}
-          </AppText>
-        </View>
+        {Platform.OS === "web" ? (
+          <View
+            style={[styles.badge, { backgroundColor: statusStyle.bg }]}
+            accessibilityRole="button"
+            accessibilityLabel={`${statusLabel} phase, tap to open`}
+            accessibilityHint="Opens the itinerary at this phase"
+            onStartShouldSetResponder={() => true}
+            onResponderGrant={(e) => {
+              e.stopPropagation();
+              handleStatusPress();
+            }}
+          >
+            <AppText variant="caption" style={styles.badgeText}>
+              {statusLabel}
+            </AppText>
+          </View>
+        ) : (
+          <Pressable
+            style={[styles.badge, { backgroundColor: statusStyle.bg }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleStatusPress();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`${statusLabel} phase, tap to open`}
+            accessibilityHint="Opens the itinerary at this phase"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <AppText variant="caption" style={styles.badgeText}>
+              {statusLabel}
+            </AppText>
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.middleRow}>
         <AppText variant="caption" style={styles.destination} numberOfLines={1}>
           {destination}
-        </AppText>
-
-        <AppText variant="caption" style={styles.date} numberOfLines={1}>
-          {startDate} – {endDate}
         </AppText>
       </View>
 
@@ -111,54 +131,9 @@ export function TripCard({
           ))}
         </View>
 
-        {Platform.OS === "web" ? (
-          <View
-            style={styles.iconButton}
-            accessibilityLabel={
-              role === "admin" ? "Edit trip" : "Trip information"
-            }
-            accessibilityHint={
-              role === "admin"
-                ? "Opens trip settings"
-                : "Opens trip information screen"
-            }
-            onStartShouldSetResponder={() => true}
-            onResponderGrant={(e) => {
-              e.stopPropagation();
-              handleIconPress();
-            }}
-          >
-            {role === "admin" ? (
-              <Edit width={22} height={22} />
-            ) : (
-              <InfoIcon width={22} height={22} />
-            )}
-          </View>
-        ) : (
-          <Pressable
-            style={styles.iconButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleIconPress();
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={
-              role === "admin" ? "Edit trip" : "Trip information"
-            }
-            accessibilityHint={
-              role === "admin"
-                ? "Opens trip settings"
-                : "Opens trip information screen"
-            }
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            {role === "admin" ? (
-              <Edit width={22} height={22} />
-            ) : (
-              <InfoIcon width={22} height={22} />
-            )}
-          </Pressable>
-        )}
+        <AppText variant="caption" style={styles.date} numberOfLines={1}>
+          {startDate} – {endDate}
+        </AppText>
       </View>
     </Pressable>
   );
@@ -199,8 +174,6 @@ const styles = StyleSheet.create({
   middleRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
   },
   destination: {
     color: colors.nightBlack,
@@ -208,13 +181,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
     flex: 1,
-  },
-  date: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-    textAlign: "right",
   },
   bottomRow: {
     flexDirection: "row",
@@ -241,12 +207,11 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     fontFamily: typography.fontFamily.bodyBold,
   },
-  iconButton: {
-    padding: 8,
-    marginRight: -8,
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
+  date: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    textAlign: "right",
   },
 });

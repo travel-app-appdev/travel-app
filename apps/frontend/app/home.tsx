@@ -1,3 +1,4 @@
+// app/home.tsx
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
@@ -13,7 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
 import { colors, spacing, radius, typography } from "@/src/theme";
-import { fetchMyTrips, type Trip } from "@/src/api/trips";
+import { fetchMyTrips, invalidateMyTripsCache, type Trip } from "@/src/api/trips";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
@@ -67,10 +68,19 @@ type TripsCache = {
 };
 
 const TRIPS_STALE_TIME_MS = 30_000;
+// Minimum time between background refreshes on focus (prevents hammering
+// the API if the user rapidly switches tabs or screens)
+const TRIPS_FOCUS_REFRESH_THROTTLE_MS = 5_000;
 let tripsCache: TripsCache | null = null;
+
+let tripsCacheForceNext = false;
 
 export function invalidateTripsCache() {
   tripsCache = null;
+  tripsCacheForceNext = true;
+  // Also clear the API-level cache in trips.ts so fetchMyTrips
+  // always hits the backend on the next call for ALL users
+  invalidateMyTripsCache();
 }
 
 function formatDate(dateString: string): string {
@@ -300,19 +310,13 @@ export default function HomeScreen() {
         return;
       }
 
-      if (
-        !force &&
-        lastFetchRef.current > 0 &&
-        now - lastFetchRef.current < TRIPS_STALE_TIME_MS
-      ) {
-        setIsLoading(false);
-        return;
-      }
+      // No lastFetchRef stale check — fetch frequency is controlled
+      // by useFocusEffect throttle (TRIPS_FOCUS_REFRESH_THROTTLE_MS).
 
       setIsLoading(true);
 
       try {
-        const backendTrips = (await fetchMyTrips(userId)) as TripWithMembers[];
+        const backendTrips = (await fetchMyTrips(userId, { forceRefresh: true })) as TripWithMembers[];
 
         if (latestUserIdRef.current !== userId) {
           return;
@@ -369,7 +373,23 @@ export default function HomeScreen() {
         setIsLoading(true);
       }
 
-      void loadTrips(false);
+      const shouldForce = tripsCacheForceNext;
+      tripsCacheForceNext = false;
+      if (shouldForce) {
+        lastFetchRef.current = 0;
+      }
+      // Always do a background refresh on focus so changes made by other
+      // users (e.g. admin deleting a trip) are reflected immediately.
+      // We throttle to avoid hammering the API on rapid navigation.
+      const timeSinceLastFetch = Date.now() - lastFetchRef.current;
+      const shouldRefresh = shouldForce || timeSinceLastFetch > TRIPS_FOCUS_REFRESH_THROTTLE_MS;
+      if (shouldRefresh) {
+        // Clear the API-level cache so fetchMyTrips hits the backend fresh.
+        // This ensures changes made by other users (deletions, new members)
+        // are always reflected when this user focuses the home screen.
+        invalidateMyTripsCache(userId);
+        void loadTrips(true);
+      }
     }, [loadTrips, user?.uid])
   );
 
@@ -520,25 +540,9 @@ export default function HomeScreen() {
                 members={trip.members}
                 role={trip.role}
                 onPress={() => {
-                  router.push({
-                    pathname: "/itinerary",
-                    params: {
-                      tripId: trip.id,
-                      state: trip.status,
-                      title: trip.title,
-                      destination: trip.destination,
-                      startDate: trip.rawStartDate,
-                      endDate: trip.rawEndDate,
-                      members: JSON.stringify(trip.members),
-                      planningEndAt: trip.planningEndAt ?? "",
-                      votingEndAt: trip.votingEndAt ?? "",
-                    },
-                  });
-                }}
-                onIconPress={() => {
                   if (trip.role === "admin") {
                     router.push({
-                      pathname: "/trip-settings",
+                      pathname: "/trip-overview-admin",
                       params: {
                         tripId: trip.id,
                         title: trip.title,
@@ -555,7 +559,7 @@ export default function HomeScreen() {
                     });
                   } else {
                     router.push({
-                      pathname: "/trip-information",
+                      pathname: "/trip-overview-member",
                       params: {
                         tripId: trip.id,
                         title: trip.title,
@@ -563,6 +567,7 @@ export default function HomeScreen() {
                         startDate: trip.rawStartDate,
                         endDate: trip.rawEndDate,
                         members: JSON.stringify(trip.members),
+                        inviteCode: trip.inviteCode,
                         state: trip.rawState,
                         planningStartedAt: trip.planningStartedAt ?? "",
                         planningEndAt: trip.planningEndAt ?? "",
@@ -570,6 +575,22 @@ export default function HomeScreen() {
                       },
                     });
                   }
+                }}
+                onStatusPress={(status) => {
+                  router.push({
+                    pathname: "/itinerary",
+                    params: {
+                      tripId: trip.id,
+                      state: status,
+                      title: trip.title,
+                      destination: trip.destination,
+                      startDate: trip.rawStartDate,
+                      endDate: trip.rawEndDate,
+                      members: JSON.stringify(trip.members),
+                      planningEndAt: trip.planningEndAt ?? "",
+                      votingEndAt: trip.votingEndAt ?? "",
+                    },
+                  });
                 }}
               />
             ))}

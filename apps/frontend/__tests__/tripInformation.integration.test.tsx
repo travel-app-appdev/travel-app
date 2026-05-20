@@ -1,6 +1,6 @@
 import React from "react";
 import { render, fireEvent, waitFor } from "@testing-library/react-native";
-import TripInformationScreen from "@/app/trip-information";
+import TripInformationScreen from "@/app/trip-overview-member";
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 

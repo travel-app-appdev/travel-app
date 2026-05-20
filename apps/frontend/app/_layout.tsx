@@ -41,12 +41,12 @@ function AppStartupGate() {
         <Stack.Screen name="create-trip" options={{ title: "Create Trip" }} />
         <Stack.Screen name="join-trip" options={{ title: "Join Trip" }} />
         <Stack.Screen
-          name="trip-settings"
-          options={{ title: "Trip Settings" }}
+          name="trip-overview-admin"
+          options={{ title: "Trip Overview" }}
         />
         <Stack.Screen
-          name="trip-information"
-          options={{ title: "Trip Information" }}
+          name="trip-overview-member"
+          options={{ title: "Trip Overview" }}
         />
         <Stack.Screen
           name="questionnaire"

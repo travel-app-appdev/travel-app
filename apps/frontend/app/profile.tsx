@@ -21,6 +21,7 @@ import {
 import { auth } from "@/src/lib/firebase";
 import { updateProfile } from "@/src/api/auth";
 import { useAuth } from "@/src/context/AuthContext";
+import { invalidateTripsCache } from "./home";
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
 import { AppButton } from "@/src/components/common/AppButton";
@@ -120,6 +121,7 @@ export default function ProfileScreen() {
       const updatedUser = await updateProfile({ idToken, name: nameInput });
       setName(updatedUser.name ?? nameInput);
       setUser(user ? { ...user, name: updatedUser.name } : null);
+      invalidateTripsCache();
       setNameUpdated(true);
       safeTimeout(() => {
         setNameUpdated(false);
