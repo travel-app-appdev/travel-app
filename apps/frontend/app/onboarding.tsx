@@ -11,7 +11,8 @@ import {
   KeyboardAvoidingView,
   Alert,
   Animated,
-  Text
+  Text,
+  useWindowDimensions
 } from "react-native";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { AppButton } from "@/src/components/common/AppButton";
@@ -19,14 +20,67 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { navigate } from "expo-router/build/global-state/routing";
 import Back from "@/assets/icons/back.svg";
 import Forward from "@/assets/icons/forward.svg";
+import PalmTree from "@/assets/visuals/palm-tree.svg";
+import PalmLeaf from "@/assets/visuals/palm-leaf.svg";
+import CurlyGreen from "@/assets/visuals/curly-green.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
+import YellowVotey from "@/assets/mascots/Votey_Yellow.svg";
+import PinkVotey from "@/assets/mascots/Votey_Pink.svg";
+import GreenVotey from "@/assets/mascots/Votey_Green.svg";
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
 
+function lerp(start: number, end: number, t: number) {
+  return start + (end - start) * t;
+}
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function Onboarding() {
   const [step, setStep] = useState<1 | 2 | 3 >(1);
+  const [svgDimensions] = useState(() => Dimensions.get("window"));
+  const { width, height } = useWindowDimensions();
+  const scale = Math.min(width / 390, height / 844);
 
+  const isSmallPhone = height < 760;
+
+  const { width: svgWidth, height: svgHeight } = svgDimensions;
+  const svgSw = svgWidth / 390;
+  const svgSh = svgHeight / 844;
+  const svgWideProgress = clamp((svgWidth - 390) / (1440 - 390), 0, 1);
+
+  const palmTreeSize = 1000 * svgSw * lerp(1, 0.78, svgWideProgress);
+  const palmLeafSize = 350 * svgSw * lerp(1, 0.7, svgWideProgress);
+
+  const palmTreeRight = lerp(-520 * svgSw, -560 * svgSw + 350, svgWideProgress);
+  const palmTreeTop = lerp(-245 * svgSh + 500, (-245 * svgSh - 700) + 500, svgWideProgress);
+
+  const palmTreeLeft = lerp(-670, 100, svgWideProgress);
+  const palmTreeTop2 = lerp(-245 * svgSh + 290, (-245 * svgSh - 700) + 290, svgWideProgress);
+
+  const palmLeafLeft = lerp(-220 * svgSw, -240 * svgSw + 350, svgWideProgress);
+  const palmLeafTop = lerp(60 * svgSh, 60 * svgSh - 600, svgWideProgress);
+
+  const palmLeafRight = lerp(250 * svgSw, -560 * svgSw + 350, svgWideProgress);
+  const palmLeafTop2 = lerp(50 * svgSh +330 , (50 * svgSh - 600) +330, svgWideProgress);
+  
+  const mascotSize = Math.round(Math.min(100 * scale, isSmallPhone ? 78 : 100));
+   const mascotSize2 = Math.round(Math.min(80 * scale, isSmallPhone ? 78 : 100));
+
+  const [isLandscape, setIsLandscape] = useState(() => {
+    const { width, height } = Dimensions.get("window");
+    return width > height;
+  });
+
+   useEffect(() => {
+    const subscription = Dimensions.addEventListener("change", ({ window }) => {
+      setIsLandscape(window.width > window.height);
+    });
+    return () => subscription.remove();
+  }, []);
+  
   return (
     <View style={Styles.fullScreen}>
       <View style={Styles.safeArea}>
@@ -49,10 +103,50 @@ export default function Onboarding() {
 
               </View>
 
+                 <View
+                style={[
+                Styles.palmTreeWrapper,
+                {
+                    top: palmTreeTop2,
+                    left: palmTreeLeft,
+                    pointerEvents: "none",
+                },
+                ]}
+            >
+                <PalmTree width={palmTreeSize} height={palmTreeSize} />
+            </View>
               <View style={Styles.container}>
                 <Text style={[Styles.title]}>Plan Together</Text>
                 <View style={Styles.TitleHighlight1} />
               </View>
+
+             
+
+            <View
+                style={[
+                Styles.palmTreeWrapper,
+                {
+                    top: palmTreeTop,
+                    right: palmTreeRight,
+                    pointerEvents: "none",
+                },
+                ]}
+            >
+                <PalmTree width={palmTreeSize} height={palmTreeSize} />
+            </View>
+
+             <View
+            style={[
+              Styles.mascotWrapper,
+              {
+                bottom: isSmallPhone ? 50 : 195,
+                left: 40,
+              },
+            ]}
+            {...(Platform.OS !== "web" ? { accessible: false } : {})}
+          >
+            <YellowVotey width={mascotSize} height={mascotSize} />
+          </View>
 
               <View>
                 <Text style={Styles.InfoText}>
@@ -105,6 +199,46 @@ export default function Onboarding() {
 
               </View>
 
+              <View
+                style={[
+                Styles.palmLeafWrapper,
+                {
+                    top: palmLeafTop2,
+                    left: palmLeafLeft,
+                    pointerEvents: "none",
+                },
+                ]}
+            >
+                <PalmLeaf width={palmLeafSize} height={palmLeafSize} />
+                </View>
+
+                <View
+                    style={[
+                    Styles.palmLeafWrapper,
+                    {
+                        top: palmLeafTop,
+                        left: palmLeafRight,
+                        pointerEvents: "none",
+                        transform: [{ scaleX: -1 }],
+                    },
+                    ]}
+                >
+                    <PalmLeaf width={palmLeafSize} height={palmLeafSize} />
+                </View>
+
+                <View
+                style={[
+                Styles.mascotWrapper,
+                {
+                    top: isSmallPhone ? 50 : 270,
+                    left: 50,
+                },
+                ]}
+                {...(Platform.OS !== "web" ? { accessible: false } : {})}
+                >
+                <PinkVotey width={mascotSize2} height={mascotSize2} />
+                </View>
+
               <View style={Styles.container}>
                 <Text style={[Styles.title]}>Decide Together</Text>
                 <View style={Styles.TitleHighlight2} />
@@ -152,16 +286,40 @@ export default function Onboarding() {
             <>
               <View style={Styles.header}>
                 <View style={Styles.headerSide} />
+
+                {!isLandscape && (
+                <View
+                style={[Styles.curlyGreenWrapper2, { pointerEvents: "none" }]}
+                {...hiddenFromAccessibility}
+                >
+                <CurlyGreen width={SCREEN_WIDTH * 1.1} height={SCREEN_WIDTH * 1.1} />
+                </View>
+                )}
+
                 <View
                   style={Styles.headerTitle}
                   accessible={false}
                   importantForAccessibility="no-hide-descendants"
                 >
+                    
                   <Plane width={25} height={25} />
                   <Text style={Styles.headerLabel}>Onboarding</Text>
                 </View>
                 <View style={Styles.headerSide} />
               </View>
+
+               <View
+                style={[
+                Styles.mascotWrapper,
+                {
+                    top: isSmallPhone ? 50 : 270,
+                   right: 50,
+                },
+                ]}
+                {...(Platform.OS !== "web" ? { accessible: false } : {})}
+                >
+                <GreenVotey width={mascotSize2} height={mascotSize2} />
+                </View>
 
               <View style={Styles.container}>
                 <Text style={[Styles.title]}>Travel Together</Text>
@@ -197,6 +355,15 @@ export default function Onboarding() {
                   accessibilityHint="Completes the onboarding process and navigates to the home screen"
                 />
               </View>
+
+              {!isLandscape && (
+        <View
+          style={[Styles.curlyGreenWrapper, { pointerEvents: "none" }]}
+          {...hiddenFromAccessibility}
+        >
+          <CurlyGreen width={SCREEN_WIDTH * 1.1} height={SCREEN_WIDTH * 1.1} />
+        </View>
+      )}
             </>
           )
           }
@@ -346,9 +513,9 @@ const Styles = StyleSheet.create({
     lineHeight: typography.lineHeight.lg,
     color: colors.textPrimary,
     textAlign: "center",
-    marginTop: spacing.xxxxl2,
-    paddingLeft: spacing.xl,
-    paddingRight: spacing.xl,
+    marginTop: 200,
+    paddingLeft: spacing.xxxl,
+    paddingRight: spacing.xxxl,
     fontFamily: typography.fontFamily.body,
   },
   InfoTextBold: {
@@ -371,5 +538,32 @@ const Styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     justifyContent: "flex-end",
+  },
+  palmTreeWrapper: {
+    position: "absolute",
+  },
+  palmLeafWrapper: {
+    position: "absolute",
+  },
+ 
+
+curlyGreenWrapper: {
+  position: "absolute",
+  top: SCREEN_WIDTH * 1.12,
+  right: -SCREEN_WIDTH * 0.15,
+  zIndex: 0,
+  transform: [{ rotate: "-90deg" }],
+},
+curlyGreenWrapper2: {
+  
+position: "absolute",
+  top: SCREEN_WIDTH * 0.37,
+  left: -SCREEN_WIDTH * 0.5,
+  zIndex: 0,
+  transform: [{ rotate: "90deg" }],
+},
+mascotWrapper: {
+    position: "absolute",
+    zIndex: 3,
   },
 });
