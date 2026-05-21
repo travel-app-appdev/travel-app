@@ -152,7 +152,7 @@ export function PlanningSlotCard({
         accessibilityState={{ disabled }}
       >
         <View {...hiddenFromAccessibility}>
-          <EditIcon width={36} height={36} />
+          <EditIcon width={24} height={24} />
         </View>
 
         <AppText variant="body" style={styles.ctaText} accessible={false}>
@@ -174,8 +174,8 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     minHeight: CARD_HEIGHT,
-    borderRadius: radius.xl,
-    borderWidth: 1.5,
+    borderRadius: radius.md,
+    borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.lightWhite,
     paddingHorizontal: spacing.md,
@@ -185,8 +185,8 @@ const styles = StyleSheet.create({
   emptyCard: {
     alignSelf: "stretch",
     minHeight: 90,
-    borderRadius: radius.xl,
-    borderWidth: 1.5,
+    borderRadius: radius.md,
+    borderWidth: 1,
     borderColor: colors.nightBlack,
     backgroundColor: colors.lightWhite,
     paddingHorizontal: spacing.lg,
@@ -263,12 +263,12 @@ const styles = StyleSheet.create({
   cta: {
     width: 92,
     minHeight: CARD_HEIGHT,
-    borderRadius: radius.xl,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   editCta: {
     backgroundColor: colors.border,
@@ -284,6 +284,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.md,
-    lineHeight: typography.lineHeight.md,
+    lineHeight: typography.lineHeight.xs,
   },
 });

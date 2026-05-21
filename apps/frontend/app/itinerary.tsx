@@ -1273,11 +1273,18 @@ export default function ItineraryScreen() {
     setShowPlanningInfoPopup(false);
   });
 
+  const stateAccentColor =
+    activeState === "voting"
+      ? colors.sunsetPink
+      : activeState === "final"
+        ? colors.neonGreen
+        : colors.beachYellow;
+
   const safeAreaBg =
     activeState === "voting"
       ? colors.sunsetPink
       : activeState === "final"
-        ? colors.plantGreen
+        ? colors.neonGreen
         : colors.beachYellow;
 
   return (
@@ -1294,8 +1301,8 @@ export default function ItineraryScreen() {
           showsVerticalScrollIndicator={false}
         >
           <ItineraryHeader
-            title={itinerary.title}
-            destination={itinerary.destination}
+            title="Itinerary"
+            tripName={itinerary.title}
             startDate={itinerary.startDate}
             endDate={itinerary.endDate}
             introText={getIntroText(activeState)}
@@ -1318,6 +1325,7 @@ export default function ItineraryScreen() {
               enabledDayIds={
                 activeState === "voting" ? daysWithVotingActivities : undefined
               }
+              accentColor={stateAccentColor}
             />
 
             {activeState === "planning" && (
@@ -1487,9 +1495,11 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     position: "relative",
+    backgroundColor: colors.lightWhite
   },
   scroll: {
     flex: 1,
+    backgroundColor: colors.lightWhite,
   },
   content: {
     paddingTop: 0,

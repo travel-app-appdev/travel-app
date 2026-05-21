@@ -10,6 +10,7 @@ type Props = {
   selectedDayId: string;
   onSelectDay: (dayId: string) => void;
   enabledDayIds?: Set<string>;
+  accentColor?: string;
 };
 
 type DayChipProps = {
@@ -17,9 +18,10 @@ type DayChipProps = {
   isSelected: boolean;
   isDisabled: boolean;
   onSelectDay: (dayId: string) => void;
+  accentColor: string;
 };
 
-function DayChip({ day, isSelected, isDisabled, onSelectDay }: DayChipProps) {
+function DayChip({ day, isSelected, isDisabled, onSelectDay, accentColor }: DayChipProps) {
   const handlePress = useSinglePress(() => {
     if (!isDisabled) onSelectDay(day.id);
   });
@@ -29,7 +31,7 @@ function DayChip({ day, isSelected, isDisabled, onSelectDay }: DayChipProps) {
       onPress={handlePress}
       style={[
         styles.dayChip,
-        isSelected && styles.dayChipSelected,
+        isSelected && { backgroundColor: accentColor },
         isDisabled && styles.dayChipDisabled,
       ]}
       accessibilityRole="button"
@@ -80,6 +82,7 @@ export function ItineraryDaySelector({
   selectedDayId,
   onSelectDay,
   enabledDayIds,
+  accentColor = colors.beachYellow,
 }: Props) {
   return (
     <ScrollView
@@ -105,6 +108,7 @@ export function ItineraryDaySelector({
             isSelected={isSelected}
             isDisabled={isDisabled}
             onSelectDay={onSelectDay}
+            accentColor={accentColor}
           />
         );
       })}
@@ -118,16 +122,16 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   dayChip: {
-    minWidth: 58,
-    minHeight: 58,
-    borderRadius: radius.lg,
-    borderWidth: 1.5,
+    minWidth: 55,
+    minHeight: 65,
+    borderRadius: 15,
+    borderWidth: 1,
     borderColor: colors.nightBlack,
     backgroundColor: colors.lightWhite,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: 0,
+    paddingVertical: spacing.lg,
   },
   dayChipSelected: {
     backgroundColor: colors.beachYellow,
@@ -145,7 +149,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.lg,
-    lineHeight: typography.lineHeight.lg,
+    lineHeight: typography.lineHeight.xs,
   },
   dayNumberSelected: {
     color: colors.textPrimary,

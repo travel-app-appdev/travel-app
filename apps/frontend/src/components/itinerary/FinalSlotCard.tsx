@@ -115,9 +115,9 @@ export function FinalSlotCard({
       >
         <View style={styles.joinIcon} {...hiddenFromAccessibility}>
           {activity.hasCurrentUserJoined ? (
-            <CheckIcon width={36} height={36} color={colors.nightBlack} />
+            <CheckIcon width={24} height={24} color={colors.nightBlack} />
           ) : (
-            <JoinGroup width={36} height={36} />
+            <JoinGroup width={24} height={24} />
           )}
         </View>
         <AppText variant="body" style={styles.ctaText} accessible={false}>
@@ -134,11 +134,10 @@ const styles = StyleSheet.create({
   },
   emptyCard: {
     flex: 1,
-    minHeight: 90,
-    borderRadius: radius.xl,
+    minHeight: 117,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
     padding: spacing.lg,
     justifyContent: "space-between",
     opacity: 0.6,
@@ -165,10 +164,9 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    borderRadius: radius.xl,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: colors.nightBlack,
     padding: spacing.lg,
     gap: spacing.xs,
   },
@@ -220,14 +218,14 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   cta: {
-    width: 72,
-    borderRadius: radius.xl,
-    backgroundColor: colors.plantGreen,
+    width: 92,
+    borderRadius: radius.md,
+    backgroundColor: colors.neonGreen,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.md,
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   ctaPressed: {
     opacity: 0.85,
@@ -239,13 +237,13 @@ const styles = StyleSheet.create({
   joinPlus: {
     fontSize: 28,
     color: colors.nightBlack,
-    lineHeight: 32,
+    lineHeight: 10,
   },
   ctaText: {
     color: colors.nightBlack,
     textAlign: "center",
     fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.md,
-    lineHeight: typography.lineHeight.md,
+    lineHeight: typography.lineHeight.xs,
   },
 });
