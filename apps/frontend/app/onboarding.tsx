@@ -230,8 +230,8 @@ export default function Onboarding() {
                 style={[
                 Styles.mascotWrapper,
                 {
-                    bottom: isSmallPhone ? 50 : 202,
-                    right: 50,
+                    top: isSmallPhone ? 50 : 270,
+                    left: 50,
                 },
                 ]}
                 {...(Platform.OS !== "web" ? { accessible: false } : {})}
