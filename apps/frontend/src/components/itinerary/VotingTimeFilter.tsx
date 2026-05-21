@@ -3,7 +3,7 @@ import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 
-import LocationIcon from "@/assets/icons/location.svg";
+import LocationIcon from "@/assets/icons/location-heart.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type TimeChip = {

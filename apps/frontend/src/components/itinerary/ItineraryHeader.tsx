@@ -11,12 +11,11 @@ import MascotVoting from "@/assets/mascots/mascot-voting.svg";
 import MascotFinal from "@/assets/mascots/mascot-final.svg";
 import CalendarIcon from "@/assets/icons/calendar.svg";
 import HourglassIcon from "@/assets/icons/hourglass.svg";
-import LocationPin from "@/assets/icons/location-pin.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
   title: string;
-  destination: string;
+  tripName: string;
   startDate: string;
   endDate: string;
   introText: string;
@@ -30,7 +29,7 @@ function getHeroColor(state: ItineraryState): string {
     case "voting":
       return colors.sunsetPink;
     case "final":
-      return colors.plantGreen;
+      return colors.neonGreen;
     case "planning":
     default:
       return colors.beachYellow;
@@ -51,7 +50,7 @@ function getMascotByState(state: ItineraryState) {
 
 export function ItineraryHeader({
   title,
-  destination,
+  tripName,
   startDate,
   endDate,
   introText,
@@ -67,7 +66,6 @@ export function ItineraryHeader({
     <View style={styles.wrapper}>
       <View style={[styles.hero, { backgroundColor: heroColor }]}>
         <View style={styles.topRow}>
-
           <Pressable
             onPress={handleBack}
             accessibilityRole="button"
@@ -99,47 +97,31 @@ export function ItineraryHeader({
         </View>
 
         <View style={styles.heroContent}>
+          <Mascot width={74} height={74} {...hiddenFromAccessibility} />
 
-          <Mascot
-            width={64}
-            height={64}
-            {...hiddenFromAccessibility}
-          />
+          <AppText variant="title" style={styles.title}>
+            {title}
+          </AppText>
 
-          <View style={styles.textBlock}>
-            <AppText variant="title" style={styles.title}>
-              {title}
+          <View style={styles.tripMetaRow}>
+            <AppText variant="subtitle" style={styles.tripName}>
+              {tripName}
             </AppText>
 
             <View
-              style={styles.destinationRow}
+              style={styles.dateBadge}
               accessible={true}
-              accessibilityLabel={`Destination: ${destination}`}
+              accessibilityLabel={`Trip dates: ${formatTripDateRange(startDate, endDate)}`}
             >
-              <LocationPin
+              <CalendarIcon
                 width={18}
                 height={18}
                 {...hiddenFromAccessibility}
               />
-              <AppText variant="subtitle" style={styles.destination}>
-                {destination}
+              <AppText variant="body" style={styles.dateText}>
+                {formatTripDateRange(startDate, endDate)}
               </AppText>
             </View>
-          </View>
-
-          <View
-            style={styles.dateBadge}
-            accessible={true}
-            accessibilityLabel={`Trip dates: ${formatTripDateRange(startDate, endDate)}`}
-          >
-            <CalendarIcon
-              width={18}
-              height={18}
-              {...hiddenFromAccessibility}
-            />
-            <AppText variant="body" style={styles.dateText}>
-              {formatTripDateRange(startDate, endDate)}
-            </AppText>
           </View>
         </View>
       </View>
@@ -158,11 +140,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   hero: {
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.xxxxl2,
   },
   topRow: {
     flexDirection: "row",
@@ -191,51 +175,48 @@ const styles = StyleSheet.create({
     color: colors.nightBlack,
   },
   heroContent: {
-    gap: spacing.sm,
-  },
-  textBlock: {
     gap: spacing.xs,
   },
   title: {
+    fontFamily: typography.fontFamily.bodyBold,
     color: colors.nightBlack,
+    fontSize: typography.size.displayMd,
+    lineHeight: typography.lineHeight.displayMd,
+  },
+  tripMetaRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  tripName: {
+    flex: 1,
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.body,
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
   },
-  destinationRow: {
+  dateBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
   },
-  destination: {
+  dateText: {
     color: colors.nightBlack,
-    fontFamily: typography.fontFamily.body,
-    fontSize: typography.size.xl,
-    lineHeight: typography.lineHeight.xl,
-  },
-  locationPin: {
-    color: colors.nightBlack,
-    paddingRight: spacing.md,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
   },
   intro: {
     color: colors.nightBlack,
     fontSize: typography.size.lg,
     lineHeight: typography.lineHeight.lg,
   },
-  dateBadge: {
-    alignSelf: "flex-end",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  dateText: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-  },
   contentTopCard: {
     backgroundColor: colors.lightWhite,
-    borderTopLeftRadius: radius.xxl,
-    borderTopRightRadius: radius.xxl,
-    marginTop: -8,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    marginTop: -35,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     paddingBottom: spacing.md,

@@ -4,7 +4,7 @@ import { colors, radius, spacing, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity } from "@/src/types/itinerary";
 
-import LocationIcon from "@/assets/icons/location.svg";
+import LocationIcon from "@/assets/icons/location-heart.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import VoteIcon from "@/assets/icons/voting.svg";
 import CheckIcon from "@/assets/icons/check_mark.svg";
@@ -122,10 +122,9 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    borderRadius: radius.xl,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: colors.nightBlack,
     padding: spacing.lg,
     gap: spacing.xs,
     justifyContent: "center",
@@ -175,14 +174,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   cta: {
-    width: 72,
-    borderRadius: radius.xl,
+    width: 92,
+    borderRadius: radius.md,
     backgroundColor: colors.sunsetPink,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.md,
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   ctaPressed: {
     opacity: 0.85,
@@ -195,6 +194,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.md,
-    lineHeight: typography.lineHeight.md,
+    lineHeight: typography.lineHeight.xs,
   },
 });
