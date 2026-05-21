@@ -1235,17 +1235,45 @@ export default function TripOverviewAdminScreen() {
                           accessibilityState={canExpand ? { expanded: isOpen } : undefined}
                         >
                           <View style={styles.phaseRowInner}>
-                            <View style={[styles.phaseBadge, { backgroundColor: badgeColor }]}>
-                              <AppText
-                                variant="caption"
-                                style={[
-                                  styles.phaseBadgeText,
-                                  isFuture && styles.phaseBadgeTextMuted,
-                                ]}
+                            {isActive ? (
+                              <Pressable
+                                style={[styles.phaseBadge, { backgroundColor: badgeColor }]}
+                                onPress={() => router.push({
+                                  pathname: "/itinerary",
+                                  params: {
+                                    tripId,
+                                    state: tripState.toLowerCase() as "planning" | "voting" | "final",
+                                    title: tripName,
+                                    destination,
+                                    startDate,
+                                    endDate,
+                                    members: membersParam,
+                                    planningEndAt,
+                                    votingEndAt,
+                                  },
+                                })}
+                                accessibilityRole="button"
+                                accessibilityLabel={`${phase.label} phase, tap to open itinerary`}
+                                accessibilityHint="Opens the itinerary at this phase"
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                               >
-                                {phase.label}
-                              </AppText>
-                            </View>
+                                <AppText variant="caption" style={styles.phaseBadgeText}>
+                                  {phase.label}
+                                </AppText>
+                              </Pressable>
+                            ) : (
+                              <View style={[styles.phaseBadge, { backgroundColor: badgeColor }]}>
+                                <AppText
+                                  variant="caption"
+                                  style={[
+                                    styles.phaseBadgeText,
+                                    isFuture && styles.phaseBadgeTextMuted,
+                                  ]}
+                                >
+                                  {phase.label}
+                                </AppText>
+                              </View>
+                            )}
 
                             {phaseId !== "final" && (
                               <View style={styles.phaseTimerBlock}>
