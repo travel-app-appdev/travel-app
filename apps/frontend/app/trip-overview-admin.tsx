@@ -860,6 +860,23 @@ export default function TripOverviewAdminScreen() {
     }
   };
 
+  const handleNavigateToItinerary = useSinglePress(() => {
+    router.push({
+      pathname: "/itinerary",
+      params: {
+        tripId,
+        state: tripState.toLowerCase() as "planning" | "voting" | "final",
+        title: tripName,
+        destination,
+        startDate,
+        endDate,
+        members: membersParam,
+        planningEndAt,
+        votingEndAt,
+      },
+    });
+  });
+
   const handleDeleteTrip = () => {
     Alert.alert(
       "Delete trip",
@@ -1238,20 +1255,7 @@ export default function TripOverviewAdminScreen() {
                             {isActive ? (
                               <Pressable
                                 style={[styles.phaseBadge, { backgroundColor: badgeColor }]}
-                                onPress={() => router.push({
-                                  pathname: "/itinerary",
-                                  params: {
-                                    tripId,
-                                    state: tripState.toLowerCase() as "planning" | "voting" | "final",
-                                    title: tripName,
-                                    destination,
-                                    startDate,
-                                    endDate,
-                                    members: membersParam,
-                                    planningEndAt,
-                                    votingEndAt,
-                                  },
-                                })}
+                                onPress={handleNavigateToItinerary}
                                 accessibilityRole="button"
                                 accessibilityLabel={`${phase.label} phase, tap to open itinerary`}
                                 accessibilityHint="Opens the itinerary at this phase"
