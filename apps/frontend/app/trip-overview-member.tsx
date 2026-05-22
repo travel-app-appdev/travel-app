@@ -637,11 +637,11 @@ export default function TripOverviewMemberScreen() {
                                   {...hiddenFromAccessibility}
                                 >
                                   {isActive ? (
-                                    <Hourglass1 width={18} height={18} />
+                                    <Hourglass1 width={24} height={24} />
                                   ) : (
                                     <Hourglass0
-                                      width={18}
-                                      height={18}
+                                      width={24}
+                                      height={24}
                                       style={
                                         isFuture ? { opacity: 0.4 } : undefined
                                       }
@@ -911,7 +911,7 @@ const styles = StyleSheet.create({
   phaseDaysMuted: { color: colors.grayedOut },
   timepointWrapper: { marginTop: 1 },
   timerLabel: {
-    color: colors.textMuted,
+    color: colors.nightBlack,
     fontSize: typography.size.xs,
     lineHeight: typography.lineHeight.xs,
   },
