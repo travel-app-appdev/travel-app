@@ -75,25 +75,29 @@ export function ItineraryHeader({
             <Back width={20} height={20} />
           </Pressable>
 
-          <View
-            style={styles.timerBox}
-            accessible={true}
-            accessibilityLabel={`${daysLeftText} remaining`}
-          >
-            <HourglassIcon
-              width={18}
-              height={18}
-              {...hiddenFromAccessibility}
-            />
-            <View accessible={false}>
-              <AppText variant="body" style={styles.timerValue}>
-                {daysLeftText}
-              </AppText>
-              <AppText variant="caption" style={styles.timerLabel}>
-                Timer
-              </AppText>
+          {state !== "final" ? (
+            <View
+              style={styles.timerBox}
+              accessible={true}
+              accessibilityLabel={`${daysLeftText} remaining`}
+            >
+              <HourglassIcon
+                width={28}
+                height={28}
+                {...hiddenFromAccessibility}
+              />
+              <View accessible={false} style={styles.timerTextWrap}>
+                <AppText variant="body" style={styles.timerValue}>
+                  {daysLeftText}
+                </AppText>
+                <AppText variant="caption" style={styles.timerLabel}>
+                  Timer
+                </AppText>
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.timerPlaceholder} />
+          )}
         </View>
 
         <View style={styles.heroContent}>
@@ -165,14 +169,25 @@ const styles = StyleSheet.create({
   timerBox: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.xs,
+  },
+  timerPlaceholder: {
+    width: 80,
+    minHeight: 44,
+  },
+  timerTextWrap: {
+    justifyContent: "center",
+    gap: 0,
   },
   timerValue: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
+    lineHeight: typography.lineHeight.md,
+    marginBottom: -4,
   },
   timerLabel: {
     color: colors.nightBlack,
+    lineHeight: typography.lineHeight.sm,
   },
   heroContent: {
     gap: spacing.xs,
