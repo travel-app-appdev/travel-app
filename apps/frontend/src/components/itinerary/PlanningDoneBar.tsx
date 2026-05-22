@@ -1,11 +1,12 @@
 import { useCallback } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
-import { colors, spacing, typography } from "@/src/theme";
+import { colors, radius, spacing, typography } from "@/src/theme";
 import { PressLock } from "@/src/utils/PressLock";
 
 import CheckIcon from "@/assets/icons/check_mark.svg";
 import InfoIcon from "@/assets/icons/info.svg";
+import { ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
 
 type Props = {
   checked: boolean;
@@ -77,24 +78,26 @@ export function PlanningDoneBar({
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.md,
     zIndex: 10,
   },
   footer: {
     width: "100%",
     minHeight: 96,
     backgroundColor: colors.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: spacing.lg,
+    borderRadius: 28,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.md,
+    shadowColor: "#EFC9B8",
+    boxShadow: `0px 8px ${radius.xl}px rgba(255, 107, 53, 0.25)`,
+    elevation: 6,
   },
   doneButton: {
     minHeight: 56,
