@@ -1279,11 +1279,11 @@ export default function TripOverviewAdminScreen() {
                               <View style={styles.phaseTimerBlock}>
                                 <View style={styles.hourglassCol} {...hiddenFromAccessibility}>
                                   {isActive ? (
-                                    <Hourglass1 width={18} height={18} />
+                                    <Hourglass1 width={24} height={24} />
                                   ) : (
                                     <Hourglass0
-                                      width={18}
-                                      height={18}
+                                      width={24}
+                                      height={24}
                                       style={isFuture ? { opacity: 0.4 } : undefined}
                                     />
                                   )}
@@ -1701,7 +1701,7 @@ const styles = StyleSheet.create({
   dateTimeRow: { flexDirection: "row", gap: spacing.md },
   dateTimeHalf: { flex: 1 },
   dateInput: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.lightWhite,
     borderRadius: radius.sm,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -1838,7 +1838,7 @@ const styles = StyleSheet.create({
   phaseBadge: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     alignSelf: "flex-start",
   },
   phaseBadgeText: {
@@ -1861,7 +1861,7 @@ const styles = StyleSheet.create({
   phaseDaysMuted: { color: colors.grayedOut },
   timepointWrapper: { marginTop: 1 },
   timerLabel: {
-    color: colors.textMuted,
+    color: colors.nightBlack,
     fontSize: typography.size.xs,
     lineHeight: typography.lineHeight.xs,
   },
@@ -1945,7 +1945,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.body,
   },
   timeInputModalBox: {
-    backgroundColor: colors.white,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
