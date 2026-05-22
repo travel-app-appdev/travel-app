@@ -1513,7 +1513,7 @@ const styles = StyleSheet.create({
   slotList: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   planningContent: {
     position: "relative",
@@ -1528,11 +1528,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    backgroundColor: colors.lightWhite,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
     height: 110,
-    boxShadow: `0px 0px 10px rgba(255, 214, 0, 0.5)`,
     elevation: 4,
   },
   popupWrapper: {

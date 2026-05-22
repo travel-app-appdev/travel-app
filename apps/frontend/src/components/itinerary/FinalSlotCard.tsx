@@ -5,6 +5,7 @@ import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity } from "@/src/types/itinerary";
 
 import LocationHeartIcon from "@/assets/icons/location-heart.svg";
+import LocationPin from "@/assets/icons/location-pin.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import MembersIcon from "@/assets/icons/members.svg";
 import JoinGroup from "@/assets/icons/join-group.svg";
@@ -17,6 +18,8 @@ type Props = {
   onJoinGroup?: (activityId: string) => void;
   onPressDetails?: (activity: Activity, slotLabel: string) => void;
 };
+
+const CARD_HEIGHT = 108;
 
 export function FinalSlotCard({
   slot,
@@ -38,6 +41,7 @@ export function FinalSlotCard({
           <AppText variant="body" style={styles.emptyTimeLabel}>
             {slot.label}
           </AppText>
+
           <View style={styles.emptyContent} {...hiddenFromAccessibility}>
             <LocationHeartIcon
               width={20}
@@ -63,37 +67,49 @@ export function FinalSlotCard({
         accessibilityHint="Shows more information about this activity"
       >
         <View style={styles.timeRow} {...hiddenFromAccessibility}>
-          <LocationHeartIcon width={16} height={16} />
+          <LocationHeartIcon width={24} height={24} />
           <AppText variant="body" style={styles.timeLabel}>
             {slot.label}
           </AppText>
         </View>
 
-        <AppText variant="subtitle" style={styles.name}>
+        <AppText variant="subtitle" style={styles.name} numberOfLines={2}>
           {activity.name}
         </AppText>
 
         <View style={styles.addressRow} {...hiddenFromAccessibility}>
-          <LocationHeartIcon width={14} height={14} />
-          <AppText variant="caption" style={styles.address}>
+          <LocationPin width={16} height={16} />
+          <AppText variant="caption" style={styles.address} numberOfLines={1}>
             {activity.address}
           </AppText>
         </View>
 
-        {activity.googleMapsUrl ? (
-          <View style={styles.googleRow} {...hiddenFromAccessibility}>
-            <GoogleIcon width={14} height={14} />
-            <AppText variant="caption" style={styles.googleLink}>
-              Google Maps link
+        <View style={styles.metaRow} {...hiddenFromAccessibility}>
+          {activity.googleMapsUrl ? (
+            <View style={styles.googleRow}>
+              <GoogleIcon width={14} height={14} />
+              <AppText
+                variant="caption"
+                style={styles.googleLink}
+                numberOfLines={1}
+              >
+                Google Maps link
+              </AppText>
+            </View>
+          ) : (
+            <View style={styles.googleRow} />
+          )}
+
+          <View style={styles.joinedRow}>
+            <MembersIcon width={14} height={14} />
+            <AppText
+              variant="caption"
+              style={styles.joinedCount}
+              numberOfLines={1}
+            >
+              {activity.joinedCount ?? 0} joined
             </AppText>
           </View>
-        ) : null}
-
-        <View style={styles.joinedRow} {...hiddenFromAccessibility}>
-          <MembersIcon width={14} height={14} />
-          <AppText variant="caption" style={styles.joinedCount}>
-            {activity.joinedCount ?? 0} joined
-          </AppText>
         </View>
       </Pressable>
 
@@ -120,6 +136,7 @@ export function FinalSlotCard({
             <JoinGroup width={24} height={24} />
           )}
         </View>
+
         <AppText variant="body" style={styles.ctaText} accessible={false}>
           {activity.hasCurrentUserJoined ? "Joined\ngroup" : "Join\ngroup"}
         </AppText>
@@ -134,17 +151,22 @@ const styles = StyleSheet.create({
   },
   emptyCard: {
     flex: 1,
-    minHeight: 117,
+    minHeight: CARD_HEIGHT,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.lg,
+    backgroundColor: colors.lightWhite,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     justifyContent: "space-between",
+    overflow: "hidden",
     opacity: 0.6,
   },
   emptyTimeLabel: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
   },
   emptyContent: {
     flex: 1,
@@ -164,11 +186,15 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
+    minHeight: CARD_HEIGHT,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.nightBlack,
-    padding: spacing.lg,
+    backgroundColor: colors.lightWhite,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     gap: spacing.xs,
+    overflow: "hidden",
   },
   cardPressed: {
     opacity: 0.9,
@@ -177,54 +203,75 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   timeLabel: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
   },
   name: {
     color: colors.textPrimary,
-    fontSize: typography.size.xl,
-    lineHeight: typography.lineHeight.xl,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
+    marginBottom: 2,
   },
   addressRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+    marginTop: 1,
   },
   address: {
+    flex: 1,
     color: colors.textMuted,
-    flexShrink: 1,
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
   googleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    marginTop: spacing.xs,
+    flex: 1,
+    minWidth: 0,
   },
   googleLink: {
+    flexShrink: 1,
     color: colors.seaBlue,
     fontFamily: typography.fontFamily.bodySemiBold,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
   },
   joinedRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    marginTop: spacing.xs,
+    flexShrink: 0,
   },
   joinedCount: {
     color: colors.textMuted,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
   },
   cta: {
     width: 92,
+    minHeight: CARD_HEIGHT,
     borderRadius: radius.md,
     backgroundColor: colors.neonGreen,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     gap: spacing.sm,
   },
   ctaPressed: {
@@ -233,11 +280,6 @@ const styles = StyleSheet.create({
   joinIcon: {
     alignItems: "center",
     justifyContent: "center",
-  },
-  joinPlus: {
-    fontSize: 28,
-    color: colors.nightBlack,
-    lineHeight: 10,
   },
   ctaText: {
     color: colors.nightBlack,

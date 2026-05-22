@@ -93,7 +93,7 @@ export function ActivityDetailModal({
 
             <View style={styles.infoList}>
               <View style={styles.infoRow}>
-                <LocationIcon width={20} height={20} />
+                <LocationIcon width={32} height={32} />
                 <AppText variant="body" style={styles.infoText}>
                   {activity.address || "No address available"}
                 </AppText>
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.sm,
   },
   googleRow: {

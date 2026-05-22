@@ -892,7 +892,7 @@ export default function CreateTripScreen() {
                   : calcCalendarDays(dates.start, dates.end);
 
                 return (
-                  <View key={phaseId} style={styles.fieldGroup}>
+                  <View key={phaseId} style={styles.phaseGroup}>
                     <Pressable
                       style={styles.phaseRow}
                       onPress={() => togglePhase(phaseId)}
@@ -922,9 +922,9 @@ export default function CreateTripScreen() {
                         <View style={styles.phaseTimerBlock}>
                           <View style={styles.hourglassCol}>
                             {phase.active ? (
-                              <Hourglass1 width={20} height={20} />
+                              <Hourglass1 width={24} height={24} />
                             ) : (
-                              <Hourglass0 width={20} height={20} />
+                              <Hourglass0 width={24} height={24} />
                             )}
                           </View>
                           <View style={styles.phaseTextCol}>
@@ -1684,6 +1684,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
 
+  phaseGroup: {
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+
   fieldLabelRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1707,7 +1712,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dateInput: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.lightWhite,
     borderRadius: radius.sm,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -1805,7 +1810,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.xxxl,
   },
 
   phaseRow: {
@@ -1822,7 +1827,7 @@ const styles = StyleSheet.create({
   phaseBadge: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
   },
   phaseBadgeText: {
     fontFamily: typography.fontFamily.bodyBold,
@@ -1857,7 +1862,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   timerLabel: {
-    color: colors.textMuted,
+    color: colors.nightBlack,
     fontSize: typography.size.xs,
     lineHeight: typography.lineHeight.xs,
   },
@@ -2011,7 +2016,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.body,
   },
   timeInputModalBox: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.lightWhite,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -2044,7 +2049,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.md,
-    backgroundColor: colors.white,
+    backgroundColor: colors.lightWhite,
     borderWidth: 2,
     borderColor: colors.nightBlack,
   },
