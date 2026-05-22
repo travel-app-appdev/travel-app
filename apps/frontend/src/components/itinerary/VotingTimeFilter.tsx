@@ -48,9 +48,9 @@ function TimeChipButton({ chip, isSelected, onSelectSlot }: TimeChipButtonProps)
         importantForAccessibility="no-hide-descendants"
       >
         <LocationIcon
-          width={14}
-          height={14}
-          color={isSelected ? colors.nightBlack : colors.textMuted}
+          width={24}
+          height={24}
+          color={colors.nightBlack}
         />
       </View>
 
@@ -103,9 +103,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   chipSelected: {
     backgroundColor: colors.sunsetPink,
@@ -115,7 +112,7 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   chipLabel: {
-    color: colors.textMuted,
+    color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.sm,
   },

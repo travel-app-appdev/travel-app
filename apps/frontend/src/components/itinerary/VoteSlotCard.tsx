@@ -5,6 +5,7 @@ import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity } from "@/src/types/itinerary";
 
 import LocationIcon from "@/assets/icons/location-heart.svg";
+import LocationPin from "@/assets/icons/location-pin.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import VoteIcon from "@/assets/icons/voting.svg";
 import CheckIcon from "@/assets/icons/check_mark.svg";
@@ -16,6 +17,8 @@ type Props = {
   onPressDetails?: (activity: Activity) => void;
   selected?: boolean;
 };
+
+const CARD_HEIGHT = 108;
 
 export function VotingSlotCard({
   activity,
@@ -36,13 +39,13 @@ export function VotingSlotCard({
         accessibilityHint="Shows more information about this activity"
       >
         <View style={styles.timeRow} {...hiddenFromAccessibility}>
-          <LocationIcon width={16} height={16} />
+          <LocationIcon width={24} height={24} />
           <AppText variant="body" style={styles.timeLabel}>
             {activity.slotId}
           </AppText>
         </View>
 
-        <AppText variant="subtitle" style={styles.name}>
+        <AppText variant="subtitle" style={styles.name} numberOfLines={2}>
           {activity.name}
         </AppText>
 
@@ -51,30 +54,48 @@ export function VotingSlotCard({
           accessible={true}
           accessibilityLabel={`Address: ${activity.address}`}
         >
-          <LocationIcon width={14} height={14} {...hiddenFromAccessibility} />
-          <AppText variant="caption" style={styles.address} accessible={false}>
+          <LocationPin width={16} height={16} {...hiddenFromAccessibility} />
+          <AppText
+            variant="caption"
+            style={styles.address}
+            accessible={false}
+            numberOfLines={1}
+          >
             {activity.address}
           </AppText>
         </View>
 
-        {activity.googleMapsUrl ? (
-          <View style={styles.googleRow} {...hiddenFromAccessibility}>
-            <GoogleIcon width={14} height={14} />
-            <AppText variant="caption" style={styles.googleLink}>
-              Google Maps link
+        <View style={styles.metaRow}>
+          {activity.googleMapsUrl ? (
+            <View style={styles.googleRow} {...hiddenFromAccessibility}>
+              <GoogleIcon width={14} height={14} />
+              <AppText
+                variant="caption"
+                style={styles.googleLink}
+                numberOfLines={1}
+              >
+                Google Maps link
+              </AppText>
+            </View>
+          ) : (
+            <View style={styles.googleRow} />
+          )}
+
+          <View
+            style={styles.voteRow}
+            accessibilityLiveRegion="polite"
+            accessible={true}
+            accessibilityLabel={`${activity.voteCount ?? 0} ${activity.voteCount === 1 ? "vote" : "votes"}`}
+          >
+            <AppText
+              variant="caption"
+              style={styles.voteCount}
+              numberOfLines={1}
+            >
+              {activity.voteCount ?? 0}{" "}
+              {activity.voteCount === 1 ? "vote" : "votes"}
             </AppText>
           </View>
-        ) : null}
-
-        <View
-          accessibilityLiveRegion="polite"
-          accessible={true}
-          accessibilityLabel={`${activity.voteCount ?? 0} ${activity.voteCount === 1 ? "vote" : "votes"}`}
-        >
-          <AppText variant="caption" style={styles.voteCount}>
-            {activity.voteCount ?? 0}{" "}
-            {activity.voteCount === 1 ? "vote" : "votes"}
-          </AppText>
         </View>
       </Pressable>
 
@@ -122,12 +143,15 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
+    minHeight: CARD_HEIGHT,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.nightBlack,
-    padding: spacing.lg,
+    backgroundColor: colors.lightWhite,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     gap: spacing.xs,
-    justifyContent: "center",
+    overflow: "hidden",
   },
   cardPressed: {
     opacity: 0.9,
@@ -136,51 +160,43 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   timeLabel: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
   },
   name: {
     color: colors.textPrimary,
-    fontSize: typography.size.xl,
-    lineHeight: typography.lineHeight.xl,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
+    marginBottom: 2,
   },
   addressRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+    marginTop: 1,
   },
   address: {
+    flex: 1,
     color: colors.textMuted,
-    flexShrink: 1,
-  },
-  googleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-  },
-  googleLink: {
-    color: colors.seaBlue,
-    fontFamily: typography.fontFamily.bodySemiBold,
-  },
-  voteCount: {
-    color: colors.textMuted,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-    marginTop: spacing.xs,
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
   },
   cta: {
     width: 92,
+    minHeight: CARD_HEIGHT,
     borderRadius: radius.md,
     backgroundColor: colors.sunsetPink,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     gap: spacing.sm,
   },
   ctaPressed: {
@@ -195,5 +211,36 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.xs,
+  },
+
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  googleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flex: 1,
+    minWidth: 0,
+  },
+  googleLink: {
+    flexShrink: 1,
+    color: colors.seaBlue,
+    fontFamily: typography.fontFamily.bodySemiBold,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
+  },
+  voteRow: {
+    flexShrink: 0,
+    alignItems: "flex-end",
+  },
+  voteCount: {
+    color: colors.textMuted,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
   },
 });
