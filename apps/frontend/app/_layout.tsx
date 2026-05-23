@@ -6,6 +6,7 @@ import {
   Nunito_400Regular,
   Nunito_600SemiBold,
   Nunito_700Bold,
+  Nunito_900Black,
 } from "@expo-google-fonts/nunito";
 import { View, ActivityIndicator } from "react-native";
 import { AuthProvider, useAuth } from "@/src/context/AuthContext";
@@ -18,6 +19,7 @@ function AppStartupGate() {
     Nunito_400Regular,
     Nunito_600SemiBold,
     Nunito_700Bold,
+    Nunito_900Black,
   });
 
   const appReady = fontsLoaded && !isBootstrapping;
