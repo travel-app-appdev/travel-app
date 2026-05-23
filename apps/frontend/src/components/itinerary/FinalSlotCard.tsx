@@ -3,6 +3,7 @@ import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity } from "@/src/types/itinerary";
+import { formatActivityTimeRange } from "@/src/utils/itinerary/formatActivityTimeRange";
 
 import LocationHeartIcon from "@/assets/icons/location-heart.svg";
 import LocationPin from "@/assets/icons/location-pin.svg";
@@ -10,6 +11,7 @@ import GoogleIcon from "@/assets/icons/google.svg";
 import MembersIcon from "@/assets/icons/members.svg";
 import JoinGroup from "@/assets/icons/join-group.svg";
 import CheckIcon from "@/assets/icons/check_mark.svg";
+import Timer from "@/assets/icons/timer.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
@@ -33,6 +35,7 @@ export function FinalSlotCard({
       onPressDetails?.(activity, slot.label);
     }
   });
+  const activityTimeRange = formatActivityTimeRange(activity);
 
   if (!activity) {
     return (
@@ -63,7 +66,11 @@ export function FinalSlotCard({
         onPress={handleOpenDetails}
         style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
         accessibilityRole="button"
-        accessibilityLabel={`Open details for ${activity.name}`}
+        accessibilityLabel={
+          activityTimeRange
+            ? `Open details for ${activity.name}, ${activityTimeRange}`
+            : `Open details for ${activity.name}`
+        }
         accessibilityHint="Shows more information about this activity"
       >
         <View style={styles.timeRow} {...hiddenFromAccessibility}>
@@ -76,6 +83,15 @@ export function FinalSlotCard({
         <AppText variant="subtitle" style={styles.name} numberOfLines={2}>
           {activity.name}
         </AppText>
+
+        {!!activityTimeRange && (
+          <View style={styles.addressRow} {...hiddenFromAccessibility}>
+            <Timer width={16} height={16} />
+            <AppText variant="caption" style={styles.address} numberOfLines={1}>
+              {activityTimeRange}
+            </AppText>
+          </View>
+        )}
 
         <View style={styles.addressRow} {...hiddenFromAccessibility}>
           <LocationPin width={16} height={16} />

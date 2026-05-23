@@ -34,6 +34,8 @@ function activityFromDoc(doc: FirebaseFirestore.DocumentSnapshot, slotId?: strin
         description: data.description,
         address: data.address,
         googleMapsUrl: data.googleMapsUrl,
+        startTime: data.startTime ?? undefined,
+        endTime: data.endTime ?? undefined,
         created_at: normalizeDateTime(data.created_at) ?? normalizeDateTime((doc as any).createTime),
         source_type: data.source_type,
     } as Activity;
@@ -47,6 +49,8 @@ export async function createActivity(data: {
     description?: string;
     address?: string;
     googleMapsUrl?: string;
+    startTime?: string;
+    endTime?: string;
 }): Promise<Activity> {
     const db = admin.firestore();
 
@@ -63,6 +67,8 @@ export async function createActivity(data: {
         description: data.description ?? null,
         address: data.address ?? null,
         googleMapsUrl: data.googleMapsUrl ?? null,
+        startTime: data.startTime ?? null,
+        endTime: data.endTime ?? null,
         source_type: "manual",
         created_at: createdAt,
     });
@@ -83,6 +89,8 @@ export async function createActivity(data: {
         description: data.description,
         address: data.address,
         googleMapsUrl: data.googleMapsUrl,
+        startTime: data.startTime,
+        endTime: data.endTime,
         created_at: createdAt.toDate().toISOString(),
         source_type: "manual",
     };
@@ -101,6 +109,8 @@ export async function updateActivityById(
         description?: string;
         address?: string;
         googleMapsUrl?: string;
+        startTime?: string;
+        endTime?: string;
     }
 ): Promise<Activity> {
     const db = admin.firestore();
@@ -111,6 +121,8 @@ export async function updateActivityById(
         description: data.description ?? null,
         address: data.address ?? null,
         googleMapsUrl: data.googleMapsUrl ?? null,
+        startTime: data.startTime ?? null,
+        endTime: data.endTime ?? null,
         updated_at: admin.firestore.Timestamp.now(),
     });
 

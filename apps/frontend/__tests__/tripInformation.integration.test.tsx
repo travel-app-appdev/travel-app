@@ -73,6 +73,7 @@ jest.mock("@/src/components/common/ActionCard", () => ({
 
 // SVG assets
 const svgMock = () => null;
+jest.mock("@/assets/icons/plane.svg", () => svgMock);
 jest.mock("@/assets/icons/info.svg", () => svgMock);
 jest.mock("@/assets/icons/trip_title.svg", () => svgMock);
 jest.mock("@/assets/icons/calendar.svg", () => svgMock);
@@ -81,7 +82,14 @@ jest.mock("@/assets/icons/add_people.svg", () => svgMock);
 jest.mock("@/assets/icons/hourglass_0.svg", () => svgMock);
 jest.mock("@/assets/icons/hourglass_1.svg", () => svgMock);
 jest.mock("@/assets/icons/timepoint.svg", () => svgMock);
+jest.mock("@/assets/icons/check_mark.svg", () => svgMock);
+jest.mock("@/assets/icons/unchecked.svg", () => svgMock);
+jest.mock("@/assets/icons/key_frame.svg", () => svgMock);
+jest.mock("@/assets/icons/copy.svg", () => svgMock);
 jest.mock("@/assets/icons/exit.svg", () => svgMock);
+jest.mock("@/assets/mascots/Votey_Yellow.svg", () => svgMock);
+jest.mock("@/assets/mascots/Votey_Pink.svg", () => svgMock);
+jest.mock("@/assets/mascots/Votey_Green.svg", () => svgMock);
 
 // ─── Helper to get the mocked firebase module at runtime ─────────────────────
 

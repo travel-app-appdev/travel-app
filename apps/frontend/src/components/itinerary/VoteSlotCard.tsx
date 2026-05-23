@@ -3,12 +3,14 @@ import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity } from "@/src/types/itinerary";
+import { formatActivityTimeRange } from "@/src/utils/itinerary/formatActivityTimeRange";
 
 import LocationIcon from "@/assets/icons/location-heart.svg";
 import LocationPin from "@/assets/icons/location-pin.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import VoteIcon from "@/assets/icons/voting.svg";
 import CheckIcon from "@/assets/icons/check_mark.svg";
+import Timer from "@/assets/icons/timer.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
@@ -28,6 +30,7 @@ export function VotingSlotCard({
 }: Props) {
   const handleVote = useSinglePress(() => onAddVote(activity.id));
   const handleOpenDetails = useSinglePress(() => onPressDetails?.(activity));
+  const activityTimeRange = formatActivityTimeRange(activity);
 
   return (
     <View style={styles.row}>
@@ -35,7 +38,11 @@ export function VotingSlotCard({
         onPress={handleOpenDetails}
         style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
         accessibilityRole="button"
-        accessibilityLabel={`Open details for ${activity.name}`}
+        accessibilityLabel={
+          activityTimeRange
+            ? `Open details for ${activity.name}, ${activityTimeRange}`
+            : `Open details for ${activity.name}`
+        }
         accessibilityHint="Shows more information about this activity"
       >
         <View style={styles.timeRow} {...hiddenFromAccessibility}>
@@ -48,6 +55,24 @@ export function VotingSlotCard({
         <AppText variant="subtitle" style={styles.name} numberOfLines={2}>
           {activity.name}
         </AppText>
+
+        {!!activityTimeRange && (
+          <View
+            style={styles.addressRow}
+            accessible={true}
+            accessibilityLabel={`Activity time: ${activityTimeRange}`}
+          >
+            <Timer width={16} height={16} {...hiddenFromAccessibility} />
+            <AppText
+              variant="caption"
+              style={styles.address}
+              accessible={false}
+              numberOfLines={1}
+            >
+              {activityTimeRange}
+            </AppText>
+          </View>
+        )}
 
         <View
           style={styles.addressRow}

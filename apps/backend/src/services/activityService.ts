@@ -60,6 +60,8 @@ export async function suggestActivity(
         description: input.description,
         address: input.address,
         googleMapsUrl: input.googleMapsUrl,
+        startTime: input.startTime,
+        endTime: input.endTime,
     });
 }
 
@@ -120,6 +122,8 @@ export async function updateSuggestedActivity(
         description: input.description,
         address: input.address,
         googleMapsUrl: input.googleMapsUrl,
+        startTime: input.startTime,
+        endTime: input.endTime,
     });
 }
 

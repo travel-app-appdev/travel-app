@@ -15,6 +15,8 @@ export type CreateActivityPayload = {
   description?: string;
   address?: string;
   googleMapsUrl?: string;
+  startTime?: string;
+  endTime?: string;
 };
 
 export type UpdateActivityPayload = {
@@ -23,6 +25,8 @@ export type UpdateActivityPayload = {
   description?: string;
   address?: string;
   googleMapsUrl?: string;
+  startTime?: string;
+  endTime?: string;
 };
 
 export type VoteForActivityResponse = {
@@ -47,6 +51,8 @@ export async function createActivity(payload: CreateActivityPayload) {
         description: payload.description,
         address: payload.address,
         googleMapsUrl: payload.googleMapsUrl,
+        startTime: payload.startTime,
+        endTime: payload.endTime,
       }),
     }
   );
