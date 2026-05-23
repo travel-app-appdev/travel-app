@@ -128,6 +128,8 @@ function mapBackendActivity(
     description: activity.description ?? "",
     voteCount: activity.voteCount ?? 0,
     hasCurrentUserVote: activity.hasCurrentUserVote ?? false,
+    startTime: activity.startTime ?? "",
+    endTime: activity.endTime ?? "",
     joinedCount: activity.joinedCount ?? 0,
     hasCurrentUserJoined: activity.hasCurrentUserJoined ?? false,
     joinedMembers: activity.joinedMembers ?? [],
@@ -312,6 +314,8 @@ export default function ItineraryScreen() {
     newActivityDescription,
     newActivityAddress,
     newActivityGoogleMapsUrl,
+    newActivityStartTime,
+    newActivityEndTime,
     planningEndAt,
     votingEndAt,
     selectedDay,
@@ -331,6 +335,8 @@ export default function ItineraryScreen() {
     newActivityDescription?: string;
     newActivityAddress?: string;
     newActivityGoogleMapsUrl?: string;
+    newActivityStartTime?: string;
+    newActivityEndTime?: string;
     planningEndAt?: string;
     votingEndAt?: string;
     selectedDay?: string;
@@ -887,6 +893,8 @@ export default function ItineraryScreen() {
       newActivityDescription ?? "",
       newActivityAddress ?? "",
       newActivityGoogleMapsUrl ?? "",
+      newActivityStartTime ?? "",
+      newActivityEndTime ?? "",
     ].join("|");
 
     if (lastAppliedActivitySignatureRef.current === incomingSignature) {
@@ -902,6 +910,8 @@ export default function ItineraryScreen() {
     newActivityDescription,
     newActivityAddress,
     newActivityGoogleMapsUrl,
+    newActivityStartTime,
+    newActivityEndTime,
   ]);
 
   const slotItems = useMemo(() => {
@@ -976,6 +986,8 @@ export default function ItineraryScreen() {
         initialDescription: activity.description ?? "",
         initialAddress: activity.address ?? "",
         initialGoogleMapsUrl: activity.googleMapsUrl ?? "",
+        initialStartTime: activity.startTime ?? "",
+        initialEndTime: activity.endTime ?? "",
         activitiesJson: JSON.stringify(itinerary.activities),
         planningEndAt: timerDeadlines.planningEndAt ?? "",
         votingEndAt: timerDeadlines.votingEndAt ?? "",

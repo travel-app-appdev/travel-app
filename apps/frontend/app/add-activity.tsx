@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +22,7 @@ import LocationIcon from "@/assets/icons/location.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import TextStyle from "@/assets/icons/text-style.svg";
 import Back from "@/assets/icons/back.svg";
+import Timer from "@/assets/icons/timer.svg";
 
 import { createActivity, updateActivity } from "@/src/services/activityService";
 import { useAuth } from "@/src/context/AuthContext";
@@ -42,6 +44,16 @@ function splitSlotId(value?: string) {
   };
 }
 
+function isValidTimeString(value: string): boolean {
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
+}
+
+function normalizeTimeInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
 export default function AddActivityScreen() {
   const { idToken } = useAuth();
 
@@ -61,6 +73,8 @@ export default function AddActivityScreen() {
     initialDescription,
     initialAddress,
     initialGoogleMapsUrl,
+    initialStartTime,
+    initialEndTime,
     planningEndAt,
     votingEndAt,
     selectedDay,
@@ -80,6 +94,8 @@ export default function AddActivityScreen() {
     initialDescription?: string;
     initialAddress?: string;
     initialGoogleMapsUrl?: string;
+    initialStartTime?: string;
+    initialEndTime?: string;
     planningEndAt?: string;
     votingEndAt?: string;
     selectedDay?: string;
@@ -91,6 +107,8 @@ export default function AddActivityScreen() {
   const [description, setDescription] = useState(initialDescription ?? "");
   const [address, setAddress] = useState(initialAddress ?? "");
   const [googleLink, setGoogleLink] = useState(initialGoogleMapsUrl ?? "");
+  const [startTime, setStartTime] = useState(initialStartTime ?? "");
+  const [endTime, setEndTime] = useState(initialEndTime ?? "");
 
   function parseExistingActivities() {
     if (!activitiesJson) return [];
@@ -113,6 +131,8 @@ export default function AddActivityScreen() {
       description: description.trim(),
       address: address.trim(),
       googleMapsUrl: googleLink.trim(),
+      startTime: startTime.trim(),
+      endTime: endTime.trim(),
     };
     const existingActivities = parseExistingActivities();
     const existingIndex = existingActivities.findIndex(
@@ -143,6 +163,8 @@ export default function AddActivityScreen() {
         newActivityDescription: nextActivity.description,
         newActivityAddress: nextActivity.address,
         newActivityGoogleMapsUrl: nextActivity.googleMapsUrl,
+        newActivityStartTime: nextActivity.startTime,
+        newActivityEndTime: nextActivity.endTime,
         planningEndAt,
         votingEndAt,
         selectedDay: nextActivity.dayId ?? selectedDay,
@@ -153,6 +175,28 @@ export default function AddActivityScreen() {
   async function handleSaveActivity() {
     if (!activityName.trim()) {
       Alert.alert("Missing activity name", "Please enter an activity name.");
+      return;
+    }
+
+    const trimmedStartTime = startTime.trim();
+    const trimmedEndTime = endTime.trim();
+
+    if (trimmedStartTime && !isValidTimeString(trimmedStartTime)) {
+      Alert.alert("Invalid start time", "Please enter start time as HH:MM.");
+      return;
+    }
+
+    if (trimmedEndTime && !isValidTimeString(trimmedEndTime)) {
+      Alert.alert("Invalid end time", "Please enter end time as HH:MM.");
+      return;
+    }
+
+    if (
+      trimmedStartTime &&
+      trimmedEndTime &&
+      trimmedEndTime < trimmedStartTime
+    ) {
+      Alert.alert("Invalid time range", "End time cannot be before start time.");
       return;
     }
 
@@ -176,6 +220,8 @@ export default function AddActivityScreen() {
           description: description.trim(),
           address: address.trim(),
           googleMapsUrl: googleLink.trim(),
+          startTime: trimmedStartTime || undefined,
+          endTime: trimmedEndTime || undefined,
         });
         navigateBackWithActivity(activityId);
       } else {
@@ -188,6 +234,8 @@ export default function AddActivityScreen() {
           description: description.trim(),
           address: address.trim(),
           googleMapsUrl: googleLink.trim(),
+          startTime: trimmedStartTime || undefined,
+          endTime: trimmedEndTime || undefined,
         });
 
         navigateBackWithActivity(createdActivity.activity_id);
@@ -295,6 +343,79 @@ export default function AddActivityScreen() {
                 accessibilityLabel="Description"
                 accessibilityHint="Enter the description of the activity"
               />
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <View
+                style={styles.labelRow}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
+                <Timer width={24} height={24} />
+                <AppText variant="body" style={styles.label}>
+                  Time
+                </AppText>
+              </View>
+
+              <View style={styles.timeFieldsRow}>
+                <View style={styles.timeField}>
+                  <AppText variant="body" style={styles.timeFieldLabel}>
+                    Start time
+                  </AppText>
+                  <View style={styles.timeInputBox}>
+                    <TextInput
+                      value={startTime}
+                      onChangeText={(value) =>
+                        setStartTime(normalizeTimeInput(value))
+                      }
+                      placeholder="08:00"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType={
+                        Platform.OS === "ios"
+                          ? "numbers-and-punctuation"
+                          : "numeric"
+                      }
+                      maxLength={5}
+                      style={styles.timeInput}
+                      textAlign="center"
+                      accessibilityLabel="Activity start time"
+                      accessibilityHint="Enter the start time in HH colon MM format"
+                    />
+                    <View {...hiddenFromAccessibility}>
+                      <Timer width={20} height={20} />
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.timeField}>
+                  <AppText variant="body" style={styles.timeFieldLabel}>
+                    End time
+                  </AppText>
+                  <View style={styles.timeInputBox}>
+                    <TextInput
+                      value={endTime}
+                      onChangeText={(value) =>
+                        setEndTime(normalizeTimeInput(value))
+                      }
+                      placeholder="11:00"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType={
+                        Platform.OS === "ios"
+                          ? "numbers-and-punctuation"
+                          : "numeric"
+                      }
+                      maxLength={5}
+                      style={styles.timeInput}
+                      textAlign="center"
+                      accessibilityLabel="Activity end time"
+                      accessibilityHint="Enter the end time in HH colon MM format"
+                    />
+                    <View {...hiddenFromAccessibility}>
+                      <Timer width={20} height={20} />
+                    </View>
+                  </View>
+                </View>
+              </View>
             </View>
 
             <View style={styles.fieldGroup}>
@@ -450,6 +571,44 @@ const styles = StyleSheet.create({
   },
   multilineInput: {
     minHeight: 104,
+  },
+  timeFieldsRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  timeField: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  timeFieldLabel: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
+    paddingLeft: spacing.xs,
+  },
+  timeInputBox: {
+    minHeight: 54,
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+    borderRadius: radius.md,
+    backgroundColor: colors.lightWhite,
+    paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  timeInput: {
+    flex: 1,
+    minHeight: 44,
+    color: colors.nightBlack,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
+    fontFamily: typography.fontFamily.body,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    includeFontPadding: false,
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
   },
   saveButton: {
     alignSelf: "center",

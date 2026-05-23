@@ -9,6 +9,7 @@ jest.mock("@/assets/icons/location-pin.svg", () => "LocationPin");
 jest.mock("@/assets/icons/google.svg", () => "GoogleIcon");
 jest.mock("@/assets/icons/add.svg", () => "AddIcon");
 jest.mock("@/assets/icons/edit.svg", () => "EditIcon");
+jest.mock("@/assets/icons/timer.svg", () => "TimerIcon");
 
 const slot: TimeSlot = {
   id: "Breakfast",
@@ -23,6 +24,12 @@ const activity: Activity = {
   name: "Museum visit",
   address: "Museumplatz 1",
   googleMapsUrl: "https://maps.google.com/museum",
+};
+
+const activityWithTime: Activity = {
+  ...activity,
+  startTime: "08:00",
+  endTime: "11:00",
 };
 
 describe("PlanningSlotCard", () => {
@@ -72,5 +79,31 @@ describe("PlanningSlotCard", () => {
 
     expect(onEditActivity).toHaveBeenCalledWith(activity);
     expect(onAddActivity).not.toHaveBeenCalled();
+  });
+
+  it("renders a saved display-only activity time range", () => {
+    const { getByText } = render(
+      <PlanningSlotCard
+        slot={slot}
+        activity={activityWithTime}
+        onAddActivity={jest.fn()}
+        onEditActivity={jest.fn()}
+      />
+    );
+
+    expect(getByText("08:00 - 11:00")).toBeTruthy();
+  });
+
+  it("does not render a time range when only one time exists", () => {
+    const { queryByText } = render(
+      <PlanningSlotCard
+        slot={slot}
+        activity={{ ...activity, startTime: "08:00" }}
+        onAddActivity={jest.fn()}
+        onEditActivity={jest.fn()}
+      />
+    );
+
+    expect(queryByText("08:00")).toBeNull();
   });
 });

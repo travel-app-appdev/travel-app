@@ -4,12 +4,14 @@ import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity, TimeSlot } from "@/src/types/itinerary";
+import { formatActivityTimeRange } from "@/src/utils/itinerary/formatActivityTimeRange";
 
 import LocationHeart from "@/assets/icons/location-heart.svg";
 import LocationPin from "@/assets/icons/location-pin.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import AddIcon from "@/assets/icons/add.svg";
 import EditIcon from "@/assets/icons/edit.svg";
+import Timer from "@/assets/icons/timer.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
@@ -28,6 +30,7 @@ export function PlanningSlotCard({
   disabled = false,
 }: Props) {
   const hasActivity = Boolean(activity);
+  const activityTimeRange = formatActivityTimeRange(activity);
 
   const handleAddPressRaw = useCallback(() => {
     if (disabled) return;
@@ -92,6 +95,24 @@ export function PlanningSlotCard({
           {activity?.name}
         </AppText>
 
+        {!!activityTimeRange && (
+          <View
+            style={styles.infoRow}
+            accessible={true}
+            accessibilityLabel={`Activity time: ${activityTimeRange}`}
+          >
+            <Timer width={18} height={18} {...hiddenFromAccessibility} />
+            <AppText
+              variant="body"
+              style={styles.infoText}
+              numberOfLines={1}
+              accessible={false}
+            >
+              {activityTimeRange}
+            </AppText>
+          </View>
+        )}
+
         {!!activity?.address && (
           <View
             style={styles.infoRow}
@@ -147,7 +168,11 @@ export function PlanningSlotCard({
         ]}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={`Edit activity ${activity?.name} at ${slot.label}`}
+        accessibilityLabel={
+          activityTimeRange
+            ? `Edit activity ${activity?.name} at ${slot.label}, ${activityTimeRange}`
+            : `Edit activity ${activity?.name} at ${slot.label}`
+        }
         accessibilityHint="Opens the edit activity screen"
         accessibilityState={{ disabled }}
       >

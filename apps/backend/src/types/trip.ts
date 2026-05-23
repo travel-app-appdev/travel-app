@@ -103,6 +103,8 @@ export type Activity = {
     description?: string;
     address?: string;
     googleMapsUrl?: string;
+    startTime?: string;
+    endTime?: string;
     created_at?: string;
     voteCount?: number;
     hasCurrentUserVote?: boolean;
@@ -124,4 +126,6 @@ export type CreateActivityInput = {
     description?: string;
     address?: string;
     googleMapsUrl?: string;
+    startTime?: string;
+    endTime?: string;
 };

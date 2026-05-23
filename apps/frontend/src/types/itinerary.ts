@@ -26,6 +26,8 @@ export type Activity = {
   name: string;
   address: string;
   googleMapsUrl?: string;
+  startTime?: string;
+  endTime?: string;
   joinedCount?: number; // for final state
   hasCurrentUserJoined?: boolean;
   joinedMembers?: ActivityJoinedMember[];

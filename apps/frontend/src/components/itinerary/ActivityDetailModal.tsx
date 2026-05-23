@@ -2,6 +2,7 @@ import { Linking, Modal, Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import type { Activity, ItineraryState } from "@/src/types/itinerary";
+import { formatActivityTimeRange } from "@/src/utils/itinerary/formatActivityTimeRange";
 
 import LocationIcon from "@/assets/icons/location.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
@@ -40,6 +41,7 @@ export function ActivityDetailModal({
 
   const showMembers = state === "final";
   const topLabel = slotLabel || "Activity";
+  const activityTimeRange = formatActivityTimeRange(activity);
 
   return (
     <Modal
@@ -102,7 +104,9 @@ export function ActivityDetailModal({
               <View style={styles.infoRow}>
                 <Timer width={20} height={20} />
                 <AppText variant="body" style={styles.infoText}>
-                  {slotLabel || "No time available"}
+                  {activityTimeRange
+                    ? `${topLabel}: ${activityTimeRange}`
+                    : slotLabel || "No time available"}
                 </AppText>
               </View>
 

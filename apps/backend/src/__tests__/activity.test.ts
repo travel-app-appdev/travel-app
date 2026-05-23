@@ -69,6 +69,35 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
         expect(res.body.error).toBe('idToken is required');
     });
 
+    it('should return 400 if startTime has an invalid format', async () => {
+        const res = await request(app)
+            .post(`/itinerary/trip-123/slots/${ENCODED_SLOT_ID}/activities`)
+            .send({
+                idToken: 'valid-token',
+                name: 'Visit Palace',
+                startTime: '8:00',
+            });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('startTime must be a valid time in HH:MM format');
+        expect(activityService.suggestActivity).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 if endTime is before startTime', async () => {
+        const res = await request(app)
+            .post(`/itinerary/trip-123/slots/${ENCODED_SLOT_ID}/activities`)
+            .send({
+                idToken: 'valid-token',
+                name: 'Visit Palace',
+                startTime: '14:00',
+                endTime: '11:00',
+            });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('endTime cannot be before startTime');
+        expect(activityService.suggestActivity).not.toHaveBeenCalled();
+    });
+
     it('should return 400 if trip is not in Planning state', async () => {
         (activityService.suggestActivity as jest.Mock).mockRejectedValueOnce({
             status: 400,
@@ -113,6 +142,8 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
             description: 'Beautiful palace',
             address: 'Schönbrunner Schloßstraße 47',
             googleMapsUrl: 'https://maps.google.com',
+            startTime: '08:00',
+            endTime: '11:00',
             source_type: 'manual',
         });
 
@@ -124,6 +155,8 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
                 description: 'Beautiful palace',
                 address: 'Schönbrunner Schloßstraße 47',
                 googleMapsUrl: 'https://maps.google.com',
+                startTime: '08:00',
+                endTime: '11:00',
             });
 
         expect(activityService.suggestActivity).toHaveBeenCalledWith(
@@ -135,6 +168,8 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
                 description: 'Beautiful palace',
                 address: 'Schönbrunner Schloßstraße 47',
                 googleMapsUrl: 'https://maps.google.com',
+                startTime: '08:00',
+                endTime: '11:00',
             }
         );
 
@@ -142,7 +177,90 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
         expect(res.body).toHaveProperty('name');
         expect(res.body).toHaveProperty('trip_id');
         expect(res.body).toHaveProperty('user_id');
+        expect(res.body.startTime).toBe('08:00');
+        expect(res.body.endTime).toBe('11:00');
         expect(res.body.source_type).toBe('manual');
+    });
+});
+
+describe('PATCH /activities/:activityId', () => {
+    afterEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('should return 400 if name is missing', async () => {
+        const res = await request(app)
+            .patch('/activities/activity-123')
+            .send({ idToken: 'valid-token' });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('name is required');
+    });
+
+    it('should return 400 if endTime has an invalid format', async () => {
+        const res = await request(app)
+            .patch('/activities/activity-123')
+            .send({
+                idToken: 'valid-token',
+                name: 'Visit Palace',
+                endTime: '25:00',
+            });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('endTime must be a valid time in HH:MM format');
+        expect(activityService.updateSuggestedActivity).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 if endTime is before startTime', async () => {
+        const res = await request(app)
+            .patch('/activities/activity-123')
+            .send({
+                idToken: 'valid-token',
+                name: 'Visit Palace',
+                startTime: '14:00',
+                endTime: '11:00',
+            });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('endTime cannot be before startTime');
+        expect(activityService.updateSuggestedActivity).not.toHaveBeenCalled();
+    });
+
+    it('should update activity time fields on success', async () => {
+        (activityService.updateSuggestedActivity as jest.Mock).mockResolvedValueOnce({
+            activity_id: 'activity-123',
+            trip_id: 'trip-123',
+            user_id: 'user-123',
+            name: 'Greek Cafe',
+            startTime: '08:00',
+            endTime: '11:00',
+            source_type: 'manual',
+        });
+
+        const res = await request(app)
+            .patch('/activities/activity-123')
+            .send({
+                idToken: 'valid-token',
+                name: 'Greek Cafe',
+                startTime: '08:00',
+                endTime: '11:00',
+            });
+
+        expect(activityService.updateSuggestedActivity).toHaveBeenCalledWith(
+            'activity-123',
+            {
+                idToken: 'valid-token',
+                name: 'Greek Cafe',
+                description: undefined,
+                address: undefined,
+                googleMapsUrl: undefined,
+                startTime: '08:00',
+                endTime: '11:00',
+            }
+        );
+        expect(res.status).toBe(200);
+        expect(res.body.startTime).toBe('08:00');
+        expect(res.body.endTime).toBe('11:00');
     });
 });
 
