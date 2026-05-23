@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -13,6 +15,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 
 import { AppText } from "@/src/components/common/AppText";
+import { AppButton } from "@/src/components/common/AppButton";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 
@@ -54,8 +57,35 @@ function normalizeTimeInput(value: string): string {
   return `${digits.slice(0, 2)}:${digits.slice(2)}`;
 }
 
+type ActivityTimeField = "start" | "end";
+
+const CalendarModalWrapper = ({
+  children,
+  isLandscape,
+}: {
+  children: ReactNode;
+  isLandscape: boolean;
+}) => (
+  <View style={styles.calendarOverlay}>
+    <ScrollView
+      contentContainerStyle={[
+        { flexGrow: 1 },
+        isLandscape
+          ? { justifyContent: "flex-start" }
+          : { justifyContent: "center" },
+      ]}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.calendarModal}>{children}</View>
+    </ScrollView>
+  </View>
+);
+
 export default function AddActivityScreen() {
   const { idToken } = useAuth();
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
 
   const {
     tripId,
@@ -109,6 +139,33 @@ export default function AddActivityScreen() {
   const [googleLink, setGoogleLink] = useState(initialGoogleMapsUrl ?? "");
   const [startTime, setStartTime] = useState(initialStartTime ?? "");
   const [endTime, setEndTime] = useState(initialEndTime ?? "");
+  const [showActivityTimePicker, setShowActivityTimePicker] =
+    useState<ActivityTimeField | null>(null);
+  const [tempActivityTime, setTempActivityTime] = useState("");
+
+  function openActivityTimePicker(field: ActivityTimeField) {
+    setTempActivityTime(field === "start" ? startTime : endTime);
+    setShowActivityTimePicker(field);
+  }
+
+  function handleApplyActivityTime() {
+    if (!showActivityTimePicker) return;
+
+    const normalizedTime = tempActivityTime.trim();
+
+    if (normalizedTime && !isValidTimeString(normalizedTime)) {
+      Alert.alert("Invalid time", "Please enter a valid time as HH:MM.");
+      return;
+    }
+
+    if (showActivityTimePicker === "start") {
+      setStartTime(normalizedTime);
+    } else {
+      setEndTime(normalizedTime);
+    }
+
+    setShowActivityTimePicker(null);
+  }
 
   function parseExistingActivities() {
     if (!activitiesJson) return [];
@@ -362,58 +419,62 @@ export default function AddActivityScreen() {
                   <AppText variant="body" style={styles.timeFieldLabel}>
                     Start time
                   </AppText>
-                  <View style={styles.timeInputBox}>
-                    <TextInput
-                      value={startTime}
-                      onChangeText={(value) =>
-                        setStartTime(normalizeTimeInput(value))
-                      }
-                      placeholder="08:00"
-                      placeholderTextColor={colors.textMuted}
-                      keyboardType={
-                        Platform.OS === "ios"
-                          ? "numbers-and-punctuation"
-                          : "numeric"
-                      }
-                      maxLength={5}
-                      style={styles.timeInput}
-                      textAlign="center"
-                      accessibilityLabel="Activity start time"
-                      accessibilityHint="Enter the start time in HH colon MM format"
-                    />
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.timeInputBox,
+                      pressed && styles.timeInputBoxPressed,
+                    ]}
+                    onPress={() => openActivityTimePicker("start")}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Activity start time, currently ${
+                      startTime || "not set"
+                    }. Tap to change`}
+                    accessibilityHint="Opens the time picker"
+                  >
+                    <AppText
+                      variant="body"
+                      style={[
+                        styles.timeDisplayText,
+                        !startTime && styles.timePlaceholderText,
+                      ]}
+                    >
+                      {startTime || "HH:MM"}
+                    </AppText>
                     <View {...hiddenFromAccessibility}>
                       <Timer width={20} height={20} />
                     </View>
-                  </View>
+                  </Pressable>
                 </View>
 
                 <View style={styles.timeField}>
                   <AppText variant="body" style={styles.timeFieldLabel}>
                     End time
                   </AppText>
-                  <View style={styles.timeInputBox}>
-                    <TextInput
-                      value={endTime}
-                      onChangeText={(value) =>
-                        setEndTime(normalizeTimeInput(value))
-                      }
-                      placeholder="11:00"
-                      placeholderTextColor={colors.textMuted}
-                      keyboardType={
-                        Platform.OS === "ios"
-                          ? "numbers-and-punctuation"
-                          : "numeric"
-                      }
-                      maxLength={5}
-                      style={styles.timeInput}
-                      textAlign="center"
-                      accessibilityLabel="Activity end time"
-                      accessibilityHint="Enter the end time in HH colon MM format"
-                    />
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.timeInputBox,
+                      pressed && styles.timeInputBoxPressed,
+                    ]}
+                    onPress={() => openActivityTimePicker("end")}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Activity end time, currently ${
+                      endTime || "not set"
+                    }. Tap to change`}
+                    accessibilityHint="Opens the time picker"
+                  >
+                    <AppText
+                      variant="body"
+                      style={[
+                        styles.timeDisplayText,
+                        !endTime && styles.timePlaceholderText,
+                      ]}
+                    >
+                      {endTime || "HH:MM"}
+                    </AppText>
                     <View {...hiddenFromAccessibility}>
                       <Timer width={20} height={20} />
                     </View>
-                  </View>
+                  </Pressable>
                 </View>
               </View>
             </View>
@@ -484,6 +545,62 @@ export default function AddActivityScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={showActivityTimePicker !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowActivityTimePicker(null)}
+      >
+        <CalendarModalWrapper isLandscape={isLandscape}>
+          <AppText variant="body" style={styles.calendarTitle}>
+            {showActivityTimePicker === "start"
+              ? "Select activity start time"
+              : "Select activity end time"}
+          </AppText>
+
+          <View style={styles.timeModalContent}>
+            <AppText variant="caption" style={styles.timeModalHint}>
+              Enter the exact time in 24-hour format
+            </AppText>
+            <View style={styles.timeInputModalBox}>
+              <TextInput
+                value={tempActivityTime}
+                onChangeText={(value) =>
+                  setTempActivityTime(normalizeTimeInput(value))
+                }
+                placeholder="HH:MM"
+                placeholderTextColor={colors.textMuted}
+                keyboardType={
+                  Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"
+                }
+                maxLength={5}
+                style={styles.timeInputModal}
+                textAlign="center"
+                accessibilityLabel="Enter time in HH colon MM format"
+              />
+              <Timer width={20} height={20} />
+            </View>
+          </View>
+
+          <View style={styles.calendarActions}>
+            <AppButton
+              title="Cancel"
+              onPress={() => setShowActivityTimePicker(null)}
+              style={styles.calendarCancelButton}
+              textStyle={styles.calendarCancelButtonText}
+              accessibilityLabel="Cancel time selection"
+            />
+            <AppButton
+              title="Apply time"
+              onPress={handleApplyActivityTime}
+              style={styles.calendarApplyButton}
+              textStyle={styles.calendarApplyButtonText}
+              accessibilityLabel="Apply selected time"
+            />
+          </View>
+        </CalendarModalWrapper>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -596,18 +713,95 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: spacing.sm,
   },
-  timeInput: {
+  timeInputBoxPressed: {
+    opacity: 0.85,
+  },
+  timeDisplayText: {
     flex: 1,
-    minHeight: 44,
     color: colors.nightBlack,
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
     fontFamily: typography.fontFamily.body,
+    textAlign: "left",
+  },
+  timePlaceholderText: {
+    color: colors.textMuted,
+  },
+  calendarOverlay: {
+    flex: 1,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+  },
+  calendarModal: {
+    backgroundColor: colors.lightWhite,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+  },
+  calendarTitle: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+  },
+  calendarActions: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  calendarCancelButton: {
+    flex: 1,
+    backgroundColor: colors.beachYellow,
+  },
+  calendarCancelButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  calendarApplyButton: {
+    flex: 1,
+    backgroundColor: colors.sunsetOrange,
+  },
+  calendarApplyButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  timeModalContent: {
+    gap: spacing.md,
+  },
+  timeModalHint: {
+    color: colors.textMuted,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.body,
+  },
+  timeInputModalBox: {
+    backgroundColor: colors.lightWhite,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+    minHeight: 64,
+  },
+  timeInputModal: {
+    flex: 1,
+    minHeight: 44,
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xxl,
+    lineHeight: typography.lineHeight.xxl,
     paddingVertical: 0,
     paddingHorizontal: 0,
     includeFontPadding: false,
+    textAlignVertical: "center",
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
   },
   saveButton: {
