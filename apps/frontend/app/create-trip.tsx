@@ -1,5 +1,4 @@
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
 import { createTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
@@ -46,6 +45,8 @@ import Timepoint from "@/assets/icons/timepoint.svg";
 import CheckMark from "@/assets/icons/check_mark.svg";
 import Timer from "@/assets/icons/timer.svg";
 import Info from "@/assets/icons/info.svg";
+import Question from "@/assets/icons/question.svg";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 const PHASE_TEXT_COLORS: Record<string, string> = {
@@ -214,9 +215,9 @@ function normalizeTimeInput(value: string): string {
 }
 
 const CalendarModalWrapper = ({
-                                children,
-                                isLandscape,
-                              }: {
+  children,
+  isLandscape,
+}: {
   children: React.ReactNode;
   isLandscape: boolean;
 }) => (
@@ -253,6 +254,32 @@ export default function CreateTripScreen() {
   const [tripCode, setTripCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [showOnboardingHint, setShowOnboardingHint] = useState(false);
+
+  const blinkingDotAnim = useRef(new Animated.Value(2)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blinkingDotAnim, {
+          toValue: 0,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(blinkingDotAnim, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    loop.start();
+
+    return () => {
+      loop.stop();
+    };
+  }, [blinkingDotAnim]);
 
   const disabledTripOrange = "#facbb8";
   const disabledPlanningYellow = "#F6E08F";
@@ -300,6 +327,13 @@ export default function CreateTripScreen() {
     };
   });
 
+  const handleQuestionPress = useCallback(() => {
+    if (!PressLock.acquire()) return;
+    Promise.resolve()
+      .then(() => setShowOnboardingHint((prev) => !prev))
+      .finally(() => setTimeout(() => PressLock.release(), 300));
+  }, []);
+
   const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
   const [openPhase, setOpenPhase] = useState<PhaseKey | null>(null);
   const [showPhaseDateCalendar, setShowPhaseDateCalendar] =
@@ -311,6 +345,14 @@ export default function CreateTripScreen() {
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const { user } = useAuth();
   const router = useRouter();
+
+
+  const handleOnboardingPress = useCallback(() => {
+    if (!PressLock.acquire()) return;
+    Promise.resolve()
+      .then(() => router.push("/onboarding"))
+      .finally(() => setTimeout(() => PressLock.release(), 300));
+  }, [router]);
 
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
@@ -879,9 +921,67 @@ export default function CreateTripScreen() {
                 Set up the timers
               </AppText>
 
-              <AppText variant="body" style={styles.setupText}>
-                Set an end time for each state so the next one starts automatically.
-              </AppText>
+              <View style={styles.setupSection}>
+                {showOnboardingHint && (
+                  <View style={styles.onboardingTooltip}>
+                    <AppText
+                      variant="body"
+                      style={styles.onboardingTooltipText}
+                    >
+                      Need a refresher? Open{" "}
+                      <AppText
+                        variant="body"
+                        style={styles.onboardingTooltipLink}
+                        onPress={handleOnboardingPress}
+                        accessibilityRole="link"
+                      >
+                        onboarding
+                      </AppText>{" "}
+                      to see how planning, voting, and the final itinerary work.
+                    </AppText>
+                  </View>
+                )}
+
+                <View style={styles.setupSection}>
+                  {showOnboardingHint && (
+                    <View style={styles.onboardingTooltip}>
+                      <AppText
+                        variant="body"
+                        style={styles.onboardingTooltipText}
+                      >
+                        Need a refresher? Open{" "}
+                        <AppText
+                          variant="body"
+                          style={styles.onboardingTooltipLink}
+                          onPress={handleOnboardingPress}
+                          accessibilityRole="link"
+                        >
+                          onboarding
+                        </AppText>{" "}
+                        to see how planning, voting, and the final itinerary
+                        work.
+                      </AppText>
+                    </View>
+                  )}
+
+                  <View style={styles.setupRow}>
+                    <AppText variant="body" style={styles.setupText}>
+                      Set an end time for each state so the next one starts
+                      automatically.
+                    </AppText>
+
+                    <Pressable
+                      style={styles.questionButton}
+                      onPress={handleQuestionPress}
+                      accessibilityRole="button"
+                      accessibilityLabel="Show timer setup help"
+                      accessibilityHint="Shows a short explanation and link to onboarding"
+                    >
+                      <Question width={24} height={24} />
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
 
               {TIMER_PHASES.map((phase) => {
                 const phaseId = phase.id as PhaseKey;
@@ -901,7 +1001,10 @@ export default function CreateTripScreen() {
                       accessibilityHint={`Tap to edit ${phase.label} end date and time`}
                       accessibilityState={{ expanded: isOpen }}
                     >
-                      <View style={styles.phaseLeft} {...hiddenFromAccessibility}>
+                      <View
+                        style={styles.phaseLeft}
+                        {...hiddenFromAccessibility}
+                      >
                         <View
                           style={[
                             styles.phaseBadge,
@@ -933,12 +1036,22 @@ export default function CreateTripScreen() {
                                 {dayLabel(days, phase.active)}
                               </AppText>
                               {phase.active && (
-                                <View style={styles.timepointWrapper}>
+                                <Animated.View
+                                  style={[
+                                    styles.timepointWrapper,
+                                    phase.active && {
+                                      opacity: blinkingDotAnim,
+                                    },
+                                  ]}
+                                >
                                   <Timepoint width={7} height={7} />
-                                </View>
+                                </Animated.View>
                               )}
                             </View>
-                            <AppText variant="caption" style={styles.timerLabel}>
+                            <AppText
+                              variant="caption"
+                              style={styles.timerLabel}
+                            >
                               Timer
                             </AppText>
                           </View>
@@ -1020,7 +1133,10 @@ export default function CreateTripScreen() {
                         )}
 
                         {phaseUpdated[phaseId] && (
-                          <View style={styles.successRow} {...hiddenFromAccessibility}>
+                          <View
+                            style={styles.successRow}
+                            {...hiddenFromAccessibility}
+                          >
                             <CheckMark width={18} height={18} />
                             <AppText
                               variant="caption"
@@ -1053,7 +1169,9 @@ export default function CreateTripScreen() {
                 disabled={isCreating}
                 style={styles.nextButton}
                 textStyle={styles.nextButtonText}
-                accessibilityLabel={isCreating ? "Creating trip" : "Create trip"}
+                accessibilityLabel={
+                  isCreating ? "Creating trip" : "Create trip"
+                }
               />
             </View>
 
@@ -1341,7 +1459,9 @@ export default function CreateTripScreen() {
       style={[styles.fullScreen, step === 1 ? styles.bgStep1 : styles.bgStep2]}
     >
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-        <View style={[styles.root, step === 1 ? styles.bgStep1 : styles.bgStep2]}>
+        <View
+          style={[styles.root, step === 1 ? styles.bgStep1 : styles.bgStep2]}
+        >
           {step === 1 ? (
             <>
               <KeyboardAvoidingView
@@ -1358,7 +1478,10 @@ export default function CreateTripScreen() {
                 >
                   <View style={styles.header}>
                     <BackLink href="/home" />
-                    <View style={styles.headerTitle} {...hiddenFromAccessibility}>
+                    <View
+                      style={styles.headerTitle}
+                      {...hiddenFromAccessibility}
+                    >
                       <Plane width={25} height={25} />
                       <AppText variant="body" style={styles.headerLabel}>
                         Create trip
@@ -1379,7 +1502,10 @@ export default function CreateTripScreen() {
                   </AppText>
 
                   <View style={[styles.fieldGroup, { marginTop: 20 }]}>
-                    <View style={styles.fieldLabelRow} {...hiddenFromAccessibility}>
+                    <View
+                      style={styles.fieldLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
                       <Location width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Destination
@@ -1414,7 +1540,13 @@ export default function CreateTripScreen() {
                 <View
                   style={[
                     styles.cityScapeWrapper,
-                    { width, height: cityScapeHeight, bottom: 0, left: 0, pointerEvents: "none" },
+                    {
+                      width,
+                      height: cityScapeHeight,
+                      bottom: 0,
+                      left: 0,
+                      pointerEvents: "none",
+                    },
                   ]}
                   {...hiddenFromAccessibility}
                 >
@@ -1454,7 +1586,10 @@ export default function CreateTripScreen() {
                 >
                   <View style={styles.header}>
                     <BackLink onPress={() => setStep(1)} />
-                    <View style={styles.headerTitle} {...hiddenFromAccessibility}>
+                    <View
+                      style={styles.headerTitle}
+                      {...hiddenFromAccessibility}
+                    >
                       <Plane width={25} height={25} />
                       <AppText variant="body" style={styles.headerLabel}>
                         Create trip
@@ -1474,10 +1609,13 @@ export default function CreateTripScreen() {
                     Give your trip a name and choose a date
                   </AppText>
 
-                  <View style={styles.fieldGroup}>
-                    <View style={styles.fieldLabelRow} {...hiddenFromAccessibility}>
+                  <View style={[styles.fieldGroup, styles.tripNameGroup]}>
+                    <View
+                      style={styles.fieldLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
                       <TripTitle width={20} height={20} />
-                      <AppText variant="body" style={styles.fieldLabel}>
+                      <AppText variant="body" style={styles.fieldGroup}>
                         Trip name
                       </AppText>
                     </View>
@@ -1493,9 +1631,12 @@ export default function CreateTripScreen() {
                   </View>
 
                   <View style={styles.fieldGroup}>
-                    <View style={styles.fieldLabelRow} {...hiddenFromAccessibility}>
+                    <View
+                      style={styles.fieldLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
                       <Calendar width={20} height={20} />
-                      <AppText variant="body" style={styles.fieldLabel}>
+                      <AppText variant="body" style={styles.fieldGroup}>
                         Trip date
                       </AppText>
                     </View>
@@ -1659,25 +1800,31 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   titleStep1: {
+    fontFamily: typography.fontFamily.bodyBlack,
     fontSize: typography.size.displaySm,
-    lineHeight: typography.lineHeight.displayLg,
+    lineHeight: typography.lineHeight.displaySm,
     color: colors.textPrimary,
     textAlign: "left",
     alignSelf: "stretch",
+    marginBottom: spacing.xl,
   },
   titleStep2: {
+    fontFamily: typography.fontFamily.bodyBlack,
     fontSize: typography.size.displaySm,
-    lineHeight: typography.lineHeight.displayLg,
+    lineHeight: typography.lineHeight.displaySm,
     color: colors.textPrimary,
+    marginBottom: spacing.xxl,
     textAlign: "left",
     alignSelf: "stretch",
   },
   titleStep3: {
+    fontFamily: typography.fontFamily.bodyBlack,
     fontSize: typography.size.displaySm,
-    lineHeight: typography.lineHeight.displayLg,
+    lineHeight: typography.lineHeight.displaySm,
     color: colors.textPrimary,
     textAlign: "left",
     alignSelf: "stretch",
+    marginBottom: spacing.xxl,
   },
 
   fieldGroup: {
@@ -1699,6 +1846,9 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.xl,
     lineHeight: typography.lineHeight.xl,
+  },
+  tripNameGroup: {
+    marginBottom: spacing.sm,
   },
   inputBlackStroke: {
     borderWidth: 2,
@@ -1807,10 +1957,11 @@ const styles = StyleSheet.create({
   },
 
   setupText: {
+    flex: 1,
     fontSize: 18,
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
-    marginBottom: spacing.xxxl,
+    lineHeight: typography.lineHeight.md,
   },
 
   phaseRow: {
@@ -2064,5 +2215,41 @@ const styles = StyleSheet.create({
   },
   quickTimeChipTextActive: {
     color: colors.nightBlack,
+  },
+  setupRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  onboardingTooltip: {
+    position: "absolute",
+    top: -100,
+    right: -10,
+    maxWidth: 250,
+    backgroundColor: colors.nightBlack,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    zIndex: 40,
+  },
+  onboardingTooltipText: {
+    color: colors.lightWhite,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.size.sm,
+  },
+  onboardingTooltipLink: {
+    color: colors.beachYellow,
+    textDecorationLine: "underline",
+    fontSize: typography.size.sm,
+    fontFamily: typography.fontFamily.bodyBold,
+    lineHeight: typography.size.lg,
+  },
+  setupSection: {
+    position: "relative",
+    marginBottom: spacing.lg,
+  },
+  questionButton: {
+    marginTop: 3,
   },
 });
