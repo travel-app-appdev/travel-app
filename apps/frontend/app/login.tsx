@@ -1,4 +1,4 @@
-import { Link, router } from "expo-router";
+import { Link, router, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import {
   StyleSheet,
@@ -33,6 +33,11 @@ export default function LoginScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { setUser, setIdToken } = useAuth();
 
+  // Pick up the invite code if this login was triggered from an invite link
+  const { pendingInviteCode } = useLocalSearchParams<{
+    pendingInviteCode?: string;
+  }>();
+
   const passwordRef = useRef<TextInput>(null);
   const { width, height } = useWindowDimensions();
   const scale = Math.min(width / 390, height / 844);
@@ -66,7 +71,16 @@ export default function LoginScreen() {
       const authResponse = await loginUser(email.trim(), password);
       setUser(authResponse);
       setIdToken(authResponse.idToken);
-      router.replace("/home");
+
+      // If the user came from an invite link, return them to the invite screen
+      if (pendingInviteCode) {
+        router.replace({
+          pathname: "/invite",
+          params: { code: pendingInviteCode },
+        });
+      } else {
+        router.replace("/home");
+      }
     } catch (error: any) {
       const rawMessage = error?.message ?? "";
       const code = error?.code ?? "";
@@ -211,6 +225,18 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
+          {/* Context banner when coming from an invite */}
+          {!!pendingInviteCode && (
+            <View style={styles.inviteBanner}>
+              <AppText variant="caption" style={styles.inviteBannerText}>
+                Log in to join the trip with code{" "}
+                <AppText variant="caption" style={styles.inviteBannerCode}>
+                  {pendingInviteCode}
+                </AppText>
+              </AppText>
+            </View>
+          )}
+
           <View style={styles.form}>
             <View style={styles.fieldGroup}>
               <AppText variant="body" style={styles.label}>
@@ -379,6 +405,26 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xxxl,
     justifyContent: "space-between",
+  },
+  inviteBanner: {
+    backgroundColor: colors.seaBlue,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
+  },
+  inviteBannerText: {
+    color: colors.lightWhite,
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.md,
+    textAlign: "center",
+  },
+  inviteBannerCode: {
+    fontFamily: typography.fontFamily.bodyBold,
+    letterSpacing: 2,
+    color: colors.lightWhite,
+    fontSize: typography.size.md,
   },
   form: {
     gap: spacing.xl,

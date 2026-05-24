@@ -50,6 +50,11 @@ function AppStartupGate() {
           name="trip-overview-member"
           options={{ title: "Trip Overview" }}
         />
+        {/* ── Invite preview screen ── */}
+        <Stack.Screen
+          name="invite"
+          options={{ title: "Trip Invite" }}
+        />
         <Stack.Screen
           name="questionnaire"
           options={{ title: "Questionnaire" }}
@@ -67,6 +72,7 @@ function AppStartupGate() {
         <Stack.Screen name="itinerary" options={{ title: "Itinerary" }} />
         <Stack.Screen name="past-trips" options={{ title: "Past Trips" }} />
         <Stack.Screen name="add-activity" options={{ title: "Add Activity" }} />
+        <Stack.Screen name="onboarding" options={{ title: "Onboarding" }} />
       </Stack>
       <StatusBar style="dark" />
     </>

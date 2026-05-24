@@ -203,7 +203,7 @@ export async function finishPlanningForMember(
     tripId: string,
     idToken: string
 ): Promise<{ allDone: boolean; tripState: TripState; completedMembers: number; totalMembers: number }> {
-    
+
     const decoded = await admin.auth().verifyIdToken(idToken);
     const userId = decoded.uid;
 
@@ -352,6 +352,27 @@ export async function updateTripForAdmin(input: {
     if (!trip) throw { status: 404, message: "Trip not found after update" };
 
     return { ...trip, role: "admin" };
+}
+
+// ── Public preview by invite code — no auth required
+export async function getTripByInviteCodePublic(
+    inviteCode: string
+): Promise<Pick<Trip, "trip_id" | "title" | "destination" | "start_date" | "end_date" | "state">> {
+    const trip = await findTripByInviteCode(inviteCode);
+
+    if (!trip) {
+        throw { status: 404, message: "Invalid invite code" };
+    }
+
+    // Return only the fields a non-member needs to preview the trip
+    return {
+        trip_id: trip.trip_id,
+        title: trip.title,
+        destination: trip.destination,
+        start_date: trip.start_date,
+        end_date: trip.end_date,
+        state: trip.state,
+    };
 }
 
 function deriveTripStateFromTimeline(input: {

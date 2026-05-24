@@ -29,6 +29,7 @@ import {
   formatTripTimerText,
 } from "@/src/utils/tripTimer";
 import { nativeImportantForAccessibility, hiddenFromAccessibility } from "@/src/utils/accessibility";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import Plane from "@/assets/icons/plane.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
 import Calendar from "@/assets/icons/calendar.svg";
@@ -332,6 +333,23 @@ export default function TripOverviewMemberScreen() {
     };
   }, [planningStartedAt, planningEndAt, votingEndAt, tripStart, tripEnd]);
 
+  const handleNavigateToItinerary = useSinglePress(() => {
+    router.push({
+      pathname: "/itinerary",
+      params: {
+        tripId,
+        state: tripState.toLowerCase() as "planning" | "voting" | "final",
+        title,
+        destination,
+        startDate,
+        endDate,
+        members: membersParam,
+        planningEndAt,
+        votingEndAt,
+      },
+    });
+  });
+
   const handleLeaveTrip = () => {
     Alert.alert("Leave trip", "Are you sure you want to leave this trip?", [
       { text: "Cancel", style: "cancel" },
@@ -588,20 +606,7 @@ export default function TripOverviewMemberScreen() {
                             {isActive ? (
                               <Pressable
                                 style={[styles.phaseBadge, { backgroundColor: badgeColor }]}
-                                onPress={() => router.push({
-                                  pathname: "/itinerary",
-                                  params: {
-                                    tripId,
-                                    state: tripState.toLowerCase() as "planning" | "voting" | "final",
-                                    title,
-                                    destination,
-                                    startDate,
-                                    endDate,
-                                    members: membersParam,
-                                    planningEndAt,
-                                    votingEndAt,
-                                  },
-                                })}
+                                onPress={handleNavigateToItinerary}
                                 accessibilityRole="button"
                                 accessibilityLabel={`${phase.label} phase, tap to open itinerary`}
                                 accessibilityHint="Opens the itinerary at this phase"

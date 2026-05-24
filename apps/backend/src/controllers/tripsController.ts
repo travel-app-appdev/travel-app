@@ -1,3 +1,4 @@
+// apps/backend/src/controllers/tripsController.ts
 import { Request, Response } from "express";
 import {
     createTripForAuthenticatedUser,
@@ -10,6 +11,7 @@ import {
     finishPlanningForMember,
     finishVotingForAdmin,
     updateTripForAdmin,
+    getTripByInviteCodePublic,
 } from "../services/tripsService";
 
 export const getMyTrips = async (req: Request, res: Response): Promise<void> => {
@@ -370,6 +372,30 @@ export const updateTrip = async (req: Request, res: Response): Promise<void> => 
             res.status(400).json({ error: error.message });
         } else {
             res.status(401).json({ error: "Invalid token or failed to update trip" });
+        }
+    }
+};
+
+// ── Public trip preview by invite code (no auth required)
+export const getTripPreviewByCode = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    const inviteCode = String(req.params.inviteCode ?? "").trim().toUpperCase();
+
+    if (!inviteCode) {
+        res.status(400).json({ error: "inviteCode is required" });
+        return;
+    }
+
+    try {
+        const trip = await getTripByInviteCodePublic(inviteCode);
+        res.status(200).json(trip);
+    } catch (error: any) {
+        if (error.status === 404) {
+            res.status(404).json({ error: error.message });
+        } else {
+            res.status(500).json({ error: "Failed to load trip preview" });
         }
     }
 };

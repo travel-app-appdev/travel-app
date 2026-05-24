@@ -16,9 +16,9 @@ import {
   Animated,
   Text,
   useWindowDimensions,
+  Share,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as Clipboard from "expo-clipboard";
 import { Calendar as RangeCalendar } from "react-native-calendars";
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
@@ -33,7 +33,7 @@ import CityScape from "@/assets/visuals/city_scape.svg";
 import CurlyYellow from "@/assets/visuals/curly-yellow.svg";
 import CurlyOrange from "@/assets/visuals/curly-orange.svg";
 import Location from "@/assets/icons/location.svg";
-import Copy from "@/assets/icons/copy.svg";
+import ShareLink from "@/assets/icons/share_link.svg";
 import Calendar from "@/assets/icons/calendar.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
 import KeyFrame from "@/assets/icons/key_frame.svg";
@@ -252,7 +252,6 @@ export default function CreateTripScreen() {
   const [rangeEnd, setRangeEnd] = useState<string | null>(null);
 
   const [tripCode, setTripCode] = useState("");
-  const [copied, setCopied] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [showOnboardingHint, setShowOnboardingHint] = useState(false);
 
@@ -346,7 +345,6 @@ export default function CreateTripScreen() {
   const { user } = useAuth();
   const router = useRouter();
 
-
   const handleOnboardingPress = useCallback(() => {
     if (!PressLock.acquire()) return;
     Promise.resolve()
@@ -383,13 +381,16 @@ export default function CreateTripScreen() {
     setOpenPhase((prev) => (prev === key ? null : key));
   };
 
-  const handleCopyCodeFn = async () => {
-    await Clipboard.setStringAsync(tripCode);
-    setCopied(true);
-    safeTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleCopyCode = useSinglePress(handleCopyCodeFn);
+  // ── Share handler (replaces copy) ──────────────────────────────────────────
+  const handleShareCode = useSinglePress(async () => {
+    try {
+      await Share.share({
+        message: `Join my trip on Votey! Use invite code: ${tripCode}`,
+      });
+    } catch {
+      // User dismissed share sheet — no action needed
+    }
+  });
 
   const syncPhasesFromTripDates = (nextTripStart: Date, nextTripEnd: Date) => {
     const today = new Date();
@@ -846,10 +847,10 @@ export default function CreateTripScreen() {
   };
 
   const ProgressBar: React.FC<ProgressBarProps> = ({
-                                                     progressWidth,
-                                                     currentStep,
-                                                     totalSteps,
-                                                   }) => {
+    progressWidth,
+    currentStep,
+    totalSteps,
+  }) => {
     return (
       <View style={{ width: "100%" }}>
         <View
@@ -886,6 +887,7 @@ export default function CreateTripScreen() {
     );
   };
 
+  // ── Step 3 ─────────────────────────────────────────────────────────────────
   if (step === 3) {
     return (
       <View style={[styles.fullScreen, styles.bgStep3]}>
@@ -1351,6 +1353,7 @@ export default function CreateTripScreen() {
     );
   }
 
+  // ── Step 4 ─────────────────────────────────────────────────────────────────
   if (step === 4) {
     return (
       <View style={[styles.fullScreen, styles.bgStep1]}>
@@ -1406,16 +1409,17 @@ export default function CreateTripScreen() {
                 <View style={styles.fieldLabelRow} {...hiddenFromAccessibility}>
                   <KeyFrame width={20} height={20} />
                   <AppText variant="body" style={styles.fieldLabel}>
-                    Code
+                    Invite-Code
                   </AppText>
                 </View>
 
+                {/* ── Invite / Share control ── */}
                 <Pressable
                   style={styles.codeInput}
-                  onPress={handleCopyCode}
+                  onPress={handleShareCode}
                   accessibilityRole="button"
-                  accessibilityLabel={copied ? "Trip code copied" : "Copy trip code"}
-                  accessibilityHint="Copies the trip invite code to your clipboard"
+                  accessibilityLabel="Share trip invite code"
+                  accessibilityHint="Opens the share sheet to invite members"
                 >
                   <AppText
                     variant="body"
@@ -1424,16 +1428,13 @@ export default function CreateTripScreen() {
                   >
                     {tripCode}
                   </AppText>
-                  <View style={styles.copyActionArea} {...hiddenFromAccessibility}>
-                    <AppText variant="caption" style={styles.copiedText}>
-                      {copied ? "✓ Copied!" : "Tap to copy"}
-                    </AppText>
-                    <Copy width={20} height={20} />
+                  <View style={styles.shareIconArea} {...hiddenFromAccessibility}>
+                    <ShareLink width={22} height={22} />
                   </View>
                 </Pressable>
 
                 <AppText variant="caption" style={styles.codeCaption}>
-                  Copy this code to share the trip.
+                  Share the trip with your members.
                 </AppText>
               </View>
 
@@ -1454,6 +1455,7 @@ export default function CreateTripScreen() {
     );
   }
 
+  // ── Steps 1 & 2 ────────────────────────────────────────────────────────────
   return (
     <View
       style={[styles.fullScreen, step === 1 ? styles.bgStep1 : styles.bgStep2]}
@@ -1738,6 +1740,7 @@ export default function CreateTripScreen() {
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   fullScreen: {
     flex: 1,
@@ -1826,16 +1829,13 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     marginBottom: spacing.xxl,
   },
-
   fieldGroup: {
     gap: spacing.sm,
   },
-
   phaseGroup: {
     gap: spacing.sm,
     marginBottom: spacing.lg,
   },
-
   fieldLabelRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1878,6 +1878,7 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.md,
     color: colors.textPrimary,
   },
+  // ── Step 4: invite code box ─────────────────────────────────────────────────
   codeInput: {
     backgroundColor: colors.white,
     borderRadius: radius.sm,
@@ -1897,17 +1898,12 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.xl,
     letterSpacing: 3,
   },
-  copyActionArea: {
-    flexDirection: "row",
+  shareIconArea: {
     alignItems: "center",
-    gap: spacing.xs,
+    justifyContent: "center",
+    minWidth: 32,
+    minHeight: 32,
   },
-  copiedText: {
-    color: colors.nightBlack,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-  },
-
   codeCaption: {
     color: colors.nightBlack,
     fontSize: typography.size.sm,
@@ -1916,12 +1912,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     marginBottom: spacing.lg,
   },
-
   inlineButtonWrapper: {
     marginTop: spacing.xl,
     marginBottom: spacing.lg,
   },
-
   continueButton: {
     backgroundColor: colors.sunsetOrange,
   },
@@ -1955,7 +1949,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     zIndex: 0,
   },
-
   setupText: {
     flex: 1,
     fontSize: 18,
@@ -1963,7 +1956,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bodyBold,
     lineHeight: typography.lineHeight.md,
   },
-
   phaseRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2052,14 +2044,12 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
   },
-
   step3Footer: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.lg,
     backgroundColor: colors.lightWhite,
   },
-
   nextButton: {
     backgroundColor: colors.sunsetOrange,
   },
@@ -2080,7 +2070,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.lg,
     fontFamily: typography.fontFamily.body,
   },
-
   calendarOverlay: {
     flex: 1,
     paddingHorizontal: spacing.xl,
