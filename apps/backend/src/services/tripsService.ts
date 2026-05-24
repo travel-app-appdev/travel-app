@@ -1,3 +1,4 @@
+// apps/backend/src/services/tripsService.ts
 import admin from "../config/firebase";
 import {
     createTripWithAdminMembership,
@@ -182,18 +183,15 @@ export async function removeMemberForAdmin(input: {
     const decoded = await admin.auth().verifyIdToken(input.idToken);
     const adminUserId = decoded.uid;
 
-    // Verify the requester is an admin of this trip
     const adminMembership = await findMembership(input.tripId, adminUserId);
     if (!adminMembership || adminMembership.role !== "admin") {
         throw { status: 403, message: "Only the admin can remove members" };
     }
 
-    // Prevent admin from removing themselves
     if (input.memberId === adminUserId) {
         throw { status: 403, message: "Admin cannot remove themselves. Delete the trip instead." };
     }
 
-    // Verify the member to remove actually belongs to this trip
     const memberMembership = await findMembership(input.tripId, input.memberId);
     if (!memberMembership) {
         throw { status: 404, message: "Member not found in this trip" };
@@ -206,40 +204,33 @@ export async function finishPlanningForMember(
     tripId: string,
     idToken: string
 ): Promise<{ allDone: boolean; tripState: TripState; completedMembers: number; totalMembers: number }> {
-    
+
     const decoded = await admin.auth().verifyIdToken(idToken);
     const userId = decoded.uid;
 
-    // check trip exists
     const trip = await findTripById(tripId);
     if (!trip) {
         throw { status: 404, message: "Trip not found" };
     }
 
-    // check trip is in Planning state
     if (trip.state !== "Planning") {
         throw { status: 400, message: "Trip is not in Planning state" };
     }
 
-    // check user is a member
     const membership = await findMembership(tripId, userId);
     if (!membership) {
         throw { status: 404, message: "User is not a member of this trip" };
     }
 
-    // Make this endpoint idempotent. If the user already finished planning,
-    // still recompute the trip transition so an old Planning trip can recover.
     if (!membership.planning_done) {
         await markMemberPlanningDone(tripId, userId);
     }
 
-    // get all members and check if all are done
     const allMembers = await findAcceptedMembersByTripId(tripId);
     const completedMembers = allMembers.filter(m => m.planning_done || m.user_id === userId).length;
     const totalMembers = allMembers.length;
     const allDone = completedMembers === totalMembers;
 
-    // If all members are done, skip Voting when there are no collisions.
     let nextState: TripState = "Planning";
 
     if (allDone) {
@@ -252,8 +243,8 @@ export async function finishPlanningForMember(
         completedMembers,
         totalMembers,
     };
-    } 
-// Update trip details by admin
+}
+
 export async function updateTripForAdmin(input: {
     idToken: string;
     tripId: string;
@@ -277,7 +268,6 @@ export async function updateTripForAdmin(input: {
         throw { status: 404, message: "Trip not found" };
     }
 
-    // Effective values after this update (fall back to current where not provided)
     const effectiveTimeline = {
         start_date: input.start_date ?? current.start_date,
         end_date: input.end_date ?? current.end_date,
@@ -338,6 +328,27 @@ export async function updateTripForAdmin(input: {
     return { ...trip, role: "admin" };
 }
 
+// ── Public preview by invite code — no auth required
+export async function getTripByInviteCodePublic(
+    inviteCode: string
+): Promise<Pick<Trip, "trip_id" | "title" | "destination" | "start_date" | "end_date" | "state">> {
+    const trip = await findTripByInviteCode(inviteCode);
+
+    if (!trip) {
+        throw { status: 404, message: "Invalid invite code" };
+    }
+
+    // Return only the fields a non-member needs to preview the trip
+    return {
+        trip_id: trip.trip_id,
+        title: trip.title,
+        destination: trip.destination,
+        start_date: trip.start_date,
+        end_date: trip.end_date,
+        state: trip.state,
+    };
+}
+
 function deriveTripStateFromTimeline(input: {
     planning_end_at?: string;
     voting_end_at?: string;
@@ -375,12 +386,10 @@ function ensureValidTripTimeline(input: {
         throw { status: 400, message: "Invalid date format" };
     }
 
-    // Normalize trip end to end-of-day for comparisons like "on or before end date"
     if (end) {
         end.setHours(23, 59, 59, 999);
     }
 
-    // Rule 1: planning_end_at cannot be after trip end_date
     if (planningEnd && end && planningEnd > end) {
         throw {
             status: 400,
@@ -388,7 +397,6 @@ function ensureValidTripTimeline(input: {
         };
     }
 
-    // Rule 2: voting_end_at must be after planning_end_at
     if (votingEnd && planningEnd && votingEnd <= planningEnd) {
         throw {
             status: 400,
@@ -396,7 +404,6 @@ function ensureValidTripTimeline(input: {
         };
     }
 
-    // Rule 3 (optional but recommended): voting_end_at cannot be after trip end_date
     if (votingEnd && end && votingEnd > end) {
         throw {
             status: 400,
@@ -502,8 +509,6 @@ export async function transitionPlanningToNextState(tripId: string): Promise<Tri
 
     return updatedTrip;
 }
-
-// State transitions 'Planning Voting Final' logic
 
 async function moveCompletedPlanningToNextState(
     tripId: string,
