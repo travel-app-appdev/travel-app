@@ -68,8 +68,6 @@ type TripsCache = {
 };
 
 const TRIPS_STALE_TIME_MS = 30_000;
-// Minimum time between background refreshes on focus (prevents hammering
-// the API if the user rapidly switches tabs or screens)
 const TRIPS_FOCUS_REFRESH_THROTTLE_MS = 5_000;
 let tripsCache: TripsCache | null = null;
 
@@ -78,8 +76,6 @@ let tripsCacheForceNext = false;
 export function invalidateTripsCache() {
   tripsCache = null;
   tripsCacheForceNext = true;
-  // Also clear the API-level cache in trips.ts so fetchMyTrips
-  // always hits the backend on the next call for ALL users
   invalidateMyTripsCache();
 }
 
@@ -310,9 +306,6 @@ export default function HomeScreen() {
         return;
       }
 
-      // No lastFetchRef stale check — fetch frequency is controlled
-      // by useFocusEffect throttle (TRIPS_FOCUS_REFRESH_THROTTLE_MS).
-
       setIsLoading(true);
 
       try {
@@ -378,15 +371,9 @@ export default function HomeScreen() {
       if (shouldForce) {
         lastFetchRef.current = 0;
       }
-      // Always do a background refresh on focus so changes made by other
-      // users (e.g. admin deleting a trip) are reflected immediately.
-      // We throttle to avoid hammering the API on rapid navigation.
       const timeSinceLastFetch = Date.now() - lastFetchRef.current;
       const shouldRefresh = shouldForce || timeSinceLastFetch > TRIPS_FOCUS_REFRESH_THROTTLE_MS;
       if (shouldRefresh) {
-        // Clear the API-level cache so fetchMyTrips hits the backend fresh.
-        // This ensures changes made by other users (deletions, new members)
-        // are always reflected when this user focuses the home screen.
         invalidateMyTripsCache(userId);
         void loadTrips(true);
       }
@@ -589,6 +576,7 @@ export default function HomeScreen() {
                       members: JSON.stringify(trip.members),
                       planningEndAt: trip.planningEndAt ?? "",
                       votingEndAt: trip.votingEndAt ?? "",
+                      role: trip.role,
                     },
                   });
                 }}

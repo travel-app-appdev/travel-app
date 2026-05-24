@@ -182,18 +182,15 @@ export async function removeMemberForAdmin(input: {
     const decoded = await admin.auth().verifyIdToken(input.idToken);
     const adminUserId = decoded.uid;
 
-    // Verify the requester is an admin of this trip
     const adminMembership = await findMembership(input.tripId, adminUserId);
     if (!adminMembership || adminMembership.role !== "admin") {
         throw { status: 403, message: "Only the admin can remove members" };
     }
 
-    // Prevent admin from removing themselves
     if (input.memberId === adminUserId) {
         throw { status: 403, message: "Admin cannot remove themselves. Delete the trip instead." };
     }
 
-    // Verify the member to remove actually belongs to this trip
     const memberMembership = await findMembership(input.tripId, input.memberId);
     if (!memberMembership) {
         throw { status: 404, message: "Member not found in this trip" };
@@ -210,36 +207,29 @@ export async function finishPlanningForMember(
     const decoded = await admin.auth().verifyIdToken(idToken);
     const userId = decoded.uid;
 
-    // check trip exists
     const trip = await findTripById(tripId);
     if (!trip) {
         throw { status: 404, message: "Trip not found" };
     }
 
-    // check trip is in Planning state
     if (trip.state !== "Planning") {
         throw { status: 400, message: "Trip is not in Planning state" };
     }
 
-    // check user is a member
     const membership = await findMembership(tripId, userId);
     if (!membership) {
         throw { status: 404, message: "User is not a member of this trip" };
     }
 
-    // Make this endpoint idempotent. If the user already finished planning,
-    // still recompute the trip transition so an old Planning trip can recover.
     if (!membership.planning_done) {
         await markMemberPlanningDone(tripId, userId);
     }
 
-    // get all members and check if all are done
     const allMembers = await findAcceptedMembersByTripId(tripId);
     const completedMembers = allMembers.filter(m => m.planning_done || m.user_id === userId).length;
     const totalMembers = allMembers.length;
     const allDone = completedMembers === totalMembers;
 
-    // If all members are done, skip Voting when there are no collisions.
     let nextState: TripState = "Planning";
 
     if (allDone) {
@@ -252,8 +242,35 @@ export async function finishPlanningForMember(
         completedMembers,
         totalMembers,
     };
-    } 
-// Update trip details by admin
+}
+
+export async function finishVotingForAdmin(
+    tripId: string,
+    idToken: string
+): Promise<{ tripState: TripState }> {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const userId = decoded.uid;
+
+    const trip = await findTripById(tripId);
+    if (!trip) {
+        throw { status: 404, message: "Trip not found" };
+    }
+
+    if (trip.state !== "Voting") {
+        throw { status: 400, message: "Trip is not in Voting state" };
+    }
+
+    const membership = await findMembership(tripId, userId);
+    if (!membership || membership.role !== "admin") {
+        throw { status: 403, message: "Only the admin can end voting" };
+    }
+
+    await createFinalItineraryForTrip(tripId);
+    await updateTripState(tripId, "Final");
+
+    return { tripState: "Final" };
+}
+
 export async function updateTripForAdmin(input: {
     idToken: string;
     tripId: string;
@@ -277,7 +294,6 @@ export async function updateTripForAdmin(input: {
         throw { status: 404, message: "Trip not found" };
     }
 
-    // Effective values after this update (fall back to current where not provided)
     const effectiveTimeline = {
         start_date: input.start_date ?? current.start_date,
         end_date: input.end_date ?? current.end_date,
@@ -375,12 +391,10 @@ function ensureValidTripTimeline(input: {
         throw { status: 400, message: "Invalid date format" };
     }
 
-    // Normalize trip end to end-of-day for comparisons like "on or before end date"
     if (end) {
         end.setHours(23, 59, 59, 999);
     }
 
-    // Rule 1: planning_end_at cannot be after trip end_date
     if (planningEnd && end && planningEnd > end) {
         throw {
             status: 400,
@@ -388,7 +402,6 @@ function ensureValidTripTimeline(input: {
         };
     }
 
-    // Rule 2: voting_end_at must be after planning_end_at
     if (votingEnd && planningEnd && votingEnd <= planningEnd) {
         throw {
             status: 400,
@@ -396,7 +409,6 @@ function ensureValidTripTimeline(input: {
         };
     }
 
-    // Rule 3 (optional but recommended): voting_end_at cannot be after trip end_date
     if (votingEnd && end && votingEnd > end) {
         throw {
             status: 400,
@@ -502,8 +514,6 @@ export async function transitionPlanningToNextState(tripId: string): Promise<Tri
 
     return updatedTrip;
 }
-
-// State transitions 'Planning Voting Final' logic
 
 async function moveCompletedPlanningToNextState(
     tripId: string,
