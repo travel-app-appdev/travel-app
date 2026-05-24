@@ -33,6 +33,7 @@ import { ItineraryDaySelector } from "@/src/components/itinerary/ItineraryDaySel
 import { PlanningSlotCard } from "@/src/components/itinerary/PlanningSlotCard";
 import { SkeletonSlotCard } from "@/src/components/itinerary/SkeletonSlotCard";
 import { PlanningDoneBar } from "@/src/components/itinerary/PlanningDoneBar";
+import { VotingDoneBar } from "@/src/components/itinerary/VotingDoneBar";
 import { VotingSlotCard } from "@/src/components/itinerary/VoteSlotCard";
 import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
@@ -319,6 +320,7 @@ export default function ItineraryScreen() {
     planningEndAt,
     votingEndAt,
     selectedDay,
+    role,
   } = useLocalSearchParams<{
     tripId?: string;
     state?: "planning" | "voting" | "final";
@@ -340,6 +342,7 @@ export default function ItineraryScreen() {
     planningEndAt?: string;
     votingEndAt?: string;
     selectedDay?: string;
+    role?: "admin" | "member";
   }>();
 
   const routeState: ItineraryState | undefined =
@@ -380,6 +383,9 @@ export default function ItineraryScreen() {
 
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
   const [isSubmittingPlanning, setIsSubmittingPlanning] = useState(false);
+  const [isSubmittingVoting, setIsSubmittingVoting] = useState(false);
+
+  const isAdmin = role === "admin";
 
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
     null
@@ -1060,6 +1066,52 @@ export default function ItineraryScreen() {
     }
   }
 
+  async function handleFinishVoting() {
+    if (isSubmittingVoting) return;
+
+    if (!authToken || itinerary.tripId === "trip-fallback") {
+      setIsPreparingFinalItinerary(true);
+      if (finalizingTimeoutRef.current) {
+        clearTimeout(finalizingTimeoutRef.current);
+      }
+      finalizingTimeoutRef.current = setTimeout(() => {
+        setItinerary((current) => ({ ...current, state: "final" }));
+        setIsPreparingFinalItinerary(false);
+        setActivityRefreshKey((value) => value + 1);
+        router.setParams({ state: "final" });
+      }, TRANSITION_OVERLAY_MS);
+      return;
+    }
+
+    setIsSubmittingVoting(true);
+    try {
+      await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL}/trips/${itinerary.tripId}/finish-voting`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ idToken: authToken }),
+        }
+      );
+    } catch {
+    } finally {
+      setIsSubmittingVoting(false);
+    }
+
+    setIsPreparingFinalItinerary(true);
+    if (finalizingTimeoutRef.current) {
+      clearTimeout(finalizingTimeoutRef.current);
+    }
+    finalizingTimeoutRef.current = setTimeout(() => {
+      setItinerary((current) => ({ ...current, state: "final" }));
+      setIsPreparingFinalItinerary(false);
+      setActivityRefreshKey((value) => value + 1);
+      router.setParams({ state: "final" });
+    }, TRANSITION_OVERLAY_MS);
+  }
+
   const votingActivities = useMemo(() => {
     const all = apiActivities.length > 0 ? apiActivities : itinerary.activities;
     const groups = new Map<string, Activity[]>();
@@ -1478,6 +1530,13 @@ export default function ItineraryScreen() {
             }
             onPress={handleFinishPlanning}
             onInfoPress={handlePlanningInfoPress}
+          />
+        )}
+
+        {activeState === "voting" && isAdmin && (
+          <VotingDoneBar
+            disabled={isSubmittingVoting || isPreparingFinalItinerary}
+            onPress={handleFinishVoting}
           />
         )}
 
