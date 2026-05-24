@@ -5,6 +5,7 @@ import {
   View,
   ScrollView,
   Dimensions,
+  Pressable,
 } from "react-native";
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppText } from "@/src/components/common/AppText";
@@ -18,6 +19,7 @@ import PalmLeaf from "@/assets/visuals/palm-leaf.svg";
 import PalmTree from "@/assets/visuals/palm-tree.svg";
 import Google from "@/assets/icons/google.svg";
 import Stars from "@/assets/visuals/stars.svg";
+import JoinTest from "@/assets/icons/join_test.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -53,7 +55,6 @@ export default function StartPage() {
   const { width, height } = dimensions;
   const { width: svgWidth, height: svgHeight } = svgDimensions;
 
-  // Layout / text — reactive to rotation
   const sw = width / 390;
   const sh = height / 844;
   const baseScale = Math.min(sw, sh);
@@ -65,7 +66,6 @@ export default function StartPage() {
   const titleVotiesSize = Math.round(lerp(56 * baseScale, 82, midProgress));
   const starsSize = lerp(50 * baseScale, 62, midProgress);
 
-  // SVG sizes / positions — frozen at mount, never resize on rotation
   const svgSw = svgWidth / 390;
   const svgSh = svgHeight / 844;
   const svgWideProgress = clamp((svgWidth - 390) / (1440 - 390), 0, 1);
@@ -101,6 +101,7 @@ export default function StartPage() {
 
   return (
     <View style={styles.container}>
+      {/* ── Decorative SVGs ── */}
       <View
         style={[
           styles.palmTreeWrapper,
@@ -135,6 +136,19 @@ export default function StartPage() {
           <CurlyGreen width={SCREEN_WIDTH * 1.1} height={SCREEN_WIDTH * 1.1} />
         </View>
       )}
+
+      {/* ── join_test demo — Replace the code param with a valid invite code, then uncomment to demo invite flow */}
+      {/* <Pressable
+        style={styles.joinTestButton}
+        onPress={() =>
+          router.push({ pathname: "/invite", params: { code: "YOUR_INVITE_CODE" } })
+        }
+        accessibilityRole="button"
+        accessibilityLabel="Test invite screen"
+        accessibilityHint="Opens the invite preview screen for testing"
+      >
+        <JoinTest width={36} height={36} />
+      </Pressable> */}
 
       <ScrollView
         contentContainerStyle={[
@@ -273,6 +287,16 @@ const styles = StyleSheet.create({
     bottom: -SCREEN_WIDTH * 0.3,
     left: -SCREEN_WIDTH * 0.1,
     zIndex: 0,
+  },
+  joinTestButton: {
+    position: "absolute",
+    top: spacing.xxxxl2,
+    left: spacing.xl,
+    zIndex: 10,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   logoWrapper: {
     alignItems: "center",
