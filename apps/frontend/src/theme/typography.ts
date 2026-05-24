@@ -1,4 +1,3 @@
-// theme/typography.ts
 export const typography = {
   size: {
     xs: 12,
