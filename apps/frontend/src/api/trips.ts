@@ -23,6 +23,16 @@ export type Trip = {
   voting_end_at?: string;
 };
 
+// Minimal public trip info returned by the invite preview endpoint
+export type TripPreview = {
+  trip_id: string;
+  title: string;
+  destination: string;
+  start_date: string;
+  end_date: string;
+  state: "Planning" | "Voting" | "Final";
+};
+
 type ApiErrorResponse = {
   error?: string;
 };
@@ -317,7 +327,6 @@ type FinishPlanningPayload = {
   tripId: string;
 };
 
-
 export async function finishPlanning(
   payload: FinishPlanningPayload
 ): Promise<FinishPlanningResponse> {
@@ -340,4 +349,23 @@ export async function finishPlanning(
 
   invalidateTripsAfterMutation();
   return data as FinishPlanningResponse;
+}
+
+// ── Fetch public trip preview by invite code (no auth required) ──
+export async function fetchTripByInviteCode(
+  inviteCode: string
+): Promise<TripPreview> {
+  const response = await fetch(
+    `${API_URL}/trips/invite/${encodeURIComponent(inviteCode.toUpperCase())}`
+  );
+
+  const data: TripPreview | ApiErrorResponse = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      (data as ApiErrorResponse).error || "Invalid invite code"
+    );
+  }
+
+  return data as TripPreview;
 }
