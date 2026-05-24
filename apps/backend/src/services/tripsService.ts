@@ -244,6 +244,33 @@ export async function finishPlanningForMember(
     };
 }
 
+export async function finishVotingForAdmin(
+    tripId: string,
+    idToken: string
+): Promise<{ tripState: TripState }> {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const userId = decoded.uid;
+
+    const trip = await findTripById(tripId);
+    if (!trip) {
+        throw { status: 404, message: "Trip not found" };
+    }
+
+    if (trip.state !== "Voting") {
+        throw { status: 400, message: "Trip is not in Voting state" };
+    }
+
+    const membership = await findMembership(tripId, userId);
+    if (!membership || membership.role !== "admin") {
+        throw { status: 403, message: "Only the admin can end voting" };
+    }
+
+    await createFinalItineraryForTrip(tripId);
+    await updateTripState(tripId, "Final");
+
+    return { tripState: "Final" };
+}
+
 export async function updateTripForAdmin(input: {
     idToken: string;
     tripId: string;

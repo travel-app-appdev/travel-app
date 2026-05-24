@@ -9,6 +9,7 @@ import {
     leaveTripForMember,
     removeMemberForAdmin,
     finishPlanningForMember,
+    finishVotingForAdmin,
     updateTripForAdmin,
     getTripByInviteCodePublic,
 } from "../services/tripsService";
@@ -288,6 +289,31 @@ export const finishPlanning = async (req: Request, res: Response): Promise<void>
             res.status(409).json({ error: error.message });
         } else {
             res.status(401).json({ error: "Invalid token or failed to finish planning" });
+        }
+    }
+};
+
+export const finishVoting = async (req: Request, res: Response): Promise<void> => {
+    const tripId = String(req.params.tripId);
+    const { idToken } = req.body;
+
+    if (!idToken) {
+        res.status(400).json({ error: "idToken is required" });
+        return;
+    }
+
+    try {
+        const result = await finishVotingForAdmin(tripId, idToken);
+        res.status(200).json(result);
+    } catch (error: any) {
+        if (error.status === 404) {
+            res.status(404).json({ error: error.message });
+        } else if (error.status === 400) {
+            res.status(400).json({ error: error.message });
+        } else if (error.status === 403) {
+            res.status(403).json({ error: error.message });
+        } else {
+            res.status(401).json({ error: "Invalid token or failed to finish voting" });
         }
     }
 };
