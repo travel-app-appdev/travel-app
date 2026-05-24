@@ -1,4 +1,3 @@
-// app/home.tsx
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
@@ -607,6 +606,7 @@ export default function HomeScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+  
 }
 
 const styles = StyleSheet.create({
