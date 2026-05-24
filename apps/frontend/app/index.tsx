@@ -22,6 +22,13 @@ import Stars from "@/assets/visuals/stars.svg";
 import JoinTest from "@/assets/icons/join_test.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
+// TODO: Deep linking — when a real domain is available:
+// 1. Add the domain scheme to app.json under "expo.scheme" and "expo.android.intentFilters"
+// 2. Host /.well-known/assetlinks.json (Android) and /.well-known/apple-app-site-association (iOS)
+// 3. Update the share message in create-trip.tsx to include the deep link URL:
+//    e.g. "Join my trip on Votey! Use invite code: XYZL or open: https://voteyapp.com/invite?code=XYZL"
+// 4. This screen (invite.tsx) needs zero changes — it already reads the `code` param which is exactly what the deep link will pass to it.
+
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 function clamp(value: number, min: number, max: number) {
