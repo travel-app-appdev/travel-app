@@ -889,7 +889,7 @@ const styles = StyleSheet.create({
   phaseBadge: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     alignSelf: "flex-start",
   },
   phaseBadgeText: {
