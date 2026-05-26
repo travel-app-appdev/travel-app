@@ -118,8 +118,8 @@ export function ItineraryHeader({
               accessibilityLabel={`Trip dates: ${formatTripDateRange(startDate, endDate)}`}
             >
               <CalendarIcon
-                width={18}
-                height={18}
+                width={24}
+                height={24}
                 {...hiddenFromAccessibility}
               />
               <AppText variant="body" style={styles.dateText}>
