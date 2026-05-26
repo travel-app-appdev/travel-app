@@ -221,7 +221,11 @@ export async function toggleFinalActivityAttendance(input: {
     slotId: string;
     idToken: string;
     activityId: string;
-}): Promise<{ joined: boolean; joinedCount: number }> {
+}): Promise<{
+    joined: boolean;
+    joinedCount: number;
+    joinedMembers: { user_id: string; name: string }[];
+}> {
     const decoded = await admin.auth().verifyIdToken(input.idToken);
     const userId = decoded.uid;
 

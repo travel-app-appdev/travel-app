@@ -1302,7 +1302,7 @@ export default function ItineraryScreen() {
                 ...item,
                 hasCurrentUserJoined: result.joined,
                 joinedCount: result.joinedCount,
-                joinedMembers: item.joinedMembers,
+                joinedMembers: result.joinedMembers ?? item.joinedMembers,
               }
             : item
         );
@@ -1319,6 +1319,7 @@ export default function ItineraryScreen() {
               ...current,
               hasCurrentUserJoined: result.joined,
               joinedCount: result.joinedCount,
+              joinedMembers: result.joinedMembers ?? current.joinedMembers,
             }
           : current
       );

@@ -95,18 +95,16 @@ export function ActivityDetailModal({
 
             <View style={styles.infoList}>
               <View style={styles.infoRow}>
-                <LocationIcon width={32} height={32} />
+                <LocationIcon width={24} height={24} />
                 <AppText variant="body" style={styles.infoText}>
-                  {activity.address || "No address available"}
+                  {activity.address?.trim() || "No address available"}
                 </AppText>
               </View>
 
               <View style={styles.infoRow}>
-                <Timer width={20} height={20} />
+                <Timer width={24} height={24} />
                 <AppText variant="body" style={styles.infoText}>
-                  {activityTimeRange
-                    ? `${topLabel}: ${activityTimeRange}`
-                    : slotLabel || "No time available"}
+                  {activityTimeRange || "No time available"}
                 </AppText>
               </View>
 
@@ -131,7 +129,9 @@ export function ActivityDetailModal({
                   <MembersIcon width={20} height={20} />
                   <AppText variant="body" style={styles.infoText}>
                     {activity.joinedMembers?.length
-                      ? activity.joinedMembers.map((member) => member.name).join(", ")
+                      ? activity.joinedMembers
+                          .map((member) => member.name)
+                          .join(", ")
                       : "No members joined yet"}
                   </AppText>
                 </View>
@@ -190,7 +190,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.lg,
     paddingRight: spacing.md,
   },
-
   infoList: {
     gap: spacing.md,
     marginTop: spacing.xs,
@@ -206,7 +205,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   infoText: {
-    color: colors.textPrimary,
+    color: colors.nightBlack,
     flexShrink: 1,
   },
   linkText: {
