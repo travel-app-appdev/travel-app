@@ -32,6 +32,17 @@ export function VotingSlotCard({
   const handleOpenDetails = useSinglePress(() => onPressDetails?.(activity));
   const activityTimeRange = formatActivityTimeRange(activity);
 
+  const hasAddress = !!activity.address?.trim();
+  const hasGoogleMapsUrl = !!activity.googleMapsUrl?.trim();
+  const voteCount = activity.voteCount ?? 0;
+  const voteLabel = `${voteCount} ${voteCount === 1 ? "vote" : "votes"}`;
+
+  const detailParts = [
+    activityTimeRange ? `time ${activityTimeRange}` : null,
+    hasAddress ? `address ${activity.address.trim()}` : null,
+    hasGoogleMapsUrl ? "Google Maps link available" : null,
+  ].filter(Boolean);
+
   return (
     <View style={styles.row}>
       <Pressable
@@ -39,8 +50,8 @@ export function VotingSlotCard({
         style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
         accessibilityRole="button"
         accessibilityLabel={
-          activityTimeRange
-            ? `Open details for ${activity.name}, ${activityTimeRange}`
+          detailParts.length > 0
+            ? `Open details for ${activity.name}, ${detailParts.join(", ")}`
             : `Open details for ${activity.name}`
         }
         accessibilityHint="Shows more information about this activity"
@@ -56,72 +67,126 @@ export function VotingSlotCard({
           {activity.name}
         </AppText>
 
-        {!!activityTimeRange && (
+        {hasAddress ? (
+          <>
+            {!!activityTimeRange && (
+              <View
+                style={styles.detailRow}
+                accessible={true}
+                accessibilityLabel={`Activity time: ${activityTimeRange}`}
+              >
+                <Timer width={16} height={16} {...hiddenFromAccessibility} />
+                <AppText
+                  variant="caption"
+                  style={styles.detailText}
+                  accessible={false}
+                  numberOfLines={1}
+                >
+                  {activityTimeRange}
+                </AppText>
+              </View>
+            )}
+
+            <View
+              style={styles.detailRow}
+              accessible={true}
+              accessibilityLabel={`Address: ${activity.address.trim()}, ${voteLabel}`}
+            >
+              <LocationPin
+                width={16}
+                height={16}
+                {...hiddenFromAccessibility}
+              />
+
+              <AppText
+                variant="caption"
+                style={styles.detailText}
+                accessible={false}
+                numberOfLines={1}
+              >
+                {activity.address.trim()}
+              </AppText>
+
+              <View
+                style={styles.inlineVote}
+                accessibilityLiveRegion="polite"
+                accessible={false}
+              >
+                <AppText
+                  variant="caption"
+                  style={styles.voteCount}
+                  numberOfLines={1}
+                >
+                  {voteLabel}
+                </AppText>
+              </View>
+            </View>
+          </>
+        ) : !!activityTimeRange ? (
           <View
-            style={styles.addressRow}
+            style={styles.detailRow}
             accessible={true}
-            accessibilityLabel={`Activity time: ${activityTimeRange}`}
+            accessibilityLabel={`Activity time: ${activityTimeRange}, ${voteLabel}`}
           >
             <Timer width={16} height={16} {...hiddenFromAccessibility} />
+
             <AppText
               variant="caption"
-              style={styles.address}
+              style={styles.detailText}
               accessible={false}
               numberOfLines={1}
             >
               {activityTimeRange}
             </AppText>
-          </View>
-        )}
 
-        <View
-          style={styles.addressRow}
-          accessible={true}
-          accessibilityLabel={`Address: ${activity.address}`}
-        >
-          <LocationPin width={16} height={16} {...hiddenFromAccessibility} />
-          <AppText
-            variant="caption"
-            style={styles.address}
-            accessible={false}
-            numberOfLines={1}
-          >
-            {activity.address}
-          </AppText>
-        </View>
-
-        <View style={styles.metaRow}>
-          {activity.googleMapsUrl ? (
-            <View style={styles.googleRow} {...hiddenFromAccessibility}>
-              <GoogleIcon width={14} height={14} />
+            <View
+              style={styles.inlineVote}
+              accessibilityLiveRegion="polite"
+              accessible={false}
+            >
               <AppText
                 variant="caption"
-                style={styles.googleLink}
+                style={styles.voteCount}
                 numberOfLines={1}
               >
-                Google Maps link
+                {voteLabel}
               </AppText>
             </View>
-          ) : (
-            <View style={styles.googleRow} />
-          )}
-
+          </View>
+        ) : (
           <View
-            style={styles.voteRow}
-            accessibilityLiveRegion="polite"
+            style={styles.nameVoteRow}
             accessible={true}
-            accessibilityLabel={`${activity.voteCount ?? 0} ${activity.voteCount === 1 ? "vote" : "votes"}`}
+            accessibilityLabel={voteLabel}
           >
+            <View style={styles.nameVoteSpacer} />
             <AppText
               variant="caption"
               style={styles.voteCount}
               numberOfLines={1}
             >
-              {activity.voteCount ?? 0}{" "}
-              {activity.voteCount === 1 ? "vote" : "votes"}
+              {voteLabel}
             </AppText>
           </View>
-        </View>
+        )}
+
+        {hasGoogleMapsUrl && (
+          <View
+            style={styles.googleRow}
+            accessible={true}
+            accessibilityLabel="Google Maps link available"
+          >
+            <GoogleIcon width={14} height={14} {...hiddenFromAccessibility} />
+            <AppText
+              variant="caption"
+              style={styles.googleLink}
+              accessible={false}
+              numberOfLines={1}
+            >
+              Google Maps link
+            </AppText>
+          </View>
+        )}
       </Pressable>
 
       <Pressable
@@ -200,16 +265,42 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.lg,
     marginBottom: 2,
   },
-  addressRow: {
+  detailRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
     marginTop: 1,
   },
-  address: {
+  detailText: {
     flex: 1,
     color: colors.textMuted,
     fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
+  },
+  inlineVote: {
+    flexShrink: 0,
+    marginLeft: spacing.sm,
+  },
+  nameVoteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 1,
+  },
+  nameVoteSpacer: {
+    flex: 1,
+  },
+  googleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    minWidth: 0,
+  },
+  googleLink: {
+    flexShrink: 1,
+    color: colors.seaBlue,
+    fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
   },
@@ -236,32 +327,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.xs,
-  },
-
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  googleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    flex: 1,
-    minWidth: 0,
-  },
-  googleLink: {
-    flexShrink: 1,
-    color: colors.seaBlue,
-    fontFamily: typography.fontFamily.bodySemiBold,
-    fontSize: typography.size.md,
-    lineHeight: typography.lineHeight.md,
-  },
-  voteRow: {
-    flexShrink: 0,
-    alignItems: "flex-end",
   },
   voteCount: {
     color: colors.textMuted,

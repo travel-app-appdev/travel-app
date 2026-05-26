@@ -35,6 +35,7 @@ export function FinalSlotCard({
       onPressDetails?.(activity, slot.label);
     }
   });
+
   const activityTimeRange = formatActivityTimeRange(activity);
 
   if (!activity) {
@@ -60,6 +61,17 @@ export function FinalSlotCard({
     );
   }
 
+  const hasAddress = !!activity.address?.trim();
+  const hasGoogleMapsUrl = !!activity.googleMapsUrl?.trim();
+  const joinedCount = activity.joinedCount ?? 0;
+  const joinedLabel = `${joinedCount} joined`;
+
+  const detailParts = [
+    activityTimeRange ? `time ${activityTimeRange}` : null,
+    hasAddress ? `address ${activity.address.trim()}` : null,
+    hasGoogleMapsUrl ? "Google Maps link available" : null,
+  ].filter(Boolean);
+
   return (
     <View style={styles.row}>
       <Pressable
@@ -67,8 +79,8 @@ export function FinalSlotCard({
         style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
         accessibilityRole="button"
         accessibilityLabel={
-          activityTimeRange
-            ? `Open details for ${activity.name}, ${activityTimeRange}`
+          detailParts.length > 0
+            ? `Open details for ${activity.name}, ${detailParts.join(", ")}`
             : `Open details for ${activity.name}`
         }
         accessibilityHint="Shows more information about this activity"
@@ -84,49 +96,123 @@ export function FinalSlotCard({
           {activity.name}
         </AppText>
 
-        {!!activityTimeRange && (
-          <View style={styles.addressRow} {...hiddenFromAccessibility}>
-            <Timer width={16} height={16} />
-            <AppText variant="caption" style={styles.address} numberOfLines={1}>
+        {hasAddress ? (
+          <>
+            {!!activityTimeRange && (
+              <View
+                style={styles.detailRow}
+                accessible={true}
+                accessibilityLabel={`Activity time: ${activityTimeRange}`}
+              >
+                <Timer width={16} height={16} {...hiddenFromAccessibility} />
+                <AppText
+                  variant="caption"
+                  style={styles.detailText}
+                  accessible={false}
+                  numberOfLines={1}
+                >
+                  {activityTimeRange}
+                </AppText>
+              </View>
+            )}
+
+            <View
+              style={styles.detailRow}
+              accessible={true}
+              accessibilityLabel={`Address: ${activity.address.trim()}, ${joinedLabel}`}
+            >
+              <LocationPin
+                width={16}
+                height={16}
+                {...hiddenFromAccessibility}
+              />
+
+              <AppText
+                variant="caption"
+                style={styles.detailText}
+                accessible={false}
+                numberOfLines={1}
+              >
+                {activity.address.trim()}
+              </AppText>
+
+              <View style={styles.inlineMeta} accessible={false}>
+                <MembersIcon width={14} height={14} />
+                <AppText
+                  variant="caption"
+                  style={styles.joinedCount}
+                  numberOfLines={1}
+                >
+                  {joinedLabel}
+                </AppText>
+              </View>
+            </View>
+          </>
+        ) : !!activityTimeRange ? (
+          <View
+            style={styles.detailRow}
+            accessible={true}
+            accessibilityLabel={`Activity time: ${activityTimeRange}, ${joinedLabel}`}
+          >
+            <Timer width={16} height={16} {...hiddenFromAccessibility} />
+
+            <AppText
+              variant="caption"
+              style={styles.detailText}
+              accessible={false}
+              numberOfLines={1}
+            >
               {activityTimeRange}
             </AppText>
+
+            <View style={styles.inlineMeta} accessible={false}>
+              <MembersIcon width={14} height={14} />
+              <AppText
+                variant="caption"
+                style={styles.joinedCount}
+                numberOfLines={1}
+              >
+                {joinedLabel}
+              </AppText>
+            </View>
+          </View>
+        ) : (
+          <View
+            style={styles.nameMetaRow}
+            accessible={true}
+            accessibilityLabel={joinedLabel}
+          >
+            <View style={styles.nameMetaSpacer} />
+            <View style={styles.inlineMeta} accessible={false}>
+              <MembersIcon width={14} height={14} />
+              <AppText
+                variant="caption"
+                style={styles.joinedCount}
+                numberOfLines={1}
+              >
+                {joinedLabel}
+              </AppText>
+            </View>
           </View>
         )}
 
-        <View style={styles.addressRow} {...hiddenFromAccessibility}>
-          <LocationPin width={16} height={16} />
-          <AppText variant="caption" style={styles.address} numberOfLines={1}>
-            {activity.address}
-          </AppText>
-        </View>
-
-        <View style={styles.metaRow} {...hiddenFromAccessibility}>
-          {activity.googleMapsUrl ? (
-            <View style={styles.googleRow}>
-              <GoogleIcon width={14} height={14} />
-              <AppText
-                variant="caption"
-                style={styles.googleLink}
-                numberOfLines={1}
-              >
-                Google Maps link
-              </AppText>
-            </View>
-          ) : (
-            <View style={styles.googleRow} />
-          )}
-
-          <View style={styles.joinedRow}>
-            <MembersIcon width={14} height={14} />
+        {hasGoogleMapsUrl && (
+          <View
+            style={styles.googleRow}
+            accessible={true}
+            accessibilityLabel="Google Maps link available"
+          >
+            <GoogleIcon width={14} height={14} {...hiddenFromAccessibility} />
             <AppText
               variant="caption"
-              style={styles.joinedCount}
+              style={styles.googleLink}
+              accessible={false}
               numberOfLines={1}
             >
-              {activity.joinedCount ?? 0} joined
+              Google Maps link
             </AppText>
           </View>
-        </View>
+        )}
       </Pressable>
 
       <Pressable
@@ -234,31 +320,39 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.lg,
     marginBottom: 2,
   },
-  addressRow: {
+  detailRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
     marginTop: 1,
   },
-  address: {
+  detailText: {
     flex: 1,
     color: colors.textMuted,
     fontFamily: typography.fontFamily.body,
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
   },
-  metaRow: {
+  inlineMeta: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-    marginTop: spacing.xs,
+    gap: spacing.xs,
+    flexShrink: 0,
+    marginLeft: spacing.sm,
+  },
+  nameMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 1,
+  },
+  nameMetaSpacer: {
+    flex: 1,
   },
   googleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    flex: 1,
+    marginTop: spacing.xs,
     minWidth: 0,
   },
   googleLink: {
@@ -267,12 +361,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
-  },
-  joinedRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    flexShrink: 0,
   },
   joinedCount: {
     color: colors.textMuted,

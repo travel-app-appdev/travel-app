@@ -513,7 +513,11 @@ export async function toggleActivityAttendance(input: {
     slotId: string;
     activityId: string;
     userId: string;
-}): Promise<{ joined: boolean; joinedCount: number }> {
+}): Promise<{
+    joined: boolean;
+    joinedCount: number;
+    joinedMembers: { user_id: string; name: string }[];
+}> {
     const db = admin.firestore();
     const ref = db
         .collection("activity_attendance")
@@ -544,5 +548,6 @@ export async function toggleActivityAttendance(input: {
     return {
         joined,
         joinedCount: metadata.joinedCount,
+        joinedMembers: metadata.joinedMembers
     };
 }
