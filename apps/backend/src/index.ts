@@ -14,6 +14,27 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(cors());
 app.use(express.json());
 
+// ── Android deep link verification ───────────────────────────────────────────
+// Required for Android App Links to work with the invite flow.
+// Must be served at /.well-known/assetlinks.json over HTTPS.
+// Debug SHA256 is used for development builds.
+// Add the release SHA256 to the array when creating a production build.
+app.get("/.well-known/assetlinks.json", (_req, res) => {
+  res.json([
+    {
+      relation: ["delegate_permission/common.handle_all_urls"],
+      target: {
+        namespace: "android_app",
+        package_name: "com.anonymous.frontend",
+        sha256_cert_fingerprints: [
+          "E4:28:B5:14:E5:0B:81:56:E7:7D:40:CA:B3:DC:1F:18:73:86:BD:5C:2E:24:79:88:A8:12:A4:B4:DF:A7:65:BB", // debug
+          // "YOUR_RELEASE_SHA256_HERE", // release — add when building for production
+        ],
+      },
+    },
+  ]);
+});
+
 app.use((req, res, next) => {
   const startedAt = Date.now();
 
