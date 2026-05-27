@@ -29,6 +29,7 @@ jest.mock("expo-router", () => ({
   Link: ({ children }: any) => children,
   router: mockRouter,
   useRouter: () => mockRouter,
+  useLocalSearchParams: () => ({}),
 }));
 
 jest.mock("@/src/services/authServices", () => ({
