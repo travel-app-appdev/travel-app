@@ -5,7 +5,10 @@
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
+    "android:device": "expo run:android",
+    "android:build": "eas build --platform android --profile preview",
     "ios": "expo start --ios",
+    "ios:device": "expo run:ios",
     "web": "expo start --web",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

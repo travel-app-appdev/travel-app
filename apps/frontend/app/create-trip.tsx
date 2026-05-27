@@ -381,11 +381,14 @@ export default function CreateTripScreen() {
     setOpenPhase((prev) => (prev === key ? null : key));
   };
 
-  // ── Share handler (replaces copy) ──────────────────────────────────────────
+  // ── Share handler ──────────────────────────────────────────────────────────
+  // Shares the invite code with a deep link URL.
+  // When the backend is deployed and assetlinks.json is live, tapping the
+  // URL on Android will open the app directly to the invite screen.
   const handleShareCode = useSinglePress(async () => {
     try {
       await Share.share({
-        message: `Join my trip on Votey! Use invite code: ${tripCode}`,
+        message: `Join my trip on Votey! Use invite code: ${tripCode} or open: https://cc231023-11019.node.ustp.cloud/invite?code=${tripCode}`,
       });
     } catch {
       // User dismissed share sheet — no action needed

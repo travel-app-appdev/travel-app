@@ -7,6 +7,7 @@ import {
   Dimensions,
   Pressable,
 } from "react-native";
+import * as Linking from "expo-linking";
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography, shadows } from "@/src/theme";
@@ -22,12 +23,12 @@ import Stars from "@/assets/visuals/stars.svg";
 import JoinTest from "@/assets/icons/join_test.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
-// TODO: Deep linking — when a real domain is available:
-// 1. Add the domain scheme to app.json under "expo.scheme" and "expo.android.intentFilters"
-// 2. Host /.well-known/assetlinks.json (Android) and /.well-known/apple-app-site-association (iOS)
-// 3. Update the share message in create-trip.tsx to include the deep link URL:
-//    e.g. "Join my trip on Votey! Use invite code: XYZL or open: https://voteyapp.com/invite?code=XYZL"
-// 4. This screen (invite.tsx) needs zero changes — it already reads the `code` param which is exactly what the deep link will pass to it.
+// TODO: Deep linking — remaining steps when ready for production:
+// 1. Get release SHA256 fingerprint from EAS or release keystore and add to
+//    the sha256_cert_fingerprints array in apps/backend/src/index.ts
+// 2. Deploy backend so /.well-known/assetlinks.json is live on campus cloud
+// 3. Build a real APK (not Expo Go) with: eas build --platform android
+// 4. invite.tsx needs zero changes — already reads the `code` param correctly
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -85,6 +86,7 @@ export default function StartPage() {
   const palmLeafLeft = lerp(-240 * svgSw, -240 * svgSw + 350, svgWideProgress);
   const palmLeafTop = lerp(50 * svgSh, 50 * svgSh - 600, svgWideProgress);
 
+  // ── Google sign-in response handler ────────────────────────────────────────
   useEffect(() => {
     async function handleGoogleResponse() {
       if (response?.type === "success") {
@@ -105,6 +107,37 @@ export default function StartPage() {
 
     handleGoogleResponse();
   }, [response, signInWithGoogleToken, setUser, setIdToken]);
+
+  // ── Deep link handler ───────────────────────────────────────────────────────
+  // Catches invite links of the form:
+  // https://cc231023-11019.node.ustp.cloud/invite?code=XYZL
+  // and navigates to the invite screen automatically.
+  useEffect(() => {
+    // Handle deep link when app is already open in the background
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      const { path, queryParams } = Linking.parse(url);
+      if (path === "invite" && queryParams?.code) {
+        router.push({
+          pathname: "/invite",
+          params: { code: queryParams.code as string },
+        });
+      }
+    });
+
+    // Handle deep link when app is launched from a cold start
+    Linking.getInitialURL().then((url) => {
+      if (!url) return;
+      const { path, queryParams } = Linking.parse(url);
+      if (path === "invite" && queryParams?.code) {
+        router.replace({
+          pathname: "/invite",
+          params: { code: queryParams.code as string },
+        });
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -144,18 +177,18 @@ export default function StartPage() {
         </View>
       )}
 
-      {/* ── join_test demo — Replace the code param with a valid invite code, then uncomment to demo invite flow */}
-      {/* <Pressable
+      {/* TODO: demo only — replace code param with valid invite code from Firestore, then uncomment
+      <Pressable
         style={styles.joinTestButton}
         onPress={() =>
           router.push({ pathname: "/invite", params: { code: "YOUR_INVITE_CODE" } })
         }
         accessibilityRole="button"
         accessibilityLabel="Test invite screen"
-        accessibilityHint="Opens the invite preview screen for testing"
       >
         <JoinTest width={36} height={36} />
-      </Pressable> */}
+      </Pressable>
+      */}
 
       <ScrollView
         contentContainerStyle={[
