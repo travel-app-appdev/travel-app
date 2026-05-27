@@ -56,6 +56,31 @@ export function TripCard({
 
   const handleCardPress = useSinglePress(onPress ?? (() => {}));
   const handleStatusPress = useSinglePress(() => onStatusPress?.(status));
+  const webStatusButtonProps =
+    Platform.OS === "web"
+      ? ({
+          tabIndex: 0,
+          onKeyDown: (event: {
+            key?: string;
+            preventDefault?: () => void;
+            stopPropagation?: () => void;
+          }) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+
+            event.preventDefault?.();
+            event.stopPropagation?.();
+            handleStatusPress();
+          },
+          onClick: (event: {
+            preventDefault?: () => void;
+            stopPropagation?: () => void;
+          }) => {
+            event.preventDefault?.();
+            event.stopPropagation?.();
+            handleStatusPress();
+          },
+        } as const)
+      : {};
 
   return (
     <Pressable
@@ -63,7 +88,7 @@ export function TripCard({
       onPress={handleCardPress}
       accessibilityRole="button"
       accessibilityLabel={`${title}, ${destination}, ${startDate} to ${endDate}, ${statusLabel}`}
-      accessibilityHint="Opens trip itinerary"
+      accessibilityHint="Opens trip overview"
     >
       <View style={styles.titleRow}>
         <AppText variant="title" style={styles.title} numberOfLines={2}>
@@ -74,12 +99,12 @@ export function TripCard({
           <View
             style={[styles.badge, { backgroundColor: statusStyle.bg }]}
             accessibilityRole="button"
-            accessibilityLabel={`${statusLabel} phase, tap to open`}
+            accessibilityLabel={`${statusLabel} phase`}
             accessibilityHint="Opens the itinerary at this phase"
+            {...webStatusButtonProps}
             onStartShouldSetResponder={() => true}
             onResponderGrant={(e) => {
               e.stopPropagation();
-              handleStatusPress();
             }}
           >
             <AppText variant="caption" style={styles.badgeText}>
@@ -94,7 +119,7 @@ export function TripCard({
               handleStatusPress();
             }}
             accessibilityRole="button"
-            accessibilityLabel={`${statusLabel} phase, tap to open`}
+            accessibilityLabel={`${statusLabel} phase`}
             accessibilityHint="Opens the itinerary at this phase"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >

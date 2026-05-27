@@ -2,6 +2,7 @@ import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
 import {
+  AccessibilityInfo,
   Animated,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import { TripCard } from "@/src/components/common/TripCard";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { fetchMyTrips, invalidateMyTripsCache, type Trip } from "@/src/api/trips";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
@@ -180,8 +182,31 @@ function mapTripsToLists(backendTrips: TripWithMembers[]) {
 
 function SkeletonCard() {
   const shimmer = useRef(new Animated.Value(0)).current;
+  const [isReduceMotionEnabled, setIsReduceMotionEnabled] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    const subscription = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      setIsReduceMotionEnabled
+    );
+
+    AccessibilityInfo.isReduceMotionEnabled().then((isEnabled) => {
+      if (isMounted) setIsReduceMotionEnabled(isEnabled);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isReduceMotionEnabled) {
+      shimmer.setValue(0.55);
+      return;
+    }
+
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(shimmer, {
@@ -202,7 +227,7 @@ function SkeletonCard() {
     return () => {
       animation.stop();
     };
-  }, [shimmer]);
+  }, [isReduceMotionEnabled, shimmer]);
 
   const opacity = shimmer.interpolate({
     inputRange: [0, 1],
@@ -210,7 +235,10 @@ function SkeletonCard() {
   });
 
   return (
-    <Animated.View style={[styles.skeletonCard, { opacity }]}>
+    <Animated.View
+      style={[styles.skeletonCard, { opacity }]}
+      {...hiddenFromAccessibility}
+    >
       <View style={styles.skeletonTitleRow}>
         <View style={styles.skeletonTitle} />
         <View style={styles.skeletonBadge} />
@@ -465,7 +493,7 @@ export default function HomeScreen() {
           <Pressable
             onPress={handleYourTab}
             style={styles.tabItem}
-            accessibilityRole="button"
+            accessibilityRole="tab"
             accessibilityLabel="Show your trips"
             accessibilityState={{ selected: activeTab === "your" }}
           >
@@ -486,7 +514,7 @@ export default function HomeScreen() {
           <Pressable
             onPress={handlePastTab}
             style={styles.tabItem}
-            accessibilityRole="button"
+            accessibilityRole="tab"
             accessibilityLabel="Show past trips"
             accessibilityState={{ selected: activeTab === "past" }}
           >
@@ -506,7 +534,13 @@ export default function HomeScreen() {
         </View>
 
         {isLoading ? (
-          <View style={styles.tripList}>
+          <View
+            style={styles.tripList}
+            accessible={true}
+            accessibilityLiveRegion="polite"
+            accessibilityLabel="Loading trips"
+            accessibilityState={{ busy: true }}
+          >
             <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
