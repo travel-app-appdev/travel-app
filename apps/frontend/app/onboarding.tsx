@@ -845,7 +845,7 @@ const Styles = StyleSheet.create({
   phasePillTextLight: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.md,
-    color: colors.white,
+    color: colors.nightBlack,
   },
   phaseDesc: {
     flex: 1,
@@ -882,7 +882,7 @@ const Styles = StyleSheet.create({
   timerPillTextLight: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.md,
-    color: colors.white,
+    color: colors.nightBlack,
   },
   timerValueBlock: { flex: 1 },
   timerValue: {
