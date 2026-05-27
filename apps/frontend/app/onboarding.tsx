@@ -1,4 +1,5 @@
 import { useState, type ComponentType } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import Plane from "@/assets/icons/plane.svg";
 import {
   Pressable,
@@ -12,7 +13,6 @@ import {
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { AppButton } from "@/src/components/common/AppButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { navigate } from "expo-router/build/global-state/routing";
 import Back from "@/assets/icons/back.svg";
 import Forward from "@/assets/icons/forward.svg";
 import CurlyGreen from "@/assets/visuals/curly-green.svg";
@@ -49,6 +49,19 @@ export default function Onboarding() {
 
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+
+  const shouldReturnToCreateTrip = returnTo === "create-trip";
+
+  const handleExitOnboarding = () => {
+    if (shouldReturnToCreateTrip) {
+      router.back();
+      return;
+    }
+
+    router.replace("/home");
+  };
 
   const setTitleWidth = (stepKey: Step, measuredWidth: number) => {
     setTitleWidths((prev) =>
@@ -154,13 +167,17 @@ export default function Onboarding() {
       <View style={[Styles.continueWrapper, { width: mainBlockWidth }]}>
         <AppButton
           title={current === TOTAL_STEPS ? "Finish" : "Skip"}
-          onPress={() => navigate("/home")}
+          onPress={handleExitOnboarding}
           style={[Styles.continueButton, buttonStyle]}
           textStyle={[Styles.continueButtonText, buttonTextStyle]}
           accessibilityLabel={
             current === TOTAL_STEPS ? "Finish onboarding" : "Skip onboarding"
           }
-          accessibilityHint="Navigates to the home screen"
+          accessibilityHint={
+            shouldReturnToCreateTrip
+              ? "Returns to the create trip screen"
+              : "Navigates to the home screen"
+          }
         />
       </View>
     </View>
