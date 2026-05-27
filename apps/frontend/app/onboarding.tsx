@@ -869,7 +869,7 @@ const Styles = StyleSheet.create({
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    minWidth: 80,
+    minWidth: 88,
     alignItems: "center",
   },
   timerPillYellow: { backgroundColor: colors.beachYellow },
