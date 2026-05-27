@@ -71,6 +71,14 @@ export function TripCard({
             event.stopPropagation?.();
             handleStatusPress();
           },
+          onClick: (event: {
+            preventDefault?: () => void;
+            stopPropagation?: () => void;
+          }) => {
+            event.preventDefault?.();
+            event.stopPropagation?.();
+            handleStatusPress();
+          },
         } as const)
       : {};
 
@@ -97,7 +105,6 @@ export function TripCard({
             onStartShouldSetResponder={() => true}
             onResponderGrant={(e) => {
               e.stopPropagation();
-              handleStatusPress();
             }}
           >
             <AppText variant="caption" style={styles.badgeText}>
