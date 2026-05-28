@@ -54,6 +54,7 @@ export default function Onboarding() {
   const router = useRouter();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
 
+  const isLandscape = width > height;
   const shouldReturnToCreateTrip = returnTo === "create-trip";
 
   const handleExitOnboarding = () => {
@@ -87,11 +88,16 @@ export default function Onboarding() {
   const curlyTopTop = lerp(height * 0.01 - 100, height * 0.04 - 120, curlyProgress);
   const curlyTopLeft = lerp(-width * 0.48, -800, curlyProgress);
 
-  const mascotBaseSize = 110;
-  const mascotSize = Math.round(clamp(mascotBaseSize * scale, 96, mascotBaseSize));
+  const mascotBaseSize = isLandscape ? 70 : 110;
+  const mascotSize = Math.round(
+    clamp(mascotBaseSize * scale, isLandscape ? 72 : 96, mascotBaseSize)
+  );
 
-  const contentMaxWidth = Math.min(width - spacing.xl * 2, 520);
-  const mainBlockWidth = Math.min(width - spacing.xl * 2, 350);
+  const contentMaxWidth = Math.min(width - spacing.xl * 2, isLandscape ? 760 : 520);
+  const mainBlockWidth = Math.min(width - spacing.xl * 2, isLandscape ? 520 : 350);
+  const verticalPagePadding = isLandscape ? spacing.md : spacing.xl;
+  const bottomPagePadding = isLandscape ? spacing.xl : spacing.xxxl;
+  const containerStyle = [Styles.container, isLandscape && Styles.containerLandscape];
   const TOTAL_STEPS = 5;
 
   const renderHeader = () => (
@@ -112,7 +118,7 @@ export default function Onboarding() {
   const renderMascot = (
     Mascot: ComponentType<{ width: number; height: number }>
   ) => (
-    <View style={Styles.mascotSection}>
+    <View style={[Styles.mascotSection, isLandscape && Styles.mascotSectionLandscape]}>
       <View
         style={Styles.mascotInlineWrapper}
         {...(Platform.OS !== "web" ? { accessible: false } : {})}
@@ -127,7 +133,7 @@ export default function Onboarding() {
     buttonStyle?: object,
     buttonTextStyle?: object
   ) => (
-    <View style={Styles.footerBlock}>
+    <View style={[Styles.footerBlock, isLandscape && Styles.footerBlockLandscape]}>
       <View style={[Styles.ArrowWrapper, { width: mainBlockWidth }]}>
         {current > 1 ? (
           <Pressable
@@ -194,15 +200,21 @@ export default function Onboarding() {
             contentContainerStyle={[
               Styles.scrollContent,
               {
-                paddingTop: insets.top + spacing.xl,
-                paddingBottom: insets.bottom + spacing.xxxl,
-                minHeight: height,
+                paddingTop: insets.top + verticalPagePadding,
+                paddingBottom: insets.bottom + bottomPagePadding,
+                ...(isLandscape ? {} : { minHeight: height }),
               },
             ]}
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
-            <View style={[Styles.contentTop, { maxWidth: contentMaxWidth }]}>
+            <View
+              style={[
+                Styles.contentTop,
+                { maxWidth: contentMaxWidth },
+                isLandscape && Styles.contentTopLandscape,
+              ]}
+            >
               {step === 1 && (
                 <>
                   {renderHeader()}
@@ -220,7 +232,7 @@ export default function Onboarding() {
 
                   {renderMascot(GreenVotey)}
 
-                  <View style={Styles.container}>
+                  <View style={containerStyle}>
                     <View style={[Styles.titleBlock, { marginBottom: spacing.sm }]}>
                       <Text
                         style={Styles.title}
@@ -305,7 +317,7 @@ export default function Onboarding() {
 
                   {renderMascot(BlueVotey)}
 
-                  <View style={Styles.container}>
+                  <View style={containerStyle}>
                     <View style={[Styles.titleBlock, { marginBottom: spacing.sm }]}>
                       <Text
                         style={Styles.title}
@@ -346,9 +358,9 @@ export default function Onboarding() {
                         <Text style={Styles.timerValue}>190 days</Text>
                         <Text style={Styles.timerLabel}>Timer</Text>
                       </View>
-                     <View style={Styles.timerChevronIcon} {...hiddenFromAccessibility}>
-                      <ArrowDownIcon width={16} height={16} />
-                       </View>
+                      <View style={Styles.timerChevronIcon} {...hiddenFromAccessibility}>
+                        <ArrowDownIcon width={16} height={16} />
+                      </View>
                     </View>
 
                     <View style={Styles.timerRow}>
@@ -362,7 +374,7 @@ export default function Onboarding() {
                       </View>
                       <View style={Styles.timerChevronIcon} {...hiddenFromAccessibility}>
                         <ArrowDownIcon width={16} height={16} />
-                        </View>
+                      </View>
                     </View>
                   </View>
 
@@ -378,7 +390,7 @@ export default function Onboarding() {
 
                   {renderMascot(YellowVotey)}
 
-                  <View style={Styles.container}>
+                  <View style={containerStyle}>
                     <View style={[Styles.titleBlock, { marginBottom: spacing.sm }]}>
                       <Text
                         style={Styles.title}
@@ -461,7 +473,7 @@ export default function Onboarding() {
 
                   {renderMascot(FunnyMascot)}
 
-                  <View style={Styles.container}>
+                  <View style={containerStyle}>
                     <View style={[Styles.titleBlock, { marginBottom: spacing.sm }]}>
                       <View style={Styles.titleRow}>
                         <Text style={Styles.title}>Decide </Text>
@@ -549,7 +561,7 @@ export default function Onboarding() {
 
                   {renderMascot(GreenVotey)}
 
-                  <View style={Styles.container}>
+                  <View style={containerStyle}>
                     <View style={[Styles.titleBlock, { marginBottom: spacing.sm }]}>
                       <View style={Styles.titleRow}>
                         <Text style={Styles.title}>Travel </Text>
@@ -604,9 +616,9 @@ export default function Onboarding() {
                         </Text>
 
                         <View style={Styles.activityParticipants}>
-                         <ProfileIcon width={14} height={14} />
+                          <ProfileIcon width={14} height={14} />
                           <Text style={Styles.activityParticipantText}>4</Text>
-                          </View>
+                        </View>
                       </View>
 
                       <View style={Styles.activityInfoRow}>
@@ -654,6 +666,10 @@ const Styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { flexGrow: 1, alignItems: "center" },
   contentTop: { width: "100%", flexGrow: 1, position: "relative" },
+  contentTopLandscape: {
+    flexGrow: 0,
+    paddingBottom: spacing.lg,
+  },
   flexSpacer: { flex: 1 },
 
   header: {
@@ -678,6 +694,9 @@ const Styles = StyleSheet.create({
   container: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.xl + spacing.xs,
+  },
+  containerLandscape: {
+    paddingTop: spacing.md,
   },
 
   titleBlock: {
@@ -724,6 +743,9 @@ const Styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  mascotSectionLandscape: {
+    marginTop: spacing.lg,
+  },
   mascotInlineWrapper: {
     alignSelf: "center",
     zIndex: 3,
@@ -736,6 +758,10 @@ const Styles = StyleSheet.create({
     zIndex: 20,
     elevation: 20,
     alignItems: "center",
+  },
+  footerBlockLandscape: {
+    gap: spacing.md,
+    paddingBottom: spacing.md,
   },
   continueWrapper: {
     zIndex: 20,
@@ -899,11 +925,11 @@ const Styles = StyleSheet.create({
     color: colors.textMuted,
   },
   timerChevronIcon: {
-  width: 20,
-  height: 20,
-  alignItems: "center",
-  justifyContent: "center",
-},
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   activityCardRow: {
     flexDirection: "row",
