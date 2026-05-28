@@ -27,7 +27,8 @@ import GreenVotey from "@/assets/mascots/Votey_Green.svg";
 import BlueVotey from "@/assets/mascots/mascot-emotional.svg";
 import FunnyMascot from "@/assets/mascots/mascot-funny.svg";
 import ArrowDownIcon from "@/assets/icons/arrow_down.svg";
-import ProfileIcon from "@/assets/icons/profile.svg";
+import ProfileIcon from "@/assets/icons/members.svg";
+import JoinGroupIcon from "@/assets/icons/join-group.svg";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -633,12 +634,10 @@ export default function Onboarding() {
                     </View>
 
                     <View style={[Styles.activityAddBtn, Styles.activityAddBtnGreen]}>
-                      <View style={Styles.joinIconCircle}>
-                        <Text style={Styles.joinIconPlus}>+</Text>
-                      </View>
-                      <Text style={Styles.activityAddBtnText}>
-                        Join{"\n"}group
-                      </Text>
+                      <JoinGroupIcon width={28} height={28} />
+                        <Text style={Styles.activityAddBtnText}>
+                          Join{"\n"}group
+                        </Text>
                     </View>
                   </View>
 
@@ -1027,21 +1026,5 @@ const Styles = StyleSheet.create({
     color: colors.nightBlack,
     textAlign: "center",
     lineHeight: typography.lineHeight.md,
-  },
-  joinIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.nightBlack,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  joinIconPlus: {
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.lg,
-    lineHeight: typography.lineHeight.lg,
-    color: colors.nightBlack,
-    marginTop: -1,
-  },
+  }
 });
