@@ -346,11 +346,16 @@ export default function CreateTripScreen() {
   const router = useRouter();
 
   const handleOnboardingPress = useCallback(() => {
-    if (!PressLock.acquire()) return;
-    Promise.resolve()
-      .then(() => router.push("/onboarding"))
-      .finally(() => setTimeout(() => PressLock.release(), 300));
-  }, [router]);
+  if (!PressLock.acquire()) return;
+  Promise.resolve()
+    .then(() =>
+      router.push({
+        pathname: "/onboarding",
+        params: { returnTo: "create-trip" },
+      })
+    )
+    .finally(() => setTimeout(() => PressLock.release(), 300));
+}, [router]);
 
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
