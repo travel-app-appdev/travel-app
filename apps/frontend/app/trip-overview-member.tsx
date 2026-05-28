@@ -11,6 +11,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   useWindowDimensions,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useRef, useMemo, useEffect } from "react";
@@ -175,18 +176,31 @@ function parseIsoToTimeString(value?: string): string {
 const CHECKBOX_SIZE = 24;
 const TIMELINE_LINE_WIDTH = 2;
 
-function PhaseCheckbox({ status }: { status: PhaseStatus }) {
-  if (status === "past") {
-    return <CheckMark width={CHECKBOX_SIZE} height={CHECKBOX_SIZE} />;
+function PhaseCheckbox({
+  phaseId,
+  status,
+}: {
+  phaseId: PhaseKey;
+  status: PhaseStatus;
+}) {
+  const isChecked = status === "past" || (status === "active" && phaseId !== "voting");
+
+  if (isChecked) {
+    return (
+      <CheckMark
+        width={CHECKBOX_SIZE}
+        height={CHECKBOX_SIZE}
+        style={status === "past" ? styles.mutedIcon : undefined}
+      />
+    );
   }
-  if (status === "future") {
-    return <Unchecked width={CHECKBOX_SIZE} height={CHECKBOX_SIZE} />;
-  }
-  // active
+
   return (
-    <View style={[styles.checkbox, styles.checkboxChecked]}>
-      <View style={styles.checkboxActiveDot} />
-    </View>
+    <Unchecked
+      width={CHECKBOX_SIZE}
+      height={CHECKBOX_SIZE}
+      style={status === "future" ? styles.mutedIcon : undefined}
+    />
   );
 }
 
@@ -225,11 +239,35 @@ export default function TripOverviewMemberScreen() {
   const [isLeaving, setIsLeaving] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
+  const blinkingDotAnim = useRef(new Animated.Value(2)).current;
 
   useEffect(() => {
     const interval = setInterval(() => setTimerNow(Date.now()), 60 * 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blinkingDotAnim, {
+          toValue: 0,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(blinkingDotAnim, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    loop.start();
+
+    return () => {
+      loop.stop();
+    };
+  }, [blinkingDotAnim]);
 
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const safeTimeout = (fn: () => void, delay: number) => {
@@ -566,9 +604,10 @@ export default function TripOverviewMemberScreen() {
                   const isActive = phase.status === "active";
                   const isPast = phase.status === "past";
                   const isFuture = phase.status === "future";
+                  const isMuted = !isActive;
                   const dates = phaseDates[phaseId];
                   const timerText = formatPhaseTimerText(dates, isActive, timerNow);
-                  const badgeColor = isFuture ? phase.disabledColor : phase.color;
+                  const badgeColor = isMuted ? phase.disabledColor : phase.color;
                   const isLast = index === phases.length - 1;
 
                   return (
@@ -585,15 +624,13 @@ export default function TripOverviewMemberScreen() {
                       {/* Left: checkbox + line — hidden, parent has full label */}
                       <View style={styles.timelineLeft} {...hiddenFromAccessibility}>
                         <View style={styles.checkboxAligner}>
-                          <PhaseCheckbox status={phase.status} />
+                          <PhaseCheckbox phaseId={phaseId} status={phase.status} />
                         </View>
                         {!isLast && (
                           <View
                             style={[
                               styles.timelineLine,
-                              isPast
-                                ? styles.timelineLineSolid
-                                : styles.timelineLineDashed,
+                              styles.timelineLineDashed,
                             ]}
                           />
                         )}
@@ -627,7 +664,7 @@ export default function TripOverviewMemberScreen() {
                                   variant="caption"
                                   style={[
                                     styles.phaseBadgeText,
-                                    isFuture && styles.phaseBadgeTextMuted,
+                                    isMuted && styles.phaseBadgeTextMuted,
                                   ]}
                                 >
                                   {phase.label}
@@ -648,7 +685,7 @@ export default function TripOverviewMemberScreen() {
                                       width={24}
                                       height={24}
                                       style={
-                                        isFuture ? { opacity: 0.4 } : undefined
+                                        isMuted ? styles.mutedIcon : undefined
                                       }
                                     />
                                   )}
@@ -659,25 +696,28 @@ export default function TripOverviewMemberScreen() {
                                       variant="body"
                                       style={[
                                         styles.phaseDays,
-                                        isFuture && styles.phaseDaysMuted,
+                                        isMuted && styles.phaseDaysMuted,
                                       ]}
                                     >
                                       {timerText}
                                     </AppText>
                                     {isActive && (
-                                      <View
-                                        style={styles.timepointWrapper}
+                                      <Animated.View
+                                        style={[
+                                          styles.timepointWrapper,
+                                          { opacity: blinkingDotAnim },
+                                        ]}
                                         {...hiddenFromAccessibility}
                                       >
                                         <Timepoint width={7} height={7} />
-                                      </View>
+                                      </Animated.View>
                                     )}
                                   </View>
                                   <AppText
                                     variant="caption"
                                     style={[
                                       styles.timerLabel,
-                                      isFuture && styles.timerLabelMuted,
+                                      isMuted && styles.timerLabelMuted,
                                     ]}
                                   >
                                     Timer
@@ -685,23 +725,36 @@ export default function TripOverviewMemberScreen() {
                                 </View>
                               </View>
                             )}
+                            {phaseId === "final" && (
+                              <AppText
+                                variant="body"
+                                style={[
+                                  styles.phaseFinalDateLabel,
+                                  isMuted && styles.phaseDateLabelMuted,
+                                ]}
+                              >
+                                {formatDateDisplay(dates.start)}
+                              </AppText>
+                            )}
                           </View>
                           {/* No arrow for members — purely read-only */}
                         </View>
 
                         {/* Date range */}
-                        <AppText
-                          variant="caption"
-                          style={[
-                            styles.phaseDateLabel,
-                            isFuture && styles.phaseDateLabelMuted,
-                          ]}
-                        >
-                          {formatDateDisplay(dates.start)}
-                          {dates.start.getTime() !== dates.end.getTime()
-                            ? ` - ${formatDateDisplay(dates.end)}`
-                            : ""}
-                        </AppText>
+                        {phaseId !== "final" && (
+                          <AppText
+                            variant="caption"
+                            style={[
+                              styles.phaseDateLabel,
+                              isMuted && styles.phaseDateLabelMuted,
+                            ]}
+                          >
+                            {formatDateDisplay(dates.start)}
+                            {dates.start.getTime() !== dates.end.getTime()
+                              ? ` - ${formatDateDisplay(dates.end)}`
+                              : ""}
+                          </AppText>
+                        )}
                       </View>
                     </View>
                   );
@@ -857,6 +910,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: colors.nightBlack,
   },
+  mutedIcon: { opacity: 0.35 },
   timelineLine: {
     width: TIMELINE_LINE_WIDTH,
     flexGrow: 1,
@@ -923,6 +977,12 @@ const styles = StyleSheet.create({
   timerLabelMuted: { color: colors.grayedOut, opacity: 0.6 },
   phaseDateLabel: {
     color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+  },
+  phaseFinalDateLabel: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
   },

@@ -13,6 +13,7 @@ import {
   useWindowDimensions,
   Modal,
   TextInput,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar as RangeCalendar } from "react-native-calendars";
@@ -280,21 +281,34 @@ function MemberRow({ member, onRemove, isRemoving }: MemberRowProps) {
 }
 
 // Checkbox:
-// past   = check_mark.svg
-// active = rounded square with filled dot
-// future = unchecked.svg
-function PhaseCheckbox({ status }: { status: PhaseStatus }) {
-  if (status === "past") {
-    return <CheckMark width={CHECKBOX_SIZE} height={CHECKBOX_SIZE} />;
+// past = muted check_mark.svg
+// active planning/final = check_mark.svg
+// active voting/future = unchecked.svg
+function PhaseCheckbox({
+  phaseId,
+  status,
+}: {
+  phaseId: PhaseKey;
+  status: PhaseStatus;
+}) {
+  const isChecked = status === "past" || (status === "active" && phaseId !== "voting");
+
+  if (isChecked) {
+    return (
+      <CheckMark
+        width={CHECKBOX_SIZE}
+        height={CHECKBOX_SIZE}
+        style={status === "past" ? styles.mutedIcon : undefined}
+      />
+    );
   }
-  if (status === "future") {
-    return <Unchecked width={CHECKBOX_SIZE} height={CHECKBOX_SIZE} />;
-  }
-  // active
+
   return (
-    <View style={[styles.checkbox, styles.checkboxChecked]}>
-      <View style={styles.checkboxActiveDot} />
-    </View>
+    <Unchecked
+      width={CHECKBOX_SIZE}
+      height={CHECKBOX_SIZE}
+      style={status === "future" ? styles.mutedIcon : undefined}
+    />
   );
 }
 
@@ -330,6 +344,7 @@ export default function TripOverviewAdminScreen() {
   const isSmallScreen = screenHeight < 700;
   const [isDeleting, setIsDeleting] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
+  const blinkingDotAnim = useRef(new Animated.Value(2)).current;
 
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const safeTimeout = (fn: () => void, delay: number) => {
@@ -346,6 +361,29 @@ export default function TripOverviewAdminScreen() {
     const interval = setInterval(() => setTimerNow(Date.now()), 60 * 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blinkingDotAnim, {
+          toValue: 0,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(blinkingDotAnim, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    loop.start();
+
+    return () => {
+      loop.stop();
+    };
+  }, [blinkingDotAnim]);
 
   const deleteRef = useRef<View>(null);
 
@@ -1211,10 +1249,11 @@ export default function TripOverviewAdminScreen() {
                   const isActive = phase.status === "active";
                   const isPast = phase.status === "past";
                   const isFuture = phase.status === "future";
+                  const isMuted = !isActive;
                   const isOpen = openPhase === phaseId;
                   const dates = phaseDates[phaseId];
                   const timerText = formatPhaseTimerText(dates, isActive, timerNow);
-                  const badgeColor = isFuture ? phase.disabledColor : phase.color;
+                  const badgeColor = isMuted ? phase.disabledColor : phase.color;
                   const isLast = index === phases.length - 1;
                   const canExpand = isActive && phaseId !== "final";
 
@@ -1223,13 +1262,13 @@ export default function TripOverviewAdminScreen() {
                       {/* Left column: checkbox + vertical line — hidden, Pressable has full label */}
                       <View style={styles.timelineLeft} {...hiddenFromAccessibility}>
                         <View style={styles.checkboxAligner}>
-                          <PhaseCheckbox status={phase.status} />
+                          <PhaseCheckbox phaseId={phaseId} status={phase.status} />
                         </View>
                         {!isLast && (
                           <View
                             style={[
                               styles.timelineLine,
-                              isPast ? styles.timelineLineSolid : styles.timelineLineDashed,
+                              styles.timelineLineDashed,
                             ]}
                           />
                         )}
@@ -1246,7 +1285,7 @@ export default function TripOverviewAdminScreen() {
                           accessibilityLabel={
                             phaseId === "final"
                               ? `Final phase, starts ${formatDateDisplay(dates.start)}`
-                              : `${phase.label} phase, ${timerText}${isActive ? " remaining" : ""}`
+                              : `${phase.label} phase, ${timerText}${isActive ? " remaining" : ""}, ${isPast ? "completed" : isFuture ? "upcoming" : "in progress"}`
                           }
                           accessibilityHint={canExpand ? `Tap to edit ${phase.label} end date and time` : undefined}
                           accessibilityState={canExpand ? { expanded: isOpen } : undefined}
@@ -1271,7 +1310,7 @@ export default function TripOverviewAdminScreen() {
                                   variant="caption"
                                   style={[
                                     styles.phaseBadgeText,
-                                    isFuture && styles.phaseBadgeTextMuted,
+                                    isMuted && styles.phaseBadgeTextMuted,
                                   ]}
                                 >
                                   {phase.label}
@@ -1288,7 +1327,7 @@ export default function TripOverviewAdminScreen() {
                                     <Hourglass0
                                       width={24}
                                       height={24}
-                                      style={isFuture ? { opacity: 0.4 } : undefined}
+                                      style={isMuted ? styles.mutedIcon : undefined}
                                     />
                                   )}
                                 </View>
@@ -1298,28 +1337,45 @@ export default function TripOverviewAdminScreen() {
                                       variant="body"
                                       style={[
                                         styles.phaseDays,
-                                        isFuture && styles.phaseDaysMuted,
+                                        isMuted && styles.phaseDaysMuted,
                                       ]}
                                     >
                                       {timerText}
                                     </AppText>
                                     {isActive && (
-                                      <View style={styles.timepointWrapper} {...hiddenFromAccessibility}>
+                                      <Animated.View
+                                        style={[
+                                          styles.timepointWrapper,
+                                          { opacity: blinkingDotAnim },
+                                        ]}
+                                        {...hiddenFromAccessibility}
+                                      >
                                         <Timepoint width={7} height={7} />
-                                      </View>
+                                      </Animated.View>
                                     )}
                                   </View>
                                   <AppText
                                     variant="caption"
                                     style={[
                                       styles.timerLabel,
-                                      isFuture && styles.timerLabelMuted,
+                                      isMuted && styles.timerLabelMuted,
                                     ]}
                                   >
                                     Timer
                                   </AppText>
                                 </View>
                               </View>
+                            )}
+                            {phaseId === "final" && (
+                              <AppText
+                                variant="body"
+                                style={[
+                                  styles.phaseFinalDateLabel,
+                                  isMuted && styles.phaseDateLabelMuted,
+                                ]}
+                              >
+                                {formatDateDisplay(dates.start)}
+                              </AppText>
                             )}
                           </View>
 
@@ -1331,18 +1387,20 @@ export default function TripOverviewAdminScreen() {
                         </Pressable>
 
                         {/* Date range */}
-                        <AppText
-                          variant="caption"
-                          style={[
-                            styles.phaseDateLabel,
-                            isFuture && styles.phaseDateLabelMuted,
-                          ]}
-                        >
-                          {formatDateDisplay(dates.start)}
-                          {dates.start.getTime() !== dates.end.getTime()
-                            ? ` - ${formatDateDisplay(dates.end)}`
-                            : ""}
-                        </AppText>
+                        {phaseId !== "final" && (
+                          <AppText
+                            variant="caption"
+                            style={[
+                              styles.phaseDateLabel,
+                              isMuted && styles.phaseDateLabelMuted,
+                            ]}
+                          >
+                            {formatDateDisplay(dates.start)}
+                            {dates.start.getTime() !== dates.end.getTime()
+                              ? ` - ${formatDateDisplay(dates.end)}`
+                              : ""}
+                          </AppText>
+                        )}
 
                         {/* Expanded editor — only for active planning/voting */}
                         {isOpen && canExpand && (
@@ -1805,6 +1863,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: colors.nightBlack,
   },
+  mutedIcon: { opacity: 0.35 },
 
   timelineLine: {
     width: TIMELINE_LINE_WIDTH,
@@ -1872,6 +1931,12 @@ const styles = StyleSheet.create({
   timerLabelMuted: { color: colors.grayedOut, opacity: 0.6 },
   phaseDateLabel: {
     color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+  },
+  phaseFinalDateLabel: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
   },
