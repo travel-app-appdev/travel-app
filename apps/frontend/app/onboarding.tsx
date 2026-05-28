@@ -26,6 +26,8 @@ import YellowVotey from "@/assets/mascots/Votey_Yellow.svg";
 import GreenVotey from "@/assets/mascots/Votey_Green.svg";
 import BlueVotey from "@/assets/mascots/mascot-emotional.svg";
 import FunnyMascot from "@/assets/mascots/mascot-funny.svg";
+import ArrowDownIcon from "@/assets/icons/arrow_down.svg";
+import ProfileIcon from "@/assets/icons/profile.svg";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -344,7 +346,9 @@ export default function Onboarding() {
                         <Text style={Styles.timerValue}>190 days</Text>
                         <Text style={Styles.timerLabel}>Timer</Text>
                       </View>
-                      <Text style={Styles.timerChevron}>∧</Text>
+                     <View style={Styles.timerChevronIcon} {...hiddenFromAccessibility}>
+                      <ArrowDownIcon width={16} height={16} />
+                       </View>
                     </View>
 
                     <View style={Styles.timerRow}>
@@ -356,7 +360,9 @@ export default function Onboarding() {
                         <Text style={Styles.timerValue}>0 days</Text>
                         <Text style={Styles.timerLabel}>Timer</Text>
                       </View>
-                      <Text style={Styles.timerChevron}>∧</Text>
+                      <View style={Styles.timerChevronIcon} {...hiddenFromAccessibility}>
+                        <ArrowDownIcon width={16} height={16} />
+                        </View>
                     </View>
                   </View>
 
@@ -598,12 +604,9 @@ export default function Onboarding() {
                         </Text>
 
                         <View style={Styles.activityParticipants}>
-                          <View style={Styles.peopleIcon}>
-                            <View style={Styles.peopleIconHead} />
-                            <View style={Styles.peopleIconBody} />
-                          </View>
+                         <ProfileIcon width={14} height={14} />
                           <Text style={Styles.activityParticipantText}>4</Text>
-                        </View>
+                          </View>
                       </View>
 
                       <View style={Styles.activityInfoRow}>
@@ -895,11 +898,12 @@ const Styles = StyleSheet.create({
     fontSize: typography.size.sm,
     color: colors.textMuted,
   },
-  timerChevron: {
-    fontSize: typography.size.lg,
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.body,
-  },
+  timerChevronIcon: {
+  width: 20,
+  height: 20,
+  alignItems: "center",
+  justifyContent: "center",
+},
 
   activityCardRow: {
     flexDirection: "row",
@@ -950,26 +954,6 @@ const Styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-  },
-  peopleIcon: {
-    width: 12,
-    height: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  peopleIconHead: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: colors.nightBlack,
-  },
-  peopleIconBody: {
-    width: 9,
-    height: 5,
-    borderRadius: 5,
-    borderWidth: 1.5,
-    borderColor: colors.nightBlack,
-    marginTop: 1,
   },
   activityParticipantText: {
     fontFamily: typography.fontFamily.bodyBold,
