@@ -95,7 +95,7 @@ export default function Onboarding() {
 
   const contentMaxWidth = Math.min(width - spacing.xl * 2, isLandscape ? 760 : 520);
   const mainBlockWidth = Math.min(width - spacing.xl * 2, isLandscape ? 520 : 350);
-  const verticalPagePadding = isLandscape ? spacing.md : spacing.xl;
+  const verticalPagePadding = isLandscape ? spacing.xl : spacing.xl;
   const bottomPagePadding = isLandscape ? spacing.xl : spacing.xxxl;
   const containerStyle = [Styles.container, isLandscape && Styles.containerLandscape];
   const TOTAL_STEPS = 5;
