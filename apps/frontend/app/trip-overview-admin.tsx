@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   useFocusEffect,
-  useIsFocused,
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
@@ -347,7 +346,6 @@ export default function TripOverviewAdminScreen() {
   const votingEndAt = String(raw.votingEndAt ?? "");
 
   const router = useRouter();
-  const isFocused = useIsFocused();
   const { height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenHeight < 700;
   const [isDeleting, setIsDeleting] = useState(false);
@@ -442,14 +440,14 @@ export default function TripOverviewAdminScreen() {
   const [tripState, setTripState] = useState<Trip["state"]>(initialTripState);
   const cachedTrip = useMemo(() => {
     const currentUser = auth.currentUser;
-    if (!isFocused || !currentUser || !tripId) return null;
+    if (!currentUser?.uid || !tripId) return null;
 
     return (
       getCachedMyTrips(currentUser.uid)?.find(
         (trip) => trip.trip_id === tripId
       ) ?? null
     );
-  }, [isFocused, tripId]);
+  }, [tripId]);
   const checklistTripState = cachedTrip?.state ?? tripState;
 
   const planningStartDate = parseIsoToDate(planningStartedAt);
@@ -545,7 +543,7 @@ export default function TripOverviewAdminScreen() {
 
       async function refreshTripSnapshot() {
         const currentUser = auth.currentUser;
-        if (!currentUser || !tripId) return;
+        if (!currentUser?.uid || !tripId) return;
 
         try {
           const trips = await fetchMyTrips(currentUser.uid, {

@@ -1,6 +1,5 @@
 import {
   useFocusEffect,
-  useIsFocused,
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
@@ -244,7 +243,6 @@ export default function TripOverviewMemberScreen() {
   const inviteCodeParam = String(raw.inviteCode ?? "");
 
   const router = useRouter();
-  const isFocused = useIsFocused();
   const { height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenHeight < 700;
   const [isLeaving, setIsLeaving] = useState(false);
@@ -261,7 +259,7 @@ export default function TripOverviewMemberScreen() {
   });
   const cachedTripSnapshot = useMemo(() => {
     const currentUser = auth.currentUser;
-    if (!isFocused || !currentUser || !tripId) return null;
+    if (!currentUser?.uid || !tripId) return null;
 
     const currentTrip = getCachedMyTrips(currentUser.uid)?.find(
       (trip) => trip.trip_id === tripId
@@ -276,7 +274,7 @@ export default function TripOverviewMemberScreen() {
       planningEndAt: currentTrip.planning_end_at ?? "",
       votingEndAt: currentTrip.voting_end_at ?? "",
     };
-  }, [isFocused, tripId]);
+  }, [tripId]);
   const displayedTripSnapshot = cachedTripSnapshot ?? tripSnapshot;
   const tripState = displayedTripSnapshot.state;
 
@@ -324,7 +322,7 @@ export default function TripOverviewMemberScreen() {
 
       async function refreshTripSnapshot() {
         const currentUser = auth.currentUser;
-        if (!currentUser || !tripId) return;
+        if (!currentUser?.uid || !tripId) return;
 
         try {
           const trips = await fetchMyTrips(currentUser.uid, {

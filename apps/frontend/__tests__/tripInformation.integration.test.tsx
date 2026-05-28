@@ -18,6 +18,7 @@ const mockRouter = {
 
 // expo-router
 jest.mock("expo-router", () => ({
+  useFocusEffect: jest.fn(),
   useLocalSearchParams: () => ({
     tripId: "trip-001",
     title: "Vienna Trip",
@@ -34,6 +35,8 @@ jest.mock("expo-router", () => ({
 
 // src/api/trips
 jest.mock("@/src/api/trips", () => ({
+  fetchMyTrips: jest.fn().mockResolvedValue([]),
+  getCachedMyTrips: jest.fn().mockReturnValue(null),
   leaveTrip: (...args: any[]) => mockLeaveTrip(...args),
 }));
 
