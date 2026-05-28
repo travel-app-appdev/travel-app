@@ -1,4 +1,9 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  useFocusEffect,
+  useIsFocused,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import {
   AccessibilityInfo,
@@ -14,14 +19,19 @@ import {
   Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { AppText } from "@/src/components/common/AppText";
 import {
   ActionCard,
   ACTION_CARD_HEIGHT,
 } from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
-import { leaveTrip, type Trip } from "@/src/api/trips";
+import {
+  fetchMyTrips,
+  getCachedMyTrips,
+  leaveTrip,
+  type Trip,
+} from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
 import { invalidateTripsCache } from "./home";
 import { colors, spacing, radius, typography } from "@/src/theme";
@@ -227,19 +237,48 @@ export default function TripOverviewMemberScreen() {
   const startDate = String(raw.startDate ?? "");
   const endDate = String(raw.endDate ?? "");
   const membersParam = String(raw.members ?? "");
-  const tripState = (raw.state ?? "Planning") as Trip["state"];
+  const initialTripState = (raw.state ?? "Planning") as Trip["state"];
   const planningStartedAt = String(raw.planningStartedAt ?? "");
   const planningEndAt = String(raw.planningEndAt ?? "");
   const votingEndAt = String(raw.votingEndAt ?? "");
   const inviteCodeParam = String(raw.inviteCode ?? "");
 
   const router = useRouter();
+  const isFocused = useIsFocused();
   const { height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenHeight < 700;
   const [isLeaving, setIsLeaving] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const blinkingDotAnim = useRef(new Animated.Value(2)).current;
+  const [tripSnapshot, setTripSnapshot] = useState({
+    state: initialTripState,
+    startDate,
+    endDate,
+    planningStartedAt,
+    planningEndAt,
+    votingEndAt,
+  });
+  const cachedTripSnapshot = useMemo(() => {
+    const currentUser = auth.currentUser;
+    if (!isFocused || !currentUser || !tripId) return null;
+
+    const currentTrip = getCachedMyTrips(currentUser.uid)?.find(
+      (trip) => trip.trip_id === tripId
+    );
+    if (!currentTrip) return null;
+
+    return {
+      state: currentTrip.state,
+      startDate: currentTrip.start_date,
+      endDate: currentTrip.end_date,
+      planningStartedAt: currentTrip.planning_started_at ?? "",
+      planningEndAt: currentTrip.planning_end_at ?? "",
+      votingEndAt: currentTrip.voting_end_at ?? "",
+    };
+  }, [isFocused, tripId]);
+  const displayedTripSnapshot = cachedTripSnapshot ?? tripSnapshot;
+  const tripState = displayedTripSnapshot.state;
 
   useEffect(() => {
     const interval = setInterval(() => setTimerNow(Date.now()), 60 * 1000);
@@ -279,6 +318,43 @@ export default function TripOverviewMemberScreen() {
     return () => timeoutRefs.current.forEach(clearTimeout);
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function refreshTripSnapshot() {
+        const currentUser = auth.currentUser;
+        if (!currentUser || !tripId) return;
+
+        try {
+          const trips = await fetchMyTrips(currentUser.uid, {
+            forceRefresh: true,
+            allowStaleOnError: true,
+          });
+          const currentTrip = trips.find((trip) => trip.trip_id === tripId);
+          if (!isActive || !currentTrip) return;
+
+          setTripSnapshot({
+            state: currentTrip.state,
+            startDate: currentTrip.start_date,
+            endDate: currentTrip.end_date,
+            planningStartedAt: currentTrip.planning_started_at ?? "",
+            planningEndAt: currentTrip.planning_end_at ?? "",
+            votingEndAt: currentTrip.voting_end_at ?? "",
+          });
+        } catch (error) {
+          console.log("Could not refresh trip overview:", error);
+        }
+      }
+
+      void refreshTripSnapshot();
+
+      return () => {
+        isActive = false;
+      };
+    }, [tripId])
+  );
+
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(inviteCodeParam);
     setCodeCopied(true);
@@ -307,12 +383,18 @@ export default function TripOverviewMemberScreen() {
   }, [membersParam]);
 
   const tripStart = useMemo(
-    () => (startDate ? new Date(startDate) : new Date()),
-    [startDate]
+    () =>
+      displayedTripSnapshot.startDate
+        ? new Date(displayedTripSnapshot.startDate)
+        : new Date(),
+    [displayedTripSnapshot.startDate]
   );
   const tripEnd = useMemo(
-    () => (endDate ? new Date(endDate) : new Date()),
-    [endDate]
+    () =>
+      displayedTripSnapshot.endDate
+        ? new Date(displayedTripSnapshot.endDate)
+        : new Date(),
+    [displayedTripSnapshot.endDate]
   );
 
   const phases: {
@@ -346,9 +428,11 @@ export default function TripOverviewMemberScreen() {
   ];
 
   const phaseDates: PhaseDates = useMemo(() => {
-    const planningStartDate = parseIsoToDate(planningStartedAt);
-    const planningEndDate = parseIsoToDate(planningEndAt);
-    const votingEndDate = parseIsoToDate(votingEndAt);
+    const planningStartDate = parseIsoToDate(
+      displayedTripSnapshot.planningStartedAt
+    );
+    const planningEndDate = parseIsoToDate(displayedTripSnapshot.planningEndAt);
+    const votingEndDate = parseIsoToDate(displayedTripSnapshot.votingEndAt);
     const votingStartDate = planningEndDate ?? tripStart;
     const finalDisplayDate = votingEndDate ?? tripEnd;
 
@@ -356,12 +440,12 @@ export default function TripOverviewMemberScreen() {
       planning: {
         start: planningStartDate ?? tripStart,
         end: planningEndDate ?? tripStart,
-        time: parseIsoToTimeString(planningEndAt),
+        time: parseIsoToTimeString(displayedTripSnapshot.planningEndAt),
       },
       voting: {
         start: votingStartDate,
         end: votingEndDate ?? tripStart,
-        time: parseIsoToTimeString(votingEndAt),
+        time: parseIsoToTimeString(displayedTripSnapshot.votingEndAt),
       },
       final: {
         start: finalDisplayDate,
@@ -369,7 +453,13 @@ export default function TripOverviewMemberScreen() {
         time: "00:00",
       },
     };
-  }, [planningStartedAt, planningEndAt, votingEndAt, tripStart, tripEnd]);
+  }, [
+    displayedTripSnapshot.planningStartedAt,
+    displayedTripSnapshot.planningEndAt,
+    displayedTripSnapshot.votingEndAt,
+    tripStart,
+    tripEnd,
+  ]);
 
   const handleNavigateToItinerary = useSinglePress(() => {
     router.push({
@@ -379,11 +469,11 @@ export default function TripOverviewMemberScreen() {
         state: tripState.toLowerCase() as "planning" | "voting" | "final",
         title,
         destination,
-        startDate,
-        endDate,
+        startDate: displayedTripSnapshot.startDate,
+        endDate: displayedTripSnapshot.endDate,
         members: membersParam,
-        planningEndAt,
-        votingEndAt,
+        planningEndAt: displayedTripSnapshot.planningEndAt,
+        votingEndAt: displayedTripSnapshot.votingEndAt,
       },
     });
   });
@@ -492,10 +582,10 @@ export default function TripOverviewMemberScreen() {
               <AppText
                 variant="caption"
                 style={styles.infoValue}
-                accessibilityLabel={`Trip date: ${formatDateDisplayFromString(startDate)} to ${formatDateDisplayFromString(endDate)}`}
+                accessibilityLabel={`Trip date: ${formatDateDisplayFromString(displayedTripSnapshot.startDate)} to ${formatDateDisplayFromString(displayedTripSnapshot.endDate)}`}
               >
-                {formatDateDisplayFromString(startDate)} –{" "}
-                {formatDateDisplayFromString(endDate)}
+                {formatDateDisplayFromString(displayedTripSnapshot.startDate)} –{" "}
+                {formatDateDisplayFromString(displayedTripSnapshot.endDate)}
               </AppText>
             </View>
 

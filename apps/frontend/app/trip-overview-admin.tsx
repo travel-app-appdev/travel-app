@@ -1,5 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import {
+  useFocusEffect,
+  useIsFocused,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import {
   AccessibilityInfo,
   Alert,
@@ -28,6 +33,8 @@ import {
 import { BackLink } from "@/src/components/common/BackLink";
 import {
   deleteTrip,
+  fetchMyTrips,
+  getCachedMyTrips,
   removeMember,
   updateTrip,
   type Trip,
@@ -340,6 +347,7 @@ export default function TripOverviewAdminScreen() {
   const votingEndAt = String(raw.votingEndAt ?? "");
 
   const router = useRouter();
+  const isFocused = useIsFocused();
   const { height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenHeight < 700;
   const [isDeleting, setIsDeleting] = useState(false);
@@ -432,6 +440,17 @@ export default function TripOverviewAdminScreen() {
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   const [tripState, setTripState] = useState<Trip["state"]>(initialTripState);
+  const cachedTrip = useMemo(() => {
+    const currentUser = auth.currentUser;
+    if (!isFocused || !currentUser || !tripId) return null;
+
+    return (
+      getCachedMyTrips(currentUser.uid)?.find(
+        (trip) => trip.trip_id === tripId
+      ) ?? null
+    );
+  }, [isFocused, tripId]);
+  const checklistTripState = cachedTrip?.state ?? tripState;
 
   const planningStartDate = parseIsoToDate(planningStartedAt);
   const planningEndDate = parseIsoToDate(planningEndAt);
@@ -451,21 +470,21 @@ export default function TripOverviewAdminScreen() {
       label: "Planning",
       color: colors.beachYellow,
       disabledColor: "#F6E08F",
-      status: getPhaseStatus("planning", tripState),
+      status: getPhaseStatus("planning", checklistTripState),
     },
     {
       id: "voting",
       label: "Voting",
       color: colors.sunsetPink,
       disabledColor: "#F0B8FB",
-      status: getPhaseStatus("voting", tripState),
+      status: getPhaseStatus("voting", checklistTripState),
     },
     {
       id: "final",
       label: "Final",
       color: colors.neonGreen,
       disabledColor: "#C8F5BE",
-      status: getPhaseStatus("final", tripState),
+      status: getPhaseStatus("final", checklistTripState),
     },
   ];
 
@@ -487,9 +506,9 @@ export default function TripOverviewAdminScreen() {
     },
   });
 
-  const syncTripResponse = (trip: Trip) => {
-    const nextTripStart = parseTripDate(trip.start_date, tripStart);
-    const nextTripEnd = parseTripDate(trip.end_date, tripEnd);
+  const syncTripResponse = useCallback((trip: Trip) => {
+    const nextTripStart = parseTripDate(trip.start_date, new Date());
+    const nextTripEnd = parseTripDate(trip.end_date, nextTripStart);
     const nextPlanningStart = parseIsoToDate(trip.planning_started_at) ?? nextTripStart;
     const nextPlanningEnd = parseIsoToDate(trip.planning_end_at) ?? nextTripStart;
     const nextVotingEnd = parseIsoToDate(trip.voting_end_at) ?? nextTripEnd;
@@ -518,7 +537,37 @@ export default function TripOverviewAdminScreen() {
         time: parseIsoToTimeString(trip.voting_end_at),
       },
     });
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function refreshTripSnapshot() {
+        const currentUser = auth.currentUser;
+        if (!currentUser || !tripId) return;
+
+        try {
+          const trips = await fetchMyTrips(currentUser.uid, {
+            forceRefresh: true,
+            allowStaleOnError: true,
+          });
+          const currentTrip = trips.find((trip) => trip.trip_id === tripId);
+          if (!isActive || !currentTrip) return;
+
+          syncTripResponse(currentTrip);
+        } catch (error) {
+          console.log("Could not refresh trip overview:", error);
+        }
+      }
+
+      void refreshTripSnapshot();
+
+      return () => {
+        isActive = false;
+      };
+    }, [syncTripResponse, tripId])
+  );
 
   const [tempPhaseTime, setTempPhaseTime] = useState("12:00");
   const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
@@ -903,7 +952,7 @@ export default function TripOverviewAdminScreen() {
       pathname: "/itinerary",
       params: {
         tripId,
-        state: tripState.toLowerCase() as "planning" | "voting" | "final",
+        state: checklistTripState.toLowerCase() as "planning" | "voting" | "final",
         title: tripName,
         destination,
         startDate,
@@ -1224,19 +1273,19 @@ export default function TripOverviewAdminScreen() {
                 style={styles.checklistHeader}
                 accessible={true}
                 accessibilityRole="header"
-                accessibilityLabel={`Checklist. ${getChecklistSubtitle(tripState)}`}
+                accessibilityLabel={`Checklist. ${getChecklistSubtitle(checklistTripState)}`}
               >
                 <View style={styles.checklistTitleBlock}>
                   <AppText variant="title" style={styles.checklistTitle} accessible={false}>
                     Checklist
                   </AppText>
                   <AppText variant="body" style={styles.checklistSubtitle} accessible={false}>
-                    {getChecklistSubtitle(tripState)}
+                    {getChecklistSubtitle(checklistTripState)}
                   </AppText>
                 </View>
                 <View style={styles.mascotWrapper} {...hiddenFromAccessibility}>
                   {(() => {
-                    const Mascot = getChecklistMascot(tripState);
+                    const Mascot = getChecklistMascot(checklistTripState);
                     return <Mascot width={80} height={80} />;
                   })()}
                 </View>
