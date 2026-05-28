@@ -1,4 +1,8 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import {
   AccessibilityInfo,
@@ -11,16 +15,22 @@ import {
   Platform,
   KeyboardAvoidingView,
   useWindowDimensions,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { AppText } from "@/src/components/common/AppText";
 import {
   ActionCard,
   ACTION_CARD_HEIGHT,
 } from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
-import { leaveTrip, type Trip } from "@/src/api/trips";
+import {
+  fetchMyTrips,
+  getCachedMyTrips,
+  leaveTrip,
+  type Trip,
+} from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
 import { invalidateTripsCache } from "./home";
 import { colors, spacing, radius, typography } from "@/src/theme";
@@ -175,18 +185,31 @@ function parseIsoToTimeString(value?: string): string {
 const CHECKBOX_SIZE = 24;
 const TIMELINE_LINE_WIDTH = 2;
 
-function PhaseCheckbox({ status }: { status: PhaseStatus }) {
-  if (status === "past") {
-    return <CheckMark width={CHECKBOX_SIZE} height={CHECKBOX_SIZE} />;
+function PhaseCheckbox({
+  phaseId,
+  status,
+}: {
+  phaseId: PhaseKey;
+  status: PhaseStatus;
+}) {
+  const isChecked = status === "past" || (status === "active" && phaseId !== "voting");
+
+  if (isChecked) {
+    return (
+      <CheckMark
+        width={CHECKBOX_SIZE}
+        height={CHECKBOX_SIZE}
+        style={status === "past" ? styles.mutedIcon : undefined}
+      />
+    );
   }
-  if (status === "future") {
-    return <Unchecked width={CHECKBOX_SIZE} height={CHECKBOX_SIZE} />;
-  }
-  // active
+
   return (
-    <View style={[styles.checkbox, styles.checkboxChecked]}>
-      <View style={styles.checkboxActiveDot} />
-    </View>
+    <Unchecked
+      width={CHECKBOX_SIZE}
+      height={CHECKBOX_SIZE}
+      style={status === "future" ? styles.mutedIcon : undefined}
+    />
   );
 }
 
@@ -213,7 +236,7 @@ export default function TripOverviewMemberScreen() {
   const startDate = String(raw.startDate ?? "");
   const endDate = String(raw.endDate ?? "");
   const membersParam = String(raw.members ?? "");
-  const tripState = (raw.state ?? "Planning") as Trip["state"];
+  const initialTripState = (raw.state ?? "Planning") as Trip["state"];
   const planningStartedAt = String(raw.planningStartedAt ?? "");
   const planningEndAt = String(raw.planningEndAt ?? "");
   const votingEndAt = String(raw.votingEndAt ?? "");
@@ -225,11 +248,63 @@ export default function TripOverviewMemberScreen() {
   const [isLeaving, setIsLeaving] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
+  const blinkingDotAnim = useRef(new Animated.Value(2)).current;
+  const [tripSnapshot, setTripSnapshot] = useState({
+    state: initialTripState,
+    startDate,
+    endDate,
+    planningStartedAt,
+    planningEndAt,
+    votingEndAt,
+  });
+  const cachedTripSnapshot = useMemo(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser?.uid || !tripId) return null;
+
+    const currentTrip = getCachedMyTrips(currentUser.uid)?.find(
+      (trip) => trip.trip_id === tripId
+    );
+    if (!currentTrip) return null;
+
+    return {
+      state: currentTrip.state,
+      startDate: currentTrip.start_date,
+      endDate: currentTrip.end_date,
+      planningStartedAt: currentTrip.planning_started_at ?? "",
+      planningEndAt: currentTrip.planning_end_at ?? "",
+      votingEndAt: currentTrip.voting_end_at ?? "",
+    };
+  }, [tripId]);
+  const displayedTripSnapshot = cachedTripSnapshot ?? tripSnapshot;
+  const tripState = displayedTripSnapshot.state;
 
   useEffect(() => {
     const interval = setInterval(() => setTimerNow(Date.now()), 60 * 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blinkingDotAnim, {
+          toValue: 0,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(blinkingDotAnim, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    loop.start();
+
+    return () => {
+      loop.stop();
+    };
+  }, [blinkingDotAnim]);
 
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const safeTimeout = (fn: () => void, delay: number) => {
@@ -240,6 +315,43 @@ export default function TripOverviewMemberScreen() {
   useEffect(() => {
     return () => timeoutRefs.current.forEach(clearTimeout);
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function refreshTripSnapshot() {
+        const currentUser = auth.currentUser;
+        if (!currentUser?.uid || !tripId) return;
+
+        try {
+          const trips = await fetchMyTrips(currentUser.uid, {
+            forceRefresh: true,
+            allowStaleOnError: true,
+          });
+          const currentTrip = trips.find((trip) => trip.trip_id === tripId);
+          if (!isActive || !currentTrip) return;
+
+          setTripSnapshot({
+            state: currentTrip.state,
+            startDate: currentTrip.start_date,
+            endDate: currentTrip.end_date,
+            planningStartedAt: currentTrip.planning_started_at ?? "",
+            planningEndAt: currentTrip.planning_end_at ?? "",
+            votingEndAt: currentTrip.voting_end_at ?? "",
+          });
+        } catch (error) {
+          console.log("Could not refresh trip overview:", error);
+        }
+      }
+
+      void refreshTripSnapshot();
+
+      return () => {
+        isActive = false;
+      };
+    }, [tripId])
+  );
 
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(inviteCodeParam);
@@ -269,12 +381,18 @@ export default function TripOverviewMemberScreen() {
   }, [membersParam]);
 
   const tripStart = useMemo(
-    () => (startDate ? new Date(startDate) : new Date()),
-    [startDate]
+    () =>
+      displayedTripSnapshot.startDate
+        ? new Date(displayedTripSnapshot.startDate)
+        : new Date(),
+    [displayedTripSnapshot.startDate]
   );
   const tripEnd = useMemo(
-    () => (endDate ? new Date(endDate) : new Date()),
-    [endDate]
+    () =>
+      displayedTripSnapshot.endDate
+        ? new Date(displayedTripSnapshot.endDate)
+        : new Date(),
+    [displayedTripSnapshot.endDate]
   );
 
   const phases: {
@@ -308,9 +426,11 @@ export default function TripOverviewMemberScreen() {
   ];
 
   const phaseDates: PhaseDates = useMemo(() => {
-    const planningStartDate = parseIsoToDate(planningStartedAt);
-    const planningEndDate = parseIsoToDate(planningEndAt);
-    const votingEndDate = parseIsoToDate(votingEndAt);
+    const planningStartDate = parseIsoToDate(
+      displayedTripSnapshot.planningStartedAt
+    );
+    const planningEndDate = parseIsoToDate(displayedTripSnapshot.planningEndAt);
+    const votingEndDate = parseIsoToDate(displayedTripSnapshot.votingEndAt);
     const votingStartDate = planningEndDate ?? tripStart;
     const finalDisplayDate = votingEndDate ?? tripEnd;
 
@@ -318,12 +438,12 @@ export default function TripOverviewMemberScreen() {
       planning: {
         start: planningStartDate ?? tripStart,
         end: planningEndDate ?? tripStart,
-        time: parseIsoToTimeString(planningEndAt),
+        time: parseIsoToTimeString(displayedTripSnapshot.planningEndAt),
       },
       voting: {
         start: votingStartDate,
         end: votingEndDate ?? tripStart,
-        time: parseIsoToTimeString(votingEndAt),
+        time: parseIsoToTimeString(displayedTripSnapshot.votingEndAt),
       },
       final: {
         start: finalDisplayDate,
@@ -331,7 +451,13 @@ export default function TripOverviewMemberScreen() {
         time: "00:00",
       },
     };
-  }, [planningStartedAt, planningEndAt, votingEndAt, tripStart, tripEnd]);
+  }, [
+    displayedTripSnapshot.planningStartedAt,
+    displayedTripSnapshot.planningEndAt,
+    displayedTripSnapshot.votingEndAt,
+    tripStart,
+    tripEnd,
+  ]);
 
   const handleNavigateToItinerary = useSinglePress(() => {
     router.push({
@@ -341,11 +467,11 @@ export default function TripOverviewMemberScreen() {
         state: tripState.toLowerCase() as "planning" | "voting" | "final",
         title,
         destination,
-        startDate,
-        endDate,
+        startDate: displayedTripSnapshot.startDate,
+        endDate: displayedTripSnapshot.endDate,
         members: membersParam,
-        planningEndAt,
-        votingEndAt,
+        planningEndAt: displayedTripSnapshot.planningEndAt,
+        votingEndAt: displayedTripSnapshot.votingEndAt,
       },
     });
   });
@@ -454,10 +580,10 @@ export default function TripOverviewMemberScreen() {
               <AppText
                 variant="caption"
                 style={styles.infoValue}
-                accessibilityLabel={`Trip date: ${formatDateDisplayFromString(startDate)} to ${formatDateDisplayFromString(endDate)}`}
+                accessibilityLabel={`Trip date: ${formatDateDisplayFromString(displayedTripSnapshot.startDate)} to ${formatDateDisplayFromString(displayedTripSnapshot.endDate)}`}
               >
-                {formatDateDisplayFromString(startDate)} –{" "}
-                {formatDateDisplayFromString(endDate)}
+                {formatDateDisplayFromString(displayedTripSnapshot.startDate)} –{" "}
+                {formatDateDisplayFromString(displayedTripSnapshot.endDate)}
               </AppText>
             </View>
 
@@ -566,9 +692,10 @@ export default function TripOverviewMemberScreen() {
                   const isActive = phase.status === "active";
                   const isPast = phase.status === "past";
                   const isFuture = phase.status === "future";
+                  const isMuted = !isActive;
                   const dates = phaseDates[phaseId];
                   const timerText = formatPhaseTimerText(dates, isActive, timerNow);
-                  const badgeColor = isFuture ? phase.disabledColor : phase.color;
+                  const badgeColor = isMuted ? phase.disabledColor : phase.color;
                   const isLast = index === phases.length - 1;
 
                   return (
@@ -585,15 +712,13 @@ export default function TripOverviewMemberScreen() {
                       {/* Left: checkbox + line — hidden, parent has full label */}
                       <View style={styles.timelineLeft} {...hiddenFromAccessibility}>
                         <View style={styles.checkboxAligner}>
-                          <PhaseCheckbox status={phase.status} />
+                          <PhaseCheckbox phaseId={phaseId} status={phase.status} />
                         </View>
                         {!isLast && (
                           <View
                             style={[
                               styles.timelineLine,
-                              isPast
-                                ? styles.timelineLineSolid
-                                : styles.timelineLineDashed,
+                              styles.timelineLineDashed,
                             ]}
                           />
                         )}
@@ -627,7 +752,7 @@ export default function TripOverviewMemberScreen() {
                                   variant="caption"
                                   style={[
                                     styles.phaseBadgeText,
-                                    isFuture && styles.phaseBadgeTextMuted,
+                                    isMuted && styles.phaseBadgeTextMuted,
                                   ]}
                                 >
                                   {phase.label}
@@ -648,7 +773,7 @@ export default function TripOverviewMemberScreen() {
                                       width={24}
                                       height={24}
                                       style={
-                                        isFuture ? { opacity: 0.4 } : undefined
+                                        isMuted ? styles.mutedIcon : undefined
                                       }
                                     />
                                   )}
@@ -659,25 +784,28 @@ export default function TripOverviewMemberScreen() {
                                       variant="body"
                                       style={[
                                         styles.phaseDays,
-                                        isFuture && styles.phaseDaysMuted,
+                                        isMuted && styles.phaseDaysMuted,
                                       ]}
                                     >
                                       {timerText}
                                     </AppText>
                                     {isActive && (
-                                      <View
-                                        style={styles.timepointWrapper}
+                                      <Animated.View
+                                        style={[
+                                          styles.timepointWrapper,
+                                          { opacity: blinkingDotAnim },
+                                        ]}
                                         {...hiddenFromAccessibility}
                                       >
                                         <Timepoint width={7} height={7} />
-                                      </View>
+                                      </Animated.View>
                                     )}
                                   </View>
                                   <AppText
                                     variant="caption"
                                     style={[
                                       styles.timerLabel,
-                                      isFuture && styles.timerLabelMuted,
+                                      isMuted && styles.timerLabelMuted,
                                     ]}
                                   >
                                     Timer
@@ -685,23 +813,36 @@ export default function TripOverviewMemberScreen() {
                                 </View>
                               </View>
                             )}
+                            {phaseId === "final" && (
+                              <AppText
+                                variant="body"
+                                style={[
+                                  styles.phaseFinalDateLabel,
+                                  isMuted && styles.phaseDateLabelMuted,
+                                ]}
+                              >
+                                {formatDateDisplay(dates.start)}
+                              </AppText>
+                            )}
                           </View>
                           {/* No arrow for members — purely read-only */}
                         </View>
 
                         {/* Date range */}
-                        <AppText
-                          variant="caption"
-                          style={[
-                            styles.phaseDateLabel,
-                            isFuture && styles.phaseDateLabelMuted,
-                          ]}
-                        >
-                          {formatDateDisplay(dates.start)}
-                          {dates.start.getTime() !== dates.end.getTime()
-                            ? ` - ${formatDateDisplay(dates.end)}`
-                            : ""}
-                        </AppText>
+                        {phaseId !== "final" && (
+                          <AppText
+                            variant="caption"
+                            style={[
+                              styles.phaseDateLabel,
+                              isMuted && styles.phaseDateLabelMuted,
+                            ]}
+                          >
+                            {formatDateDisplay(dates.start)}
+                            {dates.start.getTime() !== dates.end.getTime()
+                              ? ` - ${formatDateDisplay(dates.end)}`
+                              : ""}
+                          </AppText>
+                        )}
                       </View>
                     </View>
                   );
@@ -857,6 +998,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: colors.nightBlack,
   },
+  mutedIcon: { opacity: 0.35 },
   timelineLine: {
     width: TIMELINE_LINE_WIDTH,
     flexGrow: 1,
@@ -923,6 +1065,12 @@ const styles = StyleSheet.create({
   timerLabelMuted: { color: colors.grayedOut, opacity: 0.6 },
   phaseDateLabel: {
     color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+  },
+  phaseFinalDateLabel: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
   },
