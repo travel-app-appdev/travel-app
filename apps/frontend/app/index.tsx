@@ -101,7 +101,7 @@ export default function StartPage() {
         setUser(backendUser);
         setIdToken(firebaseIdToken);
 
-        router.replace("/home");
+        router.replace("/onboarding");
       }
     }
 
