@@ -443,15 +443,8 @@ export default function HomeScreen() {
 
           <View style={styles.subtitleRow}>
             <AppText variant="body" style={styles.subtitle}>
-              where is the{" "}
+              where is the squad going?
             </AppText>
-
-            <View>
-              <AppText variant="body" style={styles.subtitleBold}>
-                squad going?
-              </AppText>
-              <View style={styles.squadUnderline} />
-            </View>
           </View>
         </View>
 
