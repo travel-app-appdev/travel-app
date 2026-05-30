@@ -1,8 +1,4 @@
-import {
-  useFocusEffect,
-  useLocalSearchParams,
-  useRouter,
-} from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import {
   AccessibilityInfo,
@@ -38,7 +34,10 @@ import {
   formatTripDurationText,
   formatTripTimerText,
 } from "@/src/utils/tripTimer";
-import { nativeImportantForAccessibility, hiddenFromAccessibility } from "@/src/utils/accessibility";
+import {
+  nativeImportantForAccessibility,
+  hiddenFromAccessibility,
+} from "@/src/utils/accessibility";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import Plane from "@/assets/icons/plane.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
@@ -53,6 +52,7 @@ import Unchecked from "@/assets/icons/unchecked.svg";
 import KeyFrame from "@/assets/icons/key_frame.svg";
 import Copy from "@/assets/icons/copy.svg";
 import Exit from "@/assets/icons/exit.svg";
+import ArrowItinerary from "@/assets/icons/arrow-itinerary.svg";
 import VoteyYellow from "@/assets/mascots/Votey_Yellow.svg";
 import VoteyPink from "@/assets/mascots/Votey_Pink.svg";
 import VoteyGreen from "@/assets/mascots/Votey_Green.svg";
@@ -74,8 +74,6 @@ type MemberParam = {
   initials: string;
   color: string;
 };
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function getPhaseStatus(
   phaseId: PhaseKey,
@@ -135,13 +133,6 @@ function formatDateDisplayFromString(dateString: string): string {
   return formatDateDisplay(date);
 }
 
-function toLocalDateString(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function dateToTimeString(date: Date): string {
   const h = date.getHours().toString().padStart(2, "0");
   const m = date.getMinutes().toString().padStart(2, "0");
@@ -180,8 +171,6 @@ function parseIsoToTimeString(value?: string): string {
   return parsed ? dateToTimeString(parsed) : "00:00";
 }
 
-// ─── Checkbox (read-only, same visual as admin) ──────────────────────────────
-
 const CHECKBOX_SIZE = 24;
 const TIMELINE_LINE_WIDTH = 2;
 
@@ -192,7 +181,8 @@ function PhaseCheckbox({
   phaseId: PhaseKey;
   status: PhaseStatus;
 }) {
-  const isChecked = status === "past" || (status === "active" && phaseId !== "voting");
+  const isChecked =
+    status === "past" || (status === "active" && phaseId !== "voting");
 
   if (isChecked) {
     return (
@@ -212,8 +202,6 @@ function PhaseCheckbox({
     />
   );
 }
-
-// ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function TripOverviewMemberScreen() {
   const raw = useLocalSearchParams<{
@@ -248,7 +236,8 @@ export default function TripOverviewMemberScreen() {
   const [isLeaving, setIsLeaving] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
-  const blinkingDotAnim = useRef(new Animated.Value(2)).current;
+  const blinkingDotAnim = useRef(new Animated.Value(1)).current;
+
   const [tripSnapshot, setTripSnapshot] = useState({
     state: initialTripState,
     startDate,
@@ -257,6 +246,7 @@ export default function TripOverviewMemberScreen() {
     planningEndAt,
     votingEndAt,
   });
+
   const cachedTripSnapshot = useMemo(() => {
     const currentUser = auth.currentUser;
     if (!currentUser?.uid || !tripId) return null;
@@ -275,6 +265,7 @@ export default function TripOverviewMemberScreen() {
       votingEndAt: currentTrip.voting_end_at ?? "",
     };
   }, [tripId]);
+
   const displayedTripSnapshot = cachedTripSnapshot ?? tripSnapshot;
   const tripState = displayedTripSnapshot.state;
 
@@ -312,6 +303,7 @@ export default function TripOverviewMemberScreen() {
     timeoutRefs.current.push(id);
     return id;
   };
+
   useEffect(() => {
     return () => timeoutRefs.current.forEach(clearTimeout);
   }, []);
@@ -387,6 +379,7 @@ export default function TripOverviewMemberScreen() {
         : new Date(),
     [displayedTripSnapshot.startDate]
   );
+
   const tripEnd = useMemo(
     () =>
       displayedTripSnapshot.endDate
@@ -448,7 +441,7 @@ export default function TripOverviewMemberScreen() {
       final: {
         start: finalDisplayDate,
         end: finalDisplayDate,
-        time: "00:00",
+        time: parseIsoToTimeString(displayedTripSnapshot.votingEndAt),
       },
     };
   }, [
@@ -527,7 +520,6 @@ export default function TripOverviewMemberScreen() {
             ]}
             showsVerticalScrollIndicator={false}
           >
-            {/* Skip link for accessibility */}
             <Pressable
               onPress={skipToLeave}
               accessibilityRole="button"
@@ -541,7 +533,6 @@ export default function TripOverviewMemberScreen() {
               </AppText>
             </Pressable>
 
-            {/* Header */}
             <View style={styles.header}>
               <BackLink href="/home" />
               <View style={styles.headerTitle} {...hiddenFromAccessibility}>
@@ -552,7 +543,6 @@ export default function TripOverviewMemberScreen() {
               </View>
             </View>
 
-            {/* Trip name — read-only */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
                 <TripTitle width={20} height={20} />
@@ -569,7 +559,6 @@ export default function TripOverviewMemberScreen() {
               </AppText>
             </View>
 
-            {/* Trip date — read-only */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
                 <Calendar width={20} height={20} />
@@ -580,14 +569,17 @@ export default function TripOverviewMemberScreen() {
               <AppText
                 variant="caption"
                 style={styles.infoValue}
-                accessibilityLabel={`Trip date: ${formatDateDisplayFromString(displayedTripSnapshot.startDate)} to ${formatDateDisplayFromString(displayedTripSnapshot.endDate)}`}
+                accessibilityLabel={`Trip date: ${formatDateDisplayFromString(
+                  displayedTripSnapshot.startDate
+                )} to ${formatDateDisplayFromString(
+                  displayedTripSnapshot.endDate
+                )}`}
               >
                 {formatDateDisplayFromString(displayedTripSnapshot.startDate)} –{" "}
                 {formatDateDisplayFromString(displayedTripSnapshot.endDate)}
               </AppText>
             </View>
 
-            {/* Destination — read-only */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
                 <Location width={20} height={20} />
@@ -604,7 +596,6 @@ export default function TripOverviewMemberScreen() {
               </AppText>
             </View>
 
-            {/* Members — read-only */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
                 <AddPeople width={20} height={20} />
@@ -615,7 +606,11 @@ export default function TripOverviewMemberScreen() {
               <AppText
                 variant="caption"
                 style={styles.infoValue}
-                accessibilityLabel={`Members: ${members.length > 0 ? members.map((m) => m.name).join(", ") : "none"}`}
+                accessibilityLabel={`Members: ${
+                  members.length > 0
+                    ? members.map((m) => m.name).join(", ")
+                    : "none"
+                }`}
               >
                 {members.length > 0
                   ? members.map((m) => m.name).join(", ")
@@ -623,11 +618,13 @@ export default function TripOverviewMemberScreen() {
               </AppText>
             </View>
 
-            {/* Invite-Code — read-only with copy */}
             <View style={styles.fieldGroup}>
               <View style={styles.infoRow}>
                 <View style={styles.infoLeft}>
-                  <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                  <View
+                    style={styles.infoLabelRow}
+                    {...hiddenFromAccessibility}
+                  >
                     <KeyFrame width={20} height={20} />
                     <AppText variant="body" style={styles.fieldLabel}>
                       Invite-Code
@@ -645,7 +642,9 @@ export default function TripOverviewMemberScreen() {
                   onPress={handleCopyCode}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityRole="button"
-                  accessibilityLabel={codeCopied ? "Trip code copied" : "Copy trip code"}
+                  accessibilityLabel={
+                    codeCopied ? "Trip code copied" : "Copy trip code"
+                  }
                   accessibilityHint="Copies the invite code to your clipboard"
                 >
                   <View {...hiddenFromAccessibility}>
@@ -664,39 +663,60 @@ export default function TripOverviewMemberScreen() {
               )}
             </View>
 
-            {/* Checklist section */}
             <View style={styles.checklistSection}>
               <View
                 style={styles.checklistHeader}
-                accessible={true}
+                accessible
                 accessibilityRole="header"
-                accessibilityLabel={`Checklist. ${getChecklistSubtitle(tripState)}`}
+                accessibilityLabel={`Checklist. ${getChecklistSubtitle(
+                  tripState
+                )}`}
               >
                 <View style={styles.checklistTitleBlock}>
-                  <AppText variant="title" style={styles.checklistTitle} accessible={false}>
+                  <AppText
+                    variant="title"
+                    style={styles.checklistTitle}
+                    accessible={false}
+                  >
                     Checklist
                   </AppText>
-                  <AppText variant="body" style={styles.checklistSubtitle} accessible={false}>
+                  <AppText
+                    variant="body"
+                    style={styles.checklistSubtitle}
+                    accessible={false}
+                  >
                     {getChecklistSubtitle(tripState)}
                   </AppText>
                 </View>
+
                 <View style={styles.mascotWrapper} {...hiddenFromAccessibility}>
                   <Mascot width={80} height={80} />
                 </View>
               </View>
 
-              {/* Timeline — read-only, no arrows or expand */}
               <View style={styles.timeline}>
                 {phases.map((phase, index) => {
                   const phaseId = phase.id;
                   const isActive = phase.status === "active";
                   const isPast = phase.status === "past";
-                  const isFuture = phase.status === "future";
                   const isMuted = !isActive;
                   const dates = phaseDates[phaseId];
-                  const timerText = formatPhaseTimerText(dates, isActive, timerNow);
-                  const badgeColor = isMuted ? phase.disabledColor : phase.color;
+                  const timerText = formatPhaseTimerText(
+                    dates,
+                    isActive,
+                    timerNow
+                  );
+                  const badgeColor = isMuted
+                    ? phase.disabledColor
+                    : phase.color;
                   const isLast = index === phases.length - 1;
+
+                  const activeShadowStyle =
+                    phaseId === "planning"
+                      ? styles.phaseCardShadowPlanning
+                      : phaseId === "voting"
+                        ? styles.phaseCardShadowVoting
+                        : styles.phaseCardShadowFinal;
 
                   return (
                     <View
@@ -705,144 +725,225 @@ export default function TripOverviewMemberScreen() {
                       accessibilityRole="text"
                       accessibilityLabel={
                         phaseId === "final"
-                          ? `Final phase, starts ${formatDateDisplay(dates.start)}`
-                          : `${phase.label} phase, ${timerText}${isActive ? " remaining" : ""}, ${isPast ? "completed" : isFuture ? "upcoming" : "in progress"}`
+                          ? `Final phase, starts ${formatDateDisplay(
+                              dates.start
+                            )}`
+                          : `${phase.label} phase, ${timerText}, ${
+                              isActive
+                                ? "in progress"
+                                : isPast
+                                  ? "completed"
+                                  : "upcoming"
+                            }`
                       }
                     >
-                      {/* Left: checkbox + line — hidden, parent has full label */}
-                      <View style={styles.timelineLeft} {...hiddenFromAccessibility}>
+                      <View
+                        style={styles.timelineLeft}
+                        {...hiddenFromAccessibility}
+                      >
                         <View style={styles.checkboxAligner}>
-                          <PhaseCheckbox phaseId={phaseId} status={phase.status} />
+                          <PhaseCheckbox
+                            phaseId={phaseId}
+                            status={phase.status}
+                          />
                         </View>
-                        {!isLast && (
+
+                        {!isLast ? (
                           <View
                             style={[
                               styles.timelineLine,
-                              styles.timelineLineDashed,
+                              isPast
+                                ? styles.timelineLineSolid
+                                : styles.timelineLineDashed,
                             ]}
                           />
-                        )}
+                        ) : null}
                       </View>
 
-                      {/* Right: phase info — hidden, parent has full label */}
-                      <View style={styles.timelineContent} {...hiddenFromAccessibility}>
-                        <View style={styles.phaseRow}>
-                          <View style={styles.phaseRowInner}>
-                            {isActive ? (
-                              <Pressable
-                                style={[styles.phaseBadge, { backgroundColor: badgeColor }]}
-                                onPress={handleNavigateToItinerary}
-                                accessibilityRole="button"
-                                accessibilityLabel={`${phase.label} phase, tap to open itinerary`}
-                                accessibilityHint="Opens the itinerary at this phase"
-                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                              >
-                                <AppText variant="caption" style={styles.phaseBadgeText}>
-                                  {phase.label}
-                                </AppText>
-                              </Pressable>
-                            ) : (
-                              <View
-                                style={[
-                                  styles.phaseBadge,
-                                  { backgroundColor: badgeColor },
-                                ]}
-                              >
-                                <AppText
-                                  variant="caption"
-                                  style={[
-                                    styles.phaseBadgeText,
-                                    isMuted && styles.phaseBadgeTextMuted,
-                                  ]}
-                                >
-                                  {phase.label}
-                                </AppText>
-                              </View>
-                            )}
-
-                            {phaseId !== "final" && (
-                              <View style={styles.phaseTimerBlock}>
-                                <View
-                                  style={styles.hourglassCol}
-                                  {...hiddenFromAccessibility}
-                                >
-                                  {isActive ? (
-                                    <Hourglass1 width={24} height={24} />
-                                  ) : (
-                                    <Hourglass0
-                                      width={24}
-                                      height={24}
-                                      style={
-                                        isMuted ? styles.mutedIcon : undefined
-                                      }
-                                    />
-                                  )}
-                                </View>
-                                <View style={styles.phaseTextCol}>
-                                  <View style={styles.daysRow}>
-                                    <AppText
-                                      variant="body"
+                      <View
+                        style={styles.timelineContent}
+                        {...hiddenFromAccessibility}
+                      >
+                        <View
+                          style={
+                            isActive
+                              ? [styles.phaseCardShadowWrap, activeShadowStyle]
+                              : undefined
+                          }
+                        >
+                          <View
+                            style={[
+                              styles.phaseRow,
+                              isActive && styles.phaseRowActiveCard,
+                            ]}
+                          >
+                            <View style={styles.phaseTopPressable}>
+                              <View style={styles.phaseRowInner}>
+                                <View style={styles.phaseTopRow}>
+                                  <View style={styles.phaseTopLeft}>
+                                    <View
                                       style={[
-                                        styles.phaseDays,
-                                        isMuted && styles.phaseDaysMuted,
+                                        styles.phaseBadge,
+                                        { backgroundColor: badgeColor },
                                       ]}
                                     >
-                                      {timerText}
-                                    </AppText>
-                                    {isActive && (
-                                      <Animated.View
+                                      <AppText
+                                        variant="caption"
                                         style={[
-                                          styles.timepointWrapper,
-                                          { opacity: blinkingDotAnim },
+                                          styles.phaseBadgeText,
+                                          isMuted && styles.phaseBadgeTextMuted,
                                         ]}
-                                        {...hiddenFromAccessibility}
                                       >
-                                        <Timepoint width={7} height={7} />
-                                      </Animated.View>
+                                        {phase.label}
+                                      </AppText>
+                                    </View>
+
+                                    {phaseId !== "final" ? (
+                                      <View style={styles.phaseTimerBlock}>
+                                        <View
+                                          style={styles.hourglassCol}
+                                          {...hiddenFromAccessibility}
+                                        >
+                                          {isActive ? (
+                                            <Hourglass1
+                                              width={32}
+                                              height={32}
+                                              style={
+                                                isMuted
+                                                  ? styles.mutedIcon
+                                                  : undefined
+                                              }
+                                            />
+                                          ) : (
+                                            <Hourglass0
+                                              width={32}
+                                              height={32}
+                                              style={
+                                                isMuted
+                                                  ? styles.mutedIcon
+                                                  : undefined
+                                              }
+                                            />
+                                          )}
+                                        </View>
+
+                                        <View style={styles.phaseTextCol}>
+                                          <View style={styles.daysRow}>
+                                            <AppText
+                                              variant="body"
+                                              style={[
+                                                styles.phaseDays,
+                                                isMuted &&
+                                                  styles.phaseDaysMuted,
+                                              ]}
+                                            >
+                                              {timerText}
+                                            </AppText>
+
+                                            {isActive ? (
+                                              <Animated.View
+                                                style={[
+                                                  styles.timepointWrapper,
+                                                  { opacity: blinkingDotAnim },
+                                                ]}
+                                                {...hiddenFromAccessibility}
+                                              >
+                                                <Timepoint
+                                                  width={7}
+                                                  height={7}
+                                                />
+                                              </Animated.View>
+                                            ) : null}
+                                          </View>
+
+                                          <AppText
+                                            variant="caption"
+                                            style={[
+                                              styles.timerLabel,
+                                              isMuted && styles.timerLabelMuted,
+                                            ]}
+                                          >
+                                            Timer
+                                          </AppText>
+                                        </View>
+                                      </View>
+                                    ) : (
+                                      <View
+                                        style={styles.finalPlaceholderBlock}
+                                      >
+                                        <AppText
+                                          variant="caption"
+                                          style={[
+                                            styles.finalPlaceholderTopLine,
+                                            isMuted &&
+                                              styles.phaseDateLabelMuted,
+                                          ]}
+                                        >
+                                          Itinerary shown
+                                        </AppText>
+
+                                        <AppText
+                                          variant="caption"
+                                          style={[
+                                            styles.finalPlaceholderBottomLine,
+                                            isMuted &&
+                                              styles.phaseDateLabelMuted,
+                                          ]}
+                                        >
+                                          {`${formatDateDisplay(dates.start)} at ${dates.time}`}
+                                        </AppText>
+                                      </View>
                                     )}
                                   </View>
+                                </View>
+
+                                {phaseId !== "final" ? (
                                   <AppText
                                     variant="caption"
                                     style={[
-                                      styles.timerLabel,
-                                      isMuted && styles.timerLabelMuted,
+                                      styles.phaseDateLabel,
+                                      isMuted && styles.phaseDateLabelMuted,
                                     ]}
                                   >
-                                    Timer
+                                    {formatDateDisplay(dates.start)}
+                                    {dates.start.getTime() !==
+                                    dates.end.getTime()
+                                      ? ` - ${formatDateDisplay(dates.end)}`
+                                      : ""}
+                                  </AppText>
+                                ) : null}
+                              </View>
+                            </View>
+
+                            {isActive ? (
+                              <Pressable
+                                onPress={handleNavigateToItinerary}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Go to itinerary for ${phase.label} phase`}
+                                style={styles.itineraryLinkRow}
+                                hitSlop={{
+                                  top: 24,
+                                  bottom: 24,
+                                  left: 24,
+                                  right: 24,
+                                }}
+                              >
+                                <View
+                                  style={styles.itineraryLinkInner}
+                                  {...hiddenFromAccessibility}
+                                >
+                                  <ArrowItinerary width={24} height={24} />
+                                  <AppText
+                                    variant="body"
+                                    style={styles.itineraryLinkText}
+                                  >
+                                    Go to Itinerary
                                   </AppText>
                                 </View>
-                              </View>
-                            )}
-                            {phaseId === "final" && (
-                              <AppText
-                                variant="body"
-                                style={[
-                                  styles.phaseFinalDateLabel,
-                                  isMuted && styles.phaseDateLabelMuted,
-                                ]}
-                              >
-                                {formatDateDisplay(dates.start)}
-                              </AppText>
-                            )}
+                              </Pressable>
+                            ) : null}
                           </View>
-                          {/* No arrow for members — purely read-only */}
                         </View>
-
-                        {/* Date range */}
-                        {phaseId !== "final" && (
-                          <AppText
-                            variant="caption"
-                            style={[
-                              styles.phaseDateLabel,
-                              isMuted && styles.phaseDateLabelMuted,
-                            ]}
-                          >
-                            {formatDateDisplay(dates.start)}
-                            {dates.start.getTime() !== dates.end.getTime()
-                              ? ` - ${formatDateDisplay(dates.end)}`
-                              : ""}
-                          </AppText>
-                        )}
                       </View>
                     </View>
                   );
@@ -891,13 +992,18 @@ const styles = StyleSheet.create({
     marginBottom: -1,
   },
   skipButtonText: { color: colors.textPrimary },
+
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
   },
-  headerTitle: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  headerTitle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
   headerLabel: {
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
@@ -905,9 +1011,12 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
 
-  // Read-only fields
   fieldGroup: { gap: spacing.sm },
-  infoLabelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  infoLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
   fieldLabel: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.xl,
@@ -921,7 +1030,6 @@ const styles = StyleSheet.create({
     paddingLeft: 28,
   },
 
-  // Invite-Code
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -939,14 +1047,17 @@ const styles = StyleSheet.create({
     paddingLeft: 28,
   },
 
-  // Checklist
   checklistSection: { gap: spacing.lg },
   checklistHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
   },
-  checklistTitleBlock: { flex: 1, gap: spacing.xs, paddingRight: spacing.md },
+  checklistTitleBlock: {
+    flex: 1,
+    gap: spacing.xs,
+    paddingRight: spacing.md,
+  },
   checklistTitle: {
     fontSize: typography.size.displaySm,
     lineHeight: typography.lineHeight.displaySm ?? typography.lineHeight.xxl,
@@ -961,55 +1072,39 @@ const styles = StyleSheet.create({
   },
   mascotWrapper: { alignSelf: "flex-start" },
 
-  // Timeline
-  timeline: { gap: 0 },
+  timeline: {
+    gap: 0,
+  },
   timelineItem: {
     flexDirection: "row",
     alignItems: "stretch",
     gap: spacing.md,
   },
   timelineLeft: {
-    alignItems: "center",
     width: CHECKBOX_SIZE,
+    alignItems: "center",
+    position: "relative",
+  },
+  mutedIcon: {
+    opacity: 0.35,
   },
   checkboxAligner: {
     height: 36,
     justifyContent: "center",
-  },
-  checkbox: {
-    width: CHECKBOX_SIZE,
-    height: CHECKBOX_SIZE,
-    borderRadius: 6,
-    borderWidth: 2,
     alignItems: "center",
-    justifyContent: "center",
+    zIndex: 2,
   },
-  checkboxChecked: {
-    borderColor: colors.nightBlack,
-    backgroundColor: colors.lightWhite,
-  },
-  checkboxUnchecked: {
-    borderColor: colors.grayedOut,
-    backgroundColor: "transparent",
-  },
-  checkboxActiveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.nightBlack,
-  },
-  mutedIcon: { opacity: 0.35 },
   timelineLine: {
+    position: "absolute",
+    top: 36,
+    bottom: 0,
     width: TIMELINE_LINE_WIDTH,
-    flexGrow: 1,
-    marginTop: 2,
-    marginBottom: 2,
+    backgroundColor: colors.grayedOut,
   },
   timelineLineSolid: {
-    backgroundColor: colors.nightBlack,
+    opacity: 0.2,
   },
   timelineLineDashed: {
-    backgroundColor: colors.grayedOut,
     opacity: 0.35,
   },
   timelineContent: {
@@ -1017,16 +1112,68 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     gap: spacing.xs,
   },
+
+  phaseCardShadowWrap: {
+    borderRadius: 32,
+    padding: 6,
+  },
   phaseRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    borderRadius: radius.xl,
+  },
+  phaseRowActiveCard: {
+    backgroundColor: colors.lightWhite,
+    borderRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderWidth: 0,
+    borderColor: "transparent",
+  },
+
+  phaseCardShadowPlanning: {
+    shadowColor: "#ebb822",
+    shadowOpacity: 0.16,
+    shadowRadius: 1,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 5,
+    boxShadow: "0px 0px 40px rgba(240, 201, 59, 0.75)",
+  },
+
+  phaseCardShadowVoting: {
+    shadowColor: colors.sunsetPink,
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 5,
+    boxShadow: "0px 0px 40px rgba(223, 133, 240, 0.75)",
+  },
+  phaseCardShadowFinal: {
+    shadowColor: colors.neonGreen,
+    shadowOpacity: 0.85,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 5,
+    boxShadow: "0px 10px 50px rgba(149, 235, 122, 0.95)",
+  },
+  phaseTopPressable: {
+    width: "100%",
   },
   phaseRowInner: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: spacing.sm,
+    flex: 1,
+  },
+  phaseTopRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
+  },
+  phaseTopLeft: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+    minWidth: 0,
   },
   phaseBadge: {
     paddingHorizontal: spacing.lg,
@@ -1040,29 +1187,50 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
     color: colors.nightBlack,
   },
-  phaseBadgeTextMuted: { color: colors.grayedOut },
+  phaseBadgeTextMuted: {
+    color: colors.grayedOut,
+  },
   phaseTimerBlock: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+    flexShrink: 1,
   },
-  hourglassCol: { justifyContent: "center", alignItems: "center" },
-  phaseTextCol: { flexDirection: "column", justifyContent: "center" },
-  daysRow: { flexDirection: "row", alignItems: "flex-start", gap: 3 },
+  hourglassCol: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  phaseTextCol: {
+    flexDirection: "column",
+    justifyContent: "center",
+  },
+  daysRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 3,
+  },
   phaseDays: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
     color: colors.textPrimary,
   },
-  phaseDaysMuted: { color: colors.grayedOut },
-  timepointWrapper: { marginTop: 1 },
+  phaseDaysMuted: {
+    color: colors.grayedOut,
+    opacity: 0.34,
+  },
+  timepointWrapper: {
+    marginTop: -5,
+  },
   timerLabel: {
     color: colors.nightBlack,
     fontSize: typography.size.xs,
     lineHeight: typography.lineHeight.xs,
   },
-  timerLabelMuted: { color: colors.grayedOut, opacity: 0.6 },
+  timerLabelMuted: {
+    color: colors.grayedOut,
+    opacity: 0.6,
+  },
   phaseDateLabel: {
     color: colors.nightBlack,
     fontSize: typography.size.sm,
@@ -1074,9 +1242,44 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
   },
-  phaseDateLabelMuted: { color: colors.grayedOut },
+  phaseDateLabelMuted: {
+    color: colors.grayedOut,
+    opacity: 0.5,
+  },
 
-  // Leave
+  finalPlaceholderBlock: {
+    justifyContent: "center",
+    flexShrink: 1,
+    gap: 2,
+  },
+  finalPlaceholderTopLine: {
+    color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  finalPlaceholderBottomLine: {
+    color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+  },
+
+  itineraryLinkRow: {
+    alignSelf: "flex-start",
+    marginTop: spacing.lg,
+  },
+  itineraryLinkInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  itineraryLinkText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+  },
+
   leaveSafeArea: { backgroundColor: colors.lightWhite },
   leaveWrapper: {
     paddingHorizontal: spacing.xl,
