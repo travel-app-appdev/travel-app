@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   dayChipDisabled: {
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.lightWhite,
     opacity: 0.45,
   },
   dayChipInner: {
