@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     minHeight: CARD_HEIGHT,
-    borderRadius: radius.xl,
+    borderRadius: radius.sm,
     backgroundColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
   cta: {
     width: 92,
     minHeight: CARD_HEIGHT,
-    borderRadius: radius.xl,
+    borderRadius: radius.sm,
     backgroundColor: colors.border,
     opacity: 0.5,
   },
