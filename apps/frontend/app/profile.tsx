@@ -220,8 +220,9 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleLogout = () => {
-    setUser(null);
+  const handleLogout = async () => {
+    await auth.signOut(); // triggers onAuthStateChanged → clears user + idToken
+    router.dismissAll();
     router.replace("/");
   };
 
