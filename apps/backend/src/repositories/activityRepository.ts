@@ -1,3 +1,4 @@
+//apps/backend/src/repositories/activityRepository.ts
 import admin from "../config/firebase";
 import { Activity } from "../types/trip";
 import { findUserById } from "./tripsRepository";
@@ -548,6 +549,66 @@ export async function toggleActivityAttendance(input: {
     return {
         joined,
         joinedCount: metadata.joinedCount,
-        joinedMembers: metadata.joinedMembers
+        joinedMembers: metadata.joinedMembers,
     };
+}
+
+/**
+ * Removes all data belonging to a user within a trip:
+ * - Their votes (activity_votes)
+ * - Their attendance records (activity_attendance)
+ * - Their activities (activities) and the corresponding timeslot links (timeslot_activities)
+ *
+ * Note: final_itinerary_slots is intentionally left untouched — the final
+ * itinerary represents the group's collective decision and should not be
+ * retroactively altered when a member leaves.
+ *
+ * Note: Firestore batches are limited to 500 write operations. This is safe
+ * for typical trip sizes; revisit if activity counts can grow very large.
+ */
+export async function removeMemberDataFromTrip(
+    tripId: string,
+    userId: string
+): Promise<void> {
+    const db = admin.firestore();
+    const batch = db.batch();
+
+    // 1. Delete the user's votes for this trip
+    const votesSnapshot = await db
+        .collection("activity_votes")
+        .where("trip_id", "==", tripId)
+        .where("user_id", "==", userId)
+        .get();
+    votesSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+
+    // 2. Delete the user's attendance records for this trip
+    const attendanceSnapshot = await db
+        .collection("activity_attendance")
+        .where("trip_id", "==", tripId)
+        .where("user_id", "==", userId)
+        .get();
+    attendanceSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+
+    // 3. Delete the user's activities and their timeslot_activities links
+    const activitiesSnapshot = await db
+        .collection("activities")
+        .where("trip_id", "==", tripId)
+        .where("user_id", "==", userId)
+        .get();
+
+    const activityIds = activitiesSnapshot.docs.map((doc) => doc.id);
+    activitiesSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+
+    // timeslot_activities uses activity_id as the foreign key; delete in chunks of 10
+    const chunkSize = 10;
+    for (let i = 0; i < activityIds.length; i += chunkSize) {
+        const chunk = activityIds.slice(i, i + chunkSize);
+        const tsaSnapshot = await db
+            .collection("timeslot_activities")
+            .where("activity_id", "in", chunk)
+            .get();
+        tsaSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    }
+
+    await batch.commit();
 }
