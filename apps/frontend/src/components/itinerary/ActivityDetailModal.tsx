@@ -441,6 +441,7 @@ const styles = StyleSheet.create({
   },
   alternativesList: {
     gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   alternativeRow: {
     flexDirection: "row",

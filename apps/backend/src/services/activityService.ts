@@ -8,6 +8,7 @@ import {
     getFinalItinerarySlotsByTripId,
     slotExistsInFinalItinerary,
     toggleActivityAttendance,
+    toggleAddedAlternativeActivityBySlot,
     updateActivityById,
     upsertActivityVote,
 } from "../repositories/activityRepository";
@@ -270,5 +271,53 @@ export async function toggleFinalActivityAttendance(input: {
         slotId: input.slotId,
         activityId: input.activityId,
         userId,
+    });
+}
+
+export async function toggleAddedAlternativeActivity(input: {
+    tripId: string;
+    slotId: string;
+    idToken: string;
+    activityId: string;
+}): Promise<{
+    added: boolean;
+    addedAlternativeActivityIds: string[];
+}> {
+    const decoded = await admin.auth().verifyIdToken(input.idToken);
+    const userId = decoded.uid;
+
+    const trip = await findTripById(input.tripId);
+    if (!trip) {
+        throw { status: 404, message: "Trip not found" };
+    }
+
+    if (trip.state !== "Final") {
+        throw { status: 400, message: "Trip is not in Final state" };
+    }
+
+    const membership = await findMembership(input.tripId, userId);
+    if (!membership) {
+        throw { status: 404, message: "User is not a member of this trip" };
+    }
+
+    const slotExists = await slotExistsInFinalItinerary(input.tripId, input.slotId);
+    if (!slotExists) {
+        throw { status: 400, message: "Slot is not part of the final itinerary" };
+    }
+
+    const activityBelongsToSlot = await activityBelongsToTripSlot(
+        input.tripId,
+        input.slotId,
+        input.activityId
+    );
+
+    if (!activityBelongsToSlot) {
+        throw { status: 400, message: "Activity does not belong to this final itinerary slot" };
+    }
+
+    return toggleAddedAlternativeActivityBySlot({
+        tripId: input.tripId,
+        slotId: input.slotId,
+        activityId: input.activityId,
     });
 }

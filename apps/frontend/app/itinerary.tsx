@@ -13,8 +13,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { doc, onSnapshot } from "firebase/firestore";
 
 import { colors, spacing } from "@/src/theme";
+import { db } from "@/src/lib/firebase";
 import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
 import { mapActivitiesToSlots } from "@/src/utils/itinerary/mapActivitiesToSlots";
@@ -45,6 +47,7 @@ import {
   getActivitiesBySlot,
   getFinalItineraryActivities,
   toggleActivityAttendance,
+  toggleAddedAlternativeToItinerary,
   voteForActivity,
   type FinalItineraryResponseDto,
 } from "@/src/services/activityService";
@@ -75,10 +78,6 @@ function splitBackendSlotId(slotId: string) {
 
 function formatSlotLabel(slotId: string) {
   return slotId.replace(/_/g, ":");
-}
-
-function buildFinalSlotKey(dayId: string, slotId: string) {
-  return `${dayId}_${slotId}`;
 }
 
 function selectVoteForActivity(
@@ -141,6 +140,7 @@ function mapBackendActivity(
     joinedCount: activity.joinedCount ?? 0,
     hasCurrentUserJoined: activity.hasCurrentUserJoined ?? false,
     joinedMembers: activity.joinedMembers ?? [],
+    isAddedToFinalItinerary: activity.isAddedToFinalItinerary ?? false,
   };
 }
 
@@ -150,6 +150,7 @@ type FinalSlotUi = {
   slotKey: string;
   selectedActivity: Activity;
   alternativeActivities: Activity[];
+  addedAlternativeActivities: Activity[];
   alternativeCount: number;
 };
 
@@ -170,12 +171,24 @@ function mapBackendFinalSlot(slot: any): FinalSlotUi {
       )
     : [];
 
+  const addedAlternativeActivities = Array.isArray(
+    slot.addedAlternativeActivities
+  )
+    ? slot.addedAlternativeActivities.map((activity: any) =>
+        mapBackendActivity(activity, {
+          dayId: split.dayId,
+          slotId: split.slotId,
+        })
+      )
+    : [];
+
   return {
     slotId: split.slotId,
     dayId: split.dayId,
     slotKey: slot.slot_id,
     selectedActivity,
     alternativeActivities,
+    addedAlternativeActivities,
     alternativeCount: slot.alternativeCount ?? alternativeActivities.length,
   };
 }
@@ -418,12 +431,7 @@ export default function ItineraryScreen() {
   });
 
   const [finalSlots, setFinalSlots] = useState<FinalSlotUi[]>([]);
-  const [
-    addedAlternativeActivitiesBySlot,
-    setAddedAlternativeActivitiesBySlot,
-  ] = useState<Record<string, Activity[]>>({});
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
-
   const [isLoadingActivities, setIsLoadingActivities] = useState(() => {
     const keys = [...activitiesCache.keys()];
     return !keys.some((k) => k.startsWith(`${tripId}_`));
@@ -458,6 +466,7 @@ export default function ItineraryScreen() {
     typeof setTimeout
   > | null>(null);
   const initialTripRefreshKeyRef = useRef<string | null>(null);
+  const lastFinalUpdateRef = useRef<string | null>(null);
 
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
@@ -776,6 +785,70 @@ export default function ItineraryScreen() {
     }
   }, [showPlanningInfoPopup]);
 
+  const refreshFinalItinerary = useCallback(async () => {
+    if (!tripId) return;
+
+    try {
+      const refreshed = await getFinalItineraryActivities(
+        tripId,
+        currentUserId ?? undefined
+      );
+
+      const mappedSlots = (refreshed.slots ?? []).map(mapBackendFinalSlot);
+      setFinalSlots(mappedSlots);
+
+      const flatMappedActivities = mappedSlots.flatMap((slot) => [
+        slot.selectedActivity,
+        ...slot.alternativeActivities,
+        ...slot.addedAlternativeActivities,
+      ]);
+
+      activitiesCache.set(`${tripId}_final`, flatMappedActivities);
+      setApiActivities(flatMappedActivities);
+    } catch (error) {
+      console.log("Could not refresh final itinerary:", error);
+    }
+  }, [tripId, currentUserId]);
+
+  useEffect(() => {
+    if (!tripId || activeState !== "final") {
+      return;
+    }
+
+    const tripRef = doc(db, "trips", tripId);
+
+    const unsubscribe = onSnapshot(
+      tripRef,
+      async (snapshot) => {
+        const data = snapshot.data();
+        const nextValue =
+          data?.final_itinerary_updated_at?.toMillis?.()?.toString?.() ?? null;
+
+        console.log("final trip listener fired", {
+          tripId,
+          exists: snapshot.exists(),
+          nextValue,
+          rawTimestamp: data?.final_itinerary_updated_at,
+          pendingWrites: snapshot.metadata.hasPendingWrites,
+        });
+
+        if (nextValue && nextValue === lastFinalUpdateRef.current) {
+          console.log("same timestamp, skipping refresh");
+          return;
+        }
+
+        lastFinalUpdateRef.current = nextValue;
+        console.log("refreshing final itinerary now");
+        await refreshFinalItinerary();
+      },
+      (error) => {
+        console.log("Final itinerary listener error:", error);
+      }
+    );
+
+    return unsubscribe;
+  }, [tripId, activeState, refreshFinalItinerary]);
+
   useEffect(() => {
     async function loadActivities() {
       if (!tripId || tripDays.length === 0) return;
@@ -822,6 +895,7 @@ export default function ItineraryScreen() {
           const flatMappedActivities = mappedSlots.flatMap((slot) => [
             slot.selectedActivity,
             ...slot.alternativeActivities,
+            ...slot.addedAlternativeActivities,
           ]);
 
           const hasChanged =
@@ -831,6 +905,8 @@ export default function ItineraryScreen() {
 
           if (hasChanged) {
             activitiesCache.set(cacheKey, flatMappedActivities);
+            setApiActivities(flatMappedActivities);
+          } else if (!cached) {
             setApiActivities(flatMappedActivities);
           }
 
@@ -867,6 +943,8 @@ export default function ItineraryScreen() {
           if (hasChanged) {
             activitiesCache.set(cacheKey, allActivities);
             setApiActivities(allActivities);
+          } else if (!cached) {
+            setApiActivities(allActivities);
           }
 
           setIsLoadingActivities(false);
@@ -899,6 +977,8 @@ export default function ItineraryScreen() {
         if (hasChanged) {
           activitiesCache.set(cacheKey, allActivities);
           setApiActivities(allActivities);
+        } else if (!cached) {
+          setApiActivities(allActivities);
         }
 
         setIsLoadingActivities(false);
@@ -924,7 +1004,7 @@ export default function ItineraryScreen() {
   useEffect(() => {
     if (activeState !== "final") {
       setFinalSlots([]);
-      setAddedAlternativeActivitiesBySlot({});
+      lastFinalUpdateRef.current = null;
     }
   }, [activeState]);
 
@@ -1262,24 +1342,30 @@ export default function ItineraryScreen() {
       setSelectedActivity(activity);
       setSelectedActivitySlotLabel(slotLabel);
 
-      const slotKey = buildFinalSlotKey(activity.dayId, activity.slotId);
-
       const matchingFinalSlot = finalSlots.find(
         (slot) =>
           slot.dayId === activity.dayId &&
           slot.slotId === activity.slotId &&
-          slot.selectedActivity.id === activity.id
+          (slot.selectedActivity.id === activity.id ||
+            slot.alternativeActivities.some(
+              (item) => item.id === activity.id
+            ) ||
+            slot.addedAlternativeActivities.some(
+              (item) => item.id === activity.id
+            ))
       );
 
       setSelectedAlternativeActivities(
         matchingFinalSlot?.alternativeActivities ?? []
       );
       setSelectedAddedAlternativeActivityIds(
-        (addedAlternativeActivitiesBySlot[slotKey] ?? []).map((item) => item.id)
+        (matchingFinalSlot?.addedAlternativeActivities ?? []).map(
+          (item) => item.id
+        )
       );
       setShowActivityDetailModal(true);
     },
-    [finalSlots, addedAlternativeActivitiesBySlot]
+    [finalSlots]
   );
 
   const handleCloseActivityDetails = useCallback(() => {
@@ -1291,50 +1377,61 @@ export default function ItineraryScreen() {
   }, []);
 
   const handleAddAlternativeToItinerary = useCallback(
-    (activityToToggle: Activity) => {
-      const slotKey = buildFinalSlotKey(
-        activityToToggle.dayId,
-        activityToToggle.slotId
-      );
+    async (activityToToggle: Activity) => {
+      if (!authToken || !tripId) {
+        Alert.alert("Could not update itinerary", "Please log in again.");
+        return;
+      }
 
-      setAddedAlternativeActivitiesBySlot((current) => {
-        const existing = current[slotKey] ?? [];
-        const alreadyExists = existing.some(
-          (item) => item.id === activityToToggle.id
+      try {
+        const fullSlotId = `${activityToToggle.dayId}_${activityToToggle.slotId}`;
+
+        await toggleAddedAlternativeToItinerary({
+          idToken: authToken,
+          tripId,
+          slotId: fullSlotId,
+          activityId: activityToToggle.id,
+        });
+
+        const refreshed = await getFinalItineraryActivities(
+          tripId,
+          currentUserId ?? undefined
         );
 
-        if (alreadyExists) {
-          const updated = existing.filter(
-            (item) => item.id !== activityToToggle.id
-          );
+        const mappedSlots = (refreshed.slots ?? []).map(mapBackendFinalSlot);
+        setFinalSlots(mappedSlots);
 
-          if (updated.length === 0) {
-            const { [slotKey]: _, ...rest } = current;
-            return rest;
-          }
+        const flatMappedActivities = mappedSlots.flatMap((slot) => [
+          slot.selectedActivity,
+          ...slot.alternativeActivities,
+          ...slot.addedAlternativeActivities,
+        ]);
 
-          return {
-            ...current,
-            [slotKey]: updated,
-          };
-        }
-        return {
-          ...current,
-          [slotKey]: [...existing, activityToToggle],
-        };
-      });
+        activitiesCache.set(`${tripId}_final`, flatMappedActivities);
+        setApiActivities(flatMappedActivities);
 
-      setSelectedAddedAlternativeActivityIds((current) => {
-        const alreadyExists = current.includes(activityToToggle.id);
+        const matchingFinalSlot = mappedSlots.find(
+          (slot) =>
+            slot.dayId === activityToToggle.dayId &&
+            slot.slotId === activityToToggle.slotId
+        );
 
-        if (alreadyExists) {
-          return current.filter((id) => id !== activityToToggle.id);
-        }
-
-        return [...current, activityToToggle.id];
-      });
+        setSelectedAlternativeActivities(
+          matchingFinalSlot?.alternativeActivities ?? []
+        );
+        setSelectedAddedAlternativeActivityIds(
+          (matchingFinalSlot?.addedAlternativeActivities ?? []).map(
+            (item) => item.id
+          )
+        );
+      } catch (error) {
+        Alert.alert(
+          "Could not update itinerary",
+          error instanceof Error ? error.message : "Please try again."
+        );
+      }
     },
-    []
+    [authToken, tripId, currentUserId]
   );
 
   async function handleAddVote(activityId: string) {
@@ -1494,42 +1591,11 @@ export default function ItineraryScreen() {
             ...slot,
             selectedActivity: updateItem(slot.selectedActivity),
             alternativeActivities: slot.alternativeActivities.map(updateItem),
+            addedAlternativeActivities:
+              slot.addedAlternativeActivities.map(updateItem),
           };
         })
       );
-
-      setAddedAlternativeActivitiesBySlot((current) => {
-        const next = { ...current };
-
-        Object.keys(next).forEach((slotKey) => {
-          next[slotKey] = next[slotKey].map((item) => {
-            const sameSlot =
-              item.dayId === activity.dayId && item.slotId === activity.slotId;
-
-            if (!sameSlot) return item;
-
-            if (item.id === activityId) {
-              return {
-                ...item,
-                hasCurrentUserJoined: result.joined,
-                joinedCount: result.joinedCount,
-                joinedMembers: result.joinedMembers ?? item.joinedMembers,
-              };
-            }
-
-            if (result.joined) {
-              return {
-                ...item,
-                hasCurrentUserJoined: false,
-              };
-            }
-
-            return item;
-          });
-        });
-
-        return next;
-      });
 
       setSelectedActivity((current) =>
         current &&
@@ -1725,15 +1791,10 @@ export default function ItineraryScreen() {
                       }
 
                       const addedAlternatives =
-                        addedAlternativeActivitiesBySlot[
-                          buildFinalSlotKey(finalSlot.dayId, finalSlot.slotId)
-                        ] ?? [];
+                        finalSlot.addedAlternativeActivities;
+                      const remainingAlternativeCount =
+                        finalSlot.alternativeActivities.length;
 
-                      const remainingAlternativeCount = Math.max(
-                      0,
-                      finalSlot.alternativeActivities.length -
-                        addedAlternatives.length
-                      );
                       return (
                         <View key={slot.id} style={styles.finalSlotSection}>
                           <FinalSlotCard

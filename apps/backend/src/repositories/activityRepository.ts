@@ -6,6 +6,17 @@ import {
 } from "../types/trip";
 import { findUserById } from "./tripsRepository";
 
+async function touchFinalItineraryTrip(tripId: string): Promise<void> {
+    const db = admin.firestore();
+
+    await db.collection("trips").doc(tripId).set(
+        {
+            final_itinerary_updated_at: admin.firestore.Timestamp.now(),
+        },
+        { merge: true }
+    );
+}
+
 function normalizeDateTime(value: any): string | undefined {
     if (!value) return undefined;
 
@@ -24,7 +35,10 @@ function normalizeDateTime(value: any): string | undefined {
     return undefined;
 }
 
-function activityFromDoc(doc: FirebaseFirestore.DocumentSnapshot, slotId?: string): Activity | null {
+function activityFromDoc(
+    doc: FirebaseFirestore.DocumentSnapshot,
+    slotId?: string
+): Activity | null {
     if (!doc.exists) return null;
 
     const data = doc.data()!;
@@ -40,7 +54,9 @@ function activityFromDoc(doc: FirebaseFirestore.DocumentSnapshot, slotId?: strin
         googleMapsUrl: data.googleMapsUrl,
         startTime: data.startTime ?? undefined,
         endTime: data.endTime ?? undefined,
-        created_at: normalizeDateTime(data.created_at) ?? normalizeDateTime((doc as any).createTime),
+        created_at:
+            normalizeDateTime(data.created_at) ??
+            normalizeDateTime((doc as any).createTime),
         source_type: data.source_type,
     } as Activity;
 }
@@ -89,6 +105,7 @@ export async function createActivity(data: {
         activity_id: activityRef.id,
         trip_id: data.tripId,
         user_id: data.userId,
+        slot_id: data.slotId,
         name: data.name,
         description: data.description,
         address: data.address,
@@ -100,7 +117,9 @@ export async function createActivity(data: {
     };
 }
 
-export async function getActivityById(activityId: string): Promise<Activity | null> {
+export async function getActivityById(
+    activityId: string
+): Promise<Activity | null> {
     const db = admin.firestore();
     const activityDoc = await db.collection("activities").doc(activityId).get();
     return activityFromDoc(activityDoc);
@@ -140,7 +159,11 @@ export async function updateActivityById(
     return activity;
 }
 
-async function getVoteMetadata(tripId: string, slotId: string, currentUserId?: string) {
+async function getVoteMetadata(
+    tripId: string,
+    slotId: string,
+    currentUserId?: string
+) {
     const db = admin.firestore();
     const snapshot = await db
         .collection("activity_votes")
@@ -153,7 +176,10 @@ async function getVoteMetadata(tripId: string, slotId: string, currentUserId?: s
 
     snapshot.docs.forEach((doc) => {
         const data = doc.data();
-        counts.set(data.activity_id, (counts.get(data.activity_id) ?? 0) + 1);
+        counts.set(
+            data.activity_id,
+            (counts.get(data.activity_id) ?? 0) + 1
+        );
 
         if (currentUserId && data.user_id === currentUserId) {
             currentUserActivityId = data.activity_id;
@@ -202,7 +228,11 @@ export async function getActivitiesBySlotId(
 
                     return db
                         .collection("activities")
-                        .where(admin.firestore.FieldPath.documentId(), "in", chunk)
+                        .where(
+                            admin.firestore.FieldPath.documentId(),
+                            "in",
+                            chunk
+                        )
                         .get();
                 }
             )
@@ -221,18 +251,25 @@ export async function getActivitiesBySlotId(
     }
 
     if (options.includeVotes) {
-        const metadata = await getVoteMetadata(tripId, slotId, options.currentUserId);
+        const metadata = await getVoteMetadata(
+            tripId,
+            slotId,
+            options.currentUserId
+        );
         filtered = filtered.map((activity) => ({
             ...activity,
             voteCount: metadata.counts.get(activity.activity_id) ?? 0,
-            hasCurrentUserVote: metadata.currentUserActivityId === activity.activity_id,
+            hasCurrentUserVote:
+                metadata.currentUserActivityId === activity.activity_id,
         }));
     }
 
     return filtered;
 }
 
-export async function getCandidateActivitiesByTripId(tripId: string): Promise<Activity[]> {
+export async function getCandidateActivitiesByTripId(
+    tripId: string
+): Promise<Activity[]> {
     const db = admin.firestore();
 
     const activitiesSnapshot = await db
@@ -306,7 +343,10 @@ export async function getVotingCompletionStatus(
 
     candidates.forEach((activity) => {
         if (!activity.slot_id) return;
-        slotCounts.set(activity.slot_id, (slotCounts.get(activity.slot_id) ?? 0) + 1);
+        slotCounts.set(
+            activity.slot_id,
+            (slotCounts.get(activity.slot_id) ?? 0) + 1
+        );
     });
 
     const requiredSlotIds = Array.from(slotCounts.entries())
@@ -331,7 +371,8 @@ export async function getVotingCompletionStatus(
         const data = doc.data();
         if (!requiredSlotIds.includes(data.slot_id)) return;
 
-        const userVotes = votesByUser.get(data.user_id) ?? new Set<string>();
+        const userVotes =
+            votesByUser.get(data.user_id) ?? new Set<string>();
         userVotes.add(data.slot_id);
         votesByUser.set(data.user_id, userVotes);
     });
@@ -348,7 +389,9 @@ export async function getVotingCompletionStatus(
     };
 }
 
-export async function createFinalItineraryForTrip(tripId: string): Promise<void> {
+export async function createFinalItineraryForTrip(
+    tripId: string
+): Promise<void> {
     const db = admin.firestore();
 
     const existing = await db
@@ -377,7 +420,10 @@ export async function createFinalItineraryForTrip(tripId: string): Promise<void>
     const bySlot = new Map<string, Activity[]>();
     candidates.forEach((activity) => {
         if (!activity.slot_id) return;
-        bySlot.set(activity.slot_id, [...(bySlot.get(activity.slot_id) ?? []), activity]);
+        bySlot.set(
+            activity.slot_id,
+            [...(bySlot.get(activity.slot_id) ?? []), activity]
+        );
     });
 
     const batch = db.batch();
@@ -409,12 +455,15 @@ export async function createFinalItineraryForTrip(tripId: string): Promise<void>
             trip_id: tripId,
             slot_id: slotId,
             activity_id: winner.activity_id,
-            vote_count: voteCounts.get(`${slotId}|${winner.activity_id}`) ?? 0,
+            vote_count:
+                voteCounts.get(`${slotId}|${winner.activity_id}`) ?? 0,
             selected_at: selectedAt,
+            added_alternative_activity_ids: [],
         });
     });
 
     await batch.commit();
+    await touchFinalItineraryTrip(tripId);
 }
 
 async function getJoinedMetadata(input: {
@@ -458,7 +507,7 @@ async function getJoinedMetadata(input: {
     );
 
     return {
-        joinedCount: snapshot.size,
+        joinedCount: uniqueUserIds.length,
         hasCurrentUserJoined,
         joinedMembers,
     };
@@ -506,60 +555,94 @@ export async function getFinalItinerarySlotsByTripId(
     }
 
     const slots: FinalItinerarySlot[] = await Promise.all(
-        snapshot.docs.map(async (doc): Promise<FinalItinerarySlot> => {
-            const finalData = doc.data();
-            const slotId = finalData.slot_id as string;
-            const selectedActivityId = finalData.activity_id as string;
-            const selectedVoteCount = finalData.vote_count ?? 0;
+        snapshot.docs.map(
+            async (doc): Promise<FinalItinerarySlot> => {
+                const finalData = doc.data();
+                const slotId = finalData.slot_id as string;
+                const selectedActivityId =
+                    finalData.activity_id as string;
+                const selectedVoteCount = finalData.vote_count ?? 0;
+                const addedAlternativeActivityIds = Array.isArray(
+                    finalData.added_alternative_activity_ids
+                )
+                    ? (finalData
+                        .added_alternative_activity_ids as string[])
+                    : [];
 
-            const slotActivities = await getActivitiesBySlotId(slotId, tripId);
+                const slotActivities = await getActivitiesBySlotId(
+                    slotId,
+                    tripId
+                );
 
-            const selectedBase = slotActivities.find(
-                (activity) => activity.activity_id === selectedActivityId
-            );
+                const selectedBase = slotActivities.find(
+                    (activity) =>
+                        activity.activity_id === selectedActivityId
+                );
 
-            if (!selectedBase) {
-                throw {
-                    status: 404,
-                    message: `Selected activity ${selectedActivityId} not found for slot ${slotId}`,
-                };
-            }
+                if (!selectedBase) {
+                    throw {
+                        status: 404,
+                        message: `Selected activity ${selectedActivityId} not found for slot ${slotId}`,
+                    };
+                }
 
-            const alternativeBase = slotActivities.filter(
-                (activity) => activity.activity_id !== selectedActivityId
-            );
+                const alternativeBase = slotActivities.filter(
+                    (activity) =>
+                        activity.activity_id !== selectedActivityId
+                );
 
-            const selectedActivity = await enrichActivityWithJoinedMetadata(
-                selectedBase,
-                tripId,
-                slotId,
-                currentUserId,
-                selectedVoteCount
-            );
-
-            const alternativeActivities = await Promise.all(
-                alternativeBase.map((activity) =>
-                    enrichActivityWithJoinedMetadata(
-                        activity,
+                const selectedActivity =
+                    await enrichActivityWithJoinedMetadata(
+                        selectedBase,
                         tripId,
                         slotId,
-                        currentUserId
-                    )
-                )
-            );
+                        currentUserId,
+                        selectedVoteCount
+                    );
 
-            return {
-                slot_id: slotId,
-                selectedActivity,
-                alternativeActivities,
-                alternativeCount: alternativeActivities.length,
-            };
-        })
+                const enrichedAlternativeActivities =
+                    await Promise.all(
+                        alternativeBase.map((activity) =>
+                            enrichActivityWithJoinedMetadata(
+                                activity,
+                                tripId,
+                                slotId,
+                                currentUserId
+                            )
+                        )
+                    );
+
+                const addedAlternativeActivities =
+                    enrichedAlternativeActivities.filter((activity) =>
+                        addedAlternativeActivityIds.includes(
+                            activity.activity_id
+                        )
+                    );
+
+                const alternativeActivities =
+                    enrichedAlternativeActivities.filter(
+                        (activity) =>
+                            !addedAlternativeActivityIds.includes(
+                                activity.activity_id
+                            )
+                    );
+
+                return {
+                    slot_id: slotId,
+                    selectedActivity,
+                    alternativeActivities,
+                    addedAlternativeActivities,
+                    alternativeCount: alternativeActivities.length,
+                };
+            }
+        )
     );
 
     return {
         trip_id: tripId,
-        slots: slots.sort((a, b) => a.slot_id.localeCompare(b.slot_id)),
+        slots: slots.sort((a, b) =>
+            a.slot_id.localeCompare(b.slot_id)
+        ),
     };
 }
 
@@ -567,7 +650,10 @@ export async function getFinalActivitiesByTripId(
     tripId: string,
     currentUserId?: string
 ): Promise<Activity[]> {
-    const result = await getFinalItinerarySlotsByTripId(tripId, currentUserId);
+    const result = await getFinalItinerarySlotsByTripId(
+        tripId,
+        currentUserId
+    );
     return result.slots.map((slot) => slot.selectedActivity);
 }
 
@@ -590,7 +676,9 @@ export async function activityBelongsToTripSlot(
     activityId: string
 ): Promise<boolean> {
     const activities = await getActivitiesBySlotId(slotId, tripId);
-    return activities.some((activity) => activity.activity_id === activityId);
+    return activities.some(
+        (activity) => activity.activity_id === activityId
+    );
 }
 
 export async function toggleActivityAttendance(input: {
@@ -606,7 +694,9 @@ export async function toggleActivityAttendance(input: {
     const db = admin.firestore();
     const ref = db
         .collection("activity_attendance")
-        .doc(`${input.tripId}_${input.slotId}_${input.activityId}_${input.userId}`);
+        .doc(
+            `${input.tripId}_${input.slotId}_${input.activityId}_${input.userId}`
+        );
 
     const current = await ref.get();
     const joined = !(current.exists && current.data()?.joined === true);
@@ -668,10 +758,67 @@ export async function toggleActivityAttendance(input: {
         currentUserId: input.userId,
     });
 
+    await touchFinalItineraryTrip(input.tripId);
+
     return {
         joined,
         joinedCount: metadata.joinedCount,
         joinedMembers: metadata.joinedMembers,
+    };
+}
+
+export async function toggleAddedAlternativeActivityBySlot(input: {
+    tripId: string;
+    slotId: string;
+    activityId: string;
+}): Promise<{
+    added: boolean;
+    addedAlternativeActivityIds: string[];
+}> {
+    const db = admin.firestore();
+    const ref = db
+        .collection("final_itinerary_slots")
+        .doc(`${input.tripId}_${input.slotId}`);
+    const snapshot = await ref.get();
+
+    if (!snapshot.exists) {
+        throw { status: 404, message: "Final itinerary slot not found" };
+    }
+
+    const data = snapshot.data()!;
+    const selectedActivityId = data.activity_id as string;
+
+    if (selectedActivityId === input.activityId) {
+        throw {
+            status: 400,
+            message: "Selected activity cannot be added as alternative",
+        };
+    }
+
+    const currentIds = Array.isArray(
+        data.added_alternative_activity_ids
+    )
+        ? (data.added_alternative_activity_ids as string[])
+        : [];
+
+    const alreadyAdded = currentIds.includes(input.activityId);
+    const nextIds = alreadyAdded
+        ? currentIds.filter((id) => id !== input.activityId)
+        : [...currentIds, input.activityId];
+
+    await ref.set(
+        {
+            added_alternative_activity_ids: nextIds,
+            updated_at: admin.firestore.Timestamp.now(),
+        },
+        { merge: true }
+    );
+
+    await touchFinalItineraryTrip(input.tripId);
+
+    return {
+        added: !alreadyAdded,
+        addedAlternativeActivityIds: nextIds,
     };
 }
 

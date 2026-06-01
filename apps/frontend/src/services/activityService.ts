@@ -35,6 +35,7 @@ export type FinalItinerarySlotDto = {
   slot_id: string;
   selectedActivity: BackendActivity;
   alternativeActivities: BackendActivity[];
+  addedAlternativeActivities: BackendActivity[];
   alternativeCount: number;
 };
 
@@ -71,6 +72,11 @@ export type VoteForActivityResponse = {
   slotId: string;
   tripState: "Planning" | "Voting" | "Final";
   voteAccepted?: boolean;
+};
+
+export type ToggleAddedAlternativeResponse = {
+  added: boolean;
+  addedAlternativeActivityIds: string[];
 };
 
 export async function createActivity(payload: CreateActivityPayload) {
@@ -198,6 +204,36 @@ export async function toggleActivityAttendance(payload: {
   }
 
   return data;
+}
+
+export async function toggleAddedAlternativeToItinerary(payload: {
+  idToken: string;
+  tripId: string;
+  slotId: string;
+  activityId: string;
+}): Promise<ToggleAddedAlternativeResponse> {
+  const encodedSlotId = encodePathSegment(payload.slotId);
+  const response = await fetch(
+    `${API_URL}/itinerary/${payload.tripId}/slots/${encodedSlotId}/added-alternatives`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        idToken: payload.idToken,
+        activityId: payload.activityId,
+      }),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Could not update suggested activity");
+  }
+
+  return data as ToggleAddedAlternativeResponse;
 }
 
 export async function updateActivity(

@@ -118,6 +118,7 @@ export type FinalItinerarySlot = {
     slot_id: string;
     selectedActivity: Activity;
     alternativeActivities: Activity[];
+    addedAlternativeActivities: Activity[];
     alternativeCount: number;
 };
 
