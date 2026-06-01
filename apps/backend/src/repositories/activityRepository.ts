@@ -1,4 +1,3 @@
-//apps/backend/src/repositories/activityRepository.ts
 import admin from "../config/firebase";
 import { Activity } from "../types/trip";
 import { findUserById } from "./tripsRepository";
