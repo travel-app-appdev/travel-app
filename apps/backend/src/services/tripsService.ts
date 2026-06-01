@@ -1,3 +1,4 @@
+// apps/backend/src/services/tripsService.ts
 import admin from "../config/firebase";
 import {
     createTripWithAdminMembership,
@@ -27,6 +28,7 @@ import {
 import {
     createFinalItineraryForTrip,
     getVotingCompletionStatus,
+    removeMemberDataFromTrip,
 } from "../repositories/activityRepository";
 
 
@@ -171,6 +173,7 @@ export async function leaveTripForMember(input: {
         throw { status: 403, message: "Admin cannot leave the trip. Delete it instead." };
     }
 
+    await removeMemberDataFromTrip(input.tripId, userId);
     await removeTripMember(input.tripId, userId);
 }
 
@@ -196,6 +199,7 @@ export async function removeMemberForAdmin(input: {
         throw { status: 404, message: "Member not found in this trip" };
     }
 
+    await removeMemberDataFromTrip(input.tripId, input.memberId);
     await removeTripMember(input.tripId, input.memberId);
 }
 
