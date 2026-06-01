@@ -948,7 +948,7 @@ export default function ItineraryScreen() {
       return;
     }
 
-    router.replace({
+    router.push({
       pathname: "/add-activity",
       params: {
         tripId: itinerary.tripId,
@@ -974,7 +974,7 @@ export default function ItineraryScreen() {
       return;
     }
 
-    router.replace({
+    router.push({
       pathname: "/add-activity",
       params: {
         tripId: itinerary.tripId,
