@@ -465,7 +465,6 @@ export default function TripOverviewMemberScreen() {
         members: membersParam,
         planningEndAt: displayedTripSnapshot.planningEndAt,
         votingEndAt: displayedTripSnapshot.votingEndAt,
-        role: "member",
       },
     });
   });

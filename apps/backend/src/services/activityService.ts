@@ -1,10 +1,12 @@
 import admin from "../config/firebase";
 import {
+    activityBelongsToTripSlot,
     createActivity,
     createFinalItineraryForTrip,
     getActivityById,
     getActivitiesBySlotId,
-    getFinalActivitiesByTripId,
+    getFinalItinerarySlotsByTripId,
+    slotExistsInFinalItinerary,
     toggleActivityAttendance,
     updateActivityById,
     upsertActivityVote,
@@ -14,7 +16,12 @@ import {
     findMembership,
     updateTripState,
 } from "../repositories/tripsRepository";
-import { Activity, CreateActivityInput, TripState } from "../types/trip";
+import {
+    Activity,
+    CreateActivityInput,
+    FinalItineraryResponse,
+    TripState,
+} from "../types/trip";
 
 type VoteForActivityResponse = {
     activityId: string;
@@ -195,7 +202,7 @@ export async function voteForActivity(input: {
 export async function getFinalActivities(
     tripId: string,
     userId?: string
-): Promise<Activity[]> {
+): Promise<FinalItineraryResponse> {
     const trip = await findTripById(tripId);
 
     if (!trip) {
@@ -206,14 +213,14 @@ export async function getFinalActivities(
         throw { status: 400, message: "Trip is not in Final state" };
     }
 
-    let activities = await getFinalActivitiesByTripId(tripId, userId);
+    let result = await getFinalItinerarySlotsByTripId(tripId, userId);
 
-    if (activities.length === 0) {
+    if (result.slots.length === 0) {
         await createFinalItineraryForTrip(tripId);
-        activities = await getFinalActivitiesByTripId(tripId, userId);
+        result = await getFinalItinerarySlotsByTripId(tripId, userId);
     }
 
-    return activities;
+    return result;
 }
 
 export async function toggleFinalActivityAttendance(input: {
@@ -243,14 +250,19 @@ export async function toggleFinalActivityAttendance(input: {
         throw { status: 404, message: "User is not a member of this trip" };
     }
 
-    const finalActivities = await getFinalActivitiesByTripId(input.tripId, userId);
-    const activity = finalActivities.find(
-        (item) =>
-            item.activity_id === input.activityId && item.slot_id === input.slotId
+    const slotExists = await slotExistsInFinalItinerary(input.tripId, input.slotId);
+    if (!slotExists) {
+        throw { status: 400, message: "Slot is not part of the final itinerary" };
+    }
+
+    const activityBelongsToSlot = await activityBelongsToTripSlot(
+        input.tripId,
+        input.slotId,
+        input.activityId
     );
 
-    if (!activity) {
-        throw { status: 400, message: "Activity is not part of the final itinerary slot" };
+    if (!activityBelongsToSlot) {
+        throw { status: 400, message: "Activity does not belong to this final itinerary slot" };
     }
 
     return toggleActivityAttendance({

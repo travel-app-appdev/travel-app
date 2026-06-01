@@ -19,6 +19,7 @@ type Props = {
   activity?: Activity;
   onJoinGroup?: (activityId: string) => void;
   onPressDetails?: (activity: Activity, slotLabel: string) => void;
+  otherSuggestedCount?: number;
 };
 
 const CARD_HEIGHT = 108;
@@ -28,6 +29,7 @@ export function FinalSlotCard({
   activity,
   onJoinGroup,
   onPressDetails,
+  otherSuggestedCount = 0,
 }: Props) {
   const handleJoin = useSinglePress(() => onJoinGroup?.(activity!.id));
   const handleOpenDetails = useSinglePress(() => {
@@ -70,6 +72,9 @@ export function FinalSlotCard({
     activityTimeRange ? `time ${activityTimeRange}` : null,
     hasAddress ? `address ${activity.address.trim()}` : null,
     hasGoogleMapsUrl ? "Google Maps link available" : null,
+    otherSuggestedCount > 0
+      ? `${otherSuggestedCount} other suggested activities`
+      : null,
   ].filter(Boolean);
 
   return (
@@ -85,11 +90,25 @@ export function FinalSlotCard({
         }
         accessibilityHint="Shows more information about this activity"
       >
-        <View style={styles.timeRow} {...hiddenFromAccessibility}>
-          <LocationHeartIcon width={24} height={24} />
-          <AppText variant="body" style={styles.timeLabel}>
-            {slot.label}
-          </AppText>
+        <View style={styles.timeRow}>
+          <View style={styles.timeRowLeft} {...hiddenFromAccessibility}>
+            <LocationHeartIcon width={24} height={24} />
+            <AppText variant="body" style={styles.timeLabel}>
+              {slot.label}
+            </AppText>
+          </View>
+
+          {otherSuggestedCount > 0 ? (
+            <View
+              style={styles.badge}
+              accessible={true}
+              accessibilityLabel={`${otherSuggestedCount} other suggested activities`}
+            >
+              <AppText variant="caption" style={styles.badgeText}>
+                {otherSuggestedCount}
+              </AppText>
+            </View>
+          ) : null}
         </View>
 
         <AppText variant="subtitle" style={styles.name} numberOfLines={2}>
@@ -304,14 +323,35 @@ const styles = StyleSheet.create({
   timeRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xs,
+    justifyContent: "space-between",
+    gap: spacing.sm,
     marginBottom: 2,
+  },
+  timeRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flexShrink: 1,
   },
   timeLabel: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
+  },
+  badge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.neonGreen,
+    flexShrink: 0,
+  },
+  badgeText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
   },
   name: {
     color: colors.textPrimary,

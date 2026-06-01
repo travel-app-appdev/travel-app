@@ -6,6 +6,43 @@ function encodePathSegment(value: string) {
   return encodeURIComponent(value);
 }
 
+export type JoinedMember = {
+  user_id: string;
+  name: string;
+};
+
+export type BackendActivity = {
+  activity_id: string;
+  trip_id: string;
+  user_id: string;
+  slot_id?: string;
+  name: string;
+  description?: string;
+  address?: string;
+  googleMapsUrl?: string;
+  startTime?: string;
+  endTime?: string;
+  created_at?: string;
+  voteCount?: number;
+  hasCurrentUserVote?: boolean;
+  joinedCount?: number;
+  hasCurrentUserJoined?: boolean;
+  joinedMembers?: JoinedMember[];
+  source_type?: "manual";
+};
+
+export type FinalItinerarySlotDto = {
+  slot_id: string;
+  selectedActivity: BackendActivity;
+  alternativeActivities: BackendActivity[];
+  alternativeCount: number;
+};
+
+export type FinalItineraryResponseDto = {
+  trip_id: string;
+  slots: FinalItinerarySlotDto[];
+};
+
 export type CreateActivityPayload = {
   idToken: string;
   tripId: string;
@@ -120,7 +157,7 @@ export async function voteForActivity(payload: {
 export async function getFinalItineraryActivities(
   tripId: string,
   userId?: string
-) {
+): Promise<FinalItineraryResponseDto> {
   const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
   const response = await fetch(`${API_URL}/itinerary/${tripId}/final${query}`);
 
@@ -130,7 +167,7 @@ export async function getFinalItineraryActivities(
     throw new Error(data.error || "Could not load final itinerary");
   }
 
-  return data;
+  return data as FinalItineraryResponseDto;
 }
 
 export async function toggleActivityAttendance(payload: {

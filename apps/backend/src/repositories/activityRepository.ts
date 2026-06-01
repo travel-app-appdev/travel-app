@@ -1,5 +1,9 @@
 import admin from "../config/firebase";
-import { Activity } from "../types/trip";
+import {
+    Activity,
+    FinalItineraryResponse,
+    FinalItinerarySlot,
+} from "../types/trip";
 import { findUserById } from "./tripsRepository";
 
 function normalizeDateTime(value: any): string | undefined {
@@ -198,11 +202,7 @@ export async function getActivitiesBySlotId(
 
                     return db
                         .collection("activities")
-                        .where(
-                            admin.firestore.FieldPath.documentId(),
-                            "in",
-                            chunk
-                        )
+                        .where(admin.firestore.FieldPath.documentId(), "in", chunk)
                         .get();
                 }
             )
@@ -464,48 +464,133 @@ async function getJoinedMetadata(input: {
     };
 }
 
-export async function getFinalActivitiesByTripId(
+async function enrichActivityWithJoinedMetadata(
+    activity: Activity,
+    tripId: string,
+    slotId: string,
+    currentUserId?: string,
+    voteCount?: number
+): Promise<Activity> {
+    const joined = await getJoinedMetadata({
+        tripId,
+        slotId,
+        activityId: activity.activity_id,
+        currentUserId,
+    });
+
+    return {
+        ...activity,
+        slot_id: slotId,
+        voteCount,
+        joinedCount: joined.joinedCount,
+        hasCurrentUserJoined: joined.hasCurrentUserJoined,
+        joinedMembers: joined.joinedMembers,
+    };
+}
+
+export async function getFinalItinerarySlotsByTripId(
     tripId: string,
     currentUserId?: string
-): Promise<Activity[]> {
+): Promise<FinalItineraryResponse> {
     const db = admin.firestore();
     const snapshot = await db
         .collection("final_itinerary_slots")
         .where("trip_id", "==", tripId)
         .get();
 
-    if (snapshot.empty) return [];
+    if (snapshot.empty) {
+        return {
+            trip_id: tripId,
+            slots: [],
+        };
+    }
 
-    const activities: Array<Activity | null> = await Promise.all(
-        snapshot.docs.map(async (doc): Promise<Activity | null> => {
+    const slots: FinalItinerarySlot[] = await Promise.all(
+        snapshot.docs.map(async (doc): Promise<FinalItinerarySlot> => {
             const finalData = doc.data();
-            const activityDoc = await db
-                .collection("activities")
-                .doc(finalData.activity_id)
-                .get();
-            const activity = activityFromDoc(activityDoc, finalData.slot_id);
-            if (!activity) return null;
+            const slotId = finalData.slot_id as string;
+            const selectedActivityId = finalData.activity_id as string;
+            const selectedVoteCount = finalData.vote_count ?? 0;
 
-            const joined = await getJoinedMetadata({
+            const slotActivities = await getActivitiesBySlotId(slotId, tripId);
+
+            const selectedBase = slotActivities.find(
+                (activity) => activity.activity_id === selectedActivityId
+            );
+
+            if (!selectedBase) {
+                throw {
+                    status: 404,
+                    message: `Selected activity ${selectedActivityId} not found for slot ${slotId}`,
+                };
+            }
+
+            const alternativeBase = slotActivities.filter(
+                (activity) => activity.activity_id !== selectedActivityId
+            );
+
+            const selectedActivity = await enrichActivityWithJoinedMetadata(
+                selectedBase,
                 tripId,
-                slotId: finalData.slot_id,
-                activityId: finalData.activity_id,
+                slotId,
                 currentUserId,
-            });
+                selectedVoteCount
+            );
+
+            const alternativeActivities = await Promise.all(
+                alternativeBase.map((activity) =>
+                    enrichActivityWithJoinedMetadata(
+                        activity,
+                        tripId,
+                        slotId,
+                        currentUserId
+                    )
+                )
+            );
 
             return {
-                ...activity,
-                voteCount: finalData.vote_count ?? 0,
-                joinedCount: joined.joinedCount,
-                hasCurrentUserJoined: joined.hasCurrentUserJoined,
-                joinedMembers: joined.joinedMembers,
-            } as Activity;
+                slot_id: slotId,
+                selectedActivity,
+                alternativeActivities,
+                alternativeCount: alternativeActivities.length,
+            };
         })
     );
 
-    return activities
-        .filter((activity): activity is Activity => activity !== null)
-        .sort((a, b) => (a.slot_id ?? "").localeCompare(b.slot_id ?? ""));
+    return {
+        trip_id: tripId,
+        slots: slots.sort((a, b) => a.slot_id.localeCompare(b.slot_id)),
+    };
+}
+
+export async function getFinalActivitiesByTripId(
+    tripId: string,
+    currentUserId?: string
+): Promise<Activity[]> {
+    const result = await getFinalItinerarySlotsByTripId(tripId, currentUserId);
+    return result.slots.map((slot) => slot.selectedActivity);
+}
+
+export async function slotExistsInFinalItinerary(
+    tripId: string,
+    slotId: string
+): Promise<boolean> {
+    const db = admin.firestore();
+    const doc = await db
+        .collection("final_itinerary_slots")
+        .doc(`${tripId}_${slotId}`)
+        .get();
+
+    return doc.exists;
+}
+
+export async function activityBelongsToTripSlot(
+    tripId: string,
+    slotId: string,
+    activityId: string
+): Promise<boolean> {
+    const activities = await getActivitiesBySlotId(slotId, tripId);
+    return activities.some((activity) => activity.activity_id === activityId);
 }
 
 export async function toggleActivityAttendance(input: {
@@ -526,17 +611,55 @@ export async function toggleActivityAttendance(input: {
     const current = await ref.get();
     const joined = !(current.exists && current.data()?.joined === true);
 
-    await ref.set(
-        {
-            trip_id: input.tripId,
-            slot_id: input.slotId,
-            activity_id: input.activityId,
-            user_id: input.userId,
-            joined,
-            updated_at: admin.firestore.Timestamp.now(),
-        },
-        { merge: true }
-    );
+    if (joined) {
+        const existingAttendanceSnapshot = await db
+            .collection("activity_attendance")
+            .where("trip_id", "==", input.tripId)
+            .where("slot_id", "==", input.slotId)
+            .where("user_id", "==", input.userId)
+            .where("joined", "==", true)
+            .get();
+
+        const batch = db.batch();
+
+        existingAttendanceSnapshot.docs.forEach((doc) => {
+            batch.set(
+                doc.ref,
+                {
+                    joined: false,
+                    updated_at: admin.firestore.Timestamp.now(),
+                },
+                { merge: true }
+            );
+        });
+
+        batch.set(
+            ref,
+            {
+                trip_id: input.tripId,
+                slot_id: input.slotId,
+                activity_id: input.activityId,
+                user_id: input.userId,
+                joined: true,
+                updated_at: admin.firestore.Timestamp.now(),
+            },
+            { merge: true }
+        );
+
+        await batch.commit();
+    } else {
+        await ref.set(
+            {
+                trip_id: input.tripId,
+                slot_id: input.slotId,
+                activity_id: input.activityId,
+                user_id: input.userId,
+                joined: false,
+                updated_at: admin.firestore.Timestamp.now(),
+            },
+            { merge: true }
+        );
+    }
 
     const metadata = await getJoinedMetadata({
         tripId: input.tripId,
