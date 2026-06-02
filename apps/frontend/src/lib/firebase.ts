@@ -1,7 +1,7 @@
 // apps/frontend/src/lib/firebase.ts
-// Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCQ2WK29B0IejbYVLKDr-S7r0MOuNM3sCk",
@@ -13,12 +13,15 @@ const firebaseConfig = {
   measurementId: "G-TP2R4EX5JL",
 };
 
-// Initialize Firebase
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
 export const auth = getAuth(app);
+export const db = getFirestore(app);
 
 if (__DEV__ && process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", {
     disableWarnings: true,
   });
+
+  connectFirestoreEmulator(db, "127.0.0.1", 8080);
 }

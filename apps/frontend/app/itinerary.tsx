@@ -13,8 +13,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { doc, onSnapshot } from "firebase/firestore";
 
 import { colors, spacing } from "@/src/theme";
+import { db } from "@/src/lib/firebase";
 import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
 import { mapActivitiesToSlots } from "@/src/utils/itinerary/mapActivitiesToSlots";
@@ -27,6 +29,7 @@ import type {
   ItineraryState,
   Activity,
 } from "@/src/types/itinerary";
+
 import { AppText } from "@/src/components/common/AppText";
 import { ItineraryHeader } from "@/src/components/itinerary/ItineraryHeader";
 import { ItineraryDaySelector } from "@/src/components/itinerary/ItineraryDaySelector";
@@ -37,13 +40,16 @@ import { VotingDoneBar } from "@/src/components/itinerary/VotingDoneBar";
 import { VotingSlotCard } from "@/src/components/itinerary/VoteSlotCard";
 import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
+import { FinalSuggestedActivitiesSection } from "@/src/components/itinerary/FinalSuggestedActivitiesSection";
 import { ActivityDetailModal } from "@/src/components/itinerary/ActivityDetailModal";
 import { fetchMyTrips, finishPlanning, type Trip } from "@/src/api/trips";
 import {
   getActivitiesBySlot,
   getFinalItineraryActivities,
   toggleActivityAttendance,
+  toggleAddedAlternativeToItinerary,
   voteForActivity,
+  type FinalItineraryResponseDto,
 } from "@/src/services/activityService";
 
 const DEV_FORCE_STATE: ItineraryState | null = null;
@@ -134,7 +140,72 @@ function mapBackendActivity(
     joinedCount: activity.joinedCount ?? 0,
     hasCurrentUserJoined: activity.hasCurrentUserJoined ?? false,
     joinedMembers: activity.joinedMembers ?? [],
+    isAddedToFinalItinerary: activity.isAddedToFinalItinerary ?? false,
   };
+}
+
+type FinalSlotUi = {
+  slotId: string;
+  dayId: string;
+  slotKey: string;
+  selectedActivity: Activity;
+  alternativeActivities: Activity[];
+  addedAlternativeActivities: Activity[];
+  alternativeCount: number;
+};
+
+function mapBackendFinalSlot(slot: any): FinalSlotUi {
+  const split = splitBackendSlotId(slot.slot_id);
+
+  const selectedActivity = mapBackendActivity(slot.selectedActivity, {
+    dayId: split.dayId,
+    slotId: split.slotId,
+  });
+
+  const alternativeActivities = Array.isArray(slot.alternativeActivities)
+    ? slot.alternativeActivities.map((activity: any) =>
+        mapBackendActivity(activity, {
+          dayId: split.dayId,
+          slotId: split.slotId,
+        })
+      )
+    : [];
+
+  const addedAlternativeActivities = Array.isArray(
+    slot.addedAlternativeActivities
+  )
+    ? slot.addedAlternativeActivities.map((activity: any) =>
+        mapBackendActivity(activity, {
+          dayId: split.dayId,
+          slotId: split.slotId,
+        })
+      )
+    : [];
+
+  return {
+    slotId: split.slotId,
+    dayId: split.dayId,
+    slotKey: slot.slot_id,
+    selectedActivity,
+    alternativeActivities,
+    addedAlternativeActivities,
+    alternativeCount: slot.alternativeCount ?? alternativeActivities.length,
+  };
+}
+
+function mergeAlternativeLists(
+  alternativeActivities: Activity[],
+  addedAlternativeActivities: Activity[]
+): Activity[] {
+  const byId = new Map<string, Activity>();
+
+  [...alternativeActivities, ...addedAlternativeActivities].forEach(
+    (activity) => {
+      byId.set(activity.id, activity);
+    }
+  );
+
+  return Array.from(byId.values());
 }
 
 type RouteMember = {
@@ -374,8 +445,8 @@ export default function ItineraryScreen() {
     return matchingKey ? (activitiesCache.get(matchingKey) ?? []) : [];
   });
 
+  const [finalSlots, setFinalSlots] = useState<FinalSlotUi[]>([]);
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
-
   const [isLoadingActivities, setIsLoadingActivities] = useState(() => {
     const keys = [...activitiesCache.keys()];
     return !keys.some((k) => k.startsWith(`${tripId}_`));
@@ -392,6 +463,16 @@ export default function ItineraryScreen() {
   );
   const [selectedActivitySlotLabel, setSelectedActivitySlotLabel] =
     useState("");
+  const [selectedAlternativeActivities, setSelectedAlternativeActivities] =
+    useState<Activity[]>([]);
+  const [
+    selectedDisplayedAlternativeActivities,
+    setSelectedDisplayedAlternativeActivities,
+  ] = useState<Activity[]>([]);
+  const [
+    selectedAddedAlternativeActivityIds,
+    setSelectedAddedAlternativeActivityIds,
+  ] = useState<string[]>([]);
   const [showActivityDetailModal, setShowActivityDetailModal] = useState(false);
 
   const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -404,6 +485,7 @@ export default function ItineraryScreen() {
     typeof setTimeout
   > | null>(null);
   const initialTripRefreshKeyRef = useRef<string | null>(null);
+  const lastFinalUpdateRef = useRef<string | null>(null);
 
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
@@ -543,6 +625,7 @@ export default function ItineraryScreen() {
             members: refreshedPlanningStatus
               ? JSON.stringify(refreshedPlanningStatus)
               : members,
+            role: role ?? "admin",
           });
         };
 
@@ -598,6 +681,7 @@ export default function ItineraryScreen() {
       timerDeadlines.planningEndAt,
       tripId,
       votingEndAt,
+      role,
     ]
   );
 
@@ -720,6 +804,60 @@ export default function ItineraryScreen() {
     }
   }, [showPlanningInfoPopup]);
 
+  const refreshFinalItinerary = useCallback(async () => {
+    if (!tripId) return;
+
+    try {
+      const refreshed = await getFinalItineraryActivities(
+        tripId,
+        currentUserId ?? undefined
+      );
+
+      const mappedSlots = (refreshed.slots ?? []).map(mapBackendFinalSlot);
+      setFinalSlots(mappedSlots);
+
+      const flatMappedActivities = mappedSlots.flatMap((slot) => [
+        slot.selectedActivity,
+        ...slot.alternativeActivities,
+        ...slot.addedAlternativeActivities,
+      ]);
+
+      activitiesCache.set(`${tripId}_final`, flatMappedActivities);
+      setApiActivities(flatMappedActivities);
+    } catch (error) {
+      console.log("Could not refresh final itinerary:", error);
+    }
+  }, [tripId, currentUserId]);
+
+  useEffect(() => {
+    if (!tripId || activeState !== "final") {
+      return;
+    }
+
+    const tripRef = doc(db, "trips", tripId);
+
+    const unsubscribe = onSnapshot(
+      tripRef,
+      async (snapshot) => {
+        const data = snapshot.data();
+        const nextValue =
+          data?.final_itinerary_updated_at?.toMillis?.()?.toString?.() ?? null;
+
+        if (nextValue && nextValue === lastFinalUpdateRef.current) {
+          return;
+        }
+
+        lastFinalUpdateRef.current = nextValue;
+        await refreshFinalItinerary();
+      },
+      (error) => {
+        console.log("Final itinerary listener error:", error);
+      }
+    );
+
+    return unsubscribe;
+  }, [tripId, activeState, refreshFinalItinerary]);
+
   useEffect(() => {
     async function loadActivities() {
       if (!tripId || tripDays.length === 0) return;
@@ -753,23 +891,32 @@ export default function ItineraryScreen() {
 
       try {
         if (activeState === "final") {
-          const finalActivities = await getFinalItineraryActivities(
-            tripId,
-            currentUserId ?? undefined
+          const finalResponse: FinalItineraryResponseDto =
+            await getFinalItineraryActivities(
+              tripId,
+              currentUserId ?? undefined
+            );
+
+          const mappedSlots = (finalResponse.slots ?? []).map(
+            mapBackendFinalSlot
           );
 
-          const mapped = finalActivities.map((activity: any) =>
-            mapBackendActivity(activity, {
-              dayId: resolvedDayId,
-              slotId: activity.slot_id ?? "",
-            })
-          );
+          const flatMappedActivities = mappedSlots.flatMap((slot) => [
+            slot.selectedActivity,
+            ...slot.alternativeActivities,
+            ...slot.addedAlternativeActivities,
+          ]);
 
-          const hasChanged = JSON.stringify(cached) !== JSON.stringify(mapped);
+          const hasChanged =
+            JSON.stringify(cached) !== JSON.stringify(flatMappedActivities);
+
+          setFinalSlots(mappedSlots);
 
           if (hasChanged) {
-            activitiesCache.set(cacheKey, mapped);
-            setApiActivities(mapped);
+            activitiesCache.set(cacheKey, flatMappedActivities);
+            setApiActivities(flatMappedActivities);
+          } else if (!cached) {
+            setApiActivities(flatMappedActivities);
           }
 
           setIsLoadingActivities(false);
@@ -805,6 +952,8 @@ export default function ItineraryScreen() {
           if (hasChanged) {
             activitiesCache.set(cacheKey, allActivities);
             setApiActivities(allActivities);
+          } else if (!cached) {
+            setApiActivities(allActivities);
           }
 
           setIsLoadingActivities(false);
@@ -837,6 +986,8 @@ export default function ItineraryScreen() {
         if (hasChanged) {
           activitiesCache.set(cacheKey, allActivities);
           setApiActivities(allActivities);
+        } else if (!cached) {
+          setApiActivities(allActivities);
         }
 
         setIsLoadingActivities(false);
@@ -846,7 +997,7 @@ export default function ItineraryScreen() {
       }
     }
 
-    loadActivities();
+    void loadActivities();
   }, [
     tripId,
     newActivityId,
@@ -858,6 +1009,13 @@ export default function ItineraryScreen() {
     itinerary.startDate,
     activityRefreshKey,
   ]);
+
+  useEffect(() => {
+    if (activeState !== "final") {
+      setFinalSlots([]);
+      lastFinalUpdateRef.current = null;
+    }
+  }, [activeState]);
 
   function handlePlanningInfoPress() {
     if (showPlanningInfoPopup) {
@@ -1181,6 +1339,9 @@ export default function ItineraryScreen() {
       setSelectedActivitySlotLabel(
         slotChip?.label ?? formatSlotLabel(activity.slotId)
       );
+      setSelectedAlternativeActivities([]);
+      setSelectedDisplayedAlternativeActivities([]);
+      setSelectedAddedAlternativeActivityIds([]);
       setShowActivityDetailModal(true);
     },
     [votingTimeChips]
@@ -1190,16 +1351,143 @@ export default function ItineraryScreen() {
     (activity: Activity, slotLabel: string) => {
       setSelectedActivity(activity);
       setSelectedActivitySlotLabel(slotLabel);
+
+      const matchingFinalSlot = finalSlots.find((slot) => {
+        if (slot.selectedActivity.id === activity.id) return true;
+
+        if (
+          slot.alternativeActivities.some((item) => item.id === activity.id)
+        ) {
+          return true;
+        }
+
+        if (
+          slot.addedAlternativeActivities.some(
+            (item) => item.id === activity.id
+          )
+        ) {
+          return true;
+        }
+
+        return false;
+      });
+
+      const alternativeActivities =
+        matchingFinalSlot?.alternativeActivities ?? [];
+      const addedAlternativeActivities =
+        matchingFinalSlot?.addedAlternativeActivities ?? [];
+
+      setSelectedAlternativeActivities(alternativeActivities);
+      setSelectedDisplayedAlternativeActivities(
+        mergeAlternativeLists(alternativeActivities, addedAlternativeActivities)
+      );
+      setSelectedAddedAlternativeActivityIds(
+        addedAlternativeActivities.map((item) => item.id)
+      );
       setShowActivityDetailModal(true);
     },
-    []
+    [finalSlots]
   );
 
   const handleCloseActivityDetails = useCallback(() => {
     setShowActivityDetailModal(false);
     setSelectedActivity(null);
     setSelectedActivitySlotLabel("");
+    setSelectedAlternativeActivities([]);
+    setSelectedDisplayedAlternativeActivities([]);
+    setSelectedAddedAlternativeActivityIds([]);
   }, []);
+
+  const handleAddAlternativeToItinerary = useCallback(
+    async (activityToToggle: Activity) => {
+      if (!authToken || !tripId) {
+        Alert.alert("Could not update itinerary", "Please log in again.");
+        return;
+      }
+
+      try {
+        const fullSlotId = `${activityToToggle.dayId}_${activityToToggle.slotId}`;
+
+        await toggleAddedAlternativeToItinerary({
+          idToken: authToken,
+          tripId,
+          slotId: fullSlotId,
+          activityId: activityToToggle.id,
+        });
+
+        const refreshed = await getFinalItineraryActivities(
+          tripId,
+          currentUserId ?? undefined
+        );
+
+        const mappedSlots = (refreshed.slots ?? []).map(mapBackendFinalSlot);
+        setFinalSlots(mappedSlots);
+
+        const flatMappedActivities = mappedSlots.flatMap((slot) => [
+          slot.selectedActivity,
+          ...slot.alternativeActivities,
+          ...slot.addedAlternativeActivities,
+        ]);
+
+        activitiesCache.set(`${tripId}_final`, flatMappedActivities);
+        setApiActivities(flatMappedActivities);
+
+        const matchingFinalSlot = mappedSlots.find((slot) => {
+          if (slot.selectedActivity.id === activityToToggle.id) return true;
+
+          if (
+            slot.alternativeActivities.some(
+              (item) => item.id === activityToToggle.id
+            )
+          ) {
+            return true;
+          }
+
+          if (
+            slot.addedAlternativeActivities.some(
+              (item) => item.id === activityToToggle.id
+            )
+          ) {
+            return true;
+          }
+
+          return false;
+        });
+
+        const alternativeActivities =
+          matchingFinalSlot?.alternativeActivities ?? [];
+        const addedAlternativeActivities =
+          matchingFinalSlot?.addedAlternativeActivities ?? [];
+        const nextAddedIds = addedAlternativeActivities.map((item) => item.id);
+
+        setSelectedAlternativeActivities(alternativeActivities);
+        setSelectedDisplayedAlternativeActivities(
+          mergeAlternativeLists(
+            alternativeActivities,
+            addedAlternativeActivities
+          )
+        );
+        setSelectedAddedAlternativeActivityIds(nextAddedIds);
+
+        setSelectedActivity((current) =>
+          current?.id === activityToToggle.id
+            ? {
+                ...current,
+                isAddedToFinalItinerary: nextAddedIds.includes(
+                  activityToToggle.id
+                ),
+              }
+            : current
+        );
+      } catch (error) {
+        Alert.alert(
+          "Could not update itinerary",
+          error instanceof Error ? error.message : "Please try again."
+        );
+      }
+    },
+    [authToken, tripId, currentUserId]
+  );
 
   async function handleAddVote(activityId: string) {
     if (!authToken || !tripId || !selectedVotingSlotId) {
@@ -1268,13 +1556,16 @@ export default function ItineraryScreen() {
     [apiActivities, itinerary.activities]
   );
 
-  const finalActivityMap = useMemo(() => {
-    const map = new Map<string, Activity>();
-    finalActivities
-      .filter((a) => a.dayId === selectedDayId)
-      .forEach((a) => map.set(a.slotId, a));
+  const finalSlotsForSelectedDay = useMemo(
+    () => finalSlots.filter((slot) => slot.dayId === selectedDayId),
+    [finalSlots, selectedDayId]
+  );
+
+  const finalSlotMap = useMemo(() => {
+    const map = new Map<string, FinalSlotUi>();
+    finalSlotsForSelectedDay.forEach((slot) => map.set(slot.slotId, slot));
     return map;
-  }, [finalActivities, selectedDayId]);
+  }, [finalSlotsForSelectedDay]);
 
   async function handleJoinGroup(activityId: string) {
     const activity = finalActivities.find((item) => item.id === activityId);
@@ -1294,21 +1585,72 @@ export default function ItineraryScreen() {
       });
 
       const applyAttendanceUpdate = (activities: Activity[]) =>
-        activities.map((item) =>
-          item.id === activityId &&
-          item.dayId === activity.dayId &&
-          item.slotId === activity.slotId
-            ? {
+        activities.map((item) => {
+          const sameSlot =
+            item.dayId === activity.dayId && item.slotId === activity.slotId;
+
+          if (!sameSlot) return item;
+
+          if (item.id === activityId) {
+            return {
+              ...item,
+              hasCurrentUserJoined: result.joined,
+              joinedCount: result.joinedCount,
+              joinedMembers: result.joinedMembers ?? item.joinedMembers,
+            };
+          }
+
+          if (result.joined) {
+            return {
+              ...item,
+              hasCurrentUserJoined: false,
+            };
+          }
+
+          return item;
+        });
+
+      updateCachedActivities(tripId, applyAttendanceUpdate);
+      setApiActivities((current) => applyAttendanceUpdate(current));
+
+      setFinalSlots((current) =>
+        current.map((slot) => {
+          if (
+            slot.dayId !== activity.dayId ||
+            slot.slotId !== activity.slotId
+          ) {
+            return slot;
+          }
+
+          const updateItem = (item: Activity): Activity => {
+            if (item.id === activityId) {
+              return {
                 ...item,
                 hasCurrentUserJoined: result.joined,
                 joinedCount: result.joinedCount,
                 joinedMembers: result.joinedMembers ?? item.joinedMembers,
-              }
-            : item
-        );
+              };
+            }
 
-      updateCachedActivities(tripId, applyAttendanceUpdate);
-      setApiActivities((current) => applyAttendanceUpdate(current));
+            if (result.joined) {
+              return {
+                ...item,
+                hasCurrentUserJoined: false,
+              };
+            }
+
+            return item;
+          };
+
+          return {
+            ...slot,
+            selectedActivity: updateItem(slot.selectedActivity),
+            alternativeActivities: slot.alternativeActivities.map(updateItem),
+            addedAlternativeActivities:
+              slot.addedAlternativeActivities.map(updateItem),
+          };
+        })
+      );
 
       setSelectedActivity((current) =>
         current &&
@@ -1322,6 +1664,64 @@ export default function ItineraryScreen() {
               joinedMembers: result.joinedMembers ?? current.joinedMembers,
             }
           : current
+      );
+
+      setSelectedAlternativeActivities((current) =>
+        current.map((item) => {
+          if (
+            item.dayId !== activity.dayId ||
+            item.slotId !== activity.slotId
+          ) {
+            return item;
+          }
+
+          if (item.id === activityId) {
+            return {
+              ...item,
+              hasCurrentUserJoined: result.joined,
+              joinedCount: result.joinedCount,
+              joinedMembers: result.joinedMembers ?? item.joinedMembers,
+            };
+          }
+
+          if (result.joined) {
+            return {
+              ...item,
+              hasCurrentUserJoined: false,
+            };
+          }
+
+          return item;
+        })
+      );
+
+      setSelectedDisplayedAlternativeActivities((current) =>
+        current.map((item) => {
+          if (
+            item.dayId !== activity.dayId ||
+            item.slotId !== activity.slotId
+          ) {
+            return item;
+          }
+
+          if (item.id === activityId) {
+            return {
+              ...item,
+              hasCurrentUserJoined: result.joined,
+              joinedCount: result.joinedCount,
+              joinedMembers: result.joinedMembers ?? item.joinedMembers,
+            };
+          }
+
+          if (result.joined) {
+            return {
+              ...item,
+              hasCurrentUserJoined: false,
+            };
+          }
+
+          return item;
+        })
       );
     } catch (error) {
       Alert.alert(
@@ -1459,15 +1859,46 @@ export default function ItineraryScreen() {
               <View style={styles.slotList}>
                 {isLoadingActivities
                   ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
-                  : slots.map((slot) => (
-                      <FinalSlotCard
-                        key={slot.id}
-                        slot={slot}
-                        activity={finalActivityMap.get(slot.id)}
-                        onJoinGroup={handleJoinGroup}
-                        onPressDetails={handleOpenFinalActivityDetails}
-                      />
-                    ))}
+                  : slots.map((slot) => {
+                      const finalSlot = finalSlotMap.get(slot.id);
+
+                      if (!finalSlot) {
+                        return (
+                          <FinalSlotCard
+                            key={slot.id}
+                            slot={slot}
+                            activity={undefined}
+                            onJoinGroup={handleJoinGroup}
+                            onPressDetails={handleOpenFinalActivityDetails}
+                          />
+                        );
+                      }
+
+                      const addedAlternatives =
+                        finalSlot.addedAlternativeActivities;
+                      const remainingAlternativeCount =
+                        finalSlot.alternativeActivities.length;
+
+                      return (
+                        <View key={slot.id} style={styles.finalSlotSection}>
+                          <FinalSlotCard
+                            slot={slot}
+                            activity={finalSlot.selectedActivity}
+                            onJoinGroup={handleJoinGroup}
+                            onPressDetails={handleOpenFinalActivityDetails}
+                            otherSuggestedCount={remainingAlternativeCount}
+                          />
+
+                          <FinalSuggestedActivitiesSection
+                            slotLabel={slot.label}
+                            activities={addedAlternatives}
+                            onJoinGroup={handleJoinGroup}
+                            onPressDetails={handleOpenFinalActivityDetails}
+                            accentColor={stateAccentColor}
+                          />
+                        </View>
+                      );
+                    })}
               </View>
             )}
           </View>
@@ -1482,6 +1913,9 @@ export default function ItineraryScreen() {
           activity={selectedActivity}
           slotLabel={selectedActivitySlotLabel}
           state={activeState}
+          alternativeActivities={selectedDisplayedAlternativeActivities}
+          addedAlternativeActivityIds={selectedAddedAlternativeActivityIds}
+          onAddAlternativeToItinerary={handleAddAlternativeToItinerary}
           onClose={handleCloseActivityDetails}
         />
 
@@ -1493,7 +1927,6 @@ export default function ItineraryScreen() {
               accessibilityRole="button"
               accessibilityLabel="Dismiss planning information"
             />
-
             <View
               ref={popupRef}
               style={[
@@ -1567,7 +2000,7 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     position: "relative",
-    backgroundColor: colors.lightWhite
+    backgroundColor: colors.lightWhite,
   },
   scroll: {
     flex: 1,
@@ -1585,6 +2018,9 @@ const styles = StyleSheet.create({
   slotList: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
+    gap: spacing.sm,
+  },
+  finalSlotSection: {
     gap: spacing.sm,
   },
   planningContent: {
