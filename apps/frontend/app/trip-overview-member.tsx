@@ -12,10 +12,12 @@ import {
   KeyboardAvoidingView,
   useWindowDimensions,
   Animated,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { AppText } from "@/src/components/common/AppText";
+import { AppButton } from "@/src/components/common/AppButton";
 import {
   ActionCard,
   ACTION_CARD_HEIGHT,
@@ -178,9 +180,9 @@ function isDeadlinePast(deadline?: string): boolean {
 }
 
 function PhaseCheckbox({
-  phaseId,
-  status,
-}: {
+                         phaseId,
+                         status,
+                       }: {
   phaseId: PhaseKey;
   status: PhaseStatus;
 }) {
@@ -203,6 +205,19 @@ function PhaseCheckbox({
       height={CHECKBOX_SIZE}
       style={status === "future" ? styles.mutedIcon : undefined}
     />
+  );
+}
+
+function ModalShell({ children }: { children: React.ReactNode }) {
+  return (
+    <SafeAreaView
+      style={styles.modalSafeArea}
+      edges={["top", "right", "bottom", "left"]}
+    >
+      <View style={styles.calendarOverlay}>
+        <View style={styles.calendarModal}>{children}</View>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -237,6 +252,7 @@ export default function TripOverviewMemberScreen() {
   const { height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenHeight < 700;
   const [isLeaving, setIsLeaving] = useState(false);
+  const [showLeaveTripModal, setShowLeaveTripModal] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const blinkingDotAnim = useRef(new Animated.Value(1)).current;
@@ -501,35 +517,34 @@ export default function TripOverviewMemberScreen() {
     });
   });
 
-  const handleLeaveTrip = () => {
-    Alert.alert("Leave trip", "Are you sure you want to leave this trip?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Leave",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            setIsLeaving(true);
-            const currentUser = auth.currentUser;
-            if (!currentUser) {
-              Alert.alert("Not logged in", "Please log in again.");
-              return;
-            }
-            const idToken = await currentUser.getIdToken();
-            await leaveTrip({ idToken, tripId });
-            invalidateTripsCache();
-            router.replace("/home");
-          } catch (error) {
-            const message =
-              error instanceof Error ? error.message : "Failed to leave trip";
-            Alert.alert("Leave failed", message);
-          } finally {
-            setIsLeaving(false);
-          }
-        },
-      },
-    ]);
-  };
+  const openLeaveTripModal = useSinglePress(() => {
+    if (isLeaving) return;
+    setShowLeaveTripModal(true);
+  });
+
+  async function handleConfirmLeaveTrip() {
+    try {
+      setIsLeaving(true);
+      setShowLeaveTripModal(false);
+
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        Alert.alert("Not logged in", "Please log in again.");
+        return;
+      }
+
+      const idToken = await currentUser.getIdToken();
+      await leaveTrip({ idToken, tripId });
+      invalidateTripsCache();
+      router.replace("/home");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to leave trip";
+      Alert.alert("Leave failed", message);
+    } finally {
+      setIsLeaving(false);
+    }
+  }
 
   const Mascot = getChecklistMascot(tripState);
 
@@ -757,15 +772,15 @@ export default function TripOverviewMemberScreen() {
                       accessibilityLabel={
                         phaseId === "final"
                           ? `Final phase, starts ${formatDateDisplay(
-                              dates.start
-                            )}`
+                            dates.start
+                          )}`
                           : `${phase.label} phase, ${timerText}, ${
-                              isActive
-                                ? "in progress"
-                                : isPast
-                                  ? "completed"
-                                  : "upcoming"
-                            }`
+                            isActive
+                              ? "in progress"
+                              : isPast
+                                ? "completed"
+                                : "upcoming"
+                          }`
                       }
                     >
                       <View
@@ -865,7 +880,7 @@ export default function TripOverviewMemberScreen() {
                                               style={[
                                                 styles.phaseDays,
                                                 isMuted &&
-                                                  styles.phaseDaysMuted,
+                                                styles.phaseDaysMuted,
                                               ]}
                                             >
                                               {timerText}
@@ -891,7 +906,8 @@ export default function TripOverviewMemberScreen() {
                                             variant="caption"
                                             style={[
                                               styles.timerLabel,
-                                              isMuted && styles.timerLabelMuted,
+                                              isMuted &&
+                                              styles.timerLabelMuted,
                                             ]}
                                           >
                                             Timer
@@ -907,7 +923,7 @@ export default function TripOverviewMemberScreen() {
                                           style={[
                                             styles.finalPlaceholderTopLine,
                                             isMuted &&
-                                              styles.phaseDateLabelMuted,
+                                            styles.phaseDateLabelMuted,
                                           ]}
                                         >
                                           Itinerary shown
@@ -918,7 +934,7 @@ export default function TripOverviewMemberScreen() {
                                           style={[
                                             styles.finalPlaceholderBottomLine,
                                             isMuted &&
-                                              styles.phaseDateLabelMuted,
+                                            styles.phaseDateLabelMuted,
                                           ]}
                                         >
                                           {`${formatDateDisplay(dates.start)} at ${dates.time}`}
@@ -996,11 +1012,48 @@ export default function TripOverviewMemberScreen() {
               <ActionCard
                 label={isLeaving ? "Leaving..." : "Leave trip"}
                 icon={<Exit width={20} height={20} />}
-                onPress={handleLeaveTrip}
+                onPress={openLeaveTripModal}
                 accessibilityHint="Leaves this trip"
               />
             </View>
           </SafeAreaView>
+
+          <Modal
+            visible={showLeaveTripModal}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => setShowLeaveTripModal(false)}
+          >
+            <ModalShell>
+              <AppText variant="body" style={styles.calendarTitle}>
+                Leave trip
+              </AppText>
+
+              <View style={styles.timeModalContent}>
+                <AppText variant="caption" style={styles.timeModalHint}>
+                  Are you sure you want to leave this trip?
+                </AppText>
+              </View>
+
+              <View style={styles.calendarActions}>
+                <AppButton
+                  title="Cancel"
+                  onPress={() => setShowLeaveTripModal(false)}
+                  style={styles.calendarCancelButton}
+                  textStyle={styles.calendarCancelButtonText}
+                  accessibilityLabel="Cancel leaving trip"
+                />
+                <AppButton
+                  title={isLeaving ? "Leaving..." : "Leave"}
+                  onPress={handleConfirmLeaveTrip}
+                  style={styles.deleteTripButton}
+                  textStyle={styles.calendarApplyButtonText}
+                  accessibilityLabel="Confirm leaving trip"
+                />
+              </View>
+            </ModalShell>
+          </Modal>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -1171,7 +1224,6 @@ const styles = StyleSheet.create({
     elevation: 0,
     boxShadow: "0px 0px 40px rgba(240, 201, 59, 0.75)",
   },
-
   phaseCardShadowVoting: {
     shadowColor: colors.sunsetPink,
     shadowOpacity: 0.16,
@@ -1319,5 +1371,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
+  },
+
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  calendarOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+  },
+  calendarModal: {
+    backgroundColor: colors.lightWhite,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+  },
+  calendarTitle: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+  },
+  timeModalContent: {
+    gap: spacing.md,
+  },
+  timeModalHint: {
+    color: colors.nightBlack,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.body,
+  },
+  calendarActions: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  calendarCancelButton: {
+    flex: 1,
+    backgroundColor: colors.beachYellow,
+  },
+  calendarCancelButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  deleteTripButton: {
+    flex: 1,
+    backgroundColor: colors.sunsetOrange,
+  },
+  calendarApplyButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
   },
 });

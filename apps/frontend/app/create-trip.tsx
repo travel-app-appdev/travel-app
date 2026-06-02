@@ -221,20 +221,25 @@ const CalendarModalWrapper = ({
   children: React.ReactNode;
   isLandscape: boolean;
 }) => (
-  <View style={styles.calendarOverlay}>
-    <ScrollView
-      contentContainerStyle={[
-        { flexGrow: 1 },
-        isLandscape
-          ? { justifyContent: "flex-start" }
-          : { justifyContent: "center" },
-      ]}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.calendarModal}>{children}</View>
-    </ScrollView>
-  </View>
+  <SafeAreaView
+    style={styles.modalSafeArea}
+    edges={["top", "right", "bottom", "left"]}
+  >
+    <View style={styles.calendarOverlay}>
+      <ScrollView
+        contentContainerStyle={[
+          { flexGrow: 1 },
+          isLandscape
+            ? { justifyContent: "flex-start" }
+            : { justifyContent: "center" },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.calendarModal}>{children}</View>
+      </ScrollView>
+    </View>
+  </SafeAreaView>
 );
 
 export default function CreateTripScreen() {
@@ -254,6 +259,7 @@ export default function CreateTripScreen() {
   const [tripCode, setTripCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [showOnboardingHint, setShowOnboardingHint] = useState(false);
+  const [showNotLoggedInModal, setShowNotLoggedInModal] = useState(false);
 
   const blinkingDotAnim = useRef(new Animated.Value(2)).current;
 
@@ -386,10 +392,6 @@ export default function CreateTripScreen() {
     setOpenPhase((prev) => (prev === key ? null : key));
   };
 
-  // ── Share handler ──────────────────────────────────────────────────────────
-  // Shares the invite code with a deep link URL.
-  // When the backend is deployed and assetlinks.json is live, tapping the
-  // URL on Android will open the app directly to the invite screen.
   const handleShareCode = useSinglePress(async () => {
     try {
       await Share.share({
@@ -739,10 +741,7 @@ export default function CreateTripScreen() {
   const handleCreateTrip = async () => {
     if (isCreating) return;
     if (!user) {
-      Alert.alert(
-        "Not logged in",
-        "Please log in again and try creating a trip."
-      );
+      setShowNotLoggedInModal(true);
       return;
     }
     if (!destination.trim()) {
@@ -899,7 +898,6 @@ export default function CreateTripScreen() {
     );
   };
 
-  // ── Step 3 ─────────────────────────────────────────────────────────────────
   if (step === 3) {
     return (
       <View style={[styles.fullScreen, styles.bgStep3]}>
@@ -1100,7 +1098,9 @@ export default function CreateTripScreen() {
                             style={[styles.dateInput, styles.dateTimeHalf]}
                             onPress={() => openPhaseCalendar(phaseId)}
                             accessibilityRole="button"
-                            accessibilityLabel={`${phase.label} end date, currently ${formatDateDisplay(dates.end)}. Tap to change`}
+                            accessibilityLabel={`${phase.label} end date, currently ${formatDateDisplay(
+                              dates.end
+                            )}. Tap to change`}
                           >
                             <AppText variant="body" style={styles.dateText}>
                               {formatDateDisplay(dates.end)}
@@ -1194,6 +1194,7 @@ export default function CreateTripScreen() {
               visible={showPhaseDateCalendar !== null}
               transparent
               animationType="fade"
+              statusBarTranslucent
               onRequestClose={() => setShowPhaseDateCalendar(null)}
             >
               <CalendarModalWrapper isLandscape={isLandscape}>
@@ -1307,6 +1308,7 @@ export default function CreateTripScreen() {
               visible={showPhaseTimePicker !== null}
               transparent
               animationType="fade"
+              statusBarTranslucent
               onRequestClose={() => setShowPhaseTimePicker(null)}
             >
               <CalendarModalWrapper isLandscape={isLandscape}>
@@ -1360,13 +1362,47 @@ export default function CreateTripScreen() {
                 </View>
               </CalendarModalWrapper>
             </Modal>
+
+            <Modal
+              visible={showNotLoggedInModal}
+              transparent
+              animationType="fade"
+              statusBarTranslucent
+              onRequestClose={() => setShowNotLoggedInModal(false)}
+            >
+              <SafeAreaView
+                style={styles.modalSafeArea}
+                edges={["top", "right", "bottom", "left"]}
+              >
+                <View style={styles.calendarOverlay}>
+                  <View style={styles.authModal}>
+                    <AppText variant="body" style={styles.calendarTitle}>
+                      Not logged in
+                    </AppText>
+
+                    <AppText variant="caption" style={styles.authModalText}>
+                      Please log in again and try creating a trip.
+                    </AppText>
+
+                    <View style={styles.authModalActions}>
+                      <AppButton
+                        title="Okay"
+                        onPress={() => setShowNotLoggedInModal(false)}
+                        style={styles.authModalButton}
+                        textStyle={styles.authModalButtonText}
+                        accessibilityLabel="Close not logged in popup"
+                      />
+                    </View>
+                  </View>
+                </View>
+              </SafeAreaView>
+            </Modal>
           </View>
         </SafeAreaView>
       </View>
     );
   }
 
-  // ── Step 4 ─────────────────────────────────────────────────────────────────
   if (step === 4) {
     return (
       <View style={[styles.fullScreen, styles.bgStep1]}>
@@ -1427,7 +1463,6 @@ export default function CreateTripScreen() {
                   </AppText>
                 </View>
 
-                {/* ── Invite / Share control ── */}
                 <Pressable
                   style={styles.codeInput}
                   onPress={handleShareCode}
@@ -1472,7 +1507,6 @@ export default function CreateTripScreen() {
     );
   }
 
-  // ── Steps 1 & 2 ────────────────────────────────────────────────────────────
   return (
     <View
       style={[styles.fullScreen, step === 1 ? styles.bgStep1 : styles.bgStep2]}
@@ -1666,7 +1700,9 @@ export default function CreateTripScreen() {
                       style={styles.dateInput}
                       onPress={handleOpenTripCalendar}
                       accessibilityRole="button"
-                      accessibilityLabel={`Trip start date, currently ${formatDate(tripStart)}. Tap to change`}
+                      accessibilityLabel={`Trip start date, currently ${formatDate(
+                        tripStart
+                      )}. Tap to change`}
                       accessibilityHint="Opens the calendar to select a date range"
                     >
                       <AppText variant="body" style={styles.dateText}>
@@ -1697,6 +1733,7 @@ export default function CreateTripScreen() {
             visible={showTripCalendar}
             transparent
             animationType="fade"
+            statusBarTranslucent
             onRequestClose={() => setShowTripCalendar(false)}
           >
             <CalendarModalWrapper isLandscape={isLandscape}>
@@ -1753,6 +1790,41 @@ export default function CreateTripScreen() {
                 />
               </View>
             </CalendarModalWrapper>
+          </Modal>
+
+          <Modal
+            visible={showNotLoggedInModal}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => setShowNotLoggedInModal(false)}
+          >
+            <SafeAreaView
+              style={styles.modalSafeArea}
+              edges={["top", "right", "bottom", "left"]}
+            >
+              <View style={styles.calendarOverlay}>
+                <View style={styles.authModal}>
+                  <AppText variant="body" style={styles.calendarTitle}>
+                    Not logged in
+                  </AppText>
+
+                  <AppText variant="caption" style={styles.authModalText}>
+                    Please log in again and try creating a trip.
+                  </AppText>
+
+                  <View style={styles.authModalActions}>
+                    <AppButton
+                      title="Okay"
+                      onPress={() => setShowNotLoggedInModal(false)}
+                      style={styles.authModalButton}
+                      textStyle={styles.authModalButtonText}
+                      accessibilityLabel="Close not logged in popup"
+                    />
+                  </View>
+                </View>
+              </View>
+            </SafeAreaView>
           </Modal>
         </View>
       </SafeAreaView>
@@ -1908,7 +1980,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.md,
     color: colors.textPrimary,
   },
-  // ── Step 4: invite code box ─────────────────────────────────────────────────
   codeInput: {
     backgroundColor: colors.white,
     borderRadius: radius.sm,
@@ -2100,10 +2171,15 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.lg,
     fontFamily: typography.fontFamily.body,
   },
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
   calendarOverlay: {
     flex: 1,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xl,
+    justifyContent: "center",
   },
   calendarModal: {
     backgroundColor: colors.lightWhite,
@@ -2270,5 +2346,29 @@ const styles = StyleSheet.create({
   },
   questionButton: {
     marginTop: 3,
+  },
+  authModal: {
+    backgroundColor: colors.lightWhite,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+  },
+  authModalText: {
+    color: colors.nightBlack,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.md,
+    fontFamily: typography.fontFamily.body,
+  },
+  authModalActions: {
+    marginTop: spacing.sm,
+  },
+  authModalButton: {
+    backgroundColor: colors.sunsetOrange,
+  },
+  authModalButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
   },
 });
