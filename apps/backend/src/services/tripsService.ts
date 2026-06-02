@@ -1,3 +1,4 @@
+// apps/backend/src/services/tripsService.ts
 import admin from "../config/firebase";
 import {
     createTripWithAdminMembership,
@@ -15,6 +16,8 @@ import {
     resetPlanningDoneForTrip,
     updateTripState,
     updateTripById,
+    getExpoPushTokensByUserIds,
+    findTripAdminUserId,
 } from "../repositories/tripsRepository";
 import {
     CreateTripWithAuthInput,
@@ -29,6 +32,7 @@ import {
     getVotingCompletionStatus,
     removeMemberDataFromTrip,
 } from "../repositories/activityRepository";
+import { sendPushNotifications } from "./notificationService";
 
 
 export async function getTripsForUser(userId: string): Promise<Trip[]> {
@@ -91,7 +95,7 @@ export async function createTripForAuthenticatedUser(
         end_date: input.end_date,
         invite_code: inviteCode,
         planning_end_at: input.planning_end_at,
-        voting_end_at: input.voting_end_at
+        voting_end_at: input.voting_end_at,
     });
 }
 
@@ -136,6 +140,11 @@ export async function joinTripWithInviteCode(input: JoinTripInput): Promise<Trip
 
     await addTripMember(trip.trip_id, userId);
 
+    // Notify the trip admin that a new member joined
+    notifyAdminMemberJoined(trip.trip_id, userId, trip.title).catch(
+        (err) => console.error("[notifications] joinTripWithInviteCode:", err)
+    );
+
     return { ...trip, role: "member" };
 }
 
@@ -172,8 +181,23 @@ export async function leaveTripForMember(input: {
         throw { status: 403, message: "Admin cannot leave the trip. Delete it instead." };
     }
 
+    // Fetch trip title and leaving user's name before removing data
+    const [trip, leavingUser] = await Promise.all([
+        findTripById(input.tripId),
+        findUserById(userId),
+    ]);
+
     await removeMemberDataFromTrip(input.tripId, userId);
     await removeTripMember(input.tripId, userId);
+
+    // Notify admin that a member left
+    if (trip) {
+        notifyAdminMemberLeft(
+            input.tripId,
+            leavingUser?.name ?? "A member",
+            trip.title
+        ).catch((err) => console.error("[notifications] leaveTripForMember:", err));
+    }
 }
 
 export async function removeMemberForAdmin(input: {
@@ -237,6 +261,30 @@ export async function finishPlanningForMember(
 
     if (allDone) {
         nextState = await moveCompletedPlanningToNextState(tripId, allMembers);
+
+        // Notify all members about the state transition
+        notifyAllMembersStateTransition(
+            tripId,
+            allMembers.map((m) => m.user_id),
+            nextState,
+            trip.title
+        ).catch((err) =>
+            console.error("[notifications] finishPlanningForMember allDone:", err)
+        );
+    } else {
+        // Notify other members that this teammate finished planning
+        const finishingUser = await findUserById(userId);
+        const otherMemberIds = allMembers
+            .map((m) => m.user_id)
+            .filter((id) => id !== userId);
+
+        notifyTeammateFinishedPlanning(
+            otherMemberIds,
+            finishingUser?.name ?? "A teammate",
+            trip.title
+        ).catch((err) =>
+            console.error("[notifications] finishPlanningForMember teammate:", err)
+        );
     }
 
     return {
@@ -270,6 +318,17 @@ export async function finishVotingForAdmin(
 
     await createFinalItineraryForTrip(tripId);
     await updateTripState(tripId, "Final");
+
+    // Notify all members that the final itinerary is ready
+    const allMembers = await findAcceptedMembersByTripId(tripId);
+    notifyAllMembersStateTransition(
+        tripId,
+        allMembers.map((m) => m.user_id),
+        "Final",
+        trip.title
+    ).catch((err) =>
+        console.error("[notifications] finishVotingForAdmin:", err)
+    );
 
     return { tripState: "Final" };
 }
@@ -367,7 +426,6 @@ export async function getTripByInviteCodePublic(
         throw { status: 404, message: "Invalid invite code" };
     }
 
-    // Return only the fields a non-member needs to preview the trip
     return {
         trip_id: trip.trip_id,
         title: trip.title,
@@ -377,6 +435,101 @@ export async function getTripByInviteCodePublic(
         state: trip.state,
     };
 }
+
+// ─────────────────────────────────────────────
+// Notification helpers
+// All fire-and-forget: called with .catch() so
+// they never interrupt the main request flow.
+// ─────────────────────────────────────────────
+
+async function notifyAllMembersStateTransition(
+    tripId: string,
+    memberUserIds: string[],
+    nextState: TripState,
+    tripTitle: string
+): Promise<void> {
+    const tokens = await getExpoPushTokensByUserIds(memberUserIds);
+    if (tokens.length === 0) return;
+
+    let title: string;
+    let body: string;
+
+    if (nextState === "Voting") {
+        title = "Time to vote! 🗳️";
+        body = `Planning has ended for "${tripTitle}". Cast your votes now!`;
+    } else {
+        title = "Your itinerary is ready! 🎉";
+        body = `Voting is over for "${tripTitle}". Check your final itinerary!`;
+    }
+
+    await sendPushNotifications(tokens, title, body, { tripId });
+}
+
+async function notifyAdminMemberJoined(
+    tripId: string,
+    joiningUserId: string,
+    tripTitle: string
+): Promise<void> {
+    const [adminUserId, joiningUser] = await Promise.all([
+        findTripAdminUserId(tripId),
+        findUserById(joiningUserId),
+    ]);
+
+    if (!adminUserId) return;
+
+    // Don't notify if the admin is the one joining (solo trip edge case)
+    if (adminUserId === joiningUserId) return;
+
+    const tokens = await getExpoPushTokensByUserIds([adminUserId]);
+    if (tokens.length === 0) return;
+
+    const memberName = joiningUser?.name ?? "Someone";
+    await sendPushNotifications(
+        tokens,
+        "New member joined! 👋",
+        `${memberName} joined your trip "${tripTitle}"`,
+        { tripId }
+    );
+}
+
+async function notifyAdminMemberLeft(
+    tripId: string,
+    leavingMemberName: string,
+    tripTitle: string
+): Promise<void> {
+    const adminUserId = await findTripAdminUserId(tripId);
+    if (!adminUserId) return;
+
+    const tokens = await getExpoPushTokensByUserIds([adminUserId]);
+    if (tokens.length === 0) return;
+
+    await sendPushNotifications(
+        tokens,
+        "A member left the trip",
+        `${leavingMemberName} left "${tripTitle}"`,
+        { tripId }
+    );
+}
+
+async function notifyTeammateFinishedPlanning(
+    otherMemberIds: string[],
+    finishingMemberName: string,
+    tripTitle: string
+): Promise<void> {
+    const tokens = await getExpoPushTokensByUserIds(otherMemberIds);
+    if (tokens.length === 0) return;
+
+    await sendPushNotifications(
+        tokens,
+        "Teammate finished planning ✅",
+        `${finishingMemberName} finished planning for "${tripTitle}"`,
+        {}
+    );
+}
+
+// ─────────────────────────────────────────────
+// State transition logic (unchanged)
+// ─────────────────────────────────────────────
 
 function deriveTripStateFromTimeline(input: {
     planning_end_at?: string;
@@ -528,7 +681,17 @@ export async function transitionPlanningToNextState(tripId: string): Promise<Tri
         return trip;
     }
 
-    await moveCompletedPlanningToNextState(tripId, members);
+    const nextState = await moveCompletedPlanningToNextState(tripId, members);
+
+    // Notify all members of the automatic state transition
+    notifyAllMembersStateTransition(
+        tripId,
+        members.map((m) => m.user_id),
+        nextState,
+        trip.title
+    ).catch((err) =>
+        console.error("[notifications] transitionPlanningToNextState:", err)
+    );
 
     const updatedTrip = await findTripById(tripId);
 
@@ -595,6 +758,17 @@ export async function transitionVotingToFinalIfNeeded(tripId: string): Promise<T
 
     await createFinalItineraryForTrip(tripId);
     await updateTripState(tripId, "Final");
+
+    // Notify all members that voting ended and final itinerary is ready
+    const allMembers = await findAcceptedMembersByTripId(tripId);
+    notifyAllMembersStateTransition(
+        tripId,
+        allMembers.map((m) => m.user_id),
+        "Final",
+        trip.title
+    ).catch((err) =>
+        console.error("[notifications] transitionVotingToFinalIfNeeded:", err)
+    );
 
     const updatedTrip = await findTripById(tripId);
 
