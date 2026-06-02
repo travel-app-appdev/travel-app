@@ -21,12 +21,7 @@ import {
   ACTION_CARD_HEIGHT,
 } from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
-import {
-  fetchMyTrips,
-  getCachedMyTrips,
-  leaveTrip,
-  type Trip,
-} from "@/src/api/trips";
+import { fetchMyTrips, leaveTrip, type Trip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
 import { invalidateTripsCache } from "./home";
 import { colors, spacing, radius, typography } from "@/src/theme";
@@ -173,6 +168,14 @@ function parseIsoToTimeString(value?: string): string {
 
 const CHECKBOX_SIZE = 24;
 const TIMELINE_LINE_WIDTH = 2;
+const TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS = 10 * 1000;
+
+function isDeadlinePast(deadline?: string): boolean {
+  if (!deadline) return false;
+
+  const parsed = new Date(deadline);
+  return !Number.isNaN(parsed.getTime()) && parsed.getTime() <= Date.now();
+}
 
 function PhaseCheckbox({
   phaseId,
@@ -247,27 +250,7 @@ export default function TripOverviewMemberScreen() {
     votingEndAt,
   });
 
-  const cachedTripSnapshot = useMemo(() => {
-    const currentUser = auth.currentUser;
-    if (!currentUser?.uid || !tripId) return null;
-
-    const currentTrip = getCachedMyTrips(currentUser.uid)?.find(
-      (trip) => trip.trip_id === tripId
-    );
-    if (!currentTrip) return null;
-
-    return {
-      state: currentTrip.state,
-      startDate: currentTrip.start_date,
-      endDate: currentTrip.end_date,
-      planningStartedAt: currentTrip.planning_started_at ?? "",
-      planningEndAt: currentTrip.planning_end_at ?? "",
-      votingEndAt: currentTrip.voting_end_at ?? "",
-    };
-  }, [tripId]);
-
-  const displayedTripSnapshot = cachedTripSnapshot ?? tripSnapshot;
-  const tripState = displayedTripSnapshot.state;
+  const tripState = tripSnapshot.state;
 
   useEffect(() => {
     const interval = setInterval(() => setTimerNow(Date.now()), 60 * 1000);
@@ -308,42 +291,98 @@ export default function TripOverviewMemberScreen() {
     return () => timeoutRefs.current.forEach(clearTimeout);
   }, []);
 
+  const refreshTripSnapshot = useCallback(
+    async (
+      options: {
+        forceRefresh?: boolean;
+        shouldApply?: () => boolean;
+      } = {}
+    ) => {
+      const currentUser = auth.currentUser;
+      if (!currentUser?.uid || !tripId) return null;
+
+      try {
+        const trips = await fetchMyTrips(currentUser.uid, {
+          forceRefresh: options.forceRefresh ?? true,
+          allowStaleOnError: true,
+        });
+        const currentTrip = trips.find((trip) => trip.trip_id === tripId);
+        if (!currentTrip || options.shouldApply?.() === false) return null;
+
+        setTripSnapshot({
+          state: currentTrip.state,
+          startDate: currentTrip.start_date,
+          endDate: currentTrip.end_date,
+          planningStartedAt: currentTrip.planning_started_at ?? "",
+          planningEndAt: currentTrip.planning_end_at ?? "",
+          votingEndAt: currentTrip.voting_end_at ?? "",
+        });
+
+        return currentTrip;
+      } catch (error) {
+        console.log("Could not refresh trip overview:", error);
+        return null;
+      }
+    },
+    [tripId]
+  );
+
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
-      async function refreshTripSnapshot() {
-        const currentUser = auth.currentUser;
-        if (!currentUser?.uid || !tripId) return;
-
-        try {
-          const trips = await fetchMyTrips(currentUser.uid, {
-            forceRefresh: true,
-            allowStaleOnError: true,
-          });
-          const currentTrip = trips.find((trip) => trip.trip_id === tripId);
-          if (!isActive || !currentTrip) return;
-
-          setTripSnapshot({
-            state: currentTrip.state,
-            startDate: currentTrip.start_date,
-            endDate: currentTrip.end_date,
-            planningStartedAt: currentTrip.planning_started_at ?? "",
-            planningEndAt: currentTrip.planning_end_at ?? "",
-            votingEndAt: currentTrip.voting_end_at ?? "",
-          });
-        } catch (error) {
-          console.log("Could not refresh trip overview:", error);
-        }
-      }
-
-      void refreshTripSnapshot();
+      void refreshTripSnapshot({ shouldApply: () => isActive });
 
       return () => {
         isActive = false;
       };
-    }, [tripId])
+    }, [refreshTripSnapshot])
   );
+
+  useEffect(() => {
+    if (!tripId || (tripState !== "Planning" && tripState !== "Voting")) {
+      return;
+    }
+
+    let deadlineTimeout: ReturnType<typeof setTimeout> | null = null;
+    const activeDeadline =
+      tripState === "Planning"
+        ? tripSnapshot.planningEndAt
+        : tripSnapshot.votingEndAt;
+
+    const forceRefresh = () => {
+      setTimerNow(Date.now());
+      void refreshTripSnapshot({ forceRefresh: true });
+    };
+
+    if (activeDeadline) {
+      if (isDeadlinePast(activeDeadline)) {
+        forceRefresh();
+      } else {
+        const delay = Math.max(
+          0,
+          new Date(activeDeadline).getTime() - Date.now() + 1000
+        );
+        deadlineTimeout = setTimeout(forceRefresh, delay);
+      }
+    }
+
+    const pollInterval = setInterval(
+      forceRefresh,
+      TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS
+    );
+
+    return () => {
+      if (deadlineTimeout) clearTimeout(deadlineTimeout);
+      clearInterval(pollInterval);
+    };
+  }, [
+    refreshTripSnapshot,
+    tripId,
+    tripSnapshot.planningEndAt,
+    tripSnapshot.votingEndAt,
+    tripState,
+  ]);
 
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(inviteCodeParam);
@@ -374,18 +413,13 @@ export default function TripOverviewMemberScreen() {
 
   const tripStart = useMemo(
     () =>
-      displayedTripSnapshot.startDate
-        ? new Date(displayedTripSnapshot.startDate)
-        : new Date(),
-    [displayedTripSnapshot.startDate]
+      tripSnapshot.startDate ? new Date(tripSnapshot.startDate) : new Date(),
+    [tripSnapshot.startDate]
   );
 
   const tripEnd = useMemo(
-    () =>
-      displayedTripSnapshot.endDate
-        ? new Date(displayedTripSnapshot.endDate)
-        : new Date(),
-    [displayedTripSnapshot.endDate]
+    () => (tripSnapshot.endDate ? new Date(tripSnapshot.endDate) : new Date()),
+    [tripSnapshot.endDate]
   );
 
   const phases: {
@@ -419,11 +453,9 @@ export default function TripOverviewMemberScreen() {
   ];
 
   const phaseDates: PhaseDates = useMemo(() => {
-    const planningStartDate = parseIsoToDate(
-      displayedTripSnapshot.planningStartedAt
-    );
-    const planningEndDate = parseIsoToDate(displayedTripSnapshot.planningEndAt);
-    const votingEndDate = parseIsoToDate(displayedTripSnapshot.votingEndAt);
+    const planningStartDate = parseIsoToDate(tripSnapshot.planningStartedAt);
+    const planningEndDate = parseIsoToDate(tripSnapshot.planningEndAt);
+    const votingEndDate = parseIsoToDate(tripSnapshot.votingEndAt);
     const votingStartDate = planningEndDate ?? tripStart;
     const finalDisplayDate = votingEndDate ?? tripEnd;
 
@@ -431,23 +463,23 @@ export default function TripOverviewMemberScreen() {
       planning: {
         start: planningStartDate ?? tripStart,
         end: planningEndDate ?? tripStart,
-        time: parseIsoToTimeString(displayedTripSnapshot.planningEndAt),
+        time: parseIsoToTimeString(tripSnapshot.planningEndAt),
       },
       voting: {
         start: votingStartDate,
         end: votingEndDate ?? tripStart,
-        time: parseIsoToTimeString(displayedTripSnapshot.votingEndAt),
+        time: parseIsoToTimeString(tripSnapshot.votingEndAt),
       },
       final: {
         start: finalDisplayDate,
         end: finalDisplayDate,
-        time: parseIsoToTimeString(displayedTripSnapshot.votingEndAt),
+        time: parseIsoToTimeString(tripSnapshot.votingEndAt),
       },
     };
   }, [
-    displayedTripSnapshot.planningStartedAt,
-    displayedTripSnapshot.planningEndAt,
-    displayedTripSnapshot.votingEndAt,
+    tripSnapshot.planningStartedAt,
+    tripSnapshot.planningEndAt,
+    tripSnapshot.votingEndAt,
     tripStart,
     tripEnd,
   ]);
@@ -460,11 +492,11 @@ export default function TripOverviewMemberScreen() {
         state: tripState.toLowerCase() as "planning" | "voting" | "final",
         title,
         destination,
-        startDate: displayedTripSnapshot.startDate,
-        endDate: displayedTripSnapshot.endDate,
+        startDate: tripSnapshot.startDate,
+        endDate: tripSnapshot.endDate,
         members: membersParam,
-        planningEndAt: displayedTripSnapshot.planningEndAt,
-        votingEndAt: displayedTripSnapshot.votingEndAt,
+        planningEndAt: tripSnapshot.planningEndAt,
+        votingEndAt: tripSnapshot.votingEndAt,
       },
     });
   });
@@ -570,13 +602,11 @@ export default function TripOverviewMemberScreen() {
                 variant="caption"
                 style={styles.infoValue}
                 accessibilityLabel={`Trip date: ${formatDateDisplayFromString(
-                  displayedTripSnapshot.startDate
-                )} to ${formatDateDisplayFromString(
-                  displayedTripSnapshot.endDate
-                )}`}
+                  tripSnapshot.startDate
+                )} to ${formatDateDisplayFromString(tripSnapshot.endDate)}`}
               >
-                {formatDateDisplayFromString(displayedTripSnapshot.startDate)} –{" "}
-                {formatDateDisplayFromString(displayedTripSnapshot.endDate)}
+                {formatDateDisplayFromString(tripSnapshot.startDate)} –{" "}
+                {formatDateDisplayFromString(tripSnapshot.endDate)}
               </AppText>
             </View>
 
