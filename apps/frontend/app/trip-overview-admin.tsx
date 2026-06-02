@@ -29,7 +29,6 @@ import { BackLink } from "@/src/components/common/BackLink";
 import {
   deleteTrip,
   fetchMyTrips,
-  getCachedMyTrips,
   removeMember,
   updateTrip,
   type Trip,
@@ -205,6 +204,13 @@ function parseTripDate(value: string | undefined, fallback: Date): Date {
   if (!dateOnly) return fallback;
   const parsed = fromDateString(dateOnly);
   return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+}
+
+function isDeadlinePast(deadline?: string): boolean {
+  if (!deadline) return false;
+
+  const parsed = new Date(deadline);
+  return !Number.isNaN(parsed.getTime()) && parsed.getTime() <= Date.now();
 }
 
 function isValidTimeString(value: string): boolean {
@@ -441,23 +447,17 @@ export default function TripOverviewAdminScreen() {
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   const [tripState, setTripState] = useState<Trip["state"]>(initialTripState);
+  const [tripTiming, setTripTiming] = useState({
+    planningStartedAt,
+    planningEndAt,
+    votingEndAt,
+  });
 
-  const cachedTrip = useMemo(() => {
-    const currentUser = auth.currentUser;
-    if (!currentUser?.uid || !tripId) return null;
+  const checklistTripState = tripState;
 
-    return (
-      getCachedMyTrips(currentUser.uid)?.find(
-        (trip) => trip.trip_id === tripId
-      ) ?? null
-    );
-  }, [tripId]);
-
-  const checklistTripState = cachedTrip?.state ?? tripState;
-
-  const planningStartDate = parseIsoToDate(planningStartedAt);
-  const planningEndDate = parseIsoToDate(planningEndAt);
-  const votingEndDate = parseIsoToDate(votingEndAt);
+  const planningStartDate = parseIsoToDate(tripTiming.planningStartedAt);
+  const planningEndDate = parseIsoToDate(tripTiming.planningEndAt);
+  const votingEndDate = parseIsoToDate(tripTiming.votingEndAt);
   const votingStartDate = planningEndDate ?? tripStart;
   const finalDisplayDate = votingEndDate ?? tripEnd;
 
@@ -495,17 +495,17 @@ export default function TripOverviewAdminScreen() {
     planning: {
       start: planningStartDate ?? tripStart,
       end: planningEndDate ?? tripStart,
-      time: parseIsoToTimeString(planningEndAt),
+      time: parseIsoToTimeString(tripTiming.planningEndAt),
     },
     voting: {
       start: votingStartDate,
       end: votingEndDate ?? tripStart,
-      time: parseIsoToTimeString(votingEndAt),
+      time: parseIsoToTimeString(tripTiming.votingEndAt),
     },
     final: {
       start: finalDisplayDate,
       end: finalDisplayDate,
-      time: parseIsoToTimeString(votingEndAt),
+      time: parseIsoToTimeString(tripTiming.votingEndAt),
     },
   });
 
@@ -525,6 +525,11 @@ export default function TripOverviewAdminScreen() {
     setDestinationInput(trip.destination);
     setTripStart(nextTripStart);
     setTripEnd(nextTripEnd);
+    setTripTiming({
+      planningStartedAt: trip.planning_started_at ?? "",
+      planningEndAt: trip.planning_end_at ?? "",
+      votingEndAt: trip.voting_end_at ?? "",
+    });
     setPhaseDates({
       planning: {
         start: nextPlanningStart,
@@ -544,43 +549,100 @@ export default function TripOverviewAdminScreen() {
     });
   }, []);
 
+  const refreshTripSnapshot = useCallback(
+    async (
+      options: {
+        forceRefresh?: boolean;
+        shouldApply?: () => boolean;
+      } = {}
+    ) => {
+      const currentUser = auth.currentUser;
+      if (!currentUser?.uid || !tripId) return null;
+
+      try {
+        const trips = await fetchMyTrips(currentUser.uid, {
+          forceRefresh: options.forceRefresh ?? true,
+          allowStaleOnError: true,
+        });
+        const currentTrip = trips.find((trip) => trip.trip_id === tripId);
+        if (!currentTrip || options.shouldApply?.() === false) return null;
+
+        syncTripResponse(currentTrip);
+        return currentTrip;
+      } catch (error) {
+        console.log("Could not refresh trip overview:", error);
+        return null;
+      }
+    },
+    [syncTripResponse, tripId]
+  );
+
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
-      async function refreshTripSnapshot() {
-        const currentUser = auth.currentUser;
-        if (!currentUser?.uid || !tripId) return;
-
-        try {
-          const trips = await fetchMyTrips(currentUser.uid, {
-            forceRefresh: true,
-            allowStaleOnError: true,
-          });
-          const currentTrip = trips.find((trip) => trip.trip_id === tripId);
-          if (!isActive || !currentTrip) return;
-
-          syncTripResponse(currentTrip);
-        } catch (error) {
-          console.log("Could not refresh trip overview:", error);
-        }
-      }
-
-      void refreshTripSnapshot();
+      void refreshTripSnapshot({ shouldApply: () => isActive });
 
       return () => {
         isActive = false;
       };
-    }, [syncTripResponse, tripId])
+    }, [refreshTripSnapshot])
   );
+
+  useEffect(() => {
+    if (!tripId || (tripState !== "Planning" && tripState !== "Voting")) {
+      return;
+    }
+
+    let deadlineTimeout: ReturnType<typeof setTimeout> | null = null;
+    const activeDeadline =
+      tripState === "Planning"
+        ? tripTiming.planningEndAt
+        : tripTiming.votingEndAt;
+
+    const forceRefresh = () => {
+      setTimerNow(Date.now());
+      void refreshTripSnapshot({ forceRefresh: true });
+    };
+
+    if (activeDeadline) {
+      if (isDeadlinePast(activeDeadline)) {
+        forceRefresh();
+      } else {
+        const delay = Math.max(
+          0,
+          new Date(activeDeadline).getTime() - Date.now() + 1000
+        );
+        deadlineTimeout = setTimeout(forceRefresh, delay);
+      }
+    }
+
+    const pollInterval = setInterval(
+      forceRefresh,
+      TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS
+    );
+
+    return () => {
+      if (deadlineTimeout) clearTimeout(deadlineTimeout);
+      clearInterval(pollInterval);
+    };
+  }, [
+    refreshTripSnapshot,
+    tripId,
+    tripState,
+    tripTiming.planningEndAt,
+    tripTiming.votingEndAt,
+  ]);
 
   const [tempPhaseTime, setTempPhaseTime] = useState("12:00");
   const [phaseUpdated, setPhaseUpdated] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const nextPlanningStart = parseIsoToDate(planningStartedAt) ?? tripStart;
-    const nextPlanningEnd = parseIsoToDate(planningEndAt) ?? tripStart;
-    const nextVotingEnd = parseIsoToDate(votingEndAt) ?? tripEnd;
+    const nextPlanningStart =
+      parseIsoToDate(tripTiming.planningStartedAt) ?? tripStart;
+    const nextPlanningEnd =
+      parseIsoToDate(tripTiming.planningEndAt) ?? tripStart;
+    const nextVotingEnd = parseIsoToDate(tripTiming.votingEndAt) ?? tripEnd;
 
     const safePlanningEnd =
       nextPlanningEnd < nextPlanningStart
@@ -600,20 +662,26 @@ export default function TripOverviewAdminScreen() {
       planning: {
         start: nextPlanningStart,
         end: safePlanningEnd,
-        time: parseIsoToTimeString(planningEndAt),
+        time: parseIsoToTimeString(tripTiming.planningEndAt),
       },
       voting: {
         start: safePlanningEnd,
         end: safeVotingEnd,
-        time: parseIsoToTimeString(votingEndAt),
+        time: parseIsoToTimeString(tripTiming.votingEndAt),
       },
       final: {
         start: safeVotingEnd,
         end: safeVotingEnd,
-        time: parseIsoToTimeString(votingEndAt),
+        time: parseIsoToTimeString(tripTiming.votingEndAt),
       },
     });
-  }, [planningStartedAt, planningEndAt, votingEndAt, tripStart, tripEnd]);
+  }, [
+    tripTiming.planningStartedAt,
+    tripTiming.planningEndAt,
+    tripTiming.votingEndAt,
+    tripStart,
+    tripEnd,
+  ]);
 
   const disabledTripOrange = "#facbb8";
   const disabledPlanningYellow = "#F6E08F";
@@ -1061,27 +1129,22 @@ export default function TripOverviewAdminScreen() {
         const currentVotingEnd = new Date(
           combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
         );
-        const safeVotingEnd =
-          currentVotingEnd < nextPlanningEnd
-            ? nextPlanningEnd
-            : currentVotingEnd;
 
-        await updateTrip({
+        if (currentVotingEnd <= nextPlanningEnd) {
+          Alert.alert(
+            "Invalid phase order",
+            "Voting end must be after planning end."
+          );
+          return;
+        }
+
+        const updatedTrip = await updateTrip({
           idToken,
           tripId,
           planning_end_at: combineDateAndTime(phase.end, phase.time),
         });
 
-        setPhaseDates((prev: PhaseDates) => ({
-          ...prev,
-          planning: { ...prev.planning, end: phase.end, time: phase.time },
-          voting: {
-            ...prev.voting,
-            start: nextPlanningEnd,
-            end: safeVotingEnd,
-          },
-          final: { ...prev.final, start: safeVotingEnd, end: safeVotingEnd },
-        }));
+        syncTripResponse(updatedTrip);
       }
 
       if (phaseId === "voting") {
@@ -1105,7 +1168,7 @@ export default function TripOverviewAdminScreen() {
           return;
         }
 
-        await updateTrip({
+        const updatedTrip = await updateTrip({
           idToken,
           tripId,
           start_date: toLocalDateString(tripStart),
@@ -1117,16 +1180,7 @@ export default function TripOverviewAdminScreen() {
           voting_end_at: combineDateAndTime(phase.end, phase.time),
         });
 
-        setPhaseDates((prev: PhaseDates) => ({
-          ...prev,
-          voting: { ...prev.voting, end: phase.end, time: phase.time },
-          final: {
-            ...prev.final,
-            start: phase.end,
-            end: phase.end,
-            time: phase.time,
-          },
-        }));
+        syncTripResponse(updatedTrip);
       }
 
       setPhaseUpdated((prev) => ({ ...prev, [phaseId]: false }));
@@ -1158,11 +1212,11 @@ export default function TripOverviewAdminScreen() {
           | "final",
         title: tripName,
         destination,
-        startDate,
-        endDate,
+        startDate: toLocalDateString(tripStart),
+        endDate: toLocalDateString(tripEnd),
         members: membersParam,
-        planningEndAt,
-        votingEndAt,
+        planningEndAt: tripTiming.planningEndAt,
+        votingEndAt: tripTiming.votingEndAt,
         role: "admin",
       },
     });
@@ -2347,6 +2401,7 @@ export default function TripOverviewAdminScreen() {
 
 const CHECKBOX_SIZE = 24;
 const TIMELINELINEWIDTH = 1;
+const TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS = 10 * 1000;
 
 const styles = StyleSheet.create({
   fullScreen: {

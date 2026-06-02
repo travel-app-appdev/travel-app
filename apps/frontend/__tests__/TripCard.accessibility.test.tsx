@@ -4,6 +4,8 @@ import { Platform } from "react-native";
 
 import { TripCard } from "@/src/components/common/TripCard";
 
+jest.mock("@/assets/icons/card_arrow.svg", () => () => null);
+
 const originalPlatformOS = Platform.OS;
 
 function renderPlanningTripCard() {
