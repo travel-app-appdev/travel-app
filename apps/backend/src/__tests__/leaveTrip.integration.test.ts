@@ -55,7 +55,11 @@ jest.mock("../config/firebase", () => {
                 }),
             }),
 
-            firestore: () => ({
+            firestore: Object.assign(() => ({
+                batch: () => ({
+                    delete: jest.fn(),
+                    commit: jest.fn().mockResolvedValue(undefined),
+                }),
                 collection: (name: string) => {
 
                     // ── trip_members ──
@@ -111,11 +115,28 @@ jest.mock("../config/firebase", () => {
                                     exists: id === TRIP_ID,
                                     data: () => (id === TRIP_ID ? TRIP_DATA : null),
                                 }),
+                                set: jest.fn().mockResolvedValue({}),
                             })),
                         };
                     }
 
+                    if (name === "activity_votes" || name === "activity_attendance") {
+                        return {
+                            where: jest.fn().mockReturnThis(),
+                            get: jest.fn().mockResolvedValue({
+                                empty: true,
+                                docs: [],
+                            }),
+                        };
+                    }
+
                     return {};
+                },
+            }), {
+                Timestamp: {
+                    now: jest.fn(() => ({
+                        toDate: () => new Date("2026-01-01T00:00:00.000Z"),
+                    })),
                 },
             }),
         },

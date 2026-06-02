@@ -90,6 +90,7 @@ jest.mock("@/assets/icons/unchecked.svg", () => svgMock);
 jest.mock("@/assets/icons/key_frame.svg", () => svgMock);
 jest.mock("@/assets/icons/copy.svg", () => svgMock);
 jest.mock("@/assets/icons/exit.svg", () => svgMock);
+jest.mock("@/assets/icons/arrow-itinerary.svg", () => svgMock);
 jest.mock("@/assets/mascots/Votey_Yellow.svg", () => svgMock);
 jest.mock("@/assets/mascots/Votey_Pink.svg", () => svgMock);
 jest.mock("@/assets/mascots/Votey_Green.svg", () => svgMock);
