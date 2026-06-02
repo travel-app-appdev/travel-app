@@ -466,40 +466,11 @@ export default function Onboarding() {
                     everyone have a say in choosing activities for each slot.
                   </Text>
 
-                  <View style={[Styles.activityCardRow, { width: mainBlockWidth }]}>
-                    <View
-                      style={[
-                        Styles.activityCard,
-                        { backgroundColor: colors.sunsetPink + "33" },
-                      ]}
-                    >
-                      <View style={Styles.activityTimeRow}>
-                        <LocationHeartIcon width={16} height={16} />
-                        <Text style={Styles.activityTimeText}>06:00-08:00</Text>
-                      </View>
-
-                      <Text style={Styles.activityName}>
-                        Tempel of Hephaistos
-                      </Text>
-
-                      <View style={Styles.activityInfoRow}>
-                        <LocationPinIcon width={14} height={14} />
-                        <Text style={Styles.activityInfoText}>Athina 105 55</Text>
-                      </View>
-
-                      <View style={Styles.activityInfoRow}>
-                        <GoogleIcon width={14} height={14} />
-                        <Text style={Styles.activityLinkText}>Google-Link</Text>
-                      </View>
-                    </View>
-
-                    <View style={[Styles.activityAddBtn, Styles.activityAddBtnPink]}>
-                      <EditIcon width={30} height={30} />
-                      <Text style={Styles.activityAddBtnText}>
-                        Add{"\n"}Vote
-                      </Text>
-                    </View>
-                  </View>
+                  <Image
+                      source={require("../assets/images/VotingScreen.png")}
+                      style={Styles.Image2}
+                      resizeMode="contain"
+                    />
 
                   <View style={Styles.flexSpacer} />
 
@@ -985,7 +956,14 @@ const Styles = StyleSheet.create({
  Image: {
   width: "100%",
   aspectRatio: 2, // adjust based on your image
-  marginTop: spacing.md,
+  marginTop: spacing.xl,
+  alignSelf: "center",
+  borderRadius: 5,
+},
+Image2: {
+  width: "100%",
+  aspectRatio: 2, // adjust based on your image
+  marginTop: spacing.xxl,
   alignSelf: "center",
   borderRadius: 5,
 }
