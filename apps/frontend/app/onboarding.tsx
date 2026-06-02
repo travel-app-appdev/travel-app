@@ -525,47 +525,11 @@ export default function Onboarding() {
                     locked and ready - access it on the go.
                   </Text>
 
-                  <View style={[Styles.activityCardRow, { width: mainBlockWidth }]}>
-                    <View
-                      style={[
-                        Styles.activityCard,
-                        { backgroundColor: colors.neonGreen + "33" },
-                      ]}
-                    >
-                      <View style={Styles.activityTimeRow}>
-                        <LocationHeartIcon width={16} height={16} />
-                        <Text style={Styles.activityTimeText}>06:00-08:00</Text>
-                      </View>
-
-                      <View style={Styles.activityNameRow}>
-                        <Text style={[Styles.activityName, Styles.activityNameInRow]}>
-                          Tempel of Hephaistos
-                        </Text>
-
-                        <View style={Styles.activityParticipants}>
-                          <ProfileIcon width={14} height={14} />
-                          <Text style={Styles.activityParticipantText}>4</Text>
-                        </View>
-                      </View>
-
-                      <View style={Styles.activityInfoRow}>
-                        <LocationPinIcon width={14} height={14} />
-                        <Text style={Styles.activityInfoText}>Athina 105 55</Text>
-                      </View>
-
-                      <View style={Styles.activityInfoRow}>
-                        <GoogleIcon width={14} height={14} />
-                        <Text style={Styles.activityLinkText}>Google-Link</Text>
-                      </View>
-                    </View>
-
-                    <View style={[Styles.activityAddBtn, Styles.activityAddBtnGreen]}>
-                      <JoinGroupIcon width={28} height={28} />
-                        <Text style={Styles.activityAddBtnText}>
-                          Join{"\n"}group
-                        </Text>
-                    </View>
-                  </View>
+                 <Image
+                      source={require("../assets/images/FinalScreen.png")}
+                      style={Styles.Image2}
+                      resizeMode="contain"
+                    />
 
                   <View style={Styles.flexSpacer} />
 
