@@ -29,6 +29,7 @@ import FunnyMascot from "@/assets/mascots/mascot-funny.svg";
 import ArrowDownIcon from "@/assets/icons/arrow_down.svg";
 import ProfileIcon from "@/assets/icons/members.svg";
 import JoinGroupIcon from "@/assets/icons/join-group.svg";
+import { Image } from "react-native";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -349,35 +350,13 @@ export default function Onboarding() {
                     always end Voting early.
                   </Text>
 
-                  <View style={[Styles.timersRows, { width: mainBlockWidth }]}>
-                    <View style={Styles.timerRow}>
-                      <View style={[Styles.timerPill, Styles.timerPillYellow]}>
-                        <Text style={Styles.timerPillTextDark}>Planning</Text>
-                      </View>
-                      <HourglassIcon width={20} height={20} />
-                      <View style={Styles.timerValueBlock}>
-                        <Text style={Styles.timerValue}>190 days</Text>
-                        <Text style={Styles.timerLabel}>Timer</Text>
-                      </View>
-                      <View style={Styles.timerChevronIcon} {...hiddenFromAccessibility}>
-                        <ArrowDownIcon width={16} height={16} />
-                      </View>
-                    </View>
+                 
+                    <Image
+                      source={require("../assets/images/Timer.Screenshot.png")}
+                      style={Styles.Image}
+                      resizeMode="contain"
+                    />
 
-                    <View style={Styles.timerRow}>
-                      <View style={[Styles.timerPill, Styles.timerPillPink]}>
-                        <Text style={Styles.timerPillTextLight}>Voting</Text>
-                      </View>
-                      <HourglassIcon width={20} height={20} />
-                      <View style={Styles.timerValueBlock}>
-                        <Text style={Styles.timerValue}>0 days</Text>
-                        <Text style={Styles.timerLabel}>Timer</Text>
-                      </View>
-                      <View style={Styles.timerChevronIcon} {...hiddenFromAccessibility}>
-                        <ArrowDownIcon width={16} height={16} />
-                      </View>
-                    </View>
-                  </View>
 
                   <View style={Styles.flexSpacer} />
 
@@ -423,40 +402,16 @@ export default function Onboarding() {
                     itinerary and collaborate in one place.
                   </Text>
 
-                  <View style={[Styles.activityCardRow, { width: mainBlockWidth }]}>
-                    <View
-                      style={[
-                        Styles.activityCard,
-                        { backgroundColor: colors.beachYellow + "33" },
-                      ]}
-                    >
-                      <View style={Styles.activityTimeRow}>
-                        <LocationHeartIcon width={16} height={16} />
-                        <Text style={Styles.activityTimeText}>06:00-08:00</Text>
-                      </View>
-
-                      <Text style={Styles.activityName}>
-                        Tempel of Hephaistos
-                      </Text>
-
-                      <View style={Styles.activityInfoRow}>
-                        <LocationPinIcon width={14} height={14} />
-                        <Text style={Styles.activityInfoText}>Athina 105 55</Text>
-                      </View>
-
-                      <View style={Styles.activityInfoRow}>
-                        <GoogleIcon width={14} height={14} />
-                        <Text style={Styles.activityLinkText}>Google-Link</Text>
-                      </View>
-                    </View>
-
-                    <View style={[Styles.activityAddBtn, Styles.activityAddBtnYellow]}>
-                      <EditIcon width={30} height={30} />
-                      <Text style={Styles.activityAddBtnText}>
-                        Add{"\n"}Activity
-                      </Text>
-                    </View>
-                  </View>
+                   <Image
+                      source={require("../assets/images/EmptyActivity.png")}
+                      style={Styles.Image}
+                      resizeMode="contain"
+                    />
+                     <Image
+                      source={require("../assets/images/DetailWindow.png")}
+                      style={Styles.Image}
+                      resizeMode="contain"
+                    />
 
                   <View style={Styles.flexSpacer} />
 
@@ -1026,5 +981,14 @@ const Styles = StyleSheet.create({
     color: colors.nightBlack,
     textAlign: "center",
     lineHeight: typography.lineHeight.md,
-  }
+  },
+ Image: {
+  width: "100%",
+  aspectRatio: 2, // adjust based on your image
+  marginTop: spacing.md,
+  alignSelf: "center",
+  borderRadius: 5,
+}
+
+
 });
