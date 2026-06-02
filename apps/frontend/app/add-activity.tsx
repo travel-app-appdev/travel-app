@@ -202,7 +202,7 @@ export default function AddActivityScreen() {
             index === existingIndex ? nextActivity : activity
           );
 
-    router.replace({
+    router.dismissTo({
       pathname: "/itinerary",
       params: {
         tripId,
@@ -305,7 +305,12 @@ export default function AddActivityScreen() {
     }
   }
 
-  const handleBack = useSinglePress(() =>
+  const handleBack = useSinglePress(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
     router.replace({
       pathname: "/itinerary",
       params: {
@@ -317,9 +322,12 @@ export default function AddActivityScreen() {
         state,
         members,
         activitiesJson,
+        planningEndAt,
+        votingEndAt,
+        selectedDay,
       },
-    })
-  );
+    });
+  });
 
   const handleSave = useSinglePress(handleSaveActivity);
 

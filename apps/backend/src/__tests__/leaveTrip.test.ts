@@ -4,21 +4,38 @@ import { leaveTripForMember } from "../services/tripsService";
 const mockVerifyIdToken = jest.fn();
 const mockGet = jest.fn();
 const mockDelete = jest.fn();
+const mockBatchDelete = jest.fn();
+const mockBatchCommit = jest.fn();
 
-jest.mock("../config/firebase", () => ({
-    __esModule: true,
-    default: {
+jest.mock("../config/firebase", () => {
+    const firestore = () => ({
+        batch: () => ({
+            delete: mockBatchDelete,
+            commit: mockBatchCommit,
+        }),
+        collection: () => ({
+            where: jest.fn().mockReturnThis(),
+            get: mockGet,
+            doc: jest.fn().mockReturnValue({
+                set: jest.fn().mockResolvedValue(undefined),
+            }),
+        }),
+    });
+
+    (firestore as any).Timestamp = {
+        now: jest.fn(() => ({ toDate: () => new Date("2026-01-01T00:00:00.000Z") })),
+    };
+
+    return {
+        __esModule: true,
+        default: {
         auth: () => ({
             verifyIdToken: mockVerifyIdToken,
         }),
-        firestore: () => ({
-            collection: () => ({
-                where: jest.fn().mockReturnThis(),
-                get: mockGet,
-            }),
-        }),
+        firestore,
     },
-}));
+    };
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -44,6 +61,7 @@ describe("leaveTripForMember", () => {
         jest.clearAllMocks();
         mockVerifyIdToken.mockResolvedValue({ uid: MEMBER_UID });
         mockDelete.mockResolvedValue(undefined);
+        mockBatchCommit.mockResolvedValue(undefined);
     });
 
     // ── Happy path ────────────────────────────────────────────────────────────

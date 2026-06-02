@@ -28,6 +28,15 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockParams,
 }));
 
+jest.mock("firebase/firestore", () => ({
+  doc: jest.fn(),
+  onSnapshot: jest.fn(() => jest.fn()),
+}));
+
+jest.mock("@/src/lib/firebase", () => ({
+  db: {},
+}));
+
 jest.mock("@/src/context/AuthContext", () => ({
   useAuth: () => ({
     user: { uid: "user-123" },

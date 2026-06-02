@@ -8,14 +8,20 @@ import ProfileScreen from "@/app/profile";
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
+const mockDismissAll = jest.fn();
 const mockUpdateProfile = jest.fn();
 const mockGetIdToken = jest.fn();
 const mockUpdatePassword = jest.fn();
 const mockReauthenticate = jest.fn();
+const mockSignOut = jest.fn();
 
 // expo-router
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mockReplace, push: mockPush }),
+  useRouter: () => ({
+    replace: mockReplace,
+    push: mockPush,
+    dismissAll: mockDismissAll,
+  }),
 }));
 
 // src/api/auth — updateProfile API call
@@ -39,6 +45,7 @@ jest.mock("@/src/lib/firebase", () => ({
       getIdToken: () => mockGetIdToken(),
       email: "helen@example.com",
     },
+    signOut: () => mockSignOut(),
   },
 }));
 
@@ -103,6 +110,7 @@ describe("ProfileScreen", () => {
     mockGetIdToken.mockResolvedValue("valid-id-token");
     mockUpdatePassword.mockResolvedValue(undefined);
     mockReauthenticate.mockResolvedValue(undefined);
+    mockSignOut.mockResolvedValue(undefined);
   });
 
   // ── Renders ───────────────────────────────────────────────────────────────
@@ -492,13 +500,17 @@ describe("ProfileScreen", () => {
 
   // ── Logout ────────────────────────────────────────────────────────────────
 
-  it("clears user and redirects to / when Logout is pressed", () => {
+  it("signs out and redirects to / when Logout is pressed", async () => {
     const { getByText } = render(<ProfileScreen />);
 
     fireEvent.press(getByText("Logout"));
 
-    expect(mockSetUser).toHaveBeenCalledWith(null);
-    expect(mockReplace).toHaveBeenCalledWith("/");
+    await waitFor(() => {
+      expect(mockSignOut).toHaveBeenCalled();
+      expect(mockDismissAll).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith("/");
+    });
+    expect(mockSetUser).not.toHaveBeenCalled();
   });
 
   // ── Not logged in ─────────────────────────────────────────────────────────
