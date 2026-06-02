@@ -114,6 +114,19 @@ export type Activity = {
     source_type: "manual";
 };
 
+export type FinalItinerarySlot = {
+    slot_id: string;
+    selectedActivity: Activity;
+    alternativeActivities: Activity[];
+    addedAlternativeActivities: Activity[];
+    alternativeCount: number;
+};
+
+export type FinalItineraryResponse = {
+    trip_id: string;
+    slots: FinalItinerarySlot[];
+};
+
 export type TimeSlotActivity = {
     slot_id: string;
     activity_id: string;

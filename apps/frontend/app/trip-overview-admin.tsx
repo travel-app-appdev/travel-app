@@ -1163,6 +1163,7 @@ export default function TripOverviewAdminScreen() {
         members: membersParam,
         planningEndAt,
         votingEndAt,
+        role: "admin",
       },
     });
   });
@@ -2770,7 +2771,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 1,
     shadowOffset: { width: 0, height: 1 },
-    elevation: 5,
+    elevation: 0,
     boxShadow: "0px 0px 40px rgba(240, 201, 59, 0.75)",
   },
 
@@ -2779,7 +2780,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 1 },
-    elevation: 5,
+    elevation: 0,
     boxShadow: "0px 0px 40px rgba(223, 133, 240, 0.75)",
   },
   phaseCardShadowFinal: {
@@ -2787,7 +2788,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.85,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 1 },
-    elevation: 5,
+    elevation: 0,
     boxShadow: "0px 10px 40px rgba(149, 235, 122, 0.85)",
   },
   phaseTopPressable: {
