@@ -392,7 +392,7 @@ export default function AddActivityScreen() {
               <TextInput
                 value={description}
                 onChangeText={setDescription}
-                placeholder="Description"
+                placeholder="What will you do there? Any details or tips for your travel mates?"
                 placeholderTextColor={colors.textMuted}
                 style={[styles.input, styles.multilineInput]}
                 multiline
@@ -813,6 +813,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.xl,
+    marginTop: spacing.xxxl,
     marginBottom: spacing.xl,
   },
   saveButtonPressed: {
