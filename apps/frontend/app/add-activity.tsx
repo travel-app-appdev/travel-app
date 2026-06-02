@@ -202,7 +202,7 @@ export default function AddActivityScreen() {
             index === existingIndex ? nextActivity : activity
           );
 
-    router.replace({
+    router.dismissTo({
       pathname: "/itinerary",
       params: {
         tripId,
