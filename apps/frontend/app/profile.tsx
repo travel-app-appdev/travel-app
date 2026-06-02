@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   AccessibilityInfo,
   Alert,
@@ -42,7 +42,10 @@ import CheckMark from "@/assets/icons/check_mark.svg";
 import VisibilityOn from "@/assets/icons/visibility_on.svg";
 import VisibilityOff from "@/assets/icons/visibility_off.svg";
 import Exit from "@/assets/icons/exit.svg";
-import { hiddenFromAccessibility, nativeImportantForAccessibility } from "@/src/utils/accessibility";
+import {
+  hiddenFromAccessibility,
+  nativeImportantForAccessibility,
+} from "@/src/utils/accessibility";
 
 export default function ProfileScreen() {
   const { user, setUser } = useAuth();
@@ -291,10 +294,7 @@ export default function ProfileScreen() {
 
             <View style={styles.header}>
               <BackLink href="/home" />
-              <View
-                style={styles.headerTitle}
-                {...hiddenFromAccessibility}
-              >
+              <View style={styles.headerTitle} {...hiddenFromAccessibility}>
                 <Profile width={20} height={20} />
                 <AppText variant="body" style={styles.headerLabel}>
                   Profile
@@ -304,58 +304,79 @@ export default function ProfileScreen() {
 
             {/* Name */}
             <View style={styles.fieldGroup}>
-              <Pressable
-                style={styles.infoRow}
-                onPress={handleNameRow}
-                accessibilityRole="button"
-                accessibilityLabel={`Edit name, current value: ${name || "not set"}`}
-                accessibilityState={{ expanded: nameOpen }}
-              >
-                <View style={styles.infoLeft}>
-                  <View
-                    style={styles.infoLabelRow}
-                    {...hiddenFromAccessibility}
+              {nameOpen ? (
+                <View style={[styles.infoRow, styles.infoRowEditing]}>
+                  <View style={styles.infoLeft}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
+                      <IdCard width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Name
+                      </AppText>
+                    </View>
+                    <AppInput
+                      value={nameInput}
+                      onChangeText={(text) => {
+                        setNameInput(text);
+                        setNameUpdated(false);
+                        setNameError(null);
+                      }}
+                      placeholder="Enter your name"
+                      autoFocus
+                      accessibilityLabel="Name"
+                      accessibilityHint="Edit your name"
+                      hasError={!!nameError}
+                      style={[styles.inputBlackStroke, styles.inlineInput]}
+                    />
+                  </View>
+                  <Pressable
+                    style={styles.rowChevronButton}
+                    onPress={handleNameRow}
+                    accessibilityRole="button"
+                    accessibilityLabel="Collapse name editor"
+                    accessibilityState={{ expanded: true }}
                   >
-                    <IdCard width={20} height={20} />
-                    <AppText variant="body" style={styles.fieldLabel}>
-                      Name
+                    <View {...hiddenFromAccessibility}>
+                      <ArrowUp width={20} height={20} />
+                    </View>
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  style={styles.infoRow}
+                  onPress={handleNameRow}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit name, current value: ${name || "not set"}`}
+                  accessibilityState={{ expanded: false }}
+                >
+                  <View style={styles.infoLeft}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
+                      <IdCard width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Name
+                      </AppText>
+                    </View>
+                    <AppText
+                      variant="caption"
+                      style={styles.infoValue}
+                      accessible={false}
+                    >
+                      {name || "—"}
                     </AppText>
                   </View>
-                  <AppText
-                    variant="caption"
-                    style={styles.infoValue}
-                    accessible={false}
-                  >
-                    {name || "—"}
-                  </AppText>
-                </View>
-                <View
-                  {...hiddenFromAccessibility}
-                >
-                  {nameOpen ? (
-                    <ArrowUp width={20} height={20} />
-                  ) : (
+                  <View {...hiddenFromAccessibility}>
                     <ArrowDown width={20} height={20} />
-                  )}
-                </View>
-              </Pressable>
+                  </View>
+                </Pressable>
+              )}
 
               {nameOpen && (
                 <View style={styles.expandedField}>
-                  <AppInput
-                    value={nameInput}
-                    onChangeText={(text) => {
-                      setNameInput(text);
-                      setNameUpdated(false);
-                      setNameError(null);
-                    }}
-                    placeholder="Enter your name"
-                    autoFocus
-                    accessibilityLabel="Name"
-                    accessibilityHint="Edit your name"
-                    hasError={!!nameError}
-                    style={styles.inputBlackStroke}
-                  />
                   {nameError && (
                     <AppText
                       variant="caption"
@@ -394,60 +415,81 @@ export default function ProfileScreen() {
 
             {/* Email */}
             <View style={styles.fieldGroup}>
-              <Pressable
-                style={styles.infoRow}
-                onPress={handleEmailRow}
-                accessibilityRole="button"
-                accessibilityLabel={`Edit email, current value: ${email || "not set"}`}
-                accessibilityState={{ expanded: emailOpen }}
-              >
-                <View style={styles.infoLeft}>
-                  <View
-                    style={styles.infoLabelRow}
-                    {...hiddenFromAccessibility}
+              {emailOpen ? (
+                <View style={[styles.infoRow, styles.infoRowEditing]}>
+                  <View style={styles.infoLeft}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
+                      <Email width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Email
+                      </AppText>
+                    </View>
+                    <AppInput
+                      value={emailInput}
+                      onChangeText={(text) => {
+                        setEmailInput(text);
+                        setEmailUpdated(false);
+                        setEmailError(null);
+                      }}
+                      placeholder="Enter your email"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoFocus
+                      accessibilityLabel="Email"
+                      accessibilityHint="Edit your email"
+                      hasError={!!emailError}
+                      style={[styles.inputBlackStroke, styles.inlineInput]}
+                    />
+                  </View>
+                  <Pressable
+                    style={styles.rowChevronButton}
+                    onPress={handleEmailRow}
+                    accessibilityRole="button"
+                    accessibilityLabel="Collapse email editor"
+                    accessibilityState={{ expanded: true }}
                   >
-                    <Email width={20} height={20} />
-                    <AppText variant="body" style={styles.fieldLabel}>
-                      Email
+                    <View {...hiddenFromAccessibility}>
+                      <ArrowUp width={20} height={20} />
+                    </View>
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  style={styles.infoRow}
+                  onPress={handleEmailRow}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit email, current value: ${email || "not set"}`}
+                  accessibilityState={{ expanded: false }}
+                >
+                  <View style={styles.infoLeft}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
+                      <Email width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Email
+                      </AppText>
+                    </View>
+                    <AppText
+                      variant="caption"
+                      style={styles.infoValue}
+                      accessible={false}
+                    >
+                      {email || "—"}
                     </AppText>
                   </View>
-                  <AppText
-                    variant="caption"
-                    style={styles.infoValue}
-                    accessible={false}
-                  >
-                    {email || "—"}
-                  </AppText>
-                </View>
-                <View
-                  {...hiddenFromAccessibility}
-                >
-                  {emailOpen ? (
-                    <ArrowUp width={20} height={20} />
-                  ) : (
+                  <View {...hiddenFromAccessibility}>
                     <ArrowDown width={20} height={20} />
-                  )}
-                </View>
-              </Pressable>
+                  </View>
+                </Pressable>
+              )}
 
               {emailOpen && (
                 <View style={styles.expandedField}>
-                  <AppInput
-                    value={emailInput}
-                    onChangeText={(text) => {
-                      setEmailInput(text);
-                      setEmailUpdated(false);
-                      setEmailError(null);
-                    }}
-                    placeholder="Enter your email"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoFocus
-                    accessibilityLabel="Email"
-                    accessibilityHint="Edit your email"
-                    hasError={!!emailError}
-                    style={styles.inputBlackStroke}
-                  />
                   {emailError && (
                     <AppText
                       variant="caption"
@@ -515,9 +557,7 @@ export default function ProfileScreen() {
                     ****************
                   </AppText>
                 </View>
-                <View
-                  {...hiddenFromAccessibility}
-                >
+                <View {...hiddenFromAccessibility}>
                   {passwordOpen ? (
                     <ArrowUp width={20} height={20} />
                   ) : (
@@ -556,9 +596,7 @@ export default function ProfileScreen() {
                           : "Show current password"
                       }
                     >
-                      <View
-                        {...hiddenFromAccessibility}
-                      >
+                      <View {...hiddenFromAccessibility}>
                         {currentPasswordVisible ? (
                           <VisibilityOff width={24} height={24} />
                         ) : (
@@ -595,9 +633,7 @@ export default function ProfileScreen() {
                           : "Show new password"
                       }
                     >
-                      <View
-                        {...hiddenFromAccessibility}
-                      >
+                      <View {...hiddenFromAccessibility}>
                         {passwordVisible ? (
                           <VisibilityOff width={24} height={24} />
                         ) : (
@@ -725,6 +761,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: spacing.sm,
   },
+  infoRowEditing: {
+    alignItems: "flex-start",
+  },
   infoLeft: {
     gap: spacing.xs,
     flex: 1,
@@ -752,6 +791,15 @@ const styles = StyleSheet.create({
   inputBlackStroke: {
     borderWidth: 2,
     borderColor: colors.nightBlack,
+  },
+  inlineInput: {
+    marginTop: spacing.xs,
+  },
+  rowChevronButton: {
+    minWidth: 36,
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
   },
   passwordFieldLabel: {
     color: colors.textPrimary,
