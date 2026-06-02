@@ -3,6 +3,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/src/lib/firebase";
 import { loginWithToken } from "@/src/api/auth";
 import type { AuthResponse } from "@/src/api/auth";
+import { registerForPushNotifications } from "@/src/lib/notifications";
 
 type AuthContextValue = {
   user: AuthResponse | null;
@@ -25,14 +26,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
-          // Get Firebase token
           const token = await firebaseUser.getIdToken();
           setIdToken(token);
 
-          // Kick off backend login, but DON'T block bootstrap on it
           loginWithToken(token)
             .then((backendUser) => {
               setUser(backendUser);
+
+              // Register push token after successful login.
+              // Fire-and-forget: never blocks or breaks the auth flow.
+              registerForPushNotifications(token).catch((err) =>
+                console.warn("[notifications] registration failed:", err)
+              );
             })
             .catch(() => {
               setUser(null);
@@ -45,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } finally {
         if (!hasResolvedOnce) {
           hasResolvedOnce = true;
-          setIsBootstrapping(false); // we’re done with initial auth check
+          setIsBootstrapping(false);
         }
       }
     });
