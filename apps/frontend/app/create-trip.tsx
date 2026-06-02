@@ -346,16 +346,16 @@ export default function CreateTripScreen() {
   const router = useRouter();
 
   const handleOnboardingPress = useCallback(() => {
-  if (!PressLock.acquire()) return;
-  Promise.resolve()
-    .then(() =>
-      router.push({
-        pathname: "/onboarding",
-        params: { returnTo: "create-trip" },
-      })
-    )
-    .finally(() => setTimeout(() => PressLock.release(), 300));
-}, [router]);
+    if (!PressLock.acquire()) return;
+    Promise.resolve()
+      .then(() =>
+        router.push({
+          pathname: "/onboarding",
+          params: { returnTo: "create-trip" },
+        })
+      )
+      .finally(() => setTimeout(() => PressLock.release(), 300));
+  }, [router]);
 
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
@@ -584,7 +584,8 @@ export default function CreateTripScreen() {
     );
 
     if (isPlanningEditor) return { ...tripRange, ...planningRange };
-    if (isVotingEditor) return { ...tripRange, ...planningRange, ...votingRange };
+    if (isVotingEditor)
+      return { ...tripRange, ...planningRange, ...votingRange };
     return tripRange;
   }, [
     showPhaseDateCalendar,
@@ -653,7 +654,10 @@ export default function CreateTripScreen() {
           voting: {
             ...prev.voting,
             start: phase.end,
-            end: prev.voting.end < phase.end ? new Date(phase.end) : prev.voting.end,
+            end:
+              prev.voting.end < phase.end
+                ? new Date(phase.end)
+                : prev.voting.end,
           },
           final: {
             ...prev.final,
@@ -905,11 +909,12 @@ export default function CreateTripScreen() {
         >
           <View style={[styles.root, styles.bgStep3]}>
             <ScrollView
+              stickyHeaderIndices={[0]}
               contentContainerStyle={styles.containerStep3}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={styles.header}>
+              <View style={[styles.header, styles.headerStep3]}>
                 <BackLink onPress={() => setStep(2)} />
                 <View style={styles.headerTitle} {...hiddenFromAccessibility}>
                   <Plane width={25} height={25} />
@@ -1385,6 +1390,7 @@ export default function CreateTripScreen() {
 
             <ScrollView
               style={styles.scroll}
+              stickyHeaderIndices={[0]}
               contentContainerStyle={[
                 styles.containerStep4,
                 { paddingBottom: isLandscape ? spacing.xxxl : spacing.xl },
@@ -1392,7 +1398,7 @@ export default function CreateTripScreen() {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={styles.header}>
+              <View style={[styles.header, styles.headerStep1]}>
                 <View style={styles.headerTitle} {...hiddenFromAccessibility}>
                   <Plane width={25} height={25} />
                   <AppText variant="body" style={styles.headerLabel}>
@@ -1436,7 +1442,10 @@ export default function CreateTripScreen() {
                   >
                     {tripCode}
                   </AppText>
-                  <View style={styles.shareIconArea} {...hiddenFromAccessibility}>
+                  <View
+                    style={styles.shareIconArea}
+                    {...hiddenFromAccessibility}
+                  >
                     <ShareLink width={22} height={22} />
                   </View>
                 </Pressable>
@@ -1479,6 +1488,7 @@ export default function CreateTripScreen() {
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
               >
                 <ScrollView
+                  stickyHeaderIndices={[0]}
                   contentContainerStyle={[
                     styles.containerStep1,
                     { paddingBottom: cityScapeHeight + spacing.xxxl },
@@ -1486,7 +1496,7 @@ export default function CreateTripScreen() {
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  <View style={styles.header}>
+                  <View style={[styles.header, styles.headerStep1]}>
                     <BackLink href="/home" />
                     <View
                       style={styles.headerTitle}
@@ -1587,6 +1597,7 @@ export default function CreateTripScreen() {
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
               >
                 <ScrollView
+                  stickyHeaderIndices={[0]}
                   contentContainerStyle={[
                     styles.containerStep2,
                     { paddingBottom: spacing.xxxl + width * 0.18 },
@@ -1594,7 +1605,7 @@ export default function CreateTripScreen() {
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  <View style={styles.header}>
+                  <View style={[styles.header, styles.headerStep2]}>
                     <BackLink onPress={() => setStep(1)} />
                     <View
                       style={styles.headerTitle}
@@ -1798,6 +1809,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
+    zIndex: 10,
+    elevation: 4,
+  },
+  headerStep1: {
+    backgroundColor: colors.beachYellow,
+  },
+  headerStep2: {
+    backgroundColor: colors.sunsetOrange,
+  },
+  headerStep3: {
+    backgroundColor: colors.lightWhite,
   },
   headerTitle: {
     flexDirection: "row",

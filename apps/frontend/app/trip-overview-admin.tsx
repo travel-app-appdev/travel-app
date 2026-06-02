@@ -1209,6 +1209,7 @@ export default function TripOverviewAdminScreen() {
         >
           <ScrollView
             style={styles.flex}
+            stickyHeaderIndices={[1]}
             contentContainerStyle={[
               styles.container,
               {
@@ -2379,6 +2380,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
+    backgroundColor: colors.lightWhite,
+    zIndex: 10,
+    elevation: 4,
   },
   headerTitle: {
     flexDirection: "row",

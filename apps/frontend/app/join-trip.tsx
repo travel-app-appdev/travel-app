@@ -75,6 +75,7 @@ export default function JoinTripScreen() {
         >
           <ScrollView
             style={styles.scroll}
+            stickyHeaderIndices={[0]}
             contentContainerStyle={styles.container}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -94,10 +95,7 @@ export default function JoinTripScreen() {
             </AppText>
 
             <View style={styles.fieldGroup}>
-              <View
-                style={styles.fieldLabelRow}
-                {...hiddenFromAccessibility}
-              >
+              <View style={styles.fieldLabelRow} {...hiddenFromAccessibility}>
                 <KeyFrame width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
                   Code
@@ -174,6 +172,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
     zIndex: 1,
+    backgroundColor: colors.plantGreen,
+    elevation: 4,
   },
   headerTitle: {
     flexDirection: "row",

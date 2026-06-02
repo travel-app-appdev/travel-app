@@ -253,7 +253,10 @@ export default function AddActivityScreen() {
       trimmedEndTime &&
       trimmedEndTime < trimmedStartTime
     ) {
-      Alert.alert("Invalid time range", "End time cannot be before start time.");
+      Alert.alert(
+        "Invalid time range",
+        "End time cannot be before start time."
+      );
       return;
     }
 
@@ -337,6 +340,7 @@ export default function AddActivityScreen() {
 
       <ScrollView
         style={styles.scroll}
+        stickyHeaderIndices={[0]}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
@@ -635,6 +639,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.xxl,
+    backgroundColor: colors.beachYellow,
+    zIndex: 10,
+    elevation: 4,
   },
   backButton: {
     justifyContent: "center",
