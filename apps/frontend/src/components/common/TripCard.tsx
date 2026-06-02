@@ -2,6 +2,7 @@ import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "./AppText";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
+import CardArrow from "@/assets/icons/card_arrow.svg";
 
 type TripStatus = "planning" | "voting" | "final";
 type TripRole = "admin" | "member";
@@ -82,6 +83,15 @@ export function TripCard({
         } as const)
       : {};
 
+  const badgeContent = (
+    <>
+      <AppText variant="caption" style={styles.badgeText}>
+        {statusLabel}
+      </AppText>
+      <CardArrow width={14} height={14} />
+    </>
+  );
+
   return (
     <Pressable
       style={[styles.card, { backgroundColor: cardColor }]}
@@ -107,9 +117,7 @@ export function TripCard({
               e.stopPropagation();
             }}
           >
-            <AppText variant="caption" style={styles.badgeText}>
-              {statusLabel}
-            </AppText>
+            {badgeContent}
           </View>
         ) : (
           <Pressable
@@ -123,9 +131,7 @@ export function TripCard({
             accessibilityHint="Opens the itinerary at this phase"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <AppText variant="caption" style={styles.badgeText}>
-              {statusLabel}
-            </AppText>
+            {badgeContent}
           </Pressable>
         )}
       </View>
@@ -185,10 +191,19 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.xxl,
   },
   badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.lg,
     alignSelf: "flex-start",
+    // drop shadow
+    shadowColor: colors.nightBlack,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
   },
   badgeText: {
     fontFamily: typography.fontFamily.bodyBold,
