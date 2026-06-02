@@ -329,7 +329,7 @@ export function ActivityDetailModal({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.42)",
+    backgroundColor: "rgba(0,0,0,0.45)",
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,

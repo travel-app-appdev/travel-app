@@ -91,6 +91,10 @@ type CalendarDay = {
 
 type PhaseStatus = "past" | "active" | "future";
 
+const CHECKBOX_SIZE = 24;
+const TIMELINE_LINE_WIDTH = 1;
+const TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS = 10 * 1000;
+
 function getChecklistSubtitle(tripState: Trip["state"]): string {
   switch (tripState) {
     case "Voting":
@@ -208,7 +212,6 @@ function parseTripDate(value: string | undefined, fallback: Date): Date {
 
 function isDeadlinePast(deadline?: string): boolean {
   if (!deadline) return false;
-
   const parsed = new Date(deadline);
   return !Number.isNaN(parsed.getTime()) && parsed.getTime() <= Date.now();
 }
@@ -327,6 +330,19 @@ function PhaseCheckbox({
   );
 }
 
+function ModalShell({ children }: { children: React.ReactNode }) {
+  return (
+    <SafeAreaView
+      style={styles.modalSafeArea}
+      edges={["top", "right", "bottom", "left"]}
+    >
+      <View style={styles.calendarOverlay}>
+        <View style={styles.calendarModal}>{children}</View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
 export default function TripOverviewAdminScreen() {
   const raw = useLocalSearchParams<{
     tripId: string;
@@ -359,6 +375,12 @@ export default function TripOverviewAdminScreen() {
   const isSmallScreen = screenHeight < 700;
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteTripModal, setShowDeleteTripModal] = useState(false);
+  const [showRemoveMemberModal, setShowRemoveMemberModal] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const blinkingDotAnim = useRef(new Animated.Value(1)).current;
 
@@ -867,31 +889,43 @@ export default function TripOverviewAdminScreen() {
     }
   };
 
-  const handleRemoveMember = (id: string, name: string) => {
-    Alert.alert("Remove member", `Are you sure you want to remove ${name}?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            setRemovingMemberId(id);
-            const idToken = await getIdToken();
-            if (!idToken) return;
-            await removeMember({ idToken, tripId, memberId: id });
-            setMembers((prev) => prev.filter((m) => m.id !== id));
-          } catch (error) {
-            Alert.alert(
-              "Remove failed",
-              error instanceof Error ? error.message : "Failed to remove member"
-            );
-          } finally {
-            setRemovingMemberId(null);
-          }
-        },
-      },
-    ]);
+  const openRemoveMemberModal = (id: string, name: string) => {
+    if (removingMemberId) return;
+    setMemberToRemove({ id, name });
+    setShowRemoveMemberModal(true);
   };
+
+  const handleRemoveMember = (id: string, name: string) => {
+    openRemoveMemberModal(id, name);
+  };
+
+  async function handleConfirmRemoveMember() {
+    if (!memberToRemove) return;
+
+    try {
+      setRemovingMemberId(memberToRemove.id);
+      setShowRemoveMemberModal(false);
+
+      const idToken = await getIdToken();
+      if (!idToken) return;
+
+      await removeMember({
+        idToken,
+        tripId,
+        memberId: memberToRemove.id,
+      });
+
+      setMembers((prev) => prev.filter((m) => m.id !== memberToRemove.id));
+      setMemberToRemove(null);
+    } catch (error) {
+      Alert.alert(
+        "Remove failed",
+        error instanceof Error ? error.message : "Failed to remove member"
+      );
+    } finally {
+      setRemovingMemberId(null);
+    }
+  }
 
   const openTripCalendar = () => {
     setTripRangeStart(toLocalDateString(tripStart));
@@ -1222,37 +1256,31 @@ export default function TripOverviewAdminScreen() {
     });
   });
 
-  const handleDeleteTrip = () => {
-    Alert.alert(
-      "Delete trip",
-      "Are you sure you want to delete this trip? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setIsDeleting(true);
-              const idToken = await getIdToken();
-              if (!idToken) return;
+  const openDeleteTripModal = useSinglePress(() => {
+    if (isDeleting) return;
+    setShowDeleteTripModal(true);
+  });
 
-              await deleteTrip({ idToken, tripId });
-              invalidateTripsCache();
-              router.replace("/home");
-            } catch (error) {
-              Alert.alert(
-                "Delete failed",
-                error instanceof Error ? error.message : "Failed to delete trip"
-              );
-            } finally {
-              setIsDeleting(false);
-            }
-          },
-        },
-      ]
-    );
-  };
+  async function handleConfirmDeleteTrip() {
+    try {
+      setIsDeleting(true);
+      setShowDeleteTripModal(false);
+
+      const idToken = await getIdToken();
+      if (!idToken) return;
+
+      await deleteTrip({ idToken, tripId });
+      invalidateTripsCache();
+      router.replace("/home");
+    } catch (error) {
+      Alert.alert(
+        "Delete failed",
+        error instanceof Error ? error.message : "Failed to delete trip"
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   return (
     <View style={styles.fullScreen}>
@@ -1683,7 +1711,7 @@ export default function TripOverviewAdminScreen() {
                     style={[styles.infoValue, styles.codeValue]}
                     accessible={false}
                   >
-                    {inviteCodeParam || "—"}
+                    {inviteCodeParam}
                   </AppText>
                 </View>
 
@@ -2133,276 +2161,356 @@ export default function TripOverviewAdminScreen() {
               <ActionCard
                 label={isDeleting ? "Deleting..." : "Delete trip"}
                 icon={<Trash width={20} height={20} />}
-                onPress={handleDeleteTrip}
+                onPress={openDeleteTripModal}
                 accessibilityHint="Permanently deletes this trip"
               />
             </View>
           </SafeAreaView>
 
           <Modal
+            visible={showDeleteTripModal}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => setShowDeleteTripModal(false)}
+          >
+            <ModalShell>
+              <AppText variant="body" style={styles.calendarTitle}>
+                Delete trip
+              </AppText>
+
+              <View style={styles.timeModalContent}>
+                <AppText variant="caption" style={styles.timeModalHint}>
+                  Are you sure you want to delete this trip? This action cannot
+                  be undone.
+                </AppText>
+              </View>
+
+              <View style={styles.calendarActions}>
+                <AppButton
+                  title="Cancel"
+                  onPress={() => setShowDeleteTripModal(false)}
+                  style={styles.calendarCancelButton}
+                  textStyle={styles.calendarCancelButtonText}
+                  accessibilityLabel="Cancel deleting trip"
+                />
+                <AppButton
+                  title={isDeleting ? "Deleting..." : "Delete"}
+                  onPress={handleConfirmDeleteTrip}
+                  style={styles.deleteTripButton}
+                  textStyle={styles.calendarApplyButtonText}
+                  accessibilityLabel="Confirm deleting trip"
+                />
+              </View>
+            </ModalShell>
+          </Modal>
+
+          <Modal
+            visible={showRemoveMemberModal}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => {
+              setShowRemoveMemberModal(false);
+              setMemberToRemove(null);
+            }}
+          >
+            <ModalShell>
+              <AppText variant="body" style={styles.calendarTitle}>
+                Remove member
+              </AppText>
+
+              <View style={styles.timeModalContent}>
+                <AppText variant="caption" style={styles.timeModalHint}>
+                  {memberToRemove
+                    ? `Are you sure you want to remove ${memberToRemove.name}?`
+                    : "Are you sure you want to remove this member?"}
+                </AppText>
+              </View>
+
+              <View style={styles.calendarActions}>
+                <AppButton
+                  title="Cancel"
+                  onPress={() => {
+                    setShowRemoveMemberModal(false);
+                    setMemberToRemove(null);
+                  }}
+                  style={styles.calendarCancelButton}
+                  textStyle={styles.calendarCancelButtonText}
+                  accessibilityLabel="Cancel removing member"
+                />
+                <AppButton
+                  title={
+                    removingMemberId && memberToRemove?.id === removingMemberId
+                      ? "Removing..."
+                      : "Remove"
+                  }
+                  onPress={handleConfirmRemoveMember}
+                  style={styles.deleteTripButton}
+                  textStyle={styles.calendarApplyButtonText}
+                  accessibilityLabel="Confirm removing member"
+                />
+              </View>
+            </ModalShell>
+          </Modal>
+
+          <Modal
             visible={showPhaseTimePicker !== null}
             transparent
             animationType="fade"
+            statusBarTranslucent
             onRequestClose={() => setShowPhaseTimePicker(null)}
           >
-            <View style={styles.calendarOverlay}>
-              <View style={styles.calendarModal}>
-                <AppText variant="body" style={styles.calendarTitle}>
-                  {showPhaseTimePicker === "planning"
-                    ? "Select planning end time"
-                    : "Select voting end time"}
+            <ModalShell>
+              <AppText variant="body" style={styles.calendarTitle}>
+                {showPhaseTimePicker === "planning"
+                  ? "Select planning end time"
+                  : "Select voting end time"}
+              </AppText>
+
+              <View style={styles.timeModalContent}>
+                <AppText variant="caption" style={styles.timeModalHint}>
+                  Enter the exact time in 24-hour format
                 </AppText>
 
-                <View style={styles.timeModalContent}>
-                  <AppText variant="caption" style={styles.timeModalHint}>
-                    Enter the exact time in 24-hour format
-                  </AppText>
-
-                  <View style={styles.timeInputModalBox}>
-                    <TextInput
-                      value={tempPhaseTime}
-                      onChangeText={(value) =>
-                        setTempPhaseTime(normalizeTimeInput(value))
-                      }
-                      placeholder="HH:MM"
-                      placeholderTextColor={colors.textMuted}
-                      keyboardType={
-                        Platform.OS === "ios"
-                          ? "numbers-and-punctuation"
-                          : "numeric"
-                      }
-                      maxLength={5}
-                      style={styles.timeInputModal}
-                      textAlign="center"
-                      accessibilityLabel="Enter time in HH colon MM format"
-                    />
-                    <View {...hiddenFromAccessibility}>
-                      <Timer width={20} height={20} />
-                    </View>
+                <View style={styles.timeInputModalBox}>
+                  <TextInput
+                    value={tempPhaseTime}
+                    onChangeText={(value) =>
+                      setTempPhaseTime(normalizeTimeInput(value))
+                    }
+                    placeholder="HH:MM"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType={
+                      Platform.OS === "ios"
+                        ? "numbers-and-punctuation"
+                        : "numeric"
+                    }
+                    maxLength={5}
+                    style={styles.timeInputModal}
+                    textAlign="center"
+                    accessibilityLabel="Enter time in HH colon MM format"
+                  />
+                  <View {...hiddenFromAccessibility}>
+                    <Timer width={20} height={20} />
                   </View>
                 </View>
-
-                <View style={styles.calendarActions}>
-                  <AppButton
-                    title="Cancel"
-                    onPress={() => setShowPhaseTimePicker(null)}
-                    style={styles.calendarCancelButton}
-                    textStyle={styles.calendarCancelButtonText}
-                    accessibilityLabel="Cancel time selection"
-                  />
-                  <AppButton
-                    title="Apply time"
-                    onPress={handleApplyPhaseTime}
-                    style={styles.calendarApplyButton}
-                    textStyle={styles.calendarApplyButtonText}
-                    accessibilityLabel="Apply selected time"
-                  />
-                </View>
               </View>
-            </View>
+
+              <View style={styles.calendarActions}>
+                <AppButton
+                  title="Cancel"
+                  onPress={() => setShowPhaseTimePicker(null)}
+                  style={styles.calendarCancelButton}
+                  textStyle={styles.calendarCancelButtonText}
+                  accessibilityLabel="Cancel time selection"
+                />
+                <AppButton
+                  title="Apply time"
+                  onPress={handleApplyPhaseTime}
+                  style={styles.calendarApplyButton}
+                  textStyle={styles.calendarApplyButtonText}
+                  accessibilityLabel="Apply selected time"
+                />
+              </View>
+            </ModalShell>
           </Modal>
 
           <Modal
             visible={showTripDateCalendar}
             transparent
             animationType="fade"
+            statusBarTranslucent
             onRequestClose={() => setShowTripDateCalendar(false)}
           >
-            <View style={styles.calendarOverlay}>
-              <View style={styles.calendarModal}>
-                <AppText variant="body" style={styles.calendarTitle}>
-                  Update trip dates
-                </AppText>
+            <ModalShell>
+              <AppText variant="body" style={styles.calendarTitle}>
+                Update trip dates
+              </AppText>
 
-                <RangeCalendar
-                  markingType="period"
-                  minDate={toLocalDateString(new Date())}
-                  markedDates={markedTripDates}
-                  onDayPress={handleTripDayPress}
-                  enableSwipeMonths
-                  hideExtraDays
-                  firstDay={1}
-                  renderArrow={(direction) => (
-                    <AppText variant="body" style={styles.calendarArrow}>
-                      {direction === "left" ? "‹" : "›"}
-                    </AppText>
-                  )}
-                  theme={{
-                    backgroundColor: colors.lightWhite,
-                    calendarBackground: colors.lightWhite,
-                    textSectionTitleColor: colors.textMuted,
-                    dayTextColor: colors.nightBlack,
-                    textDisabledColor: colors.textMuted,
-                    monthTextColor: colors.nightBlack,
-                    arrowColor: colors.nightBlack,
-                    todayTextColor: colors.sunsetOrange,
-                    textDayFontFamily: typography.fontFamily.body,
-                    textMonthFontFamily: typography.fontFamily.bodyBold,
-                    textDayHeaderFontFamily: typography.fontFamily.bodyBold,
-                    textDayFontSize: typography.size.md,
-                    textMonthFontSize: typography.size.lg,
-                    textDayHeaderFontSize: typography.size.sm,
-                  }}
-                  style={styles.calendarCard}
-                />
+              <RangeCalendar
+                markingType="period"
+                minDate={toLocalDateString(new Date())}
+                markedDates={markedTripDates}
+                onDayPress={handleTripDayPress}
+                enableSwipeMonths
+                hideExtraDays
+                firstDay={1}
+                renderArrow={(direction) => (
+                  <AppText variant="body" style={styles.calendarArrow}>
+                    {direction === "left" ? "‹" : "›"}
+                  </AppText>
+                )}
+                theme={{
+                  backgroundColor: colors.lightWhite,
+                  calendarBackground: colors.lightWhite,
+                  textSectionTitleColor: colors.textMuted,
+                  dayTextColor: colors.nightBlack,
+                  textDisabledColor: colors.textMuted,
+                  monthTextColor: colors.nightBlack,
+                  arrowColor: colors.nightBlack,
+                  todayTextColor: colors.sunsetOrange,
+                  textDayFontFamily: typography.fontFamily.body,
+                  textMonthFontFamily: typography.fontFamily.bodyBold,
+                  textDayHeaderFontFamily: typography.fontFamily.bodyBold,
+                  textDayFontSize: typography.size.md,
+                  textMonthFontSize: typography.size.lg,
+                  textDayHeaderFontSize: typography.size.sm,
+                }}
+                style={styles.calendarCard}
+              />
 
-                <View style={styles.calendarLegend}>
-                  <View style={styles.legendRow}>
-                    <View
-                      style={[
-                        styles.legendSwatch,
-                        { backgroundColor: colors.sunsetOrange },
-                      ]}
-                    />
-                    <AppText variant="caption" style={styles.legendLabel}>
-                      Trip dates
-                    </AppText>
-                  </View>
-                </View>
-
-                <View style={styles.calendarActions}>
-                  <AppButton
-                    title="Cancel"
-                    onPress={() => setShowTripDateCalendar(false)}
-                    style={styles.calendarCancelButton}
-                    textStyle={styles.calendarCancelButtonText}
-                    accessibilityLabel="Cancel trip date selection"
+              <View style={styles.calendarLegend}>
+                <View style={styles.legendRow}>
+                  <View
+                    style={[
+                      styles.legendSwatch,
+                      { backgroundColor: colors.sunsetOrange },
+                    ]}
                   />
-                  <AppButton
-                    title="Apply"
-                    onPress={applyTripRange}
-                    style={styles.calendarApplyButton}
-                    textStyle={styles.calendarApplyButtonText}
-                    accessibilityLabel="Apply selected trip dates"
-                  />
+                  <AppText variant="caption" style={styles.legendLabel}>
+                    Trip dates
+                  </AppText>
                 </View>
               </View>
-            </View>
+
+              <View style={styles.calendarActions}>
+                <AppButton
+                  title="Cancel"
+                  onPress={() => setShowTripDateCalendar(false)}
+                  style={styles.calendarCancelButton}
+                  textStyle={styles.calendarCancelButtonText}
+                  accessibilityLabel="Cancel trip date selection"
+                />
+                <AppButton
+                  title="Apply"
+                  onPress={applyTripRange}
+                  style={styles.calendarApplyButton}
+                  textStyle={styles.calendarApplyButtonText}
+                  accessibilityLabel="Apply selected trip dates"
+                />
+              </View>
+            </ModalShell>
           </Modal>
 
           <Modal
             visible={showPhaseDateCalendar !== null}
             transparent
             animationType="fade"
+            statusBarTranslucent
             onRequestClose={closePhaseCalendar}
           >
-            <View style={styles.calendarOverlay}>
-              <View style={styles.calendarModal}>
-                <AppText variant="body" style={styles.calendarTitle}>
-                  {activePhaseCalendar === "planning"
-                    ? "Select planning end date"
-                    : "Select voting end date"}
-                </AppText>
+            <ModalShell>
+              <AppText variant="body" style={styles.calendarTitle}>
+                {activePhaseCalendar === "planning"
+                  ? "Select planning end date"
+                  : "Select voting end date"}
+              </AppText>
 
-                <RangeCalendar
-                  markingType="period"
-                  minDate={
-                    activePhaseCalendar === "planning"
-                      ? toLocalDateString(phaseDates.planning.start)
-                      : toLocalDateString(phaseDates.voting.start)
-                  }
-                  maxDate={toLocalDateString(tripEnd)}
-                  markedDates={getPhaseMarkedDates}
-                  onDayPress={handlePhaseCalendarDayPress}
-                  enableSwipeMonths
-                  hideExtraDays
-                  firstDay={1}
-                  renderArrow={(direction) => (
-                    <AppText variant="body" style={styles.calendarArrow}>
-                      {direction === "left" ? "‹" : "›"}
-                    </AppText>
-                  )}
-                  theme={{
-                    backgroundColor: colors.lightWhite,
-                    calendarBackground: colors.lightWhite,
-                    textSectionTitleColor: colors.textMuted,
-                    dayTextColor: colors.nightBlack,
-                    textDisabledColor: colors.textMuted,
-                    monthTextColor: colors.nightBlack,
-                    arrowColor: colors.nightBlack,
-                    todayTextColor: colors.sunsetOrange,
-                    textDayFontFamily: typography.fontFamily.body,
-                    textMonthFontFamily: typography.fontFamily.bodyBold,
-                    textDayHeaderFontFamily: typography.fontFamily.bodyBold,
-                    textDayFontSize: typography.size.md,
-                    textMonthFontSize: typography.size.lg,
-                    textDayHeaderFontSize: typography.size.sm,
-                  }}
-                  style={styles.calendarCard}
-                />
+              <RangeCalendar
+                markingType="period"
+                minDate={
+                  activePhaseCalendar === "planning"
+                    ? toLocalDateString(phaseDates.planning.start)
+                    : toLocalDateString(phaseDates.voting.start)
+                }
+                maxDate={toLocalDateString(tripEnd)}
+                markedDates={getPhaseMarkedDates}
+                onDayPress={handlePhaseCalendarDayPress}
+                enableSwipeMonths
+                hideExtraDays
+                firstDay={1}
+                renderArrow={(direction) => (
+                  <AppText variant="body" style={styles.calendarArrow}>
+                    {direction === "left" ? "‹" : "›"}
+                  </AppText>
+                )}
+                theme={{
+                  backgroundColor: colors.lightWhite,
+                  calendarBackground: colors.lightWhite,
+                  textSectionTitleColor: colors.textMuted,
+                  dayTextColor: colors.nightBlack,
+                  textDisabledColor: colors.textMuted,
+                  monthTextColor: colors.nightBlack,
+                  arrowColor: colors.nightBlack,
+                  todayTextColor: colors.sunsetOrange,
+                  textDayFontFamily: typography.fontFamily.body,
+                  textMonthFontFamily: typography.fontFamily.bodyBold,
+                  textDayHeaderFontFamily: typography.fontFamily.bodyBold,
+                  textDayFontSize: typography.size.md,
+                  textMonthFontSize: typography.size.lg,
+                  textDayHeaderFontSize: typography.size.sm,
+                }}
+                style={styles.calendarCard}
+              />
 
-                <View style={styles.calendarLegend}>
-                  <View style={styles.legendRow}>
-                    <View
-                      style={[
-                        styles.legendSwatch,
-                        {
-                          backgroundColor:
-                            activePhaseCalendar === "planning" ||
-                            activePhaseCalendar === "voting"
-                              ? disabledTripOrange
-                              : colors.sunsetOrange,
-                        },
-                      ]}
-                    />
-                    <AppText variant="caption" style={styles.legendLabel}>
-                      Trip dates
-                    </AppText>
-                  </View>
-
-                  <View style={styles.legendRow}>
-                    <View
-                      style={[
-                        styles.legendSwatch,
-                        {
-                          backgroundColor:
-                            activePhaseCalendar === "voting"
-                              ? disabledPlanningYellow
-                              : colors.beachYellow,
-                        },
-                      ]}
-                    />
-                    <AppText variant="caption" style={styles.legendLabel}>
-                      Planning state
-                    </AppText>
-                  </View>
-
-                  {activePhaseCalendar === "voting" && (
-                    <View style={styles.legendRow}>
-                      <View
-                        style={[
-                          styles.legendSwatch,
-                          { backgroundColor: colors.sunsetPink },
-                        ]}
-                      />
-                      <AppText variant="caption" style={styles.legendLabel}>
-                        Voting state
-                      </AppText>
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.calendarActions}>
-                  <AppButton
-                    title="Close"
-                    onPress={closePhaseCalendar}
-                    style={styles.calendarCancelButton}
-                    textStyle={styles.calendarCancelButtonText}
-                    accessibilityLabel="Close timer date selection"
+              <View style={styles.calendarLegend}>
+                <View style={styles.legendRow}>
+                  <View
+                    style={[
+                      styles.legendSwatch,
+                      {
+                        backgroundColor:
+                          activePhaseCalendar === "planning" ||
+                          activePhaseCalendar === "voting"
+                            ? disabledTripOrange
+                            : colors.sunsetOrange,
+                      },
+                    ]}
                   />
+                  <AppText variant="caption" style={styles.legendLabel}>
+                    Trip dates
+                  </AppText>
                 </View>
+
+                <View style={styles.legendRow}>
+                  <View
+                    style={[
+                      styles.legendSwatch,
+                      {
+                        backgroundColor:
+                          activePhaseCalendar === "voting"
+                            ? disabledPlanningYellow
+                            : colors.beachYellow,
+                      },
+                    ]}
+                  />
+                  <AppText variant="caption" style={styles.legendLabel}>
+                    Planning state
+                  </AppText>
+                </View>
+
+                {activePhaseCalendar === "voting" && (
+                  <View style={styles.legendRow}>
+                    <View
+                      style={[
+                        styles.legendSwatch,
+                        { backgroundColor: colors.sunsetPink },
+                      ]}
+                    />
+                    <AppText variant="caption" style={styles.legendLabel}>
+                      Voting state
+                    </AppText>
+                  </View>
+                )}
               </View>
-            </View>
+
+              <View style={styles.calendarActions}>
+                <AppButton
+                  title="Close"
+                  onPress={closePhaseCalendar}
+                  style={styles.calendarCancelButton}
+                  textStyle={styles.calendarCancelButtonText}
+                  accessibilityLabel="Close timer date selection"
+                />
+              </View>
+            </ModalShell>
           </Modal>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
 }
-
-const CHECKBOX_SIZE = 24;
-const TIMELINELINEWIDTH = 1;
-const TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS = 10 * 1000;
 
 const styles = StyleSheet.create({
   fullScreen: {
@@ -2420,6 +2528,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     gap: spacing.xl,
   },
+
   skipButton: {
     opacity: 0,
     height: 1,
@@ -2452,22 +2561,22 @@ const styles = StyleSheet.create({
   },
 
   fieldGroup: {
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   infoRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     paddingVertical: spacing.xs,
+    position: "relative",
   },
   infoRowEditing: {
-    alignItems: "stretch",
-    flexDirection: "column",
-    position: "relative",
+    minHeight: 64,
   },
   infoLeft: {
     gap: spacing.xs,
     flex: 1,
+    paddingRight: spacing.xl,
   },
   infoLabelRow: {
     flexDirection: "row",
@@ -2519,6 +2628,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   dateTimeRow: {
     flexDirection: "row",
     gap: spacing.md,
@@ -2529,7 +2639,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   dateInput: {
-    backgroundColor: colors.lightWhite,
+    backgroundColor: colors.white,
     borderRadius: radius.sm,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -2549,6 +2659,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     paddingRight: spacing.sm,
   },
+
   updateButton: {
     backgroundColor: colors.beachYellow,
   },
@@ -2652,7 +2763,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 36,
     bottom: 0,
-    width: TIMELINELINEWIDTH,
+    width: TIMELINE_LINE_WIDTH,
     backgroundColor: colors.grayedOut,
   },
   timelineLineSolid: {
@@ -2676,16 +2787,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xl,
   },
-  activePhaseCardPlanning: {
-    shadowColor: colors.beachYellow,
+  phaseCardShadowWrap: {
+    borderRadius: 32,
   },
-  activePhaseCardVoting: {
+  phaseCardShadowPlanning: {
+    shadowColor: "#ebb822",
+    shadowOpacity: 0.16,
+    shadowRadius: 1,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 0,
+    boxShadow: "0px 0px 40px rgba(240, 201, 59, 0.75)",
+  },
+  phaseCardShadowVoting: {
     shadowColor: colors.sunsetPink,
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 0,
+    boxShadow: "0px 0px 40px rgba(223, 133, 240, 0.75)",
   },
-  activePhaseCardFinal: {
+  phaseCardShadowFinal: {
     shadowColor: colors.neonGreen,
+    shadowOpacity: 0.85,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 0,
+    boxShadow: "0px 10px 40px rgba(149, 235, 122, 0.85)",
   },
-
+  phaseTopPressable: {
+    width: "100%",
+  },
   phaseRowInner: {
     flexDirection: "column",
     alignItems: "stretch",
@@ -2697,18 +2828,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.md,
   },
+  phaseTopLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+    minWidth: 0,
+  },
   phaseBadge: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.lg,
     alignSelf: "flex-start",
-  },
-  phaseBadgeActive: {
-    shadowColor: colors.nightBlack,
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
   },
   phaseBadgeText: {
     fontFamily: typography.fontFamily.bodyBold,
@@ -2760,13 +2891,6 @@ const styles = StyleSheet.create({
     color: colors.grayedOut,
     opacity: 0.6,
   },
-  phaseChevronButton: {
-    marginLeft: "auto",
-    minWidth: 36,
-    minHeight: 36,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   phaseChevronWrap: {
     justifyContent: "center",
     alignItems: "center",
@@ -2811,16 +2935,17 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xl,
     lineHeight: typography.lineHeight.xl,
   },
-  phaseExpandedCard: {
-    backgroundColor: colors.lightWhite,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginTop: spacing.sm,
+  phaseExpandedInside: {
+    gap: spacing.md,
+    marginTop: spacing.md,
   },
   phaseEndLabel: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.md,
     color: colors.textPrimary,
+  },
+  timelineLeftActiveOpen: {
+    paddingTop: 0,
   },
 
   deleteSafeArea: {
@@ -2832,6 +2957,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
   },
 
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
   calendarOverlay: {
     flex: 1,
     justifyContent: "center",
@@ -2904,6 +3033,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.sunsetOrange,
   },
+  deleteTripButton: {
+    flex: 1,
+    backgroundColor: colors.sunsetOrange,
+  },
   calendarApplyButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
@@ -2911,61 +3044,9 @@ const styles = StyleSheet.create({
   timeModalContent: {
     gap: spacing.md,
   },
-  phaseCardShadowWrap: {
-    borderRadius: 32,
-  },
-  phaseCard: {
-    borderRadius: 28,
-  },
-  phaseCardActive: {
-    backgroundColor: colors.lightWhite,
-    paddingHorizontal: spacing.lg,
-  },
-  phaseCardShadowPlanning: {
-    shadowColor: "#ebb822",
-    shadowOpacity: 0.16,
-    shadowRadius: 1,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 0,
-    boxShadow: "0px 0px 40px rgba(240, 201, 59, 0.75)",
-  },
-
-  phaseCardShadowVoting: {
-    shadowColor: colors.sunsetPink,
-    shadowOpacity: 0.16,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 0,
-    boxShadow: "0px 0px 40px rgba(223, 133, 240, 0.75)",
-  },
-  phaseCardShadowFinal: {
-    shadowColor: colors.neonGreen,
-    shadowOpacity: 0.85,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 0,
-    boxShadow: "0px 10px 40px rgba(149, 235, 122, 0.85)",
-  },
-  phaseTopPressable: {
-    width: "100%",
-  },
-  phaseTopLeft: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
-    minWidth: 0,
-  },
-  phaseExpandedInside: {
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  timelineLeftActiveOpen: {
-    paddingTop: 0,
-  },
   timeModalHint: {
-    color: colors.textMuted,
-    fontSize: typography.size.sm,
+    color: colors.nightBlack,
+    fontSize: typography.size.lg,
     lineHeight: typography.lineHeight.sm,
     fontFamily: typography.fontFamily.body,
   },
