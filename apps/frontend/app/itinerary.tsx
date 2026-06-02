@@ -193,6 +193,21 @@ function mapBackendFinalSlot(slot: any): FinalSlotUi {
   };
 }
 
+function mergeAlternativeLists(
+  alternativeActivities: Activity[],
+  addedAlternativeActivities: Activity[]
+): Activity[] {
+  const byId = new Map<string, Activity>();
+
+  [...alternativeActivities, ...addedAlternativeActivities].forEach(
+    (activity) => {
+      byId.set(activity.id, activity);
+    }
+  );
+
+  return Array.from(byId.values());
+}
+
 type RouteMember = {
   id?: string;
   userId?: string;
@@ -450,6 +465,10 @@ export default function ItineraryScreen() {
     useState("");
   const [selectedAlternativeActivities, setSelectedAlternativeActivities] =
     useState<Activity[]>([]);
+  const [
+    selectedDisplayedAlternativeActivities,
+    setSelectedDisplayedAlternativeActivities,
+  ] = useState<Activity[]>([]);
   const [
     selectedAddedAlternativeActivityIds,
     setSelectedAddedAlternativeActivityIds,
@@ -824,21 +843,11 @@ export default function ItineraryScreen() {
         const nextValue =
           data?.final_itinerary_updated_at?.toMillis?.()?.toString?.() ?? null;
 
-        console.log("final trip listener fired", {
-          tripId,
-          exists: snapshot.exists(),
-          nextValue,
-          rawTimestamp: data?.final_itinerary_updated_at,
-          pendingWrites: snapshot.metadata.hasPendingWrites,
-        });
-
         if (nextValue && nextValue === lastFinalUpdateRef.current) {
-          console.log("same timestamp, skipping refresh");
           return;
         }
 
         lastFinalUpdateRef.current = nextValue;
-        console.log("refreshing final itinerary now");
         await refreshFinalItinerary();
       },
       (error) => {
@@ -1331,6 +1340,7 @@ export default function ItineraryScreen() {
         slotChip?.label ?? formatSlotLabel(activity.slotId)
       );
       setSelectedAlternativeActivities([]);
+      setSelectedDisplayedAlternativeActivities([]);
       setSelectedAddedAlternativeActivityIds([]);
       setShowActivityDetailModal(true);
     },
@@ -1342,26 +1352,37 @@ export default function ItineraryScreen() {
       setSelectedActivity(activity);
       setSelectedActivitySlotLabel(slotLabel);
 
-      const matchingFinalSlot = finalSlots.find(
-        (slot) =>
-          slot.dayId === activity.dayId &&
-          slot.slotId === activity.slotId &&
-          (slot.selectedActivity.id === activity.id ||
-            slot.alternativeActivities.some(
-              (item) => item.id === activity.id
-            ) ||
-            slot.addedAlternativeActivities.some(
-              (item) => item.id === activity.id
-            ))
-      );
+      const matchingFinalSlot = finalSlots.find((slot) => {
+        if (slot.selectedActivity.id === activity.id) return true;
 
-      setSelectedAlternativeActivities(
-        matchingFinalSlot?.alternativeActivities ?? []
+        if (
+          slot.alternativeActivities.some((item) => item.id === activity.id)
+        ) {
+          return true;
+        }
+
+        if (
+          slot.addedAlternativeActivities.some(
+            (item) => item.id === activity.id
+          )
+        ) {
+          return true;
+        }
+
+        return false;
+      });
+
+      const alternativeActivities =
+        matchingFinalSlot?.alternativeActivities ?? [];
+      const addedAlternativeActivities =
+        matchingFinalSlot?.addedAlternativeActivities ?? [];
+
+      setSelectedAlternativeActivities(alternativeActivities);
+      setSelectedDisplayedAlternativeActivities(
+        mergeAlternativeLists(alternativeActivities, addedAlternativeActivities)
       );
       setSelectedAddedAlternativeActivityIds(
-        (matchingFinalSlot?.addedAlternativeActivities ?? []).map(
-          (item) => item.id
-        )
+        addedAlternativeActivities.map((item) => item.id)
       );
       setShowActivityDetailModal(true);
     },
@@ -1373,6 +1394,7 @@ export default function ItineraryScreen() {
     setSelectedActivity(null);
     setSelectedActivitySlotLabel("");
     setSelectedAlternativeActivities([]);
+    setSelectedDisplayedAlternativeActivities([]);
     setSelectedAddedAlternativeActivityIds([]);
   }, []);
 
@@ -1410,19 +1432,52 @@ export default function ItineraryScreen() {
         activitiesCache.set(`${tripId}_final`, flatMappedActivities);
         setApiActivities(flatMappedActivities);
 
-        const matchingFinalSlot = mappedSlots.find(
-          (slot) =>
-            slot.dayId === activityToToggle.dayId &&
-            slot.slotId === activityToToggle.slotId
-        );
+        const matchingFinalSlot = mappedSlots.find((slot) => {
+          if (slot.selectedActivity.id === activityToToggle.id) return true;
 
-        setSelectedAlternativeActivities(
-          matchingFinalSlot?.alternativeActivities ?? []
-        );
-        setSelectedAddedAlternativeActivityIds(
-          (matchingFinalSlot?.addedAlternativeActivities ?? []).map(
-            (item) => item.id
+          if (
+            slot.alternativeActivities.some(
+              (item) => item.id === activityToToggle.id
+            )
+          ) {
+            return true;
+          }
+
+          if (
+            slot.addedAlternativeActivities.some(
+              (item) => item.id === activityToToggle.id
+            )
+          ) {
+            return true;
+          }
+
+          return false;
+        });
+
+        const alternativeActivities =
+          matchingFinalSlot?.alternativeActivities ?? [];
+        const addedAlternativeActivities =
+          matchingFinalSlot?.addedAlternativeActivities ?? [];
+        const nextAddedIds = addedAlternativeActivities.map((item) => item.id);
+
+        setSelectedAlternativeActivities(alternativeActivities);
+        setSelectedDisplayedAlternativeActivities(
+          mergeAlternativeLists(
+            alternativeActivities,
+            addedAlternativeActivities
           )
+        );
+        setSelectedAddedAlternativeActivityIds(nextAddedIds);
+
+        setSelectedActivity((current) =>
+          current?.id === activityToToggle.id
+            ? {
+                ...current,
+                isAddedToFinalItinerary: nextAddedIds.includes(
+                  activityToToggle.id
+                ),
+              }
+            : current
         );
       } catch (error) {
         Alert.alert(
@@ -1612,6 +1667,35 @@ export default function ItineraryScreen() {
       );
 
       setSelectedAlternativeActivities((current) =>
+        current.map((item) => {
+          if (
+            item.dayId !== activity.dayId ||
+            item.slotId !== activity.slotId
+          ) {
+            return item;
+          }
+
+          if (item.id === activityId) {
+            return {
+              ...item,
+              hasCurrentUserJoined: result.joined,
+              joinedCount: result.joinedCount,
+              joinedMembers: result.joinedMembers ?? item.joinedMembers,
+            };
+          }
+
+          if (result.joined) {
+            return {
+              ...item,
+              hasCurrentUserJoined: false,
+            };
+          }
+
+          return item;
+        })
+      );
+
+      setSelectedDisplayedAlternativeActivities((current) =>
         current.map((item) => {
           if (
             item.dayId !== activity.dayId ||
@@ -1829,7 +1913,7 @@ export default function ItineraryScreen() {
           activity={selectedActivity}
           slotLabel={selectedActivitySlotLabel}
           state={activeState}
-          alternativeActivities={selectedAlternativeActivities}
+          alternativeActivities={selectedDisplayedAlternativeActivities}
           addedAlternativeActivityIds={selectedAddedAlternativeActivityIds}
           onAddAlternativeToItinerary={handleAddAlternativeToItinerary}
           onClose={handleCloseActivityDetails}
@@ -1843,7 +1927,6 @@ export default function ItineraryScreen() {
               accessibilityRole="button"
               accessibilityLabel="Dismiss planning information"
             />
-
             <View
               ref={popupRef}
               style={[

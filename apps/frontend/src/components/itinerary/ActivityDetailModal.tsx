@@ -60,23 +60,21 @@ export function ActivityDetailModal({
     setIsAlternativesExpanded((current) => !current);
   });
 
+  const remainingAlternativeCount = useMemo(() => {
+    return Math.max(
+      0,
+      alternativeActivities.filter(
+        (alternative) => !addedAlternativeActivityIds.includes(alternative.id)
+      ).length
+    );
+  }, [alternativeActivities, addedAlternativeActivityIds]);
+
   if (!activity) return null;
 
   const showMembers = state === "final";
   const topLabel = slotLabel || "Activity";
   const activityTimeRange = formatActivityTimeRange(activity);
   const hasAlternatives = alternativeActivities.length > 0;
-
-  const remainingAlternativeCount = useMemo(
-    () =>
-      Math.max(
-        0,
-        alternativeActivities.filter(
-          (alternative) => !addedAlternativeActivityIds.includes(alternative.id)
-        ).length
-      ),
-    [alternativeActivities, addedAlternativeActivityIds]
-  );
 
   return (
     <Modal
