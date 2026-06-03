@@ -381,7 +381,7 @@ export default function AddActivityScreen() {
               <TextInput
                 value={activityName}
                 onChangeText={setActivityName}
-                placeholder="Roman Agora"
+                placeholder="Activity"
                 placeholderTextColor={colors.textMuted}
                 style={styles.input}
                 accessibilityLabel="Activity name"
