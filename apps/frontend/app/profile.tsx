@@ -2,8 +2,8 @@ import { useRouter } from "expo-router";
 import { useState, useEffect, useRef } from "react";
 import {
   AccessibilityInfo,
-  Alert,
   findNodeHandle,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -46,6 +46,19 @@ import {
   hiddenFromAccessibility,
   nativeImportantForAccessibility,
 } from "@/src/utils/accessibility";
+
+function ModalShell({ children }: { children: React.ReactNode }) {
+  return (
+    <SafeAreaView
+      style={styles.modalSafeArea}
+      edges={["top", "right", "bottom", "left"]}
+    >
+      <View style={styles.calendarOverlay}>
+        <View style={styles.calendarModal}>{children}</View>
+      </View>
+    </SafeAreaView>
+  );
+}
 
 export default function ProfileScreen() {
   const { user, setUser } = useAuth();
@@ -110,6 +123,33 @@ export default function ProfileScreen() {
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackTitle, setFeedbackTitle] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackAction, setFeedbackAction] = useState<(() => void) | null>(
+    null
+  );
+
+  function openFeedbackModal(
+    title: string,
+    message: string,
+    action?: () => void
+  ) {
+    setFeedbackTitle(title);
+    setFeedbackMessage(message);
+    setFeedbackAction(() => action ?? null);
+    setShowFeedbackModal(true);
+  }
+
+  const closeFeedbackModal = () => {
+    setShowFeedbackModal(false);
+    const action = feedbackAction;
+    setFeedbackAction(null);
+    if (action) {
+      action();
+    }
+  };
+
   const handleUpdateName = async () => {
     if (isUpdatingName) return;
     try {
@@ -117,7 +157,7 @@ export default function ProfileScreen() {
       setNameError(null);
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert("Not logged in", "Please log in again.");
+        openFeedbackModal("Not logged in", "Please log in again.");
         return;
       }
       const idToken = await currentUser.getIdToken();
@@ -144,25 +184,20 @@ export default function ProfileScreen() {
       setEmailError(null);
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert("Not logged in", "Please log in again.");
+        openFeedbackModal("Not logged in", "Please log in again.");
         return;
       }
       const idToken = await currentUser.getIdToken();
       await updateProfile({ idToken, email: emailInput });
       setEmailUpdated(true);
       safeTimeout(() => {
-        Alert.alert(
+        openFeedbackModal(
           "Email updated",
           "Your email has been changed. Please log in again with your new email address.",
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                setUser(null);
-                router.replace("/");
-              },
-            },
-          ]
+          () => {
+            setUser(null);
+            router.replace("/");
+          }
         );
       }, 1000);
     } catch (error: any) {
@@ -187,7 +222,7 @@ export default function ProfileScreen() {
       setPasswordError(null);
       const currentUser = auth.currentUser;
       if (!currentUser || !currentUser.email) {
-        Alert.alert("Not logged in", "Please log in again.");
+        openFeedbackModal("Not logged in", "Please log in again.");
         return;
       }
       const credential = EmailAuthProvider.credential(
@@ -224,7 +259,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    await auth.signOut(); // triggers onAuthStateChanged → clears user + idToken
+    await auth.signOut();
     router.dismissAll();
     router.replace("/");
   };
@@ -303,7 +338,6 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            {/* Name */}
             <View style={styles.fieldGroup}>
               {nameOpen ? (
                 <View style={[styles.infoRow, styles.infoRowEditing]}>
@@ -414,7 +448,6 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            {/* Email */}
             <View style={styles.fieldGroup}>
               {emailOpen ? (
                 <View style={[styles.infoRow, styles.infoRowEditing]}>
@@ -531,7 +564,6 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            {/* Password */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -705,6 +737,36 @@ export default function ProfileScreen() {
               />
             </View>
           </SafeAreaView>
+
+          <Modal
+            visible={showFeedbackModal}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={closeFeedbackModal}
+          >
+            <ModalShell>
+              <AppText variant="body" style={styles.calendarTitle}>
+                {feedbackTitle}
+              </AppText>
+
+              <View style={styles.timeModalContent}>
+                <AppText variant="caption" style={styles.feedbackMessage}>
+                  {feedbackMessage}
+                </AppText>
+              </View>
+
+              <View style={styles.calendarActions}>
+                <AppButton
+                  title="OK"
+                  onPress={closeFeedbackModal}
+                  style={styles.calendarApplyButton}
+                  textStyle={styles.calendarApplyButtonText}
+                  accessibilityLabel="Close message"
+                />
+              </View>
+            </ModalShell>
+          </Modal>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -862,5 +924,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
+  },
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  calendarOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+  },
+  calendarModal: {
+    backgroundColor: colors.lightWhite,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+  },
+  calendarTitle: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+  },
+  timeModalContent: {
+    gap: spacing.md,
+  },
+  feedbackMessage: {
+    color: colors.nightBlack,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.md,
+    fontFamily: typography.fontFamily.bodySemiBold,
+  },
+  calendarActions: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  calendarApplyButton: {
+    flex: 1,
+    backgroundColor: colors.sunsetOrange,
+  },
+  calendarApplyButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
   },
 });
