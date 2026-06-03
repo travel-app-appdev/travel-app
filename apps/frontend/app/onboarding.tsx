@@ -29,6 +29,7 @@ import FunnyMascot from "@/assets/mascots/mascot-funny.svg";
 import ArrowDownIcon from "@/assets/icons/arrow_down.svg";
 import ProfileIcon from "@/assets/icons/members.svg";
 import JoinGroupIcon from "@/assets/icons/join-group.svg";
+import { Image } from "react-native";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -349,35 +350,13 @@ export default function Onboarding() {
                     always end Voting early.
                   </Text>
 
-                  <View style={[Styles.timersRows, { width: mainBlockWidth }]}>
-                    <View style={Styles.timerRow}>
-                      <View style={[Styles.timerPill, Styles.timerPillYellow]}>
-                        <Text style={Styles.timerPillTextDark}>Planning</Text>
-                      </View>
-                      <HourglassIcon width={20} height={20} />
-                      <View style={Styles.timerValueBlock}>
-                        <Text style={Styles.timerValue}>190 days</Text>
-                        <Text style={Styles.timerLabel}>Timer</Text>
-                      </View>
-                      <View style={Styles.timerChevronIcon} {...hiddenFromAccessibility}>
-                        <ArrowDownIcon width={16} height={16} />
-                      </View>
-                    </View>
+                 
+                    <Image
+                      source={require("../assets/images/Timer.Screenshot.png")}
+                      style={Styles.Image}
+                      resizeMode="contain"
+                    />
 
-                    <View style={Styles.timerRow}>
-                      <View style={[Styles.timerPill, Styles.timerPillPink]}>
-                        <Text style={Styles.timerPillTextLight}>Voting</Text>
-                      </View>
-                      <HourglassIcon width={20} height={20} />
-                      <View style={Styles.timerValueBlock}>
-                        <Text style={Styles.timerValue}>0 days</Text>
-                        <Text style={Styles.timerLabel}>Timer</Text>
-                      </View>
-                      <View style={Styles.timerChevronIcon} {...hiddenFromAccessibility}>
-                        <ArrowDownIcon width={16} height={16} />
-                      </View>
-                    </View>
-                  </View>
 
                   <View style={Styles.flexSpacer} />
 
@@ -423,40 +402,16 @@ export default function Onboarding() {
                     itinerary and collaborate in one place.
                   </Text>
 
-                  <View style={[Styles.activityCardRow, { width: mainBlockWidth }]}>
-                    <View
-                      style={[
-                        Styles.activityCard,
-                        { backgroundColor: colors.beachYellow + "33" },
-                      ]}
-                    >
-                      <View style={Styles.activityTimeRow}>
-                        <LocationHeartIcon width={16} height={16} />
-                        <Text style={Styles.activityTimeText}>06:00-08:00</Text>
-                      </View>
-
-                      <Text style={Styles.activityName}>
-                        Tempel of Hephaistos
-                      </Text>
-
-                      <View style={Styles.activityInfoRow}>
-                        <LocationPinIcon width={14} height={14} />
-                        <Text style={Styles.activityInfoText}>Athina 105 55</Text>
-                      </View>
-
-                      <View style={Styles.activityInfoRow}>
-                        <GoogleIcon width={14} height={14} />
-                        <Text style={Styles.activityLinkText}>Google-Link</Text>
-                      </View>
-                    </View>
-
-                    <View style={[Styles.activityAddBtn, Styles.activityAddBtnYellow]}>
-                      <EditIcon width={30} height={30} />
-                      <Text style={Styles.activityAddBtnText}>
-                        Add{"\n"}Activity
-                      </Text>
-                    </View>
-                  </View>
+                   <Image
+                      source={require("../assets/images/EmptyActivity.png")}
+                      style={Styles.Image}
+                      resizeMode="contain"
+                    />
+                     <Image
+                      source={require("../assets/images/DetailWindow.png")}
+                      style={Styles.Image3}
+                      resizeMode="contain"
+                    />
 
                   <View style={Styles.flexSpacer} />
 
@@ -511,40 +466,11 @@ export default function Onboarding() {
                     everyone have a say in choosing activities for each slot.
                   </Text>
 
-                  <View style={[Styles.activityCardRow, { width: mainBlockWidth }]}>
-                    <View
-                      style={[
-                        Styles.activityCard,
-                        { backgroundColor: colors.sunsetPink + "33" },
-                      ]}
-                    >
-                      <View style={Styles.activityTimeRow}>
-                        <LocationHeartIcon width={16} height={16} />
-                        <Text style={Styles.activityTimeText}>06:00-08:00</Text>
-                      </View>
-
-                      <Text style={Styles.activityName}>
-                        Tempel of Hephaistos
-                      </Text>
-
-                      <View style={Styles.activityInfoRow}>
-                        <LocationPinIcon width={14} height={14} />
-                        <Text style={Styles.activityInfoText}>Athina 105 55</Text>
-                      </View>
-
-                      <View style={Styles.activityInfoRow}>
-                        <GoogleIcon width={14} height={14} />
-                        <Text style={Styles.activityLinkText}>Google-Link</Text>
-                      </View>
-                    </View>
-
-                    <View style={[Styles.activityAddBtn, Styles.activityAddBtnPink]}>
-                      <EditIcon width={30} height={30} />
-                      <Text style={Styles.activityAddBtnText}>
-                        Add{"\n"}Vote
-                      </Text>
-                    </View>
-                  </View>
+                  <Image
+                      source={require("../assets/images/VotingScreen.png")}
+                      style={Styles.Image2}
+                      resizeMode="contain"
+                    />
 
                   <View style={Styles.flexSpacer} />
 
@@ -599,47 +525,11 @@ export default function Onboarding() {
                     locked and ready - access it on the go.
                   </Text>
 
-                  <View style={[Styles.activityCardRow, { width: mainBlockWidth }]}>
-                    <View
-                      style={[
-                        Styles.activityCard,
-                        { backgroundColor: colors.neonGreen + "33" },
-                      ]}
-                    >
-                      <View style={Styles.activityTimeRow}>
-                        <LocationHeartIcon width={16} height={16} />
-                        <Text style={Styles.activityTimeText}>06:00-08:00</Text>
-                      </View>
-
-                      <View style={Styles.activityNameRow}>
-                        <Text style={[Styles.activityName, Styles.activityNameInRow]}>
-                          Tempel of Hephaistos
-                        </Text>
-
-                        <View style={Styles.activityParticipants}>
-                          <ProfileIcon width={14} height={14} />
-                          <Text style={Styles.activityParticipantText}>4</Text>
-                        </View>
-                      </View>
-
-                      <View style={Styles.activityInfoRow}>
-                        <LocationPinIcon width={14} height={14} />
-                        <Text style={Styles.activityInfoText}>Athina 105 55</Text>
-                      </View>
-
-                      <View style={Styles.activityInfoRow}>
-                        <GoogleIcon width={14} height={14} />
-                        <Text style={Styles.activityLinkText}>Google-Link</Text>
-                      </View>
-                    </View>
-
-                    <View style={[Styles.activityAddBtn, Styles.activityAddBtnGreen]}>
-                      <JoinGroupIcon width={28} height={28} />
-                        <Text style={Styles.activityAddBtnText}>
-                          Join{"\n"}group
-                        </Text>
-                    </View>
-                  </View>
+                 <Image
+                      source={require("../assets/images/FinalScreen.png")}
+                      style={Styles.Image2}
+                      resizeMode="contain"
+                    />
 
                   <View style={Styles.flexSpacer} />
 
@@ -1026,5 +916,27 @@ const Styles = StyleSheet.create({
     color: colors.nightBlack,
     textAlign: "center",
     lineHeight: typography.lineHeight.md,
-  }
+  },
+ Image: {
+  width: "100%",
+  aspectRatio: 2, // adjust based on your image
+  marginTop: spacing.xl,
+  alignSelf: "center",
+  borderRadius: 5,
+},
+Image2: {
+  width: "100%",
+  aspectRatio: 2, // adjust based on your image
+  marginTop: spacing.xxl,
+  alignSelf: "center",
+  borderRadius: 5,
+},
+Image3: {
+  width: "100%",
+  aspectRatio: 2, // adjust based on your image
+  marginTop: spacing.xs,
+  alignSelf: "center",
+  borderRadius: 5,
+}
+
 });
