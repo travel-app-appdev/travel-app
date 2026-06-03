@@ -244,18 +244,21 @@ function toUiState(state: "Planning" | "Voting" | "Final"): ItineraryState {
   }
 }
 
-function markPlanningDoneForUser(
+function setPlanningDoneForUser(
   planningStatus: TripItinerary["planningStatus"],
-  userId: string
+  userId: string,
+  planningDone: boolean
 ): TripItinerary["planningStatus"] {
   const hasExistingUser = planningStatus.some(
     (member) => member.userId === userId
   );
   if (!hasExistingUser) {
-    return [...planningStatus, { userId, hasFinishedPlanning: true }];
+    return [...planningStatus, { userId, hasFinishedPlanning: planningDone }];
   }
   return planningStatus.map((member) =>
-    member.userId === userId ? { ...member, hasFinishedPlanning: true } : member
+    member.userId === userId
+      ? { ...member, hasFinishedPlanning: planningDone }
+      : member
   );
 }
 
@@ -1157,20 +1160,23 @@ export default function ItineraryScreen() {
   }
 
   async function handleFinishPlanning() {
-    if (hasCurrentUserFinished || isSubmittingPlanning) return;
+    if (isSubmittingPlanning) return;
     if (!currentUserId) return;
 
+    const nextPlanningDone = !hasCurrentUserFinished;
+
     if (itinerary.tripId === "trip-fallback") {
-      const nextState = shouldSkipVoting(tripMemberCount)
+      const nextState = nextPlanningDone && shouldSkipVoting(tripMemberCount)
         ? "final"
         : "planning";
 
       setItinerary((current) => ({
         ...current,
         state: nextState === "final" ? current.state : nextState,
-        planningStatus: markPlanningDoneForUser(
+        planningStatus: setPlanningDoneForUser(
           current.planningStatus,
-          currentUserId
+          currentUserId,
+          nextPlanningDone
         ),
       }));
 
@@ -1197,16 +1203,18 @@ export default function ItineraryScreen() {
     setIsSubmittingPlanning(true);
 
     try {
-      await finishPlanning({
+      const result = await finishPlanning({
         idToken: authToken,
         tripId: itinerary.tripId,
+        planningDone: nextPlanningDone,
       });
 
       setItinerary((current) => ({
         ...current,
-        planningStatus: markPlanningDoneForUser(
+        planningStatus: setPlanningDoneForUser(
           current.planningStatus,
-          currentUserId
+          currentUserId,
+          result.planningDone
         ),
       }));
 
@@ -1935,7 +1943,7 @@ export default function ItineraryScreen() {
               accessibilityViewIsModal={true}
               accessible={true}
               accessibilityLiveRegion="assertive"
-              accessibilityLabel="You can no longer add activities after submitting."
+              accessibilityLabel="Uncheck Planning done to edit or add activities again."
               {...(Platform.OS === "web" ? ({ tabIndex: -1 } as any) : {})}
             >
               <View style={styles.popup}>
@@ -1944,7 +1952,7 @@ export default function ItineraryScreen() {
                   style={styles.popupText}
                   accessible={false}
                 >
-                  You can no longer add activities after submitting.
+                  Uncheck Planning done to edit or add activities again.
                 </AppText>
               </View>
             </View>

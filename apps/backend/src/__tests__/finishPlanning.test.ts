@@ -72,11 +72,21 @@ describe('POST /trips/:tripId/finish-planning', () => {
             .post('/trips/trip-123/finish-planning')
             .send({ idToken: 'valid-token' });
 
-        expect(tripsService.finishPlanningForMember).toHaveBeenCalledWith('trip-123', 'valid-token');
+        expect(tripsService.finishPlanningForMember).toHaveBeenCalledWith('trip-123', 'valid-token', undefined);
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('allDone');
         expect(res.body).toHaveProperty('tripState');
         expect(res.body).toHaveProperty('completedMembers');
         expect(res.body).toHaveProperty('totalMembers');
+    });
+
+    it('should return 400 if planningDone is not a boolean', async () => {
+        const res = await request(app)
+            .post('/trips/trip-123/finish-planning')
+            .send({ idToken: 'valid-token', planningDone: 'false' });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('planningDone must be a boolean');
+        expect(tripsService.finishPlanningForMember).not.toHaveBeenCalled();
     });
 });

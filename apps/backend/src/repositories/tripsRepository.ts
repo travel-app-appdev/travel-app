@@ -273,7 +273,11 @@ export async function removeTripMember(tripId: string, userId: string): Promise<
     await snapshot.docs[0].ref.delete();
 }
 
-export async function markMemberPlanningDone(tripId: string, userId: string): Promise<void> {
+export async function setMemberPlanningDone(
+    tripId: string,
+    userId: string,
+    planningDone: boolean
+): Promise<void> {
     const db = admin.firestore();
 
     const snapshot = await db
@@ -285,8 +289,12 @@ export async function markMemberPlanningDone(tripId: string, userId: string): Pr
     if (snapshot.empty) return;
 
     await snapshot.docs[0].ref.update({
-        planning_done: true,
+        planning_done: planningDone,
     });
+}
+
+export async function markMemberPlanningDone(tripId: string, userId: string): Promise<void> {
+    await setMemberPlanningDone(tripId, userId, true);
 }
 
 export async function resetPlanningDoneForTrip(tripId: string): Promise<void> {

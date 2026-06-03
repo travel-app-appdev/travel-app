@@ -21,6 +21,7 @@ jest.mock("../repositories/tripsRepository", () => ({
     findTripByInviteCode: jest.fn(),
     findUserById: jest.fn(),
     markMemberPlanningDone: jest.fn(),
+    setMemberPlanningDone: jest.fn(),
     removeMember: jest.fn(),
     removeTripMember: jest.fn(),
     resetPlanningDoneForTrip: jest.fn(),
@@ -47,6 +48,7 @@ import {
     findMembership,
     findTripById,
     markMemberPlanningDone,
+    setMemberPlanningDone,
     updateTripState,
 } from "../repositories/tripsRepository";
 import {
@@ -325,7 +327,7 @@ describe("planning collision transition", () => {
         });
         mocked(findAcceptedMembersByTripId).mockResolvedValue([
             { user_id: "user-a", trip_id: TRIP_ID, role: "admin", invite_status: "accepted", planning_done: true },
-            { user_id: USER_ID, trip_id: TRIP_ID, role: "member", invite_status: "accepted", planning_done: false },
+            { user_id: USER_ID, trip_id: TRIP_ID, role: "member", invite_status: "accepted", planning_done: true },
         ]);
         mocked(getVotingCompletionStatus).mockResolvedValue({
             isComplete: true,
@@ -338,9 +340,11 @@ describe("planning collision transition", () => {
             tripState: "Final",
             completedMembers: 2,
             totalMembers: 2,
+            planningDone: true,
         });
 
-        expect(markMemberPlanningDone).toHaveBeenCalledWith(TRIP_ID, USER_ID);
+        expect(setMemberPlanningDone).toHaveBeenCalledWith(TRIP_ID, USER_ID, true);
+        expect(markMemberPlanningDone).not.toHaveBeenCalled();
         expect(getVotingCompletionStatus).toHaveBeenCalledWith(TRIP_ID, ["user-a", USER_ID]);
         expect(createFinalItineraryForTrip).toHaveBeenCalledWith(TRIP_ID);
         expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Final");
@@ -364,7 +368,7 @@ describe("planning collision transition", () => {
         });
         mocked(findAcceptedMembersByTripId).mockResolvedValue([
             { user_id: "user-a", trip_id: TRIP_ID, role: "admin", invite_status: "accepted", planning_done: true },
-            { user_id: USER_ID, trip_id: TRIP_ID, role: "member", invite_status: "accepted", planning_done: false },
+            { user_id: USER_ID, trip_id: TRIP_ID, role: "member", invite_status: "accepted", planning_done: true },
         ]);
         mocked(getVotingCompletionStatus).mockResolvedValue({
             isComplete: false,
@@ -377,8 +381,10 @@ describe("planning collision transition", () => {
             tripState: "Voting",
             completedMembers: 2,
             totalMembers: 2,
+            planningDone: true,
         });
 
+        expect(setMemberPlanningDone).toHaveBeenCalledWith(TRIP_ID, USER_ID, true);
         expect(createFinalItineraryForTrip).not.toHaveBeenCalled();
         expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Voting");
     });
@@ -400,7 +406,7 @@ describe("planning collision transition", () => {
             planning_done: false,
         });
         mocked(findAcceptedMembersByTripId).mockResolvedValue([
-            { user_id: USER_ID, trip_id: TRIP_ID, role: "admin", invite_status: "accepted", planning_done: false },
+            { user_id: USER_ID, trip_id: TRIP_ID, role: "admin", invite_status: "accepted", planning_done: true },
         ]);
 
         await expect(finishPlanningForMember(TRIP_ID, TOKEN)).resolves.toEqual({
@@ -408,11 +414,48 @@ describe("planning collision transition", () => {
             tripState: "Final",
             completedMembers: 1,
             totalMembers: 1,
+            planningDone: true,
         });
 
+        expect(setMemberPlanningDone).toHaveBeenCalledWith(TRIP_ID, USER_ID, true);
         expect(getVotingCompletionStatus).not.toHaveBeenCalled();
         expect(createFinalItineraryForTrip).toHaveBeenCalledWith(TRIP_ID);
         expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Final");
+    });
+
+    it("lets a member unmark planning done without advancing the trip", async () => {
+        mocked(findTripById).mockResolvedValue({
+            trip_id: TRIP_ID,
+            title: "Vienna",
+            destination: "Vienna",
+            start_date: "2026-06-01",
+            end_date: "2026-06-03",
+            state: "Planning",
+        });
+        mocked(findMembership).mockResolvedValue({
+            user_id: USER_ID,
+            trip_id: TRIP_ID,
+            role: "member",
+            invite_status: "accepted",
+            planning_done: true,
+        });
+        mocked(findAcceptedMembersByTripId).mockResolvedValue([
+            { user_id: "user-a", trip_id: TRIP_ID, role: "admin", invite_status: "accepted", planning_done: true },
+            { user_id: USER_ID, trip_id: TRIP_ID, role: "member", invite_status: "accepted", planning_done: false },
+        ]);
+
+        await expect(finishPlanningForMember(TRIP_ID, TOKEN, false)).resolves.toEqual({
+            allDone: false,
+            tripState: "Planning",
+            completedMembers: 1,
+            totalMembers: 2,
+            planningDone: false,
+        });
+
+        expect(setMemberPlanningDone).toHaveBeenCalledWith(TRIP_ID, USER_ID, false);
+        expect(getVotingCompletionStatus).not.toHaveBeenCalled();
+        expect(createFinalItineraryForTrip).not.toHaveBeenCalled();
+        expect(updateTripState).not.toHaveBeenCalled();
     });
 
     it("uses the same no-collision rule for timer-based planning transitions", async () => {

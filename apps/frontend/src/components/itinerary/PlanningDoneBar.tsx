@@ -21,7 +21,7 @@ export function PlanningDoneBar({
   onPress,
   onInfoPress,
 }: Props) {
-  const isDisabled = checked || disabled;
+  const isDisabled = disabled;
 
   const handlePress = useCallback(() => {
     if (isDisabled) return;
@@ -42,23 +42,23 @@ export function PlanningDoneBar({
     <View style={[styles.wrapper, { pointerEvents: "box-none" }]}>
       <View style={styles.footer}>
         <Pressable
-          style={[styles.doneButton, checked && styles.doneButtonChecked]}
+          style={styles.doneButton}
           onPress={handlePress}
           disabled={isDisabled}
-          accessibilityRole="button"
+          accessibilityRole="checkbox"
           accessibilityLabel={
-            checked ? "Planning already submitted" : "Submit planning"
+            checked ? "Mark planning as not done" : "Mark planning as done"
           }
-          accessibilityState={{ disabled: isDisabled }}
+          accessibilityState={{ checked, disabled: isDisabled }}
         >
-          <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-            {checked && (
-              <CheckIcon width={14} height={14} color={colors.nightBlack} />
-            )}
-          </View>
+          {checked ? (
+            <CheckIcon width={22} height={22} color={colors.nightBlack} />
+          ) : (
+            <View style={styles.checkbox} />
+          )}
 
           <AppText variant="body" style={styles.doneText}>
-            {checked ? "Planning submitted" : "Planning done"}
+            Planning done
           </AppText>
         </Pressable>
 
@@ -66,7 +66,7 @@ export function PlanningDoneBar({
           style={styles.infoButton}
           onPress={handleInfoPress}
           accessibilityRole="button"
-          accessibilityLabel="Show planning submission info"
+          accessibilityLabel="Show planning done info"
         >
           <InfoIcon width={24} height={24} />
         </Pressable>
@@ -110,9 +110,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm,
   },
-  doneButtonChecked: {
-    opacity: 0.7,
-  },
   checkbox: {
     width: 22,
     height: 22,
@@ -122,10 +119,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
-  },
-  checkboxChecked: {
-    backgroundColor: colors.beachYellow,
-    borderColor: colors.nightBlack,
   },
   doneText: {
     color: colors.nightBlack,

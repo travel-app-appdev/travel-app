@@ -11,7 +11,7 @@ import {
     createTripWithInviteCode,
     deleteTripById,
     removeTripMember,
-    markMemberPlanningDone,
+    setMemberPlanningDone,
     resetPlanningDoneForTrip,
     updateTripState,
     updateTripById,
@@ -255,8 +255,9 @@ export async function removeMemberForAdmin(input: {
 
 export async function finishPlanningForMember(
     tripId: string,
-    idToken: string
-): Promise<{ allDone: boolean; tripState: TripState; completedMembers: number; totalMembers: number }> {
+    idToken: string,
+    planningDone = true
+): Promise<{ allDone: boolean; tripState: TripState; completedMembers: number; totalMembers: number; planningDone: boolean }> {
 
     const decoded = await admin.auth().verifyIdToken(idToken);
     const userId = decoded.uid;
@@ -275,14 +276,12 @@ export async function finishPlanningForMember(
         throw { status: 404, message: "User is not a member of this trip" };
     }
 
-    if (!membership.planning_done) {
-        await markMemberPlanningDone(tripId, userId);
-    }
+    await setMemberPlanningDone(tripId, userId, planningDone);
 
     const allMembers = await findAcceptedMembersByTripId(tripId);
-    const completedMembers = allMembers.filter(m => m.planning_done || m.user_id === userId).length;
+    const completedMembers = allMembers.filter(m => m.planning_done).length;
     const totalMembers = allMembers.length;
-    const allDone = completedMembers === totalMembers;
+    const allDone = totalMembers > 0 && completedMembers === totalMembers;
 
     let nextState: TripState = "Planning";
 
@@ -319,6 +318,7 @@ export async function finishPlanningForMember(
         tripState: nextState,
         completedMembers,
         totalMembers,
+        planningDone,
     };
 }
 
