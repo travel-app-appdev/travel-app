@@ -42,7 +42,12 @@ import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
 import { FinalSuggestedActivitiesSection } from "@/src/components/itinerary/FinalSuggestedActivitiesSection";
 import { ActivityDetailModal } from "@/src/components/itinerary/ActivityDetailModal";
-import { fetchTripForUser, finishPlanning, type Trip } from "@/src/api/trips";
+import {
+  fetchTripForUser,
+  finishPlanning,
+  finishVoting,
+  type Trip,
+} from "@/src/api/trips";
 import {
   getActivitiesBySlot,
   getFinalItineraryActivities,
@@ -625,7 +630,7 @@ export default function ItineraryScreen() {
             members: refreshedPlanningStatus
               ? JSON.stringify(refreshedPlanningStatus)
               : members,
-            role: role ?? "admin",
+            role: currentTrip.role ?? role ?? "member",
           });
         };
 
@@ -1258,40 +1263,7 @@ export default function ItineraryScreen() {
     }
   }
 
-  async function handleFinishVoting() {
-    if (isSubmittingVoting) return;
-
-    if (!authToken || itinerary.tripId === "trip-fallback") {
-      setIsPreparingFinalItinerary(true);
-      if (finalizingTimeoutRef.current) {
-        clearTimeout(finalizingTimeoutRef.current);
-      }
-      finalizingTimeoutRef.current = setTimeout(() => {
-        setItinerary((current) => ({ ...current, state: "final" }));
-        setIsPreparingFinalItinerary(false);
-        setActivityRefreshKey((value) => value + 1);
-        router.setParams({ state: "final" });
-      }, TRANSITION_OVERLAY_MS);
-      return;
-    }
-
-    setIsSubmittingVoting(true);
-    try {
-      await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL}/trips/${itinerary.tripId}/finish-voting`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ idToken: authToken }),
-        }
-      );
-    } catch {
-    } finally {
-      setIsSubmittingVoting(false);
-    }
-
+  function showVotingFinalTransition() {
     setIsPreparingFinalItinerary(true);
     if (finalizingTimeoutRef.current) {
       clearTimeout(finalizingTimeoutRef.current);
@@ -1302,6 +1274,67 @@ export default function ItineraryScreen() {
       setActivityRefreshKey((value) => value + 1);
       router.setParams({ state: "final" });
     }, TRANSITION_OVERLAY_MS);
+  }
+
+  function handleVotingInfoPress() {
+    Alert.alert(
+      "Submit voting",
+      "Only admins can end voting manually. This closes voting for all members and creates the final itinerary."
+    );
+  }
+
+  async function submitFinishVoting() {
+    if (isSubmittingVoting) return;
+
+    if (itinerary.tripId === "trip-fallback") {
+      showVotingFinalTransition();
+      return;
+    }
+
+    if (!authToken) {
+      Alert.alert("Not logged in", "Please log in again.");
+      return;
+    }
+
+    setIsSubmittingVoting(true);
+    try {
+      const result = await finishVoting({
+        idToken: authToken,
+        tripId: itinerary.tripId,
+      });
+
+      if (result.tripState === "Final") {
+        showVotingFinalTransition();
+      } else {
+        void refreshTripTimerFields({ forceRefresh: true });
+      }
+    } catch (error) {
+      Alert.alert(
+        "Could not finish voting",
+        error instanceof Error ? error.message : "Please try again."
+      );
+    } finally {
+      setIsSubmittingVoting(false);
+    }
+  }
+
+  function handleFinishVoting() {
+    if (isSubmittingVoting || isPreparingFinalItinerary) return;
+
+    Alert.alert(
+      "End voting?",
+      "Are you sure you want to end voting for all members?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "End voting",
+          style: "destructive",
+          onPress: () => {
+            void submitFinishVoting();
+          },
+        },
+      ]
+    );
   }
 
   const votingActivities = useMemo(() => {
@@ -2005,6 +2038,7 @@ export default function ItineraryScreen() {
           <VotingDoneBar
             disabled={isSubmittingVoting || isPreparingFinalItinerary}
             onPress={handleFinishVoting}
+            onInfoPress={handleVotingInfoPress}
           />
         )}
 
