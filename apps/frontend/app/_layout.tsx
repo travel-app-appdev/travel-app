@@ -10,6 +10,11 @@ import {
 } from "@expo-google-fonts/nunito";
 import { View, ActivityIndicator } from "react-native";
 import { AuthProvider, useAuth } from "@/src/context/AuthContext";
+import { configureNotificationHandler } from "@/src/lib/notifications";
+
+// Configure how notifications appear when the app is in the foreground.
+// Called once at module load time, before any component mounts.
+configureNotificationHandler();
 
 function AppStartupGate() {
   const { isBootstrapping } = useAuth();
@@ -50,7 +55,6 @@ function AppStartupGate() {
           name="trip-overview-member"
           options={{ title: "Trip Overview" }}
         />
-        {/* ── Invite preview screen ── */}
         <Stack.Screen
           name="invite"
           options={{ title: "Trip Invite" }}

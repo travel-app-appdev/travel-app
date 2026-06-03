@@ -321,6 +321,65 @@ export async function updateTripById(
     await db.collection("trips").doc(tripId).update(data);
 }
 
+/**
+ * Saves or updates an Expo push token for a user.
+ * Stored on the user document under `expoPushToken`.
+ */
+export async function saveExpoPushToken(
+    userId: string,
+    token: string
+): Promise<void> {
+    const db = admin.firestore();
+    await db.collection("users").doc(userId).set(
+        { expoPushToken: token },
+        { merge: true }
+    );
+}
+
+/**
+ * Retrieves Expo push tokens for a list of user IDs.
+ * Skips users with no token stored.
+ */
+export async function getExpoPushTokensByUserIds(
+    userIds: string[]
+): Promise<string[]> {
+    if (userIds.length === 0) return [];
+
+    const db = admin.firestore();
+
+    const chunkSize = 10;
+    const tokens: string[] = [];
+
+    for (let i = 0; i < userIds.length; i += chunkSize) {
+        const chunk = userIds.slice(i, i + chunkSize);
+        const snapshot = await db
+            .collection("users")
+            .where(admin.firestore.FieldPath.documentId(), "in", chunk)
+            .get();
+
+        snapshot.docs.forEach((doc) => {
+            const token = doc.data()?.expoPushToken;
+            if (typeof token === "string" && token.length > 0) {
+                tokens.push(token);
+            }
+        });
+    }
+
+    return tokens;
+}
+
+/**
+ * Finds the admin user ID for a trip.
+ */
+export async function findTripAdminUserId(tripId: string): Promise<string | null> {
+    const db = admin.firestore();
+    const tripDoc = await db.collection("trips").doc(tripId).get();
+
+    if (!tripDoc.exists) return null;
+
+    return tripDoc.data()?.admin_user_id ?? null;
+}
+
 function normalizeDateTime(value: any): string | undefined {
     if (!value) return undefined;
 

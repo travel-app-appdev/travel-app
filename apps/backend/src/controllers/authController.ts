@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { loginWithIdToken, registerUser, updateUserProfile } from "../services/authService";
+import admin from "../config/firebase";
+import { saveExpoPushToken } from "../repositories/tripsRepository";
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   const { idToken } = req.body;
@@ -67,5 +69,23 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
     } else {
       res.status(401).json({ error: "Invalid token or failed to update profile" });
     }
+  }
+};
+
+export const savePushToken = async (req: Request, res: Response): Promise<void> => {
+  const { idToken, expoPushToken } = req.body;
+
+  if (!idToken || !expoPushToken) {
+    res.status(400).json({ error: "idToken and expoPushToken are required" });
+    return;
+  }
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    await saveExpoPushToken(decoded.uid, expoPushToken);
+    res.status(200).json({ success: true });
+  } catch (error: any) {
+    console.error("savePushToken error:", error);
+    res.status(500).json({ error: "Failed to save push token" });
   }
 };
