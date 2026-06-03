@@ -39,10 +39,17 @@ const mockResponse = () => {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("updateProfile controller — validation", () => {
+    let consoleErrorSpy: jest.SpyInstance;
+
     beforeEach(() => {
         jest.clearAllMocks();
+        consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
         mockVerifyIdToken.mockResolvedValue({ uid: "user-123" });
         mockFirestoreSet.mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+        consoleErrorSpy.mockRestore();
     });
 
     // ── Missing idToken ───────────────────────────────────────────────────────
