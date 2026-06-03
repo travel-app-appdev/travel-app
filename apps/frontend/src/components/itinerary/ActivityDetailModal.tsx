@@ -16,6 +16,7 @@ import ArrowUpIcon from "@/assets/icons/arrow_up.svg";
 import CheckIcon from "@/assets/icons/check_mark.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
+import { ScrollView } from "react-native-gesture-handler";
 
 type Props = {
   visible: boolean;
@@ -91,14 +92,14 @@ export function ActivityDetailModal({
           accessibilityRole="button"
           accessibilityLabel="Close activity details"
         />
-
+        
         <View style={styles.centerWrap} pointerEvents="box-none">
           <View
             style={styles.modalCard}
             accessibilityViewIsModal={true}
             accessible={true}
             accessibilityLabel={`Activity details for ${activity.name}`}
-          >
+          >  
             <View style={styles.headerRow}>
               <AppText variant="body" style={styles.smallTitle}>
                 {topLabel}
@@ -115,6 +116,14 @@ export function ActivityDetailModal({
                 </View>
               </Pressable>
             </View>
+
+            
+              <ScrollView
+                  style={{ flex: 1 }}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: 16 }}
+                >
+
 
             <AppText variant="subtitle" style={styles.title}>
               {activity.name}
@@ -225,6 +234,7 @@ export function ActivityDetailModal({
                           style={styles.alternativeRow}
                         >
                           <View style={styles.alternativeCard}>
+                            
                             <AppText
                               variant="body"
                               style={styles.alternativeSlotLabel}
@@ -319,9 +329,12 @@ export function ActivityDetailModal({
                 ) : null}
               </View>
             ) : null}
+           </ScrollView>
           </View>
         </View>
+        
       </View>
+      
     </Modal>
   );
 }
@@ -342,6 +355,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: "100%",
+    height: "90%",
     maxWidth: 460,
     borderRadius: radius.xl,
     borderWidth: 1,
@@ -504,4 +518,5 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.body,
     lineHeight: typography.lineHeight.xs,
   },
+  
 });
