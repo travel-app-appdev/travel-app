@@ -409,7 +409,7 @@ export default function Onboarding() {
                     />
                      <Image
                       source={require("../assets/images/DetailWindow.png")}
-                      style={Styles.Image}
+                      style={Styles.Image3}
                       resizeMode="contain"
                     />
 
@@ -930,7 +930,13 @@ Image2: {
   marginTop: spacing.xxl,
   alignSelf: "center",
   borderRadius: 5,
+},
+Image3: {
+  width: "100%",
+  aspectRatio: 2, // adjust based on your image
+  marginTop: spacing.xs,
+  alignSelf: "center",
+  borderRadius: 5,
 }
-
 
 });
