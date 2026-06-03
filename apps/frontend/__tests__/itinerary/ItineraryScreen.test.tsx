@@ -7,7 +7,7 @@ const mockSetParams = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
-const mockFetchMyTrips = jest.fn();
+const mockFetchTripForUser = jest.fn();
 const mockFinishPlanning = jest.fn();
 const mockGetActivitiesBySlot = jest.fn();
 const mockGetFinalItineraryActivities = jest.fn();
@@ -45,8 +45,8 @@ jest.mock("@/src/context/AuthContext", () => ({
 }));
 
 jest.mock("@/src/api/trips", () => ({
-  fetchMyTrips: (userId: unknown, options: unknown) =>
-    mockFetchMyTrips(userId, options),
+  fetchTripForUser: (userId: unknown, tripId: unknown, options: unknown) =>
+    mockFetchTripForUser(userId, tripId, options),
   finishPlanning: (payload: unknown) => mockFinishPlanning(payload),
 }));
 
@@ -177,7 +177,7 @@ describe("ItineraryScreen transition overlays", () => {
 
   it("shows a loading overlay before applying a Planning to Voting refresh", async () => {
     setBaseParams("planning");
-    mockFetchMyTrips.mockResolvedValueOnce([backendTrip("Voting")]);
+    mockFetchTripForUser.mockResolvedValueOnce(backendTrip("Voting"));
 
     const { getByText, unmount } = render(<ItineraryScreen />);
 
@@ -189,18 +189,21 @@ describe("ItineraryScreen transition overlays", () => {
       expect.objectContaining({ state: "voting" })
     );
 
-    await waitFor(() => {
-      expect(mockSetParams).toHaveBeenCalledWith(
-        expect.objectContaining({ state: "voting" })
-      );
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(mockSetParams).toHaveBeenCalledWith(
+          expect.objectContaining({ state: "voting" })
+        );
+      },
+      { timeout: 2500 }
+    );
 
     unmount();
   });
 
   it("shows a loading overlay before applying a Voting to Final refresh", async () => {
     setBaseParams("voting");
-    mockFetchMyTrips.mockResolvedValueOnce([backendTrip("Final")]);
+    mockFetchTripForUser.mockResolvedValueOnce(backendTrip("Final"));
 
     const { getByText, unmount } = render(<ItineraryScreen />);
 
@@ -212,11 +215,14 @@ describe("ItineraryScreen transition overlays", () => {
       expect.objectContaining({ state: "final" })
     );
 
-    await waitFor(() => {
-      expect(mockSetParams).toHaveBeenCalledWith(
-        expect.objectContaining({ state: "final" })
-      );
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(mockSetParams).toHaveBeenCalledWith(
+          expect.objectContaining({ state: "final" })
+        );
+      },
+      { timeout: 2500 }
+    );
 
     unmount();
   });
@@ -227,7 +233,7 @@ describe("ItineraryScreen transition overlays", () => {
       { id: "2026-06-02", label: "2 Jun" },
     ];
     setBaseParams("voting");
-    mockFetchMyTrips.mockResolvedValue([backendTrip("Voting")]);
+    mockFetchTripForUser.mockResolvedValue(backendTrip("Voting"));
     mockGetActivitiesBySlot.mockImplementation(
       (_tripId: unknown, slotId: unknown) => {
         if (slotId === "2026-06-02_Breakfast") {
@@ -270,8 +276,7 @@ describe("ItineraryScreen transition overlays", () => {
         calls.some(([props]) => {
           const enabledDayIds = (props as any).enabledDayIds as Set<string>;
           return (
-            enabledDayIds?.has("2026-06-02") &&
-            !enabledDayIds.has("2026-06-01")
+            enabledDayIds?.has("2026-06-02") && !enabledDayIds.has("2026-06-01")
           );
         })
       ).toBe(true);

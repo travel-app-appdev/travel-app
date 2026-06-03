@@ -6,7 +6,7 @@ import TripOverviewMemberScreen from "@/app/trip-overview-member";
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
-const mockFetchMyTrips = jest.fn();
+const mockFetchTripForUser = jest.fn();
 const mockGetCachedMyTrips = jest.fn();
 const mockUpdateTrip = jest.fn();
 const mockGetIdToken = jest.fn();
@@ -41,8 +41,8 @@ jest.mock("react-native-safe-area-context", () => ({
 }));
 
 jest.mock("@/src/api/trips", () => ({
-  fetchMyTrips: (userId: unknown, options: unknown) =>
-    mockFetchMyTrips(userId, options),
+  fetchTripForUser: (userId: unknown, tripId: unknown, options: unknown) =>
+    mockFetchTripForUser(userId, tripId, options),
   getCachedMyTrips: (userId: unknown) => mockGetCachedMyTrips(userId),
   updateTrip: (payload: unknown) => mockUpdateTrip(payload),
   deleteTrip: jest.fn(),
@@ -195,9 +195,9 @@ describe("trip overview checklist timer transitions", () => {
 
   it("updates member overview from Planning to Voting when the planning timer expires", async () => {
     setOverviewParams("Planning");
-    mockFetchMyTrips
-      .mockResolvedValueOnce([backendTrip("Planning")])
-      .mockResolvedValueOnce([backendTrip("Voting")]);
+    mockFetchTripForUser
+      .mockResolvedValueOnce(backendTrip("Planning"))
+      .mockResolvedValueOnce(backendTrip("Voting"));
 
     const screen = render(<TripOverviewMemberScreen />);
 
@@ -225,7 +225,7 @@ describe("trip overview checklist timer transitions", () => {
       planningEndAt: "2026-06-02T09:59:00.000Z",
     });
     mockGetCachedMyTrips.mockReturnValue([backendTrip("Planning")]);
-    mockFetchMyTrips.mockResolvedValue([backendTrip("Voting")]);
+    mockFetchTripForUser.mockResolvedValue(backendTrip("Voting"));
 
     const screen = render(<TripOverviewMemberScreen />);
 
@@ -241,9 +241,9 @@ describe("trip overview checklist timer transitions", () => {
 
   it("updates admin overview from Planning to Voting when the planning timer expires", async () => {
     setOverviewParams("Planning");
-    mockFetchMyTrips
-      .mockResolvedValueOnce([backendTrip("Planning")])
-      .mockResolvedValueOnce([backendTrip("Voting")]);
+    mockFetchTripForUser
+      .mockResolvedValueOnce(backendTrip("Planning"))
+      .mockResolvedValueOnce(backendTrip("Voting"));
 
     const screen = render(<TripOverviewAdminScreen />);
 
@@ -264,9 +264,9 @@ describe("trip overview checklist timer transitions", () => {
     setOverviewParams("Voting", {
       votingEndAt: PLANNING_END,
     });
-    mockFetchMyTrips
-      .mockResolvedValueOnce([backendTrip("Voting")])
-      .mockResolvedValueOnce([backendTrip("Final")]);
+    mockFetchTripForUser
+      .mockResolvedValueOnce(backendTrip("Voting"))
+      .mockResolvedValueOnce(backendTrip("Final"));
 
     const screen = render(<TripOverviewAdminScreen />);
 
@@ -285,7 +285,7 @@ describe("trip overview checklist timer transitions", () => {
 
   it("updates admin checklist immediately from the timer edit response", async () => {
     setOverviewParams("Planning");
-    mockFetchMyTrips.mockResolvedValue([backendTrip("Planning")]);
+    mockFetchTripForUser.mockResolvedValue(backendTrip("Planning"));
     mockUpdateTrip.mockResolvedValue(backendTrip("Voting"));
 
     const screen = render(<TripOverviewAdminScreen />);

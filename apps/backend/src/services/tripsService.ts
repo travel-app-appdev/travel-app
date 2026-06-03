@@ -50,24 +50,52 @@ export async function getTripsForUser(userId: string): Promise<Trip[]> {
 
             const tripMembers = await findAcceptedMembersByTripId(membership.trip_id);
 
-            const members = tripMembers.map((member) => ({
-                id: member.user_id,
-                name: (member as any).user_name ?? "Unknown User",
-                role: member.role,
-                planning_done: member.planning_done ?? false,
-            }));
-
-            return {
-                ...trip,
-                role: membership.role,
-                members,
-            };
+            return buildTripForMembership(trip, membership, tripMembers);
         })
     );
 
     return tripResults.filter((trip): trip is Trip => trip !== null);
 }
 
+export async function getTripForUser(
+    tripId: string,
+    userId: string
+): Promise<Trip> {
+    const membership = await findMembership(tripId, userId);
+
+    if (!membership || membership.invite_status !== "accepted") {
+        throw { status: 404, message: "Trip not found" };
+    }
+
+    const trip = await advanceTripStateIfNeeded(tripId);
+    const tripMembers = await findAcceptedMembersByTripId(tripId);
+
+    return buildTripForMembership(trip, membership, tripMembers);
+}
+
+function buildTripForMembership(
+    trip: Trip,
+    membership: { role: string },
+    tripMembers: {
+        user_id: string;
+        user_name?: string;
+        role: string;
+        planning_done?: boolean;
+    }[]
+): Trip {
+    const members = tripMembers.map((member) => ({
+        id: member.user_id,
+        name: member.user_name ?? "Unknown User",
+        role: member.role,
+        planning_done: member.planning_done ?? false,
+    }));
+
+    return {
+        ...trip,
+        role: membership.role,
+        members,
+    };
+}
 
 export async function createTripForAuthenticatedUser(
     input: CreateTripWithAuthInput

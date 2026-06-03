@@ -42,7 +42,7 @@ import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
 import { FinalSuggestedActivitiesSection } from "@/src/components/itinerary/FinalSuggestedActivitiesSection";
 import { ActivityDetailModal } from "@/src/components/itinerary/ActivityDetailModal";
-import { fetchMyTrips, finishPlanning, type Trip } from "@/src/api/trips";
+import { fetchTripForUser, finishPlanning, type Trip } from "@/src/api/trips";
 import {
   getActivitiesBySlot,
   getFinalItineraryActivities,
@@ -54,7 +54,7 @@ import {
 
 const DEV_FORCE_STATE: ItineraryState | null = null;
 const TRANSITION_OVERLAY_MS = 1800;
-const TRIP_STATE_POLL_INTERVAL_MS = 10 * 1000;
+const TRIP_STATE_POLL_INTERVAL_MS = 30 * 1000;
 
 const activitiesCache = new Map<string, Activity[]>();
 
@@ -463,8 +463,7 @@ export default function ItineraryScreen() {
   );
   const [selectedActivitySlotLabel, setSelectedActivitySlotLabel] =
     useState("");
-  const [selectedAlternativeActivities, setSelectedAlternativeActivities] =
-    useState<Activity[]>([]);
+  const [, setSelectedAlternativeActivities] = useState<Activity[]>([]);
   const [
     selectedDisplayedAlternativeActivities,
     setSelectedDisplayedAlternativeActivities,
@@ -576,12 +575,10 @@ export default function ItineraryScreen() {
       if (!currentUserId || !tripId) return;
 
       try {
-        const trips = await fetchMyTrips(currentUserId, {
+        const currentTrip = await fetchTripForUser(currentUserId, tripId, {
           forceRefresh: options.forceRefresh,
           allowStaleOnError: true,
         });
-
-        const currentTrip = trips.find((trip) => trip.trip_id === tripId);
         if (!currentTrip) return;
 
         const refreshedPlanningStatus = mapTripMembersToPlanningStatus(
