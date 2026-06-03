@@ -51,11 +51,11 @@ export function PlanningDoneBar({
           }
           accessibilityState={{ checked, disabled: isDisabled }}
         >
-          <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-            {checked && (
-              <CheckIcon width={14} height={14} color={colors.nightBlack} />
-            )}
-          </View>
+          {checked ? (
+            <CheckIcon width={22} height={22} color={colors.nightBlack} />
+          ) : (
+            <View style={styles.checkbox} />
+          )}
 
           <AppText variant="body" style={styles.doneText}>
             Planning done
@@ -119,10 +119,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
-  },
-  checkboxChecked: {
-    backgroundColor: colors.beachYellow,
-    borderColor: colors.nightBlack,
   },
   doneText: {
     color: colors.nightBlack,
