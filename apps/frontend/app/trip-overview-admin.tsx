@@ -377,6 +377,9 @@ export default function TripOverviewAdminScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteTripModal, setShowDeleteTripModal] = useState(false);
   const [showRemoveMemberModal, setShowRemoveMemberModal] = useState(false);
+  const [showRemoveMemberErrorModal, setShowRemoveMemberErrorModal] =
+    useState(false);
+  const [removeMemberErrorMessage, setRemoveMemberErrorMessage] = useState("");
   const [memberToRemove, setMemberToRemove] = useState<{
     id: string;
     name: string;
@@ -918,10 +921,12 @@ export default function TripOverviewAdminScreen() {
       setMembers((prev) => prev.filter((m) => m.id !== memberToRemove.id));
       setMemberToRemove(null);
     } catch (error) {
-      Alert.alert(
-        "Remove failed",
-        error instanceof Error ? error.message : "Failed to remove member"
+      setRemoveMemberErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to remove member."
       );
+      setShowRemoveMemberErrorModal(true);
     } finally {
       setRemovingMemberId(null);
     }
@@ -2249,6 +2254,37 @@ export default function TripOverviewAdminScreen() {
                   style={styles.deleteTripButton}
                   textStyle={styles.calendarApplyButtonText}
                   accessibilityLabel="Confirm removing member"
+                />
+              </View>
+            </ModalShell>
+          </Modal>
+
+          <Modal
+            visible={showRemoveMemberErrorModal}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => setShowRemoveMemberErrorModal(false)}
+          >
+            <ModalShell>
+              <AppText variant="body" style={styles.calendarTitle}>
+                Remove failed
+              </AppText>
+
+              <View style={styles.timeModalContent}>
+                <AppText variant="caption" style={styles.timeModalHint}>
+                  {removeMemberErrorMessage ||
+                    "Admin cannot remove themselves. Delete the trip instead."}
+                </AppText>
+              </View>
+
+              <View style={styles.calendarActions}>
+                <AppButton
+                  title="OK"
+                  onPress={() => setShowRemoveMemberErrorModal(false)}
+                  style={styles.deleteTripButton}
+                  textStyle={styles.calendarApplyButtonText}
+                  accessibilityLabel="Close remove member error"
                 />
               </View>
             </ModalShell>
