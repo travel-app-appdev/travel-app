@@ -450,11 +450,13 @@ export type FinishPlanningResponse = {
   tripState: "Planning" | "Voting" | "Final";
   completedMembers: number;
   totalMembers: number;
+  planningDone: boolean;
 };
 
 type FinishPlanningPayload = {
   idToken: string;
   tripId: string;
+  planningDone?: boolean;
 };
 
 export async function finishPlanning(
@@ -465,7 +467,12 @@ export async function finishPlanning(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken: payload.idToken }),
+      body: JSON.stringify({
+        idToken: payload.idToken,
+        ...(payload.planningDone !== undefined
+          ? { planningDone: payload.planningDone }
+          : {}),
+      }),
     }
   );
 

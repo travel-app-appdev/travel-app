@@ -294,15 +294,20 @@ export const removeMember = async (req: Request, res: Response): Promise<void> =
 
 export const finishPlanning = async (req: Request, res: Response): Promise<void> => {
     const tripId = String(req.params.tripId);
-    const { idToken } = req.body;
+    const { idToken, planningDone } = req.body;
 
     if (!idToken) {
         res.status(400).json({ error: "idToken is required" });
         return;
     }
 
+    if (planningDone !== undefined && typeof planningDone !== "boolean") {
+        res.status(400).json({ error: "planningDone must be a boolean" });
+        return;
+    }
+
     try {
-        const result = await finishPlanningForMember(tripId, idToken);
+        const result = await finishPlanningForMember(tripId, idToken, planningDone);
         res.status(200).json(result);
     } catch (error: any) {
         if (error.status === 404) {
