@@ -86,6 +86,38 @@ const CalendarModalWrapper = ({
   </SafeAreaView>
 );
 
+function StickyHeader({
+  isEditMode,
+  onBack,
+}: {
+  isEditMode: boolean;
+  onBack: () => void;
+}) {
+  return (
+    <View style={styles.stickyHeaderBlock}>
+      <View style={styles.header}>
+        <View style={styles.backButtonSlot}>
+          <Pressable
+            onPress={onBack}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Back width={20} height={20} />
+          </Pressable>
+        </View>
+
+        <View style={styles.headerTitleRow} {...hiddenFromAccessibility}>
+          <LocationHeartIcon width={24} height={24} />
+          <AppText variant="body" style={styles.headerTitle}>
+            {isEditMode ? "Edit activity" : "Add activity"}
+          </AppText>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function AddActivityScreen() {
   const { idToken } = useAuth();
   const { width, height } = useWindowDimensions();
@@ -364,25 +396,7 @@ export default function AddActivityScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <Pressable
-            onPress={handleBack}
-            style={styles.backButton}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Back width={20} height={20} />
-          </Pressable>
-
-          <View style={styles.headerTitleRow}>
-            <LocationHeartIcon width={24} height={24} />
-            <AppText variant="body" style={styles.headerTitle}>
-              {isEditMode ? "Edit activity" : "Add activity"}
-            </AppText>
-          </View>
-
-          <View style={styles.headerSpacer} />
-        </View>
+        <StickyHeader isEditMode={isEditMode} onBack={handleBack} />
 
         <View style={styles.form}>
           <View style={styles.fields}>
@@ -681,38 +695,56 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     backgroundColor: colors.beachYellow,
     paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: spacing.xl,
+  },
+  stickyHeaderBlock: {
     paddingTop: spacing.xxl,
     paddingBottom: spacing.xl,
+    backgroundColor: colors.beachYellow,
+    zIndex: 20,
+    elevation: 0,
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
   },
   header: {
     width: "100%",
-    flexDirection: "row",
+    minHeight: 44,
+    position: "relative",
+    justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xxl,
     backgroundColor: colors.beachYellow,
-    zIndex: 10,
-    elevation: 4,
+  },
+  backButtonSlot: {
+    position: "absolute",
+    left: spacing.lg,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-start",
+    zIndex: 2,
   },
   backButton: {
     justifyContent: "center",
-    paddingLeft: spacing.md,
+    alignItems: "center",
+    minWidth: 44,
+    minHeight: 44,
   },
   headerTitleRow: {
-    flex: 1,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: spacing.sm,
+    alignSelf: "center",
   },
   headerTitle: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
-  },
-  headerSpacer: {
-    width: 44,
   },
   form: {
     flex: 1,

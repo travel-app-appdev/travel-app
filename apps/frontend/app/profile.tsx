@@ -60,6 +60,27 @@ function ModalShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+function StickyHeader() {
+  const router = useRouter();
+
+  return (
+    <View style={styles.stickyHeaderBlock}>
+      <View style={styles.header}>
+        <View style={styles.backButtonSlot}>
+          <BackLink onPress={() => router.replace("/home")} />
+        </View>
+
+        <View style={styles.headerTitle} {...hiddenFromAccessibility}>
+          <Profile width={24} height={24} />
+          <AppText variant="body" style={styles.headerLabel}>
+            Profile
+          </AppText>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
   const { user, setUser } = useAuth();
   const router = useRouter();
@@ -72,6 +93,7 @@ export default function ProfileScreen() {
     timeoutRefs.current.push(id);
     return id;
   };
+
   useEffect(() => {
     const timeouts = timeoutRefs.current;
     return () => {
@@ -301,9 +323,22 @@ export default function ProfileScreen() {
           style={styles.flex}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
+          <Pressable
+            onPress={skipToLogout}
+            accessibilityRole="button"
+            accessibilityLabel="Skip to logout button"
+            accessibilityHint="Moves focus directly to the logout action"
+            style={styles.skipButton}
+            {...nativeImportantForAccessibility}
+          >
+            <AppText variant="caption" style={styles.skipButtonText}>
+              Skip to logout
+            </AppText>
+          </Pressable>
+
           <ScrollView
             style={styles.flex}
-            stickyHeaderIndices={[1]}
+            stickyHeaderIndices={[0]}
             contentContainerStyle={[
               styles.container,
               {
@@ -315,28 +350,7 @@ export default function ProfileScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            <Pressable
-              onPress={skipToLogout}
-              accessibilityRole="button"
-              accessibilityLabel="Skip to logout button"
-              accessibilityHint="Moves focus directly to the logout action"
-              style={styles.skipButton}
-              {...nativeImportantForAccessibility}
-            >
-              <AppText variant="caption" style={styles.skipButtonText}>
-                Skip to logout
-              </AppText>
-            </Pressable>
-
-            <View style={styles.header}>
-              <BackLink href="/home" />
-              <View style={styles.headerTitle} {...hiddenFromAccessibility}>
-                <Profile width={20} height={20} />
-                <AppText variant="body" style={styles.headerLabel}>
-                  Profile
-                </AppText>
-              </View>
-            </View>
+            <StickyHeader />
 
             <View style={styles.fieldGroup}>
               {nameOpen ? (
@@ -786,7 +800,7 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: 0,
     gap: spacing.xl,
   },
   skipButton: {
@@ -798,25 +812,45 @@ const styles = StyleSheet.create({
   skipButtonText: {
     color: colors.textPrimary,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
+  stickyHeaderBlock: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
     backgroundColor: colors.lightWhite,
-    zIndex: 10,
-    elevation: 4,
+    zIndex: 20,
+    elevation: 0,
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  header: {
+    position: "relative",
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backButtonSlot: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-start",
+    zIndex: 2,
   },
   headerTitle: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: spacing.sm,
+    alignSelf: "center",
   },
   headerLabel: {
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
     fontFamily: typography.fontFamily.bodyBold,
     color: colors.textPrimary,
+    textAlignVertical: "center",
   },
   fieldGroup: {
     gap: spacing.md,
