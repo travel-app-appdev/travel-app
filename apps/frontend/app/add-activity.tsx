@@ -1,6 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -66,20 +65,25 @@ const CalendarModalWrapper = ({
   children: ReactNode;
   isLandscape: boolean;
 }) => (
-  <View style={styles.calendarOverlay}>
-    <ScrollView
-      contentContainerStyle={[
-        { flexGrow: 1 },
-        isLandscape
-          ? { justifyContent: "flex-start" }
-          : { justifyContent: "center" },
-      ]}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.calendarModal}>{children}</View>
-    </ScrollView>
-  </View>
+  <SafeAreaView
+    style={styles.modalSafeArea}
+    edges={["top", "right", "bottom", "left"]}
+  >
+    <View style={styles.calendarOverlay}>
+      <ScrollView
+        contentContainerStyle={[
+          { flexGrow: 1 },
+          isLandscape
+            ? { justifyContent: "flex-start" }
+            : { justifyContent: "center" },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.calendarModal}>{children}</View>
+      </ScrollView>
+    </View>
+  </SafeAreaView>
 );
 
 export default function AddActivityScreen() {
@@ -143,6 +147,16 @@ export default function AddActivityScreen() {
     useState<ActivityTimeField | null>(null);
   const [tempActivityTime, setTempActivityTime] = useState("");
 
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackTitle, setFeedbackTitle] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+
+  function openFeedbackModal(title: string, message: string) {
+    setFeedbackTitle(title);
+    setFeedbackMessage(message);
+    setShowFeedbackModal(true);
+  }
+
   function openActivityTimePicker(field: ActivityTimeField) {
     setTempActivityTime(field === "start" ? startTime : endTime);
     setShowActivityTimePicker(field);
@@ -154,7 +168,7 @@ export default function AddActivityScreen() {
     const normalizedTime = tempActivityTime.trim();
 
     if (normalizedTime && !isValidTimeString(normalizedTime)) {
-      Alert.alert("Invalid time", "Please enter a valid time as HH:MM.");
+      openFeedbackModal("Invalid time", "Please enter a valid time as HH:MM.");
       return;
     }
 
@@ -231,7 +245,10 @@ export default function AddActivityScreen() {
 
   async function handleSaveActivity() {
     if (!activityName.trim()) {
-      Alert.alert("Missing activity name", "Please enter an activity name.");
+      openFeedbackModal(
+        "Missing activity name",
+        "Please enter an activity name."
+      );
       return;
     }
 
@@ -239,12 +256,15 @@ export default function AddActivityScreen() {
     const trimmedEndTime = endTime.trim();
 
     if (trimmedStartTime && !isValidTimeString(trimmedStartTime)) {
-      Alert.alert("Invalid start time", "Please enter start time as HH:MM.");
+      openFeedbackModal(
+        "Invalid start time",
+        "Please enter start time as HH:MM."
+      );
       return;
     }
 
     if (trimmedEndTime && !isValidTimeString(trimmedEndTime)) {
-      Alert.alert("Invalid end time", "Please enter end time as HH:MM.");
+      openFeedbackModal("Invalid end time", "Please enter end time as HH:MM.");
       return;
     }
 
@@ -253,7 +273,7 @@ export default function AddActivityScreen() {
       trimmedEndTime &&
       trimmedEndTime < trimmedStartTime
     ) {
-      Alert.alert(
+      openFeedbackModal(
         "Invalid time range",
         "End time cannot be before start time."
       );
@@ -261,14 +281,14 @@ export default function AddActivityScreen() {
     }
 
     if (!tripId || !dayId || !slotId) {
-      Alert.alert("Missing data", "Trip, day, or time slot is missing.");
+      openFeedbackModal("Missing data", "Trip, day, or time slot is missing.");
       return;
     }
 
     const token = idToken ?? (await auth.currentUser?.getIdToken());
 
     if (!token) {
-      Alert.alert("Not logged in", "Please log in again.");
+      openFeedbackModal("Not logged in", "Please log in again.");
       return;
     }
 
@@ -301,7 +321,7 @@ export default function AddActivityScreen() {
         navigateBackWithActivity(createdActivity.activity_id);
       }
     } catch (error) {
-      Alert.alert(
+      openFeedbackModal(
         "Could not save activity",
         error instanceof Error ? error.message : "Please try again."
       );
@@ -381,7 +401,7 @@ export default function AddActivityScreen() {
               <TextInput
                 value={activityName}
                 onChangeText={setActivityName}
-                placeholder="Activity"
+                placeholder="Name"
                 placeholderTextColor={colors.textMuted}
                 style={styles.input}
                 accessibilityLabel="Activity name"
@@ -562,6 +582,7 @@ export default function AddActivityScreen() {
         visible={showActivityTimePicker !== null}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={() => setShowActivityTimePicker(null)}
       >
         <CalendarModalWrapper isLandscape={isLandscape}>
@@ -609,6 +630,36 @@ export default function AddActivityScreen() {
               style={styles.calendarApplyButton}
               textStyle={styles.calendarApplyButtonText}
               accessibilityLabel="Apply selected time"
+            />
+          </View>
+        </CalendarModalWrapper>
+      </Modal>
+
+      <Modal
+        visible={showFeedbackModal}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowFeedbackModal(false)}
+      >
+        <CalendarModalWrapper isLandscape={isLandscape}>
+          <AppText variant="body" style={styles.calendarTitle}>
+            {feedbackTitle}
+          </AppText>
+
+          <View style={styles.timeModalContent}>
+            <AppText variant="caption" style={styles.timeModalHint}>
+              {feedbackMessage}
+            </AppText>
+          </View>
+
+          <View style={styles.calendarActions}>
+            <AppButton
+              title="Okay"
+              onPress={() => setShowFeedbackModal(false)}
+              style={styles.calendarApplyButton}
+              textStyle={styles.calendarApplyButtonText}
+              accessibilityLabel="Close message"
             />
           </View>
         </CalendarModalWrapper>
@@ -745,10 +796,14 @@ const styles = StyleSheet.create({
   timePlaceholderText: {
     color: colors.textMuted,
   },
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
   calendarOverlay: {
     flex: 1,
+    justifyContent: "center",
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
   },
   calendarModal: {
     backgroundColor: colors.lightWhite,
@@ -789,8 +844,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   timeModalHint: {
-    color: colors.textMuted,
-    fontSize: typography.size.sm,
+    color: colors.nightBlack,
+    fontSize: typography.size.lg,
     lineHeight: typography.lineHeight.sm,
     fontFamily: typography.fontFamily.body,
   },

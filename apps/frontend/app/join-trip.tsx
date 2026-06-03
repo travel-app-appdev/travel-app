@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import {
-  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   View,
   Dimensions,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/common/AppText";
@@ -17,7 +17,7 @@ import { BackLink } from "@/src/components/common/BackLink";
 import { joinTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
 import { invalidateTripsCache } from "./home";
-import { colors, spacing, typography } from "@/src/theme";
+import { colors, radius, spacing, typography } from "@/src/theme";
 import LinkIcon from "@/assets/icons/link.svg";
 import KeyFrame from "@/assets/icons/key_frame.svg";
 import LeafUp from "@/assets/visuals/leaf_up.svg";
@@ -26,17 +26,39 @@ import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
+function ModalShell({ children }: { children: React.ReactNode }) {
+  return (
+    <SafeAreaView
+      style={styles.modalSafeArea}
+      edges={["top", "right", "bottom", "left"]}
+    >
+      <View style={styles.calendarOverlay}>
+        <View style={styles.calendarModal}>{children}</View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
 export default function JoinTripScreen() {
   const [code, setCode] = useState("");
   const [isJoining, setIsJoining] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackTitle, setFeedbackTitle] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
   const router = useRouter();
+
+  function openFeedbackModal(title: string, message: string) {
+    setFeedbackTitle(title);
+    setFeedbackMessage(message);
+    setShowFeedbackModal(true);
+  }
 
   const handleJoin = async () => {
     try {
       setIsJoining(true);
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert("Not logged in", "Please log in again.");
+        openFeedbackModal("Not logged in", "Please log in again.");
         return;
       }
       const idToken = await currentUser.getIdToken();
@@ -46,7 +68,7 @@ export default function JoinTripScreen() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to join trip";
-      Alert.alert("Join failed", message);
+      openFeedbackModal("Join failed", message);
     } finally {
       setIsJoining(false);
     }
@@ -128,6 +150,36 @@ export default function JoinTripScreen() {
             />
           </ScrollView>
         </KeyboardAvoidingView>
+
+        <Modal
+          visible={showFeedbackModal}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setShowFeedbackModal(false)}
+        >
+          <ModalShell>
+            <AppText variant="body" style={styles.calendarTitle}>
+              {feedbackTitle}
+            </AppText>
+
+            <View style={styles.timeModalContent}>
+              <AppText variant="caption" style={styles.feedbackMessage}>
+                {feedbackMessage}
+              </AppText>
+            </View>
+
+            <View style={styles.calendarActions}>
+              <AppButton
+                title="Okay"
+                onPress={() => setShowFeedbackModal(false)}
+                style={styles.calendarApplyButton}
+                textStyle={styles.calendarApplyButtonText}
+                accessibilityLabel="Close message"
+              />
+            </View>
+          </ModalShell>
+        </Modal>
       </SafeAreaView>
     </View>
   );
@@ -220,6 +272,52 @@ const styles = StyleSheet.create({
     marginTop: spacing.xxxl,
   },
   joinButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  calendarOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+  },
+  calendarModal: {
+    backgroundColor: colors.lightWhite,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+  },
+  calendarTitle: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+  },
+  timeModalContent: {
+    gap: spacing.md,
+  },
+  feedbackMessage: {
+    color: colors.nightBlack,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.md,
+    fontFamily: typography.fontFamily.bodySemiBold,
+  },
+  calendarActions: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  calendarApplyButton: {
+    flex: 1,
+    backgroundColor: colors.neonGreen,
+  },
+  calendarApplyButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
   },
