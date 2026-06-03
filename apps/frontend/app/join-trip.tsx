@@ -39,6 +39,27 @@ function ModalShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+function StickyHeader() {
+  const router = useRouter();
+
+  return (
+    <View style={styles.stickyHeaderBlock}>
+      <View style={styles.header}>
+        <View style={styles.backButtonSlot}>
+          <BackLink onPress={() => router.replace("/home")} />
+        </View>
+
+        <View style={styles.headerTitle} {...hiddenFromAccessibility}>
+          <LinkIcon width={20} height={20} />
+          <AppText variant="body" style={styles.headerLabel}>
+            Join Trip
+          </AppText>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function JoinTripScreen() {
   const [code, setCode] = useState("");
   const [isJoining, setIsJoining] = useState(false);
@@ -102,15 +123,7 @@ export default function JoinTripScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.header}>
-              <BackLink href="/home" />
-              <View style={styles.headerTitle}>
-                <LinkIcon width={20} height={20} />
-                <AppText variant="body" style={styles.headerLabel}>
-                  Join Trip
-                </AppText>
-              </View>
-            </View>
+            <StickyHeader />
 
             <AppText variant="title" style={styles.title}>
               Which trip you wanna join?
@@ -118,7 +131,7 @@ export default function JoinTripScreen() {
 
             <View style={styles.fieldGroup}>
               <View style={styles.fieldLabelRow} {...hiddenFromAccessibility}>
-                <KeyFrame width={20} height={20} />
+                <KeyFrame width={24} height={24} />
                 <AppText variant="body" style={styles.fieldLabel}>
                   Code
                 </AppText>
@@ -198,7 +211,7 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: 0,
     paddingBottom: spacing.xxxl,
     gap: spacing.xxl,
   },
@@ -218,29 +231,50 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     transform: [{ rotate: "5deg" }],
   },
+  stickyHeaderBlock: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+    backgroundColor: "transparent",
+    zIndex: 20,
+    elevation: 0,
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+  },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
     position: "relative",
-    zIndex: 1,
-    backgroundColor: colors.plantGreen,
-    elevation: 4,
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backButtonSlot: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-start",
+    zIndex: 2,
   },
   headerTitle: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: spacing.sm,
+    alignSelf: "center",
   },
   headerLabel: {
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
     fontFamily: typography.fontFamily.bodyBold,
     color: colors.textPrimary,
+    textAlignVertical: "center",
   },
   title: {
     fontSize: typography.size.displaySm,
-    lineHeight: typography.lineHeight.displayLg,
+    lineHeight: typography.lineHeight.displaySm,
+    fontFamily: typography.fontFamily.bodyBlack,
     color: colors.textPrimary,
     textAlign: "left",
     alignSelf: "stretch",
