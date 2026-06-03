@@ -85,10 +85,10 @@ export function TripCard({
 
   const badgeContent = (
     <>
+      <CardArrow width={14} height={14} />
       <AppText variant="caption" style={styles.badgeText}>
         {statusLabel}
       </AppText>
-      <CardArrow width={14} height={14} />
     </>
   );
 
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xs,
+    gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.lg,
