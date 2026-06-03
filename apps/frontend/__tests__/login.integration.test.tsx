@@ -3,13 +3,23 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import LoginScreen from "@/app/login";
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
+const mockBack = jest.fn();
 const mockHandleLogin = jest.fn();
 const mockSetUser = jest.fn();
+const mockSetIdToken = jest.fn();
+
+const mockRouter = {
+  replace: mockReplace,
+  push: mockPush,
+  back: mockBack,
+};
 
 jest.mock("@/src/context/AuthContext", () => ({
   useAuth: () => ({
     user: null,
     setUser: mockSetUser,
+    setIdToken: mockSetIdToken,
     isAuthenticated: false,
     loading: false,
     logout: jest.fn(),
@@ -18,16 +28,9 @@ jest.mock("@/src/context/AuthContext", () => ({
 
 jest.mock("expo-router", () => ({
   Link: ({ children }: any) => children,
-  router: {
-    replace: mockReplace,
-    push: jest.fn(),
-    back: jest.fn(),
-  },
-  useRouter: () => ({
-    replace: mockReplace,
-    push: jest.fn(),
-    back: jest.fn(),
-  }),
+  router: mockRouter,
+  useRouter: () => mockRouter,
+  useLocalSearchParams: () => ({}),
 }));
 
 jest.mock("@/src/services/authServices", () => ({
@@ -57,11 +60,12 @@ describe("LoginScreen", () => {
     });
   });
 
-  it("redirects to home page after successful login", async () => {
+  it("updates auth state after successful login", async () => {
     mockHandleLogin.mockResolvedValueOnce({
       uid: "123",
       email: "test@test.com",
       name: "Helen",
+      idToken: "valid-id-token",
     });
 
     const { getByText, getByTestId } = render(<LoginScreen />);
@@ -75,11 +79,13 @@ describe("LoginScreen", () => {
       expect(mockHandleLogin).toHaveBeenCalledWith("test@test.com", "123456");
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalled();
+    expect(mockSetUser).toHaveBeenCalledWith({
+      uid: "123",
+      email: "test@test.com",
+      name: "Helen",
+      idToken: "valid-id-token",
     });
-
-    expect(mockReplace).toHaveBeenCalledWith("/home");
+    expect(mockSetIdToken).toHaveBeenCalledWith("valid-id-token");
   });
 
   it("shows service error message on failed login", async () => {

@@ -1,5 +1,4 @@
-// app/login.tsx
-import { Link, router } from "expo-router";
+import { Link, router, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import {
   StyleSheet,
@@ -34,6 +33,11 @@ export default function LoginScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { setUser, setIdToken } = useAuth();
 
+  // Pick up the invite code if this login was triggered from an invite link
+  const { pendingInviteCode } = useLocalSearchParams<{
+    pendingInviteCode?: string;
+  }>();
+
   const passwordRef = useRef<TextInput>(null);
   const { width, height } = useWindowDimensions();
   const scale = Math.min(width / 390, height / 844);
@@ -66,13 +70,36 @@ export default function LoginScreen() {
 
       const authResponse = await loginUser(email.trim(), password);
       setUser(authResponse);
-      setIdToken(authResponse.idToken); 
-      router.replace("/home");
+      setIdToken(authResponse.idToken);
 
-      router.replace("/home");
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Something went wrong";
+      // If the user came from an invite link, return them to the invite screen
+      if (pendingInviteCode) {
+        router.replace({
+          pathname: "/invite",
+          params: { code: pendingInviteCode },
+        });
+      } else {
+        router.replace("/home");
+      }
+    } catch (error: any) {
+      const rawMessage = error?.message ?? "";
+      const code = error?.code ?? "";
+
+      let message = "Something went wrong. Please try again.";
+
+      if (
+        code.includes("auth/invalid-credential") ||
+        code.includes("auth/wrong-password") ||
+        code.includes("auth/user-not-found") ||
+        rawMessage.includes("Incorrect email or password")
+      ) {
+        message = "Incorrect email or password.";
+      } else if (code.includes("auth/too-many-requests")) {
+        message = "Too many attempts. Please try again later.";
+      } else if (code.includes("auth/user-disabled")) {
+        message = "This account has been disabled.";
+      }
+
       setErrors((prev) => ({ ...prev, general: message }));
     } finally {
       setIsSubmitting(false);
@@ -94,9 +121,9 @@ export default function LoginScreen() {
           {
             paddingTop: headerTop,
             paddingBottom: headerBottom,
+            pointerEvents: "box-none",
           },
         ]}
-        pointerEvents="box-none"
       >
         <View style={styles.backWrapper}>
           <Link
@@ -198,6 +225,18 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
+          {/* Context banner when coming from an invite */}
+          {!!pendingInviteCode && (
+            <View style={styles.inviteBanner}>
+              <AppText variant="caption" style={styles.inviteBannerText}>
+                Log in to join the trip with code{" "}
+                <AppText variant="caption" style={styles.inviteBannerCode}>
+                  {pendingInviteCode}
+                </AppText>
+              </AppText>
+            </View>
+          )}
+
           <View style={styles.form}>
             <View style={styles.fieldGroup}>
               <AppText variant="body" style={styles.label}>
@@ -358,7 +397,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontFamily: typography.fontFamily.title,
   },
-
   keyboardArea: {
     flex: 1,
     zIndex: 2,
@@ -367,6 +405,26 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xxxl,
     justifyContent: "space-between",
+  },
+  inviteBanner: {
+    backgroundColor: colors.seaBlue,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
+  },
+  inviteBannerText: {
+    color: colors.lightWhite,
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.md,
+    textAlign: "center",
+  },
+  inviteBannerCode: {
+    fontFamily: typography.fontFamily.bodyBold,
+    letterSpacing: 2,
+    color: colors.lightWhite,
+    fontSize: typography.size.md,
   },
   form: {
     gap: spacing.xl,
@@ -400,7 +458,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.seaBlue,
   },
   loginButtonText: {
-    color: colors.nightBlack,
+    color: colors.lightWhite,
     fontFamily: typography.fontFamily.bodyBold,
   },
 });

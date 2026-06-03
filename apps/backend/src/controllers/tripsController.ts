@@ -1,3 +1,4 @@
+// apps/backend/src/controllers/tripsController.ts
 import { Request, Response } from "express";
 import {
     createTripForAuthenticatedUser,
@@ -8,7 +9,9 @@ import {
     leaveTripForMember,
     removeMemberForAdmin,
     finishPlanningForMember,
+    finishVotingForAdmin,
     updateTripForAdmin,
+    getTripByInviteCodePublic,
 } from "../services/tripsService";
 
 export const getMyTrips = async (req: Request, res: Response): Promise<void> => {
@@ -80,9 +83,13 @@ export const createTrip = async (req: Request, res: Response): Promise<void> => 
         });
 
         res.status(201).json(trip);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error creating trip:", error);
-        res.status(401).json({ error: "Invalid token or failed to create trip" });
+        if (error.status === 400) {
+            res.status(400).json({ error: error.message });
+        } else {
+            res.status(401).json({ error: "Invalid token or failed to create trip" });
+        }
     }
 };
 
@@ -161,9 +168,13 @@ export const createTripWithoutAuth = async (
         });
 
         res.status(201).json(trip);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error creating trip without auth:", error);
-        res.status(500).json({ error: "Failed to create trip" });
+        if (error.status === 400) {
+            res.status(400).json({ error: error.message });
+        } else {
+            res.status(500).json({ error: "Failed to create trip" });
+        }
     }
 };
 
@@ -282,7 +293,30 @@ export const finishPlanning = async (req: Request, res: Response): Promise<void>
     }
 };
 
-// New controller for updating trip details by admin
+export const finishVoting = async (req: Request, res: Response): Promise<void> => {
+    const tripId = String(req.params.tripId);
+    const { idToken } = req.body;
+
+    if (!idToken) {
+        res.status(400).json({ error: "idToken is required" });
+        return;
+    }
+
+    try {
+        const result = await finishVotingForAdmin(tripId, idToken);
+        res.status(200).json(result);
+    } catch (error: any) {
+        if (error.status === 404) {
+            res.status(404).json({ error: error.message });
+        } else if (error.status === 400) {
+            res.status(400).json({ error: error.message });
+        } else if (error.status === 403) {
+            res.status(403).json({ error: error.message });
+        } else {
+            res.status(401).json({ error: "Invalid token or failed to finish voting" });
+        }
+    }
+};
 
 export const updateTrip = async (req: Request, res: Response): Promise<void> => {
     const { idToken, title, destination, start_date, end_date,
@@ -312,7 +346,6 @@ export const updateTrip = async (req: Request, res: Response): Promise<void> => 
         }
     }
 
-    // Validate planning and voting deadlines if provided
     if (planning_end_at && voting_end_at) {
         const planningEnd = new Date(planning_end_at);
         const votingEnd = new Date(voting_end_at);
@@ -335,8 +368,34 @@ export const updateTrip = async (req: Request, res: Response): Promise<void> => 
             res.status(403).json({ error: error.message });
         } else if (error.status === 404) {
             res.status(404).json({ error: error.message });
+        } else if (error.status === 400) {
+            res.status(400).json({ error: error.message });
         } else {
             res.status(401).json({ error: "Invalid token or failed to update trip" });
+        }
+    }
+};
+
+// ── Public trip preview by invite code (no auth required)
+export const getTripPreviewByCode = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    const inviteCode = String(req.params.inviteCode ?? "").trim().toUpperCase();
+
+    if (!inviteCode) {
+        res.status(400).json({ error: "inviteCode is required" });
+        return;
+    }
+
+    try {
+        const trip = await getTripByInviteCodePublic(inviteCode);
+        res.status(200).json(trip);
+    } catch (error: any) {
+        if (error.status === 404) {
+            res.status(404).json({ error: error.message });
+        } else {
+            res.status(500).json({ error: "Failed to load trip preview" });
         }
     }
 };

@@ -1,93 +1,219 @@
-// app/index.tsx
 import { Link, router } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   StyleSheet,
   View,
   ScrollView,
-  useWindowDimensions,
+  Dimensions,
+  Pressable,
 } from "react-native";
+import * as Linking from "expo-linking";
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppText } from "@/src/components/common/AppText";
-import { colors, radius, spacing, typography } from "@/src/theme";
+import { colors, radius, spacing, typography, shadows } from "@/src/theme";
 import { useGoogleLogin } from "@/src/lib/googleAuth";
+import { loginWithToken } from "@/src/api/auth";
+import { useAuth } from "@/src/context/AuthContext";
 import VoteyLogo from "@/assets/logos/votey-logo1.svg";
 import CurlyGreen from "@/assets/visuals/curly-green.svg";
 import PalmLeaf from "@/assets/visuals/palm-leaf.svg";
 import PalmTree from "@/assets/visuals/palm-tree.svg";
 import Google from "@/assets/icons/google.svg";
 import Stars from "@/assets/visuals/stars.svg";
+import JoinTest from "@/assets/icons/join_test.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
+
+// TODO: Deep linking — remaining steps when ready for production:
+// 1. Get release SHA256 fingerprint from EAS or release keystore and add to
+//    the sha256_cert_fingerprints array in apps/backend/src/index.ts
+// 2. Deploy backend so /.well-known/assetlinks.json is live on campus cloud
+// 3. Build a real APK (not Expo Go) with: eas build --platform android
+// 4. invite.tsx needs zero changes — already reads the `code` param correctly
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function lerp(start: number, end: number, t: number) {
+  return start + (end - start) * t;
+}
 
 export default function StartPage() {
-  const { response, signInWithGoogleToken } = useGoogleLogin();
-  const { width, height } = useWindowDimensions();
+  const { response, signInWithGoogleToken, promptAsync, request } =
+    useGoogleLogin();
+  const { setUser, setIdToken } = useAuth();
+
+  const [dimensions, setDimensions] = useState(() => Dimensions.get("window"));
+  const [svgDimensions] = useState(() => Dimensions.get("window"));
+  const [isLandscape, setIsLandscape] = useState(() => {
+    const { width, height } = Dimensions.get("window");
+    return width > height;
+  });
+
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener("change", ({ window }) => {
+      setDimensions(window);
+      setIsLandscape(window.width > window.height);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  const { width, height } = dimensions;
+  const { width: svgWidth, height: svgHeight } = svgDimensions;
 
   const sw = width / 390;
   const sh = height / 844;
-  const scale = Math.min(sw, sh);
+  const baseScale = Math.min(sw, sh);
+  const midProgress = clamp((width - 390) / (1024 - 390), 0, 1);
+  const contentMaxWidth = lerp(320, 460, midProgress);
+  const logoWidth = lerp(280 * baseScale, 380, midProgress);
+  const logoHeight = lerp(180 * baseScale, 240, midProgress);
+  const titleYoooSize = Math.round(lerp(50 * baseScale, 72, midProgress));
+  const titleVotiesSize = Math.round(lerp(56 * baseScale, 82, midProgress));
+  const starsSize = lerp(50 * baseScale, 62, midProgress);
 
+  const svgSw = svgWidth / 390;
+  const svgSh = svgHeight / 844;
+  const svgWideProgress = clamp((svgWidth - 390) / (1440 - 390), 0, 1);
+
+  const palmTreeSize = 1000 * svgSw * lerp(1, 0.78, svgWideProgress);
+  const palmLeafSize = 350 * svgSw * lerp(1, 0.7, svgWideProgress);
+
+  const palmTreeRight = lerp(-560 * svgSw, -560 * svgSw + 600, svgWideProgress);
+  const palmTreeTop = lerp(-245 * svgSh, -245 * svgSh - 700, svgWideProgress);
+  const palmLeafLeft = lerp(-240 * svgSw, -240 * svgSw + 350, svgWideProgress);
+  const palmLeafTop = lerp(50 * svgSh, 50 * svgSh - 600, svgWideProgress);
+
+  // ── Google sign-in response handler ────────────────────────────────────────
   useEffect(() => {
     async function handleGoogleResponse() {
       if (response?.type === "success") {
-        const idToken = response.authentication?.idToken;
-        if (!idToken) return;
-        await signInWithGoogleToken(idToken);
-        router.replace("/home");
+        const googleIdToken =
+          response.authentication?.idToken ?? response.params?.id_token;
+
+        if (!googleIdToken) return;
+
+        const { firebaseIdToken } = await signInWithGoogleToken(googleIdToken);
+        const backendUser = await loginWithToken(firebaseIdToken);
+
+        setUser(backendUser);
+        setIdToken(firebaseIdToken);
+
+        router.replace("/onboarding");
       }
     }
+
     handleGoogleResponse();
-  }, [response, signInWithGoogleToken]);
+  }, [response, signInWithGoogleToken, setUser, setIdToken]);
+
+  // ── Deep link handler ───────────────────────────────────────────────────────
+  // Catches invite links of the form:
+  // https://cc231023-11019.node.ustp.cloud/invite?code=XYZL
+  // and navigates to the invite screen automatically.
+  useEffect(() => {
+    // Handle deep link when app is already open in the background
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      const { path, queryParams } = Linking.parse(url);
+      if (path === "invite" && queryParams?.code) {
+        router.push({
+          pathname: "/invite",
+          params: { code: queryParams.code as string },
+        });
+      }
+    });
+
+    // Handle deep link when app is launched from a cold start
+    Linking.getInitialURL().then((url) => {
+      if (!url) return;
+      const { path, queryParams } = Linking.parse(url);
+      if (path === "invite" && queryParams?.code) {
+        router.replace({
+          pathname: "/invite",
+          params: { code: queryParams.code as string },
+        });
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   return (
     <View style={styles.container}>
-      {/* Decorative background visuals — scaled to screen */}
+      {/* ── Decorative SVGs ── */}
       <View
-        style={[styles.palmTreeWrapper, { top: -245 * sh, right: -560 * sw }]}
-        pointerEvents="none"
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
+        style={[
+          styles.palmTreeWrapper,
+          {
+            top: palmTreeTop,
+            right: palmTreeRight,
+            pointerEvents: "none",
+          },
+        ]}
       >
-        <PalmTree width={1000 * sw} height={1000 * sh} />
-      </View>
-
-      <View
-        style={[styles.palmLeafWrapper, { top: 50 * sh, left: -240 * sw }]}
-        pointerEvents="none"
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
-      >
-        <PalmLeaf width={350 * sw} height={350 * sw} />
+        <PalmTree width={palmTreeSize} height={palmTreeSize} />
       </View>
 
       <View
         style={[
-          styles.curlyGreenWrapper,
-          { bottom: -220 * sh, left: -215 * sw },
+          styles.palmLeafWrapper,
+          {
+            top: palmLeafTop,
+            left: palmLeafLeft,
+            pointerEvents: "none",
+          },
         ]}
-        pointerEvents="none"
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
       >
-        <CurlyGreen width={500 * sw} height={500 * sw} />
+        <PalmLeaf width={palmLeafSize} height={palmLeafSize} />
       </View>
 
-      {/* ScrollView so tiny phones (SE) can still reach the buttons */}
+      {!isLandscape && (
+        <View
+          style={[styles.curlyGreenWrapper, { pointerEvents: "none" }]}
+          {...hiddenFromAccessibility}
+        >
+          <CurlyGreen width={SCREEN_WIDTH * 1.1} height={SCREEN_WIDTH * 1.1} />
+        </View>
+      )}
+
+      {/* TODO: demo only — replace code param with valid invite code from Firestore, then uncomment
+      <Pressable
+        style={styles.joinTestButton}
+        onPress={() =>
+          router.push({ pathname: "/invite", params: { code: "YOUR_INVITE_CODE" } })
+        }
+        accessibilityRole="button"
+        accessibilityLabel="Test invite screen"
+      >
+        <JoinTest width={36} height={36} />
+      </Pressable>
+      */}
+
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingHorizontal: lerp(spacing.xl, spacing.xxxxl2, midProgress),
+          },
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.logoWrapper}>
-          <VoteyLogo width={280 * scale} height={180 * scale} />
+        <View style={[styles.logoWrapper, { maxWidth: contentMaxWidth }]}>
+          <VoteyLogo width={logoWidth} height={logoHeight} />
 
           <View style={styles.titleWrapper}>
             <View
               style={[
                 styles.starsWrapper,
-                { top: -26 * scale, right: -20 * scale },
+                {
+                  top: lerp(-26 * baseScale, -30, midProgress),
+                  right: lerp(-20 * baseScale, -18, midProgress),
+                },
               ]}
             >
-              <Stars width={50 * scale} height={50 * scale} />
+              <Stars width={starsSize} height={starsSize} />
             </View>
 
             <AppText
@@ -95,8 +221,8 @@ export default function StartPage() {
               style={[
                 styles.titleYooo,
                 {
-                  fontSize: Math.round(50 * scale),
-                  lineHeight: Math.round(50 * scale * 1.15),
+                  fontSize: titleYoooSize,
+                  lineHeight: Math.round(titleYoooSize * 1.15),
                 },
               ]}
             >
@@ -108,8 +234,8 @@ export default function StartPage() {
               style={[
                 styles.titleTraveler,
                 {
-                  fontSize: Math.round(56 * scale),
-                  lineHeight: Math.round(56 * scale * 1.15),
+                  fontSize: titleVotiesSize,
+                  lineHeight: Math.round(titleVotiesSize * 1.15),
                 },
               ]}
             >
@@ -118,17 +244,27 @@ export default function StartPage() {
           </View>
         </View>
 
-        <View style={styles.actions}>
+        <View
+          style={[
+            styles.actions,
+            {
+              maxWidth: contentMaxWidth,
+            },
+          ]}
+        >
           <Link href="/login" asChild>
-            <View>
-              <AppButton
-                title="Login"
-                onPress={() => router.push("/login")}
-                textStyle={styles.primaryButtonText}
-                accessibilityLabel="Go to login screen"
-                accessibilityHint="Opens the login page"
-              />
-            </View>
+            <AppButton
+              title="Login"
+              onPress={() => {
+                if (typeof document !== "undefined") {
+                  (document.activeElement as HTMLElement | null)?.blur();
+                }
+                router.push("/login");
+              }}
+              textStyle={styles.primaryButtonText}
+              accessibilityLabel="Go to login screen"
+              accessibilityHint="Opens the login page"
+            />
           </Link>
 
           <View style={styles.registerRow}>
@@ -141,7 +277,7 @@ export default function StartPage() {
               accessibilityLabel="Go to registration screen"
               accessibilityRole="link"
             >
-              <View>
+              <View style={styles.registerLinkWrapper}>
                 <AppText style={styles.registerLink}>Register here</AppText>
                 <View style={styles.registerHighlight} />
               </View>
@@ -154,11 +290,12 @@ export default function StartPage() {
 
           <AppButton
             title="Continue with Google"
-            onPress={() => {}}
+            onPress={() => promptAsync()}
             variant="secondary"
             icon={<Google width={20} height={20} />}
             textStyle={styles.secondaryButtonText}
             accessibilityLabel="Continue with Google"
+            disabled={!request}
           />
         </View>
       </ScrollView>
@@ -176,7 +313,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xxxxl2,
     gap: spacing.xxxxl2,
   },
@@ -188,10 +324,24 @@ const styles = StyleSheet.create({
   },
   curlyGreenWrapper: {
     position: "absolute",
+    bottom: -SCREEN_WIDTH * 0.3,
+    left: -SCREEN_WIDTH * 0.1,
+    zIndex: 0,
+  },
+  joinTestButton: {
+    position: "absolute",
+    top: spacing.xxxxl2,
+    left: spacing.xl,
+    zIndex: 10,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   logoWrapper: {
     alignItems: "center",
     gap: spacing.xxxxl2,
+    width: "100%",
   },
   titleWrapper: {
     alignItems: "center",
@@ -206,6 +356,7 @@ const styles = StyleSheet.create({
     color: colors.beachYellow,
     textTransform: "uppercase",
     fontFamily: typography.fontFamily.title,
+    ...shadows.displayTitle,
   },
   titleTraveler: {
     color: colors.sunsetOrange,
@@ -213,10 +364,10 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.title,
     marginTop: 2,
     paddingBottom: spacing.xl,
+    ...shadows.displayTitle,
   },
   actions: {
     width: "100%",
-    maxWidth: 320,
     alignSelf: "center",
     gap: spacing.md,
   },

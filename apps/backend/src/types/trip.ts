@@ -89,6 +89,11 @@ export type Itinerary = {
     days: ItineraryDay[];
 };
 
+export type ActivityJoinedMember = {
+    user_id: string;
+    name: string;
+};
+
 export type Activity = {
     activity_id: string;
     trip_id: string;
@@ -98,12 +103,28 @@ export type Activity = {
     description?: string;
     address?: string;
     googleMapsUrl?: string;
+    startTime?: string;
+    endTime?: string;
     created_at?: string;
     voteCount?: number;
     hasCurrentUserVote?: boolean;
     joinedCount?: number;
     hasCurrentUserJoined?: boolean;
+    joinedMembers?: ActivityJoinedMember[];
     source_type: "manual";
+};
+
+export type FinalItinerarySlot = {
+    slot_id: string;
+    selectedActivity: Activity;
+    alternativeActivities: Activity[];
+    addedAlternativeActivities: Activity[];
+    alternativeCount: number;
+};
+
+export type FinalItineraryResponse = {
+    trip_id: string;
+    slots: FinalItinerarySlot[];
 };
 
 export type TimeSlotActivity = {
@@ -118,4 +139,6 @@ export type CreateActivityInput = {
     description?: string;
     address?: string;
     googleMapsUrl?: string;
+    startTime?: string;
+    endTime?: string;
 };

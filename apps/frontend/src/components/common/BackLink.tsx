@@ -1,9 +1,11 @@
-// components/common/BackLink.tsx
+import { useCallback } from "react";
 import { Link } from "expo-router";
-import { Pressable, StyleSheet } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { type Href } from "expo-router";
 import { spacing } from "@/src/theme";
+import { PressLock } from "@/src/utils/PressLock";
 import Back from "@/assets/icons/back.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type BackLinkProps = {
   href?: Href;
@@ -11,15 +13,31 @@ type BackLinkProps = {
 };
 
 export function BackLink({ href, onPress }: BackLinkProps) {
+  const handlePress = useCallback(() => {
+    if (!PressLock.acquire()) return;
+    Promise.resolve()
+      .then(() => onPress?.())
+      .finally(() => setTimeout(() => PressLock.release(), 500));
+  }, [onPress]);
+
+  const icon = (
+    <View
+      {...hiddenFromAccessibility}
+    >
+      <Back width={20} height={20} />
+    </View>
+  );
+
   if (onPress) {
     return (
       <Pressable
         style={styles.backLink}
-        onPress={onPress}
+        onPress={handlePress}
         accessibilityRole="button"
         accessibilityLabel="Go back"
+        accessibilityHint="Returns to the previous screen"
       >
-        <Back width={20} height={20} />
+        {icon}
       </Pressable>
     );
   }
@@ -28,10 +46,11 @@ export function BackLink({ href, onPress }: BackLinkProps) {
     <Link
       href={href!}
       style={styles.backLink}
-      accessibilityRole="link"
+      accessibilityRole={Platform.OS === "web" ? "link" : "button"}
       accessibilityLabel="Go back"
+      accessibilityHint="Returns to the previous screen"
     >
-      <Back width={20} height={20} />
+      {icon}
     </Link>
   );
 }

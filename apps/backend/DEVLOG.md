@@ -203,7 +203,7 @@ src/
 
 ### What I did today:
 - Implemented automatic itinerary generation for trips
-- Each day between trip start and end date gets 8 timeslots (06:00–22:00)
+- Each day between trip start and end date gets 6 activity slots
 - Timeslots are saved to Firestore and can be retrieved via GET endpoint
 - Written unit tests for timeslot generation logic
 - Fixed a bug where old Node process was blocking the new server
@@ -212,7 +212,7 @@ src/
 
 **New files:**
 - `src/__helpers__/itineraryHelper.ts` — pure functions for generating timeslots
-  - `generateDaySlots()` — returns 8 slots for one day
+  - `generateDaySlots()` — returns 6 slots for one day
   - `generateItinerary()` — generates slots for all days between start and end date
 - `src/repositories/itineraryRepository.ts` — Firestore operations for itinerary
   - `saveItinerary()` — saves all days and slots to Firestore
@@ -234,15 +234,15 @@ src/
 ### How itinerary generation works:
 1. Frontend sends POST /itinerary/:tripId/generate
 2. Backend finds the trip in Firestore to get start and end dates
-3. Backend generates 8 timeslots for each day between start and end
+3. Backend generates 6 activity slots for each day between start and end
 4. All slots are saved to Firestore under the `itinerary` collection
 5. Backend returns the full itinerary to frontend
 6. Frontend can fetch it later via GET /trips/:id/itinerary
 
 ### Timeslot format:
-Each day has 8 slots:
-- 06:00-08:00, 08:00-10:00, 10:00-12:00, 12:00-14:00
-- 14:00-16:00, 16:00-18:00, 18:00-20:00, 20:00-22:00
+Each day has 6 slots:
+- Breakfast, Morning Activity, Lunch
+- Midday Activity, Dinner, Evening Activity
 - Each slot starts with `activityId: null` — filled in later during voting
 
 ### Bugs we ran into and how we fixed them:

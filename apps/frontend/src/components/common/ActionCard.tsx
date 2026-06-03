@@ -1,8 +1,8 @@
-// components/common/ActionCard.tsx
-import { ReactNode } from "react";
+import { ReactNode, useCallback } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "./AppText";
 import { colors, spacing, radius, typography } from "@/src/theme";
+import { PressLock } from "@/src/utils/PressLock";
 import ArrowRight from "@/assets/icons/arrow_right.svg";
 
 type ActionCardProps = {
@@ -22,10 +22,17 @@ export function ActionCard({
   accessibilityLabel,
   accessibilityHint,
 }: ActionCardProps) {
+  const handlePress = useCallback(() => {
+    if (!PressLock.acquire()) return;
+    Promise.resolve()
+      .then(() => onPress())
+      .finally(() => setTimeout(() => PressLock.release(), 500));
+  }, [onPress]);
+
   return (
     <Pressable
       style={styles.card}
-      onPress={onPress}
+      onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
@@ -50,10 +57,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    shadowColor: colors.sunsetOrange,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: radius.xl,
+    boxShadow: `0px 8px ${radius.xl}px rgba(255, 107, 53, 0.25)`,
     elevation: 6,
   },
   left: {

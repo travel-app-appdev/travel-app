@@ -1,4 +1,3 @@
-// app/join-trip.tsx
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import {
@@ -17,11 +16,13 @@ import { AppButton } from "@/src/components/common/AppButton";
 import { BackLink } from "@/src/components/common/BackLink";
 import { joinTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
+import { invalidateTripsCache } from "./home";
 import { colors, spacing, typography } from "@/src/theme";
 import LinkIcon from "@/assets/icons/link.svg";
 import KeyFrame from "@/assets/icons/key_frame.svg";
 import LeafUp from "@/assets/visuals/leaf_up.svg";
 import LeafDown from "@/assets/visuals/leaf_down.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -40,6 +41,7 @@ export default function JoinTripScreen() {
       }
       const idToken = await currentUser.getIdToken();
       await joinTrip({ idToken, inviteCode: code.trim() });
+      invalidateTripsCache();
       router.replace("/home");
     } catch (error) {
       const message =
@@ -54,19 +56,15 @@ export default function JoinTripScreen() {
     <View style={styles.fullScreen}>
       <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <View
-          style={styles.leafTopRight}
-          pointerEvents="none"
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          style={[styles.leafTopRight, { pointerEvents: "none" }]}
+          {...hiddenFromAccessibility}
         >
           <LeafUp width={SCREEN_WIDTH * 0.4} height={SCREEN_WIDTH * 0.4} />
         </View>
 
         <View
-          style={styles.leafBottomLeft}
-          pointerEvents="none"
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+          style={[styles.leafBottomLeft, { pointerEvents: "none" }]}
+          {...hiddenFromAccessibility}
         >
           <LeafDown width={SCREEN_WIDTH * 0.45} height={SCREEN_WIDTH * 0.45} />
         </View>
@@ -77,6 +75,7 @@ export default function JoinTripScreen() {
         >
           <ScrollView
             style={styles.scroll}
+            stickyHeaderIndices={[0]}
             contentContainerStyle={styles.container}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -96,7 +95,7 @@ export default function JoinTripScreen() {
             </AppText>
 
             <View style={styles.fieldGroup}>
-              <View style={styles.fieldLabelRow}>
+              <View style={styles.fieldLabelRow} {...hiddenFromAccessibility}>
                 <KeyFrame width={20} height={20} />
                 <AppText variant="body" style={styles.fieldLabel}>
                   Code
@@ -173,6 +172,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
     zIndex: 1,
+    backgroundColor: colors.plantGreen,
+    elevation: 4,
   },
   headerTitle: {
     flexDirection: "row",

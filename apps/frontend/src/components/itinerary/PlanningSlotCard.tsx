@@ -1,13 +1,18 @@
+import { useCallback } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity, TimeSlot } from "@/src/types/itinerary";
+import { formatActivityTimeRange } from "@/src/utils/itinerary/formatActivityTimeRange";
 
 import LocationHeart from "@/assets/icons/location-heart.svg";
 import LocationPin from "@/assets/icons/location-pin.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import AddIcon from "@/assets/icons/add.svg";
 import EditIcon from "@/assets/icons/edit.svg";
+import Timer from "@/assets/icons/timer.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
   slot: TimeSlot;
@@ -25,102 +30,158 @@ export function PlanningSlotCard({
   disabled = false,
 }: Props) {
   const hasActivity = Boolean(activity);
+  const activityTimeRange = formatActivityTimeRange(activity);
 
-  function handlePress() {
+  const handleAddPressRaw = useCallback(() => {
     if (disabled) return;
-
-    if (activity) {
-      onEditActivity(activity);
-      return;
-    }
-
     onAddActivity(slot.id);
+  }, [disabled, onAddActivity, slot.id]);
+
+  const handleEditPressRaw = useCallback(() => {
+    if (disabled || !activity) return;
+    onEditActivity(activity);
+  }, [disabled, activity, onEditActivity]);
+
+  const handleAddPress = useSinglePress(handleAddPressRaw);
+  const handleEditPress = useSinglePress(handleEditPressRaw);
+
+  if (!hasActivity) {
+    return (
+      <Pressable
+        onPress={handleAddPress}
+        style={({ pressed }) => [
+          styles.emptyCard,
+          pressed && styles.cardPressed,
+          disabled && styles.cardDisabled,
+        ]}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={`Add activity at ${slot.label}`}
+        accessibilityHint="Opens the add activity screen"
+        accessibilityState={{ disabled }}
+      >
+        <AppText variant="body" style={styles.emptyTimeLabel}>
+          {slot.label}
+        </AppText>
+
+        <View style={styles.emptyContent}>
+          <View {...hiddenFromAccessibility}>
+            <AddIcon width={32} height={32} color={colors.nightBlack} />
+          </View>
+
+          <AppText variant="body" style={styles.emptyTitle}>
+            Empty Activity
+          </AppText>
+        </View>
+      </Pressable>
+    );
   }
 
   return (
     <View style={styles.row}>
-      <View style={[styles.card, hasActivity && styles.filledCard]}>
-        {hasActivity ? (
-          <View style={styles.filledContent}>
-            <View style={styles.timeRow}>
-              <LocationHeart width={24} height={24} />
-              <AppText variant="body" style={styles.filledTimeLabel}>
-                {slot.label}
-              </AppText>
-            </View>
+      <View style={[styles.card, styles.filledCard]}>
+        <View style={styles.timeRow} {...hiddenFromAccessibility}>
+          <LocationHeart width={24} height={24} />
+          <AppText variant="body" style={styles.filledTimeLabel}>
+            {slot.label}
+          </AppText>
+        </View>
 
+        <AppText
+          variant="body"
+          style={styles.activityTitle}
+          numberOfLines={2}
+        >
+          {activity?.name}
+        </AppText>
+
+        {!!activityTimeRange && (
+          <View
+            style={styles.infoRow}
+            accessible={true}
+            accessibilityLabel={`Activity time: ${activityTimeRange}`}
+          >
+            <Timer width={18} height={18} {...hiddenFromAccessibility} />
             <AppText
               variant="body"
-              style={styles.activityTitle}
-              numberOfLines={2}
+              style={styles.infoText}
+              numberOfLines={1}
+              accessible={false}
             >
-              {activity?.name}
+              {activityTimeRange}
             </AppText>
-
-            {!!activity?.address && (
-              <View style={styles.infoRow}>
-                <LocationPin width={20} height={20} />
-                <AppText
-                  variant="body"
-                  style={styles.infoText}
-                  numberOfLines={1}
-                >
-                  {activity.address}
-                </AppText>
-              </View>
-            )}
-
-            {!!activity?.googleMapsUrl && (
-              <View style={styles.infoRow}>
-                <GoogleIcon width={20} height={20} />
-                <AppText
-                  variant="body"
-                  style={styles.linkText}
-                  numberOfLines={1}
-                >
-                  {activity.googleMapsUrl}
-                </AppText>
-              </View>
-            )}
           </View>
-        ) : (
-          <>
-            <AppText variant="body" style={styles.timeLabel}>
-              {slot.label}
+        )}
+
+        {!!activity?.address && (
+          <View
+            style={styles.infoRow}
+            accessible={true}
+            accessibilityLabel={`Address: ${activity.address}`}
+          >
+            <LocationPin
+              width={20}
+              height={20}
+              {...hiddenFromAccessibility}
+            />
+            <AppText
+              variant="body"
+              style={styles.infoText}
+              numberOfLines={1}
+              accessible={false}
+            >
+              {activity.address}
             </AppText>
+          </View>
+        )}
 
-            <View style={styles.emptyContent}>
-              <View style={styles.emptyIconWrapper}>
-                <LocationHeart width={24} height={24} />
-              </View>
-
-              <AppText variant="body" style={styles.emptyTitle}>
-                Empty Activity
-              </AppText>
-            </View>
-          </>
+        {!!activity?.googleMapsUrl && (
+          <View
+            style={styles.infoRow}
+            accessible={true}
+            accessibilityLabel="Google Maps link available"
+          >
+            <GoogleIcon
+              width={20}
+              height={20}
+              {...hiddenFromAccessibility}
+            />
+            <AppText
+              variant="body"
+              style={styles.linkText}
+              numberOfLines={1}
+              accessible={false}
+            >
+              {activity.googleMapsUrl}
+            </AppText>
+          </View>
         )}
       </View>
 
       <Pressable
-        onPress={handlePress}
+        onPress={handleEditPress}
         style={({ pressed }) => [
           styles.cta,
-          hasActivity ? styles.editCta : styles.addCta,
+          styles.editCta,
           pressed && styles.ctaPressed,
           disabled && styles.ctaDisabled,
         ]}
         disabled={disabled}
         accessibilityRole="button"
+        accessibilityLabel={
+          activityTimeRange
+            ? `Edit activity ${activity?.name} at ${slot.label}, ${activityTimeRange}`
+            : `Edit activity ${activity?.name} at ${slot.label}`
+        }
+        accessibilityHint="Opens the edit activity screen"
+        accessibilityState={{ disabled }}
       >
-        {hasActivity ? (
-          <EditIcon width={36} height={36} />
-        ) : (
-          <AddIcon width={36} height={36} />
-        )}
+        <View {...hiddenFromAccessibility}>
+          <EditIcon width={24} height={24} />
+        </View>
 
-        <AppText variant="body" style={styles.ctaText}>
-          {hasActivity ? "Edit\nactivity" : "Add\nactivity"}
+        <AppText variant="body" style={styles.ctaText} accessible={false}>
+          Edit{"\n"}activity
         </AppText>
       </Pressable>
     </View>
@@ -135,43 +196,49 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     alignItems: "stretch",
   },
-
   card: {
     flex: 1,
     minHeight: CARD_HEIGHT,
-    borderRadius: radius.xl,
-    borderWidth: 1.5,
+    borderRadius: radius.md,
+    borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.lightWhite,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     overflow: "hidden",
   },
-
+  emptyCard: {
+    alignSelf: "stretch",
+    minHeight: 90,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+    backgroundColor: colors.lightWhite,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    overflow: "hidden",
+  },
+  cardPressed: {
+    opacity: 0.85,
+  },
+  cardDisabled: {
+    opacity: 0.5,
+  },
   filledCard: {
     borderColor: colors.nightBlack,
   },
-
-  filledContent: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: spacing.sm,
-  },
-
   timeRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
     marginBottom: 2,
   },
-
   filledTimeLabel: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
   },
-
   activityTitle: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
@@ -179,14 +246,12 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.lg,
     marginBottom: 2,
   },
-
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
     marginTop: 1,
   },
-
   infoText: {
     flex: 1,
     color: colors.nightBlack,
@@ -194,7 +259,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
   },
-
   linkText: {
     flex: 1,
     color: colors.nightBlack,
@@ -203,64 +267,48 @@ const styles = StyleSheet.create({
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
   },
-
-  timeLabel: {
-    color: colors.textMuted,
+  emptyTimeLabel: {
+    color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.lg,
     lineHeight: typography.lineHeight.lg,
   },
-
   emptyContent: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xs,
   },
-
-  emptyIconWrapper: {
-    opacity: 0.35,
-  },
-
   emptyTitle: {
-    color: colors.textMuted,
+    color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.xl,
     lineHeight: typography.lineHeight.xl,
   },
-
   cta: {
     width: 92,
     minHeight: CARD_HEIGHT,
-    borderRadius: radius.xl,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
-
-  addCta: {
-    backgroundColor: colors.beachYellow,
-  },
-
   editCta: {
     backgroundColor: colors.border,
   },
-
   ctaPressed: {
     opacity: 0.85,
   },
-
   ctaDisabled: {
     opacity: 0.5,
   },
-
   ctaText: {
     color: colors.nightBlack,
     textAlign: "center",
     fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.md,
-    lineHeight: typography.lineHeight.md,
+    lineHeight: typography.lineHeight.xs,
   },
 });

@@ -1,7 +1,6 @@
 import request from 'supertest';
 import app from '../index';
 
-// Mock Firebase Admin
 jest.mock('../config/firebase', () => ({
   __esModule: true,
   default: {
@@ -30,11 +29,22 @@ jest.mock('../config/firebase', () => ({
 }));
 
 describe('POST /auth/register', () => {
+  beforeAll(() => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    (console.error as jest.Mock).mockClear();
+  });
+
+  afterAll(() => {
+    (console.error as jest.Mock).mockRestore();
+  });
 
   it('should return 400 if fields are missing', async () => {
     const res = await request(app)
-      .post('/auth/register')
-      .send({ email: 'test@example.com' });
+        .post('/auth/register')
+        .send({ email: 'test@example.com' });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('email, password and name are required');
@@ -42,12 +52,12 @@ describe('POST /auth/register', () => {
 
   it('should return 409 if email already exists', async () => {
     const res = await request(app)
-      .post('/auth/register')
-      .send({
-        email: 'test@example.com',
-        password: 'secret123',
-        name: 'Milena'
-      });
+        .post('/auth/register')
+        .send({
+          email: 'test@example.com',
+          password: 'secret123',
+          name: 'Milena'
+        });
 
     expect(res.status).toBe(409);
     expect(res.body.error).toBe('Email is already registered');
@@ -55,21 +65,16 @@ describe('POST /auth/register', () => {
 
   it('should return 201 and user data on success', async () => {
     const res = await request(app)
-      .post('/auth/register')
-      .send({
-        email: 'newuser@example.com',
-        password: 'secret123',
-        name: 'Milena'
-      });
+        .post('/auth/register')
+        .send({
+          email: 'newuser@example.com',
+          password: 'secret123',
+          name: 'Milena'
+        });
 
     expect(res.status).toBe(201);
     expect(res.body).toHaveProperty('uid');
     expect(res.body).toHaveProperty('email');
     expect(res.body).toHaveProperty('name');
   });
-
-  afterAll(done => {
-    done();
-  });
-
 });

@@ -1,14 +1,22 @@
-// app/home.tsx
 import { Link, useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/src/context/AuthContext";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  AccessibilityInfo,
+  Animated,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
 import { colors, spacing, radius, typography } from "@/src/theme";
-import { fetchMyTrips, type Trip } from "@/src/api/trips";
+import { fetchMyTrips, invalidateMyTripsCache, type Trip } from "@/src/api/trips";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
@@ -53,6 +61,25 @@ type TripCardItem = {
   rawState: Trip["state"];
 };
 
+type TripsCache = {
+  userId: string;
+  yourTrips: TripCardItem[];
+  pastTrips: TripCardItem[];
+  fetchedAt: number;
+};
+
+const TRIPS_STALE_TIME_MS = 30_000;
+const TRIPS_FOCUS_REFRESH_THROTTLE_MS = 5_000;
+let tripsCache: TripsCache | null = null;
+
+let tripsCacheForceNext = false;
+
+export function invalidateTripsCache() {
+  tripsCache = null;
+  tripsCacheForceNext = true;
+  invalidateMyTripsCache();
+}
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString("en-US", {
@@ -71,9 +98,11 @@ function getInitials(name: string): string {
 function getCardColor(tripId: string): string {
   const palette = [colors.plantGreen, colors.sunsetOrange, colors.seaBlue];
   let hash = 0;
+
   for (let i = 0; i < tripId.length; i++) {
     hash = tripId.charCodeAt(i) + ((hash << 5) - hash);
   }
+
   return palette[Math.abs(hash) % palette.length];
 }
 
@@ -129,57 +158,260 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
   };
 }
 
+function mapTripsToLists(backendTrips: TripWithMembers[]) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const upcoming: TripCardItem[] = [];
+  const past: TripCardItem[] = [];
+
+  backendTrips.forEach((trip) => {
+    const mappedTrip = mapTripToCardTrip(trip);
+    const tripEndDate = new Date(trip.end_date);
+    tripEndDate.setHours(0, 0, 0, 0);
+
+    if (tripEndDate < today) {
+      past.push(mappedTrip);
+    } else {
+      upcoming.push(mappedTrip);
+    }
+  });
+
+  return { upcoming, past };
+}
+
+function SkeletonCard() {
+  const shimmer = useRef(new Animated.Value(0)).current;
+  const [isReduceMotionEnabled, setIsReduceMotionEnabled] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const subscription = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      setIsReduceMotionEnabled
+    );
+
+    AccessibilityInfo.isReduceMotionEnabled().then((isEnabled) => {
+      if (isMounted) setIsReduceMotionEnabled(isEnabled);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isReduceMotionEnabled) {
+      shimmer.setValue(0.55);
+      return;
+    }
+
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmer, {
+          toValue: 0,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [isReduceMotionEnabled, shimmer]);
+
+  const opacity = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 0.7],
+  });
+
+  return (
+    <Animated.View
+      style={[styles.skeletonCard, { opacity }]}
+      {...hiddenFromAccessibility}
+    >
+      <View style={styles.skeletonTitleRow}>
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonBadge} />
+      </View>
+
+      <View style={styles.skeletonMiddleRow}>
+        <View style={styles.skeletonDestination} />
+        <View style={styles.skeletonDate} />
+      </View>
+
+      <View style={styles.skeletonBottomRow}>
+        <View style={styles.skeletonAvatars}>
+          <View style={styles.skeletonAvatar} />
+          <View style={[styles.skeletonAvatar, { marginLeft: -10 }]} />
+          <View style={[styles.skeletonAvatar, { marginLeft: -10 }]} />
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>("your");
-  const [yourTrips, setYourTrips] = useState<TripCardItem[]>([]);
-  const [pastTrips, setPastTrips] = useState<TripCardItem[]>([]);
   const router = useRouter();
 
-  const loadTrips = useCallback(async () => {
-    try {
-      if (!user) {
+  const [activeTab, setActiveTab] = useState<Tab>("your");
+  const [yourTrips, setYourTrips] = useState<TripCardItem[]>(
+    tripsCache?.yourTrips ?? []
+  );
+  const [pastTrips, setPastTrips] = useState<TripCardItem[]>(
+    tripsCache?.pastTrips ?? []
+  );
+  const [isLoading, setIsLoading] = useState(!tripsCache);
+
+  const lastFetchRef = useRef<number>(tripsCache?.fetchedAt ?? 0);
+  const latestUserIdRef = useRef<string | null>(user?.uid ?? null);
+
+  useEffect(() => {
+    const newUserId = user?.uid ?? null;
+    latestUserIdRef.current = newUserId;
+
+    if (!newUserId) {
+      setYourTrips([]);
+      setPastTrips([]);
+      setIsLoading(false);
+      tripsCache = null;
+      lastFetchRef.current = 0;
+      return;
+    }
+
+    if (!tripsCache || tripsCache.userId !== newUserId) {
+      setYourTrips([]);
+      setPastTrips([]);
+      setIsLoading(true);
+      lastFetchRef.current = 0;
+      return;
+    }
+
+    setYourTrips(tripsCache.yourTrips);
+    setPastTrips(tripsCache.pastTrips);
+    setIsLoading(false);
+    lastFetchRef.current = tripsCache.fetchedAt;
+  }, [user?.uid]);
+
+  const loadTrips = useCallback(
+    async (force = false) => {
+      const userId = user?.uid ?? null;
+
+      if (!userId) {
         setYourTrips([]);
         setPastTrips([]);
+        setIsLoading(false);
+        tripsCache = null;
+        lastFetchRef.current = 0;
         return;
       }
 
-      const backendTrips = await fetchMyTrips(user.uid);
+      const now = Date.now();
+      const cachedTrips = tripsCache;
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const hasFreshCache =
+        !force &&
+        cachedTrips !== null &&
+        cachedTrips.userId === userId &&
+        now - cachedTrips.fetchedAt < TRIPS_STALE_TIME_MS;
 
-      const upcoming: TripCardItem[] = [];
-      const past: TripCardItem[] = [];
+      if (hasFreshCache) {
+        setYourTrips(cachedTrips.yourTrips);
+        setPastTrips(cachedTrips.pastTrips);
+        setIsLoading(false);
+        lastFetchRef.current = cachedTrips.fetchedAt;
+        return;
+      }
 
-      (backendTrips as TripWithMembers[]).forEach((trip: TripWithMembers) => {
-        const mappedTrip = mapTripToCardTrip(trip);
-        const tripEndDate = new Date(trip.end_date);
-        tripEndDate.setHours(0, 0, 0, 0);
+      setIsLoading(true);
 
-        if (tripEndDate < today) {
-          past.push(mappedTrip);
-        } else {
-          upcoming.push(mappedTrip);
+      try {
+        const backendTrips = (await fetchMyTrips(userId, { forceRefresh: true })) as TripWithMembers[];
+
+        if (latestUserIdRef.current !== userId) {
+          return;
         }
-      });
 
-      setYourTrips(upcoming);
-      setPastTrips(past);
-    } catch (error) {
-      console.error("Error loading trips:", error);
-      setYourTrips([]);
-      setPastTrips([]);
-    }
-  }, [user]);
+        const { upcoming, past } = mapTripsToLists(backendTrips);
+        const fetchedAt = Date.now();
+
+        tripsCache = {
+          userId,
+          yourTrips: upcoming,
+          pastTrips: past,
+          fetchedAt,
+        };
+
+        lastFetchRef.current = fetchedAt;
+        setYourTrips(upcoming);
+        setPastTrips(past);
+      } catch (error) {
+        console.error("Error loading trips:", error);
+
+        if (latestUserIdRef.current === userId) {
+          setYourTrips([]);
+          setPastTrips([]);
+        }
+      } finally {
+        if (latestUserIdRef.current === userId) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [user?.uid]
+  );
 
   useFocusEffect(
     useCallback(() => {
-      void loadTrips();
-    }, [loadTrips])
+      const userId = user?.uid ?? null;
+      latestUserIdRef.current = userId;
+
+      if (!userId) {
+        setYourTrips([]);
+        setPastTrips([]);
+        setIsLoading(false);
+        return;
+      }
+
+      if (tripsCache && tripsCache.userId === userId) {
+        setYourTrips(tripsCache.yourTrips);
+        setPastTrips(tripsCache.pastTrips);
+        setIsLoading(false);
+      } else {
+        setYourTrips([]);
+        setPastTrips([]);
+        setIsLoading(true);
+      }
+
+      const shouldForce = tripsCacheForceNext;
+      tripsCacheForceNext = false;
+      if (shouldForce) {
+        lastFetchRef.current = 0;
+      }
+      const timeSinceLastFetch = Date.now() - lastFetchRef.current;
+      const shouldRefresh = shouldForce || timeSinceLastFetch > TRIPS_FOCUS_REFRESH_THROTTLE_MS;
+      if (shouldRefresh) {
+        invalidateMyTripsCache(userId);
+        void loadTrips(true);
+      }
+    }, [loadTrips, user?.uid])
   );
 
   const trips = activeTab === "your" ? yourTrips : pastTrips;
+
+  const handleProfile = useSinglePress(() => router.push("/profile"));
+  const handleYourTab = useSinglePress(() => setActiveTab("your"));
+  const handlePastTab = useSinglePress(() => setActiveTab("past"));
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -189,11 +421,10 @@ export default function HomeScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Row */}
         <View style={styles.headerRow}>
           <Pressable
             style={styles.profileButton}
-            onPress={() => router.push("/profile")}
+            onPress={handleProfile}
             accessibilityRole="button"
             accessibilityLabel="Go to profile"
             accessibilityHint="Opens your profile screen"
@@ -205,25 +436,18 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Title */}
         <View style={styles.titleBlock}>
           <AppText variant="title" style={styles.helloText}>
             Helloooo
           </AppText>
+
           <View style={styles.subtitleRow}>
             <AppText variant="body" style={styles.subtitle}>
-              where is the{" "}
+              where is the squad going?
             </AppText>
-            <View>
-              <AppText variant="body" style={styles.subtitleBold}>
-                squad going?
-              </AppText>
-              <View style={styles.squadUnderline} />
-            </View>
           </View>
         </View>
 
-        {/* Action Cards */}
         <View style={styles.actionRow}>
           <Link href="/create-trip" asChild>
             <Pressable
@@ -258,12 +482,11 @@ export default function HomeScreen() {
           </Link>
         </View>
 
-        {/* Tabs */}
         <View style={styles.tabRow}>
           <Pressable
-            onPress={() => setActiveTab("your")}
+            onPress={handleYourTab}
             style={styles.tabItem}
-            accessibilityRole="button"
+            accessibilityRole="tab"
             accessibilityLabel="Show your trips"
             accessibilityState={{ selected: activeTab === "your" }}
           >
@@ -282,9 +505,9 @@ export default function HomeScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => setActiveTab("past")}
+            onPress={handlePastTab}
             style={styles.tabItem}
-            accessibilityRole="button"
+            accessibilityRole="tab"
             accessibilityLabel="Show past trips"
             accessibilityState={{ selected: activeTab === "past" }}
           >
@@ -303,10 +526,21 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Trip Cards or Empty State */}
-        {trips.length > 0 ? (
+        {isLoading ? (
+          <View
+            style={styles.tripList}
+            accessible={true}
+            accessibilityLiveRegion="polite"
+            accessibilityLabel="Loading trips"
+            accessibilityState={{ busy: true }}
+          >
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
+        ) : trips.length > 0 ? (
           <View style={styles.tripList}>
-            {trips.map((trip: TripCardItem) => (
+            {trips.map((trip) => (
               <TripCard
                 key={trip.id}
                 tripId={trip.id}
@@ -319,23 +553,9 @@ export default function HomeScreen() {
                 members={trip.members}
                 role={trip.role}
                 onPress={() => {
-                  router.push({
-                    pathname: "/itinerary",
-                    params: {
-                      tripId: trip.id,
-                      state: trip.status,
-                      title: trip.title,
-                      destination: trip.destination,
-                      startDate: trip.rawStartDate,
-                      endDate: trip.rawEndDate,
-                      members: JSON.stringify(trip.members),
-                    },
-                  });
-                }}
-                onIconPress={() => {
                   if (trip.role === "admin") {
                     router.push({
-                      pathname: "/trip-settings",
+                      pathname: "/trip-overview-admin",
                       params: {
                         tripId: trip.id,
                         title: trip.title,
@@ -352,7 +572,7 @@ export default function HomeScreen() {
                     });
                   } else {
                     router.push({
-                      pathname: "/trip-information",
+                      pathname: "/trip-overview-member",
                       params: {
                         tripId: trip.id,
                         title: trip.title,
@@ -360,6 +580,7 @@ export default function HomeScreen() {
                         startDate: trip.rawStartDate,
                         endDate: trip.rawEndDate,
                         members: JSON.stringify(trip.members),
+                        inviteCode: trip.inviteCode,
                         state: trip.rawState,
                         planningStartedAt: trip.planningStartedAt ?? "",
                         planningEndAt: trip.planningEndAt ?? "",
@@ -367,6 +588,23 @@ export default function HomeScreen() {
                       },
                     });
                   }
+                }}
+                onStatusPress={(status) => {
+                  router.push({
+                    pathname: "/itinerary",
+                    params: {
+                      tripId: trip.id,
+                      state: status,
+                      title: trip.title,
+                      destination: trip.destination,
+                      startDate: trip.rawStartDate,
+                      endDate: trip.rawEndDate,
+                      members: JSON.stringify(trip.members),
+                      planningEndAt: trip.planningEndAt ?? "",
+                      votingEndAt: trip.votingEndAt ?? "",
+                      role: trip.role,
+                    },
+                  });
                 }}
               />
             ))}
@@ -383,6 +621,7 @@ export default function HomeScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+  
 }
 
 const styles = StyleSheet.create({
@@ -505,5 +744,72 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 260,
     lineHeight: typography.lineHeight.md,
+  },
+  skeletonCard: {
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.sm,
+    minHeight: 148,
+    backgroundColor: colors.grayedOut,
+  },
+  skeletonTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  skeletonTitle: {
+    flex: 1,
+    height: 20,
+    borderRadius: radius.sm,
+    backgroundColor: colors.textMuted,
+    opacity: 0.4,
+    maxWidth: "60%",
+  },
+  skeletonBadge: {
+    width: 64,
+    height: 22,
+    borderRadius: radius.pill,
+    backgroundColor: colors.textMuted,
+    opacity: 0.4,
+  },
+  skeletonMiddleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  skeletonDestination: {
+    flex: 1,
+    height: 14,
+    borderRadius: radius.sm,
+    backgroundColor: colors.textMuted,
+    opacity: 0.3,
+    maxWidth: "45%",
+  },
+  skeletonDate: {
+    width: 80,
+    height: 14,
+    borderRadius: radius.sm,
+    backgroundColor: colors.textMuted,
+    opacity: 0.3,
+  },
+  skeletonBottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing.xs,
+  },
+  skeletonAvatars: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  skeletonAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.textMuted,
+    opacity: 0.35,
+    borderWidth: 2,
+    borderColor: colors.lightWhite,
   },
 });

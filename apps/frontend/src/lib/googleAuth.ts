@@ -6,16 +6,22 @@ import { auth } from "./firebase";
 WebBrowser.maybeCompleteAuthSession();
 
 export function useGoogleLogin() {
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    //expoClientId: "YOUR_EXPO_CLIENT_ID",
-    iosClientId: "YOUR_IOS_CLIENT_ID",
-    androidClientId: "YOUR_ANDROID_CLIENT_ID",
-    webClientId: "YOUR_WEB_CLIENT_ID",
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    androidClientId:
+      "176497650369-45dh080k3i8jv041mv9aov1j6u02gj0p.apps.googleusercontent.com",
+    webClientId:
+      "176497650369-0tdfoggthmj01c254gjpslvqri5c6tmh.apps.googleusercontent.com",
   });
 
-  async function signInWithGoogleToken(idToken: string) {
-    const credential = GoogleAuthProvider.credential(idToken);
-    await signInWithCredential(auth, credential);
+  async function signInWithGoogleToken(googleIdToken: string) {
+    const credential = GoogleAuthProvider.credential(googleIdToken);
+    const result = await signInWithCredential(auth, credential);
+    const firebaseIdToken = await result.user.getIdToken();
+
+    return {
+      firebaseIdToken,
+      firebaseUser: result.user,
+    };
   }
 
   return {

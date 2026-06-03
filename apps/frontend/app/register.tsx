@@ -1,5 +1,4 @@
-// app/register.tsx
-import { Link, router } from "expo-router";
+import { Link, router, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import {
   StyleSheet,
@@ -37,6 +36,11 @@ export default function RegisterScreen() {
   const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { setUser, setIdToken } = useAuth();
+
+  // Pick up the invite code if this registration was triggered from an invite link
+  const { pendingInviteCode } = useLocalSearchParams<{
+    pendingInviteCode?: string;
+  }>();
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -79,10 +83,49 @@ export default function RegisterScreen() {
       setUser(authResponse);
       setIdToken(authResponse.idToken);
 
-      router.replace("/home");
-    } catch (error) {
-      const message = getFirebaseAuthMessage(error);
-      setErrors((prev) => ({ ...prev, general: message }));
+      // If the user came from an invite link, return them to the invite screen
+      if (pendingInviteCode) {
+        router.replace({
+          pathname: "/invite",
+          params: { code: pendingInviteCode },
+        });
+      } else {
+        router.replace("/onboarding");
+      }
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const backendCode = error?.response?.data?.code ?? "";
+      const backendMessage =
+        error?.response?.data?.message ??
+        error?.response?.data?.error ??
+        error?.message ??
+        "";
+      const firebaseCode = error?.code ?? "";
+
+      if (
+        status === 409 ||
+        backendCode === "EMAIL_ALREADY_EXISTS" ||
+        firebaseCode === "auth/email-already-exists" ||
+        firebaseCode === "auth/email-already-in-use" ||
+        backendMessage.toLowerCase().includes("already") ||
+        backendMessage.toLowerCase().includes("in use")
+      ) {
+        setErrors((prev) => ({
+          ...prev,
+          email: "This email is already registered. Try logging in instead.",
+          general: undefined,
+        }));
+      } else {
+        const friendlyMessage =
+          backendMessage ||
+          getFirebaseAuthMessage(error) ||
+          "Something went wrong. Please try again.";
+
+        setErrors((prev) => ({
+          ...prev,
+          general: friendlyMessage,
+        }));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -103,9 +146,9 @@ export default function RegisterScreen() {
           {
             paddingTop: headerTop,
             paddingBottom: headerBottom,
+            pointerEvents: "box-none",
           },
         ]}
-        pointerEvents="box-none"
       >
         <View style={styles.backWrapper}>
           <Link
@@ -144,8 +187,6 @@ export default function RegisterScreen() {
                 right: 0,
               },
             ]}
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
           >
             <MascotHelloPink width={mascotSize} height={mascotSize} />
           </View>
@@ -210,6 +251,18 @@ export default function RegisterScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
+          {/* Show context banner when coming from an invite */}
+          {!!pendingInviteCode && (
+            <View style={styles.inviteBanner}>
+              <AppText variant="caption" style={styles.inviteBannerText}>
+                Create your account to join the trip with code{" "}
+                <AppText variant="caption" style={styles.inviteBannerCode}>
+                  {pendingInviteCode}
+                </AppText>
+              </AppText>
+            </View>
+          )}
+
           <View style={styles.form}>
             <View style={styles.fieldGroup}>
               <AppText variant="body" style={styles.label}>
@@ -330,6 +383,25 @@ export default function RegisterScreen() {
               />
             </View>
 
+            {/* If coming from invite, also offer login */}
+            {!!pendingInviteCode && (
+              <View style={styles.loginLinkRow}>
+                <AppText variant="caption" style={styles.loginLinkCaption}>
+                  Already have an account?
+                </AppText>
+                <Link
+                  href={{
+                    pathname: "/login",
+                    params: { pendingInviteCode },
+                  }}
+                  accessibilityLabel="Go to login screen"
+                  accessibilityRole="link"
+                >
+                  <AppText style={styles.loginLink}>Log in instead</AppText>
+                </Link>
+              </View>
+            )}
+
             <View style={styles.flowersWrapper}>
               <Flowers width={64} height={24} />
             </View>
@@ -402,7 +474,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontFamily: typography.fontFamily.title,
   },
-
   keyboardArea: {
     flex: 1,
     zIndex: 2,
@@ -411,6 +482,26 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.xxxl,
     justifyContent: "space-between",
+  },
+  inviteBanner: {
+    backgroundColor: colors.sunsetPink,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
+  },
+  inviteBannerText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
+    textAlign: "center",
+  },
+  inviteBannerCode: {
+    fontFamily: typography.fontFamily.bodyBold,
+    letterSpacing: 2,
+    color: colors.nightBlack,
+    fontSize: typography.size.md,
   },
   form: {
     gap: spacing.xl,
@@ -437,6 +528,7 @@ const styles = StyleSheet.create({
   bottomArea: {
     marginTop: spacing.xxxl,
     alignItems: "center",
+    gap: spacing.md,
   },
   buttonWrapper: {
     width: "100%",
@@ -450,8 +542,25 @@ const styles = StyleSheet.create({
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
   },
+  loginLinkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  loginLinkCaption: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.sm,
+  },
+  loginLink: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    textDecorationLine: "underline",
+  },
   flowersWrapper: {
     alignItems: "center",
-    marginTop: spacing.xl,
   },
 });

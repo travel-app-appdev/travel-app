@@ -1,4 +1,48 @@
+import { invalidateMyTripsCache } from "@/src/api/trips";
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+function encodePathSegment(value: string) {
+  return encodeURIComponent(value);
+}
+
+export type JoinedMember = {
+  user_id: string;
+  name: string;
+};
+
+export type BackendActivity = {
+  activity_id: string;
+  trip_id: string;
+  user_id: string;
+  slot_id?: string;
+  name: string;
+  description?: string;
+  address?: string;
+  googleMapsUrl?: string;
+  startTime?: string;
+  endTime?: string;
+  created_at?: string;
+  voteCount?: number;
+  hasCurrentUserVote?: boolean;
+  joinedCount?: number;
+  hasCurrentUserJoined?: boolean;
+  joinedMembers?: JoinedMember[];
+  source_type?: "manual";
+};
+
+export type FinalItinerarySlotDto = {
+  slot_id: string;
+  selectedActivity: BackendActivity;
+  alternativeActivities: BackendActivity[];
+  addedAlternativeActivities: BackendActivity[];
+  alternativeCount: number;
+};
+
+export type FinalItineraryResponseDto = {
+  trip_id: string;
+  slots: FinalItinerarySlotDto[];
+};
 
 export type CreateActivityPayload = {
   idToken: string;
@@ -9,6 +53,8 @@ export type CreateActivityPayload = {
   description?: string;
   address?: string;
   googleMapsUrl?: string;
+  startTime?: string;
+  endTime?: string;
 };
 
 export type UpdateActivityPayload = {
@@ -17,11 +63,26 @@ export type UpdateActivityPayload = {
   description?: string;
   address?: string;
   googleMapsUrl?: string;
+  startTime?: string;
+  endTime?: string;
+};
+
+export type VoteForActivityResponse = {
+  activityId: string;
+  slotId: string;
+  tripState: "Planning" | "Voting" | "Final";
+  voteAccepted?: boolean;
+};
+
+export type ToggleAddedAlternativeResponse = {
+  added: boolean;
+  addedAlternativeActivityIds: string[];
 };
 
 export async function createActivity(payload: CreateActivityPayload) {
+  const encodedSlotId = encodePathSegment(payload.slotId);
   const response = await fetch(
-    `${API_URL}/itinerary/${payload.tripId}/slots/${payload.slotId}/activities`,
+    `${API_URL}/itinerary/${payload.tripId}/slots/${encodedSlotId}/activities`,
     {
       method: "POST",
       headers: {
@@ -33,6 +94,8 @@ export async function createActivity(payload: CreateActivityPayload) {
         description: payload.description,
         address: payload.address,
         googleMapsUrl: payload.googleMapsUrl,
+        startTime: payload.startTime,
+        endTime: payload.endTime,
       }),
     }
   );
@@ -52,8 +115,9 @@ export async function getActivitiesBySlot(
   userId?: string
 ) {
   const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  const encodedSlotId = encodePathSegment(slotId);
   const response = await fetch(
-    `${API_URL}/itinerary/${tripId}/slots/${slotId}/activities${query}`
+    `${API_URL}/itinerary/${tripId}/slots/${encodedSlotId}/activities${query}`
   );
 
   const data = await response.json();
@@ -70,9 +134,10 @@ export async function voteForActivity(payload: {
   tripId: string;
   slotId: string;
   activityId: string;
-}) {
+}): Promise<VoteForActivityResponse> {
+  const encodedSlotId = encodePathSegment(payload.slotId);
   const response = await fetch(
-    `${API_URL}/itinerary/${payload.tripId}/slots/${payload.slotId}/votes`,
+    `${API_URL}/itinerary/${payload.tripId}/slots/${encodedSlotId}/votes`,
     {
       method: "POST",
       headers: {
@@ -91,13 +156,14 @@ export async function voteForActivity(payload: {
     throw new Error(data.error || "Could not add vote");
   }
 
-  return data;
+  invalidateMyTripsCache();
+  return data as VoteForActivityResponse;
 }
 
 export async function getFinalItineraryActivities(
   tripId: string,
   userId?: string
-) {
+): Promise<FinalItineraryResponseDto> {
   const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
   const response = await fetch(`${API_URL}/itinerary/${tripId}/final${query}`);
 
@@ -107,7 +173,7 @@ export async function getFinalItineraryActivities(
     throw new Error(data.error || "Could not load final itinerary");
   }
 
-  return data;
+  return data as FinalItineraryResponseDto;
 }
 
 export async function toggleActivityAttendance(payload: {
@@ -116,8 +182,9 @@ export async function toggleActivityAttendance(payload: {
   slotId: string;
   activityId: string;
 }) {
+  const encodedSlotId = encodePathSegment(payload.slotId);
   const response = await fetch(
-    `${API_URL}/itinerary/${payload.tripId}/slots/${payload.slotId}/attendance`,
+    `${API_URL}/itinerary/${payload.tripId}/slots/${encodedSlotId}/attendance`,
     {
       method: "POST",
       headers: {
@@ -137,6 +204,36 @@ export async function toggleActivityAttendance(payload: {
   }
 
   return data;
+}
+
+export async function toggleAddedAlternativeToItinerary(payload: {
+  idToken: string;
+  tripId: string;
+  slotId: string;
+  activityId: string;
+}): Promise<ToggleAddedAlternativeResponse> {
+  const encodedSlotId = encodePathSegment(payload.slotId);
+  const response = await fetch(
+    `${API_URL}/itinerary/${payload.tripId}/slots/${encodedSlotId}/added-alternatives`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        idToken: payload.idToken,
+        activityId: payload.activityId,
+      }),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Could not update suggested activity");
+  }
+
+  return data as ToggleAddedAlternativeResponse;
 }
 
 export async function updateActivity(

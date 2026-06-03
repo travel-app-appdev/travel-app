@@ -1,9 +1,8 @@
-// src/components/itinerary/ItineraryHeader.tsx
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { formatTripDateRange } from "@/src/utils/itinerary/formatTripToDateRange";
-import { Link } from "expo-router";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { ItineraryState } from "@/src/types/itinerary";
 
 import Back from "@/assets/icons/back.svg";
@@ -12,11 +11,11 @@ import MascotVoting from "@/assets/mascots/mascot-voting.svg";
 import MascotFinal from "@/assets/mascots/mascot-final.svg";
 import CalendarIcon from "@/assets/icons/calendar.svg";
 import HourglassIcon from "@/assets/icons/hourglass.svg";
-import LocationPin from "@/assets/icons/location-pin.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
   title: string;
-  destination: string;
+  tripName: string;
   startDate: string;
   endDate: string;
   introText: string;
@@ -25,13 +24,12 @@ type Props = {
   state?: ItineraryState;
 };
 
-/** Maps itinerary state to the hero background color */
 function getHeroColor(state: ItineraryState): string {
   switch (state) {
     case "voting":
       return colors.sunsetPink;
     case "final":
-      return colors.plantGreen;
+      return colors.neonGreen;
     case "planning":
     default:
       return colors.beachYellow;
@@ -52,61 +50,82 @@ function getMascotByState(state: ItineraryState) {
 
 export function ItineraryHeader({
   title,
-  destination,
+  tripName,
   startDate,
   endDate,
   introText,
-  daysLeftText = "73 days",
+  daysLeftText = "0 days",
   onBackPress,
   state = "planning",
 }: Props) {
   const heroColor = getHeroColor(state);
   const Mascot = getMascotByState(state);
+  const handleBack = useSinglePress(onBackPress);
 
   return (
     <View style={styles.wrapper}>
       <View style={[styles.hero, { backgroundColor: heroColor }]}>
         <View style={styles.topRow}>
-          <Link
-            href="/home"
-            accessibilityLabel="Go back to welcome screen"
-            accessibilityRole="link"
+          <Pressable
+            onPress={handleBack}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={styles.backButton}
           >
             <Back width={20} height={20} />
-          </Link>
+          </Pressable>
 
-          <View style={styles.timerBox}>
-            <HourglassIcon width={18} height={18} />
-            <View>
-              <AppText variant="body" style={styles.timerValue}>
-                {daysLeftText}
-              </AppText>
-              <AppText variant="caption" style={styles.timerLabel}>
-                Timer
-              </AppText>
+          {state !== "final" ? (
+            <View
+              style={styles.timerBox}
+              accessible={true}
+              accessibilityLabel={`${daysLeftText} remaining`}
+            >
+              <HourglassIcon
+                width={28}
+                height={28}
+                {...hiddenFromAccessibility}
+              />
+              <View accessible={false} style={styles.timerTextWrap}>
+                <AppText variant="body" style={styles.timerValue}>
+                  {daysLeftText}
+                </AppText>
+                <AppText variant="caption" style={styles.timerLabel}>
+                  Timer
+                </AppText>
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.timerPlaceholder} />
+          )}
         </View>
 
         <View style={styles.heroContent}>
-          <Mascot width={64} height={64} />
+          <Mascot width={74} height={74} {...hiddenFromAccessibility} />
 
-          <View style={styles.textBlock}>
-            <AppText variant="title" style={styles.title}>
-              {title}
+          <AppText variant="title" style={styles.title}>
+            {title}
+          </AppText>
+
+          <View style={styles.tripMetaRow}>
+            <AppText variant="subtitle" style={styles.tripName}>
+              {tripName}
             </AppText>
 
-            <AppText variant="subtitle" style={styles.destination}>
-              <LocationPin width={18} height={18} style={styles.locationPin} />
-              {destination}
-            </AppText>
-          </View>
-
-          <View style={styles.dateBadge}>
-            <CalendarIcon width={18} height={18} />
-            <AppText variant="body" style={styles.dateText}>
-              {formatTripDateRange(startDate, endDate)}
-            </AppText>
+            <View
+              style={styles.dateBadge}
+              accessible={true}
+              accessibilityLabel={`Trip dates: ${formatTripDateRange(startDate, endDate)}`}
+            >
+              <CalendarIcon
+                width={24}
+                height={24}
+                {...hiddenFromAccessibility}
+              />
+              <AppText variant="body" style={styles.dateText}>
+                {formatTripDateRange(startDate, endDate)}
+              </AppText>
+            </View>
           </View>
         </View>
       </View>
@@ -125,12 +144,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   hero: {
-    // backgroundColor set dynamically via style prop
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.xxxxl2,
   },
   topRow: {
     flexDirection: "row",
@@ -140,59 +160,78 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     marginBottom: spacing.xs,
   },
+  backButton: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   timerBox: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.xs,
+  },
+  timerPlaceholder: {
+    width: 80,
+    minHeight: 44,
+  },
+  timerTextWrap: {
+    justifyContent: "center",
+    gap: 0,
   },
   timerValue: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
+    lineHeight: typography.lineHeight.md,
+    marginBottom: -4,
   },
   timerLabel: {
     color: colors.nightBlack,
+    lineHeight: typography.lineHeight.sm,
   },
   heroContent: {
-    gap: spacing.sm,
-  },
-  textBlock: {
     gap: spacing.xs,
   },
   title: {
+    fontFamily: typography.fontFamily.bodyBold,
     color: colors.nightBlack,
+    fontSize: typography.size.displayMd,
+    lineHeight: typography.lineHeight.displayMd,
+  },
+  tripMetaRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  tripName: {
+    flex: 1,
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.body,
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
   },
-  destination: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.body,
-    fontSize: typography.size.xl,
-    lineHeight: typography.lineHeight.xl,
+  dateBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
-  locationPin: {
+  dateText: {
     color: colors.nightBlack,
-    paddingRight: spacing.md,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
   },
   intro: {
     color: colors.nightBlack,
     fontSize: typography.size.lg,
     lineHeight: typography.lineHeight.lg,
   },
-  dateBadge: {
-    alignSelf: "flex-end",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  dateText: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-  },
   contentTopCard: {
     backgroundColor: colors.lightWhite,
-    borderTopLeftRadius: radius.xxl,
-    borderTopRightRadius: radius.xxl,
-    marginTop: -8,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    marginTop: -35,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     paddingBottom: spacing.md,

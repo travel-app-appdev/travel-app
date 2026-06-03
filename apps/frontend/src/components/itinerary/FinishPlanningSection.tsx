@@ -45,7 +45,7 @@ export function FinishPlanningSection({
 const styles = StyleSheet.create({
   wrapper: {
     backgroundColor: colors.lightWhite,
-    borderRadius: radius.xxl,
+    borderRadius: radius.lg,
     padding: spacing.xl,
     gap: spacing.md,
   },

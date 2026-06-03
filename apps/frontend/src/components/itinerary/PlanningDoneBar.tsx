@@ -1,9 +1,12 @@
+import { useCallback } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
-import { colors, spacing, typography } from "@/src/theme";
+import { colors, radius, spacing, typography } from "@/src/theme";
+import { PressLock } from "@/src/utils/PressLock";
 
 import CheckIcon from "@/assets/icons/check_mark.svg";
 import InfoIcon from "@/assets/icons/info.svg";
+import { ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
 
 type Props = {
   checked: boolean;
@@ -20,12 +23,27 @@ export function PlanningDoneBar({
 }: Props) {
   const isDisabled = checked || disabled;
 
+  const handlePress = useCallback(() => {
+    if (isDisabled) return;
+    if (!PressLock.acquire()) return;
+    Promise.resolve()
+      .then(() => onPress())
+      .finally(() => setTimeout(() => PressLock.release(), 500));
+  }, [onPress, isDisabled]);
+
+  const handleInfoPress = useCallback(() => {
+    if (!PressLock.acquire()) return;
+    Promise.resolve()
+      .then(() => onInfoPress())
+      .finally(() => setTimeout(() => PressLock.release(), 300));
+  }, [onInfoPress]);
+
   return (
-    <View style={styles.wrapper} pointerEvents="box-none">
+    <View style={[styles.wrapper, { pointerEvents: "box-none" }]}>
       <View style={styles.footer}>
         <Pressable
           style={[styles.doneButton, checked && styles.doneButtonChecked]}
-          onPress={onPress}
+          onPress={handlePress}
           disabled={isDisabled}
           accessibilityRole="button"
           accessibilityLabel={
@@ -46,7 +64,7 @@ export function PlanningDoneBar({
 
         <Pressable
           style={styles.infoButton}
-          onPress={onInfoPress}
+          onPress={handleInfoPress}
           accessibilityRole="button"
           accessibilityLabel="Show planning submission info"
         >
@@ -60,24 +78,26 @@ export function PlanningDoneBar({
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.xl,
     zIndex: 10,
   },
   footer: {
     width: "100%",
     minHeight: 96,
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.lightWhite,
+    borderRadius: 23,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.md,
+    shadowColor: colors.sunsetOrange,
+    boxShadow: `0px -10px ${radius.lg}px rgba(255, 107, 53, 0.15)`,
+    elevation: 6,
   },
   doneButton: {
     minHeight: 56,

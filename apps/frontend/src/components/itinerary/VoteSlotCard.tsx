@@ -1,74 +1,223 @@
-// src/components/itinerary/VotingSlotCard.tsx
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
+import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { Activity } from "@/src/types/itinerary";
+import { formatActivityTimeRange } from "@/src/utils/itinerary/formatActivityTimeRange";
 
-import LocationIcon from "@/assets/icons/location.svg";
+import LocationIcon from "@/assets/icons/location-heart.svg";
+import LocationPin from "@/assets/icons/location-pin.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import VoteIcon from "@/assets/icons/voting.svg";
 import CheckIcon from "@/assets/icons/check_mark.svg";
+import Timer from "@/assets/icons/timer.svg";
+import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 type Props = {
   activity: Activity;
   onAddVote: (activityId: string) => void;
+  onPressDetails?: (activity: Activity) => void;
   selected?: boolean;
 };
 
-export function VotingSlotCard({ activity, onAddVote, selected = false }: Props) {
+const CARD_HEIGHT = 108;
+
+export function VotingSlotCard({
+  activity,
+  onAddVote,
+  onPressDetails,
+  selected = false,
+}: Props) {
+  const handleVote = useSinglePress(() => onAddVote(activity.id));
+  const handleOpenDetails = useSinglePress(() => onPressDetails?.(activity));
+  const activityTimeRange = formatActivityTimeRange(activity);
+
+  const hasAddress = !!activity.address?.trim();
+  const hasGoogleMapsUrl = !!activity.googleMapsUrl?.trim();
+  const voteCount = activity.voteCount ?? 0;
+  const voteLabel = `${voteCount} ${voteCount === 1 ? "vote" : "votes"}`;
+
+  const detailParts = [
+    activityTimeRange ? `time ${activityTimeRange}` : null,
+    hasAddress ? `address ${activity.address.trim()}` : null,
+    hasGoogleMapsUrl ? "Google Maps link available" : null,
+  ].filter(Boolean);
+
   return (
     <View style={styles.row}>
-      <View style={styles.card}>
-        {/* Time label */}
-        <View style={styles.timeRow}>
-          <LocationIcon width={16} height={16} />
+      <Pressable
+        onPress={handleOpenDetails}
+        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+        accessibilityRole="button"
+        accessibilityLabel={
+          detailParts.length > 0
+            ? `Open details for ${activity.name}, ${detailParts.join(", ")}`
+            : `Open details for ${activity.name}`
+        }
+        accessibilityHint="Shows more information about this activity"
+      >
+        <View style={styles.timeRow} {...hiddenFromAccessibility}>
+          <LocationIcon width={24} height={24} />
           <AppText variant="body" style={styles.timeLabel}>
             {activity.slotId}
           </AppText>
         </View>
 
-        {/* Activity name */}
-        <AppText variant="subtitle" style={styles.name}>
+        <AppText variant="subtitle" style={styles.name} numberOfLines={2}>
           {activity.name}
         </AppText>
 
-        {/* Address */}
-        <View style={styles.addressRow}>
-          <LocationIcon width={14} height={14} />
-          <AppText variant="caption" style={styles.address}>
-            {activity.address}
-          </AppText>
-        </View>
+        {hasAddress ? (
+          <>
+            {!!activityTimeRange && (
+              <View
+                style={styles.detailRow}
+                accessible={true}
+                accessibilityLabel={`Activity time: ${activityTimeRange}`}
+              >
+                <Timer width={16} height={16} {...hiddenFromAccessibility} />
+                <AppText
+                  variant="caption"
+                  style={styles.detailText}
+                  accessible={false}
+                  numberOfLines={1}
+                >
+                  {activityTimeRange}
+                </AppText>
+              </View>
+            )}
 
-        {/* Google Link */}
-        {activity.googleMapsUrl ? (
-          <View style={styles.googleRow}>
-            <GoogleIcon width={14} height={14} />
-            <AppText variant="caption" style={styles.googleLink}>
-              Google-Link
+            <View
+              style={styles.detailRow}
+              accessible={true}
+              accessibilityLabel={`Address: ${activity.address.trim()}, ${voteLabel}`}
+            >
+              <LocationPin
+                width={16}
+                height={16}
+                {...hiddenFromAccessibility}
+              />
+
+              <AppText
+                variant="caption"
+                style={styles.detailText}
+                accessible={false}
+                numberOfLines={1}
+              >
+                {activity.address.trim()}
+              </AppText>
+
+              <View
+                style={styles.inlineVote}
+                accessibilityLiveRegion="polite"
+                accessible={false}
+              >
+                <AppText
+                  variant="caption"
+                  style={styles.voteCount}
+                  numberOfLines={1}
+                >
+                  {voteLabel}
+                </AppText>
+              </View>
+            </View>
+          </>
+        ) : !!activityTimeRange ? (
+          <View
+            style={styles.detailRow}
+            accessible={true}
+            accessibilityLabel={`Activity time: ${activityTimeRange}, ${voteLabel}`}
+          >
+            <Timer width={16} height={16} {...hiddenFromAccessibility} />
+
+            <AppText
+              variant="caption"
+              style={styles.detailText}
+              accessible={false}
+              numberOfLines={1}
+            >
+              {activityTimeRange}
+            </AppText>
+
+            <View
+              style={styles.inlineVote}
+              accessibilityLiveRegion="polite"
+              accessible={false}
+            >
+              <AppText
+                variant="caption"
+                style={styles.voteCount}
+                numberOfLines={1}
+              >
+                {voteLabel}
+              </AppText>
+            </View>
+          </View>
+        ) : (
+          <View
+            style={styles.nameVoteRow}
+            accessible={true}
+            accessibilityLabel={voteLabel}
+          >
+            <View style={styles.nameVoteSpacer} />
+            <AppText
+              variant="caption"
+              style={styles.voteCount}
+              numberOfLines={1}
+            >
+              {voteLabel}
             </AppText>
           </View>
-        ) : null}
-      </View>
+        )}
 
-      {/* Vote CTA */}
+        {hasGoogleMapsUrl && (
+          <View
+            style={styles.googleRow}
+            accessible={true}
+            accessibilityLabel="Google Maps link available"
+          >
+            <GoogleIcon width={14} height={14} {...hiddenFromAccessibility} />
+            <AppText
+              variant="caption"
+              style={styles.googleLink}
+              accessible={false}
+              numberOfLines={1}
+            >
+              Google Maps link
+            </AppText>
+          </View>
+        )}
+      </Pressable>
+
       <Pressable
-        onPress={() => onAddVote(activity.id)}
+        onPress={handleVote}
         style={({ pressed }) => [
           styles.cta,
           selected && styles.ctaSelected,
           pressed && styles.ctaPressed,
         ]}
         accessibilityRole="button"
-        accessibilityLabel={`Vote for ${activity.name}`}
+        accessibilityLabel={
+          selected
+            ? `Remove vote for ${activity.name}`
+            : `Vote for ${activity.name}`
+        }
+        accessibilityHint={
+          selected
+            ? "Removes your vote for this activity"
+            : "Adds your vote for this activity"
+        }
         accessibilityState={{ selected }}
       >
-        {selected ? (
-          <CheckIcon width={28} height={28} color={colors.nightBlack} />
-        ) : (
-          <VoteIcon width={28} height={28} color={colors.nightBlack} />
-        )}
-        <AppText variant="body" style={styles.ctaText}>
+        <View {...hiddenFromAccessibility}>
+          {selected ? (
+            <CheckIcon width={28} height={28} color={colors.nightBlack} />
+          ) : (
+            <VoteIcon width={28} height={28} color={colors.nightBlack} />
+          )}
+        </View>
+
+        <AppText variant="body" style={styles.ctaText} accessible={false}>
           {selected ? "Added\nvote" : "Add\nvote"}
         </AppText>
       </Pressable>
@@ -84,58 +233,87 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    borderRadius: radius.xl,
+    minHeight: CARD_HEIGHT,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
+    borderColor: colors.nightBlack,
+    backgroundColor: colors.lightWhite,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     gap: spacing.xs,
-    justifyContent: "center",
+    overflow: "hidden",
+  },
+  cardPressed: {
+    opacity: 0.9,
   },
   timeRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   timeLabel: {
     color: colors.textPrimary,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
   },
   name: {
     color: colors.textPrimary,
-    fontSize: typography.size.xl,
-    lineHeight: typography.lineHeight.xl,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
+    marginBottom: 2,
   },
-  addressRow: {
+  detailRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+    marginTop: 1,
   },
-  address: {
+  detailText: {
+    flex: 1,
     color: colors.textMuted,
-    flexShrink: 1,
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
+  },
+  inlineVote: {
+    flexShrink: 0,
+    marginLeft: spacing.sm,
+  },
+  nameVoteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 1,
+  },
+  nameVoteSpacer: {
+    flex: 1,
   },
   googleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
     marginTop: spacing.xs,
+    minWidth: 0,
   },
   googleLink: {
+    flexShrink: 1,
     color: colors.seaBlue,
     fontFamily: typography.fontFamily.bodySemiBold,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
   },
   cta: {
-    width: 72,
-    borderRadius: radius.xl,
+    width: 92,
+    minHeight: CARD_HEIGHT,
+    borderRadius: radius.md,
     backgroundColor: colors.sunsetPink,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.md,
-    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
   },
   ctaPressed: {
     opacity: 0.85,
@@ -148,6 +326,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.md,
-    lineHeight: typography.lineHeight.md,
+    lineHeight: typography.lineHeight.xs,
+  },
+  voteCount: {
+    color: colors.textMuted,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
   },
 });

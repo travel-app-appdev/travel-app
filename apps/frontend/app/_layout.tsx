@@ -1,4 +1,3 @@
-// app/_layout.tsx
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
@@ -7,19 +6,25 @@ import {
   Nunito_400Regular,
   Nunito_600SemiBold,
   Nunito_700Bold,
+  Nunito_900Black,
 } from "@expo-google-fonts/nunito";
 import { View, ActivityIndicator } from "react-native";
-import { AuthProvider } from "@/src/context/AuthContext";
+import { AuthProvider, useAuth } from "@/src/context/AuthContext";
 
-export default function RootLayout() {
+function AppStartupGate() {
+  const { isBootstrapping } = useAuth();
+
   const [fontsLoaded] = useFonts({
     BagelFatOne_400Regular,
     Nunito_400Regular,
     Nunito_600SemiBold,
     Nunito_700Bold,
+    Nunito_900Black,
   });
 
-  if (!fontsLoaded) {
+  const appReady = fontsLoaded && !isBootstrapping;
+
+  if (!appReady) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator />
@@ -28,12 +33,8 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" options={{ title: "Home" }} />
         <Stack.Screen name="login" options={{ title: "Login" }} />
         <Stack.Screen name="register" options={{ title: "Register" }} />
@@ -41,14 +42,18 @@ export default function RootLayout() {
         <Stack.Screen name="profile" options={{ title: "Profile" }} />
         <Stack.Screen name="create-trip" options={{ title: "Create Trip" }} />
         <Stack.Screen name="join-trip" options={{ title: "Join Trip" }} />
-        {/* <Stack.Screen name="settings" options={{ title: "Settings" }} /> */}
         <Stack.Screen
-          name="trip-settings"
-          options={{ title: "Trip Settings" }}
+          name="trip-overview-admin"
+          options={{ title: "Trip Overview" }}
         />
         <Stack.Screen
-          name="trip-information"
-          options={{ title: "Trip Information" }}
+          name="trip-overview-member"
+          options={{ title: "Trip Overview" }}
+        />
+        {/* ── Invite preview screen ── */}
+        <Stack.Screen
+          name="invite"
+          options={{ title: "Trip Invite" }}
         />
         <Stack.Screen
           name="questionnaire"
@@ -67,8 +72,17 @@ export default function RootLayout() {
         <Stack.Screen name="itinerary" options={{ title: "Itinerary" }} />
         <Stack.Screen name="past-trips" options={{ title: "Past Trips" }} />
         <Stack.Screen name="add-activity" options={{ title: "Add Activity" }} />
+        <Stack.Screen name="onboarding" options={{ title: "Onboarding" }} />
       </Stack>
       <StatusBar style="dark" />
+    </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <AppStartupGate />
     </AuthProvider>
   );
 }

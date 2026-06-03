@@ -41,19 +41,19 @@ jest.mock('../config/firebase', () => ({
 
 describe("generateDaySlots()", () => {
 
-    it("should return 8 slots", () => {
+    it("should return 6 slots", () => {
         const slots = generateDaySlots("2026-06-01");
-        expect(slots).toHaveLength(8);
+        expect(slots).toHaveLength(6);
     });
 
-    it("should start with 06:00-08:00", () => {
+    it("should start with Breakfast", () => {
         const slots = generateDaySlots("2026-06-01");
-        expect(slots[0].slot_type).toBe("06:00-08:00");
+        expect(slots[0].slot_type).toBe("Breakfast");
     });
 
-    it("should end with 20:00-22:00", () => {
+    it("should end with Evening Activity", () => {
         const slots = generateDaySlots("2026-06-01");
-        expect(slots[7].slot_type).toBe("20:00-22:00");
+        expect(slots[5].slot_type).toBe("Evening Activity");
     });
 
     it("should have activityId null for all slots", () => {
@@ -65,7 +65,7 @@ describe("generateDaySlots()", () => {
 
     it("should include date in slot_id", () => {
         const slots = generateDaySlots("2026-06-01");
-        expect(slots[0].slot_id).toBe("2026-06-01_06:00-08:00");
+        expect(slots[0].slot_id).toBe("2026-06-01_Breakfast");
     });
 
 });
@@ -86,10 +86,10 @@ describe("generateItinerary()", () => {
         expect(result.days[2].date).toBe("2026-06-03");
     });
 
-    it("should include 8 slots per day", () => {
+    it("should include 6 slots per day", () => {
         const result = generateItinerary("trip-1", "2026-06-01", "2026-06-03");
         result.days.forEach((day) => {
-            expect(day.slots).toHaveLength(8);
+            expect(day.slots).toHaveLength(6);
         });
     });
 

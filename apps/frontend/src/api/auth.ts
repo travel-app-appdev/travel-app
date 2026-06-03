@@ -1,4 +1,3 @@
-// src/api/auth.ts
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 type RegisterPayload = {
@@ -15,6 +14,8 @@ export type AuthResponse = {
 
 type ApiErrorResponse = {
   error?: string;
+  message?: string;
+  code?: string;
 };
 
 export async function registerUser(
@@ -31,7 +32,19 @@ export async function registerUser(
   const data: AuthResponse | ApiErrorResponse = await response.json();
 
   if (!response.ok) {
-    throw new Error((data as ApiErrorResponse).error || "Registration failed");
+    const error: any = new Error(
+      (data as ApiErrorResponse).message ||
+        (data as ApiErrorResponse).error ||
+        "Registration failed"
+    );
+
+    error.response = {
+      status: response.status,
+      data,
+    };
+    error.code = (data as ApiErrorResponse).code;
+
+    throw error;
   }
 
   return data as AuthResponse;
@@ -49,7 +62,19 @@ export async function loginWithToken(idToken: string): Promise<AuthResponse> {
   const data: AuthResponse | ApiErrorResponse = await response.json();
 
   if (!response.ok) {
-    throw new Error((data as ApiErrorResponse).error || "Login failed");
+    const error: any = new Error(
+      (data as ApiErrorResponse).message ||
+        (data as ApiErrorResponse).error ||
+        "Login failed"
+    );
+
+    error.response = {
+      status: response.status,
+      data,
+    };
+    error.code = (data as ApiErrorResponse).code;
+
+    throw error;
   }
 
   return data as AuthResponse;

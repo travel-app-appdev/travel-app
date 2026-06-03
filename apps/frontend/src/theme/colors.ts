@@ -1,7 +1,6 @@
-// theme/colors.ts
 export const colors = {
   neonGreen: "#98FB82",
-  seaBlue: "#6966FF",
+  seaBlue: "#716FE7",
   sunsetPink: "#E582FB",
   beachYellow: "#F7CE46",
   sunsetOrange: "#F77646",
@@ -10,23 +9,23 @@ export const colors = {
 
   lightWhite: "#FFFEF5",
   nightBlack: "#140D0A",
-  grayedOut: "#CCCCCC",
+  grayedOut: "#767676",
 
   textPrimary: "#140D0A",
   textSecondary: "#FFFEF5",
-  textMuted: "#CCCCCC",
+  textMuted: "#767676",
 
   border: "#D9D9D9",
 
   success: "#22C55E",
   warning: "#F59E0B",
-  error: "#EF4444",
+  error: "#B91C1C",
 
   white: "#FFFFFF",
   black: "#000000",
 
   background: "#FFFEF5",
   surface: "#FFFFFF",
-  primary: "#6966FF",
+  primary: "#716FE7",
   accent: "#F77646",
 };
