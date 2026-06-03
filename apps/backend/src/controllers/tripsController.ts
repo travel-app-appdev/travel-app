@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import {
     createTripForAuthenticatedUser,
     createTripForUserWithoutAuth,
+    getTripForUser,
     getTripsForUser,
     joinTripWithInviteCode,
     deleteTripForAdmin,
@@ -28,6 +29,29 @@ export const getMyTrips = async (req: Request, res: Response): Promise<void> => 
     } catch (error) {
         console.error("Error loading trips:", error);
         res.status(500).json({ error: "Failed to load trips" });
+    }
+};
+
+export const getTrip = async (req: Request, res: Response): Promise<void> => {
+    const tripId = req.params.tripId as string;
+    const userId = req.query.userId as string;
+
+    if (!tripId || !userId) {
+        res.status(400).json({ error: "tripId and userId are required" });
+        return;
+    }
+
+    try {
+        const trip = await getTripForUser(tripId, userId);
+        res.json(trip);
+    } catch (error: any) {
+        if (error.status === 404) {
+            res.status(404).json({ error: error.message });
+            return;
+        }
+
+        console.error("Error loading trip:", error);
+        res.status(500).json({ error: "Failed to load trip" });
     }
 };
 

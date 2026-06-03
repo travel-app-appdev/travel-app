@@ -14,7 +14,11 @@ import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
 import { colors, spacing, radius, typography } from "@/src/theme";
-import { fetchMyTrips, invalidateMyTripsCache, type Trip } from "@/src/api/trips";
+import {
+  fetchMyTrips,
+  invalidateMyTripsCache,
+  type Trip,
+} from "@/src/api/trips";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 import Profile from "@/assets/icons/profile.svg";
@@ -68,8 +72,8 @@ type TripsCache = {
   fetchedAt: number;
 };
 
-const TRIPS_STALE_TIME_MS = 30_000;
-const TRIPS_FOCUS_REFRESH_THROTTLE_MS = 5_000;
+const TRIPS_STALE_TIME_MS = 60_000;
+const TRIPS_FOCUS_REFRESH_THROTTLE_MS = 60_000;
 let tripsCache: TripsCache | null = null;
 
 let tripsCacheForceNext = false;
@@ -336,7 +340,9 @@ export default function HomeScreen() {
       setIsLoading(true);
 
       try {
-        const backendTrips = (await fetchMyTrips(userId, { forceRefresh: true })) as TripWithMembers[];
+        const backendTrips = (await fetchMyTrips(userId, {
+          forceRefresh: force,
+        })) as TripWithMembers[];
 
         if (latestUserIdRef.current !== userId) {
           return;
@@ -399,7 +405,8 @@ export default function HomeScreen() {
         lastFetchRef.current = 0;
       }
       const timeSinceLastFetch = Date.now() - lastFetchRef.current;
-      const shouldRefresh = shouldForce || timeSinceLastFetch > TRIPS_FOCUS_REFRESH_THROTTLE_MS;
+      const shouldRefresh =
+        shouldForce || timeSinceLastFetch > TRIPS_FOCUS_REFRESH_THROTTLE_MS;
       if (shouldRefresh) {
         invalidateMyTripsCache(userId);
         void loadTrips(true);
@@ -621,7 +628,6 @@ export default function HomeScreen() {
       </ScrollView>
     </SafeAreaView>
   );
-  
 }
 
 const styles = StyleSheet.create({

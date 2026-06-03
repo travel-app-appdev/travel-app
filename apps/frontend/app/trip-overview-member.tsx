@@ -23,7 +23,7 @@ import {
   ACTION_CARD_HEIGHT,
 } from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
-import { fetchMyTrips, leaveTrip, type Trip } from "@/src/api/trips";
+import { fetchTripForUser, leaveTrip, type Trip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
 import { invalidateTripsCache } from "./home";
 import { colors, spacing, radius, typography } from "@/src/theme";
@@ -170,7 +170,7 @@ function parseIsoToTimeString(value?: string): string {
 
 const CHECKBOX_SIZE = 24;
 const TIMELINE_LINE_WIDTH = 2;
-const TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS = 10 * 1000;
+const TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS = 30 * 1000;
 
 function isDeadlinePast(deadline?: string): boolean {
   if (!deadline) return false;
@@ -304,7 +304,8 @@ export default function TripOverviewMemberScreen() {
   };
 
   useEffect(() => {
-    return () => timeoutRefs.current.forEach(clearTimeout);
+    const timeouts = timeoutRefs.current;
+    return () => timeouts.forEach(clearTimeout);
   }, []);
 
   const refreshTripSnapshot = useCallback(
@@ -318,11 +319,10 @@ export default function TripOverviewMemberScreen() {
       if (!currentUser?.uid || !tripId) return null;
 
       try {
-        const trips = await fetchMyTrips(currentUser.uid, {
-          forceRefresh: options.forceRefresh ?? true,
+        const currentTrip = await fetchTripForUser(currentUser.uid, tripId, {
+          forceRefresh: options.forceRefresh ?? false,
           allowStaleOnError: true,
         });
-        const currentTrip = trips.find((trip) => trip.trip_id === tripId);
         if (!currentTrip || options.shouldApply?.() === false) return null;
 
         setTripSnapshot({

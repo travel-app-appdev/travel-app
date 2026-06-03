@@ -28,7 +28,7 @@ import {
 import { BackLink } from "@/src/components/common/BackLink";
 import {
   deleteTrip,
-  fetchMyTrips,
+  fetchTripForUser,
   removeMember,
   updateTrip,
   type Trip,
@@ -93,7 +93,7 @@ type PhaseStatus = "past" | "active" | "future";
 
 const CHECKBOX_SIZE = 24;
 const TIMELINE_LINE_WIDTH = 1;
-const TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS = 10 * 1000;
+const TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS = 30 * 1000;
 
 function getChecklistSubtitle(tripState: Trip["state"]): string {
   switch (tripState) {
@@ -395,7 +395,8 @@ export default function TripOverviewAdminScreen() {
   };
 
   useEffect(() => {
-    return () => timeoutRefs.current.forEach(clearTimeout);
+    const timeouts = timeoutRefs.current;
+    return () => timeouts.forEach(clearTimeout);
   }, []);
 
   useEffect(() => {
@@ -585,11 +586,10 @@ export default function TripOverviewAdminScreen() {
       if (!currentUser?.uid || !tripId) return null;
 
       try {
-        const trips = await fetchMyTrips(currentUser.uid, {
-          forceRefresh: options.forceRefresh ?? true,
+        const currentTrip = await fetchTripForUser(currentUser.uid, tripId, {
+          forceRefresh: options.forceRefresh ?? false,
           allowStaleOnError: true,
         });
-        const currentTrip = trips.find((trip) => trip.trip_id === tripId);
         if (!currentTrip || options.shouldApply?.() === false) return null;
 
         syncTripResponse(currentTrip);
@@ -922,9 +922,7 @@ export default function TripOverviewAdminScreen() {
       setMemberToRemove(null);
     } catch (error) {
       setRemoveMemberErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to remove member."
+        error instanceof Error ? error.message : "Failed to remove member."
       );
       setShowRemoveMemberErrorModal(true);
     } finally {
