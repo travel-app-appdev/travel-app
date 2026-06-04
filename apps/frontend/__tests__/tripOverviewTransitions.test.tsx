@@ -33,6 +33,11 @@ jest.mock("react-native-calendars", () => ({
   Calendar: () => null,
 }));
 
+jest.mock("firebase/firestore", () => ({
+  doc: jest.fn(),
+  onSnapshot: jest.fn(() => jest.fn()),
+}));
+
 jest.mock("react-native-safe-area-context", () => ({
   SafeAreaView: ({ children, ...props }: any) => {
     const { View } = require("react-native");
@@ -57,6 +62,7 @@ jest.mock("@/src/lib/firebase", () => ({
       getIdToken: () => mockGetIdToken(),
     },
   },
+  db: {},
 }));
 
 jest.mock("@/app/home", () => ({

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { doc, onSnapshot } from "firebase/firestore";
 import {
   AccessibilityInfo,
   Alert,
@@ -29,11 +30,12 @@ import { BackLink } from "@/src/components/common/BackLink";
 import {
   deleteTrip,
   fetchTripForUser,
+  isTripNotFoundError,
   removeMember,
   updateTrip,
   type Trip,
 } from "@/src/api/trips";
-import { auth } from "@/src/lib/firebase";
+import { auth, db } from "@/src/lib/firebase";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { invalidateTripsCache } from "./home";
@@ -621,11 +623,19 @@ export default function TripOverviewAdminScreen() {
         syncTripResponse(currentTrip);
         return currentTrip;
       } catch (error) {
+        if (isTripNotFoundError(error)) {
+          invalidateTripsCache();
+          if (options.shouldApply?.() !== false) {
+            router.replace("/home");
+          }
+          return null;
+        }
+
         console.log("Could not refresh trip overview:", error);
         return null;
       }
     },
-    [syncTripResponse, tripId]
+    [router, syncTripResponse, tripId]
   );
 
   useFocusEffect(
@@ -639,6 +649,27 @@ export default function TripOverviewAdminScreen() {
       };
     }, [refreshTripSnapshot])
   );
+
+  useEffect(() => {
+    if (!tripId) {
+      return;
+    }
+
+    const unsubscribe = onSnapshot(
+      doc(db, "trips", tripId),
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          invalidateTripsCache();
+          router.replace("/home");
+        }
+      },
+      (error) => {
+        console.log("Trip deletion listener error:", error);
+      }
+    );
+
+    return unsubscribe;
+  }, [router, tripId]);
 
   useEffect(() => {
     if (!tripId || (tripState !== "Planning" && tripState !== "Voting")) {

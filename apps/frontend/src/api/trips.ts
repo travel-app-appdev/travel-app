@@ -37,6 +37,25 @@ type ApiErrorResponse = {
   error?: string;
 };
 
+export class TripApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "TripApiError";
+    this.status = status;
+  }
+}
+
+export function isTripNotFoundError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    (error as { status?: unknown }).status === 404
+  );
+}
+
 type FetchMyTripsOptions = {
   forceRefresh?: boolean;
   allowStaleOnError?: boolean;
@@ -138,16 +157,7 @@ export async function fetchMyTrips(
       }
 
       const trips = data as Trip[];
-      tripsCache.set(userId, {
-        trips,
-        fetchedAt: Date.now(),
-      });
-      trips.forEach((trip) => {
-        tripCache.set(getTripCacheKey(userId, trip.trip_id), {
-          trip,
-          fetchedAt: Date.now(),
-        });
-      });
+      replaceCachedTrips(userId, trips, Date.now());
 
       return trips;
     } catch (error) {
@@ -218,8 +228,13 @@ export async function fetchTripForUser(
       const data = await readApiJson<Trip>(response);
 
       if (!response.ok) {
-        throw new Error(
-          (data as ApiErrorResponse).error || "Failed to load trip"
+        if (response.status === 404) {
+          removeCachedTrip(userId, tripId);
+        }
+
+        throw new TripApiError(
+          (data as ApiErrorResponse).error || "Failed to load trip",
+          response.status
         );
       }
 
@@ -230,6 +245,10 @@ export async function fetchTripForUser(
 
       return trip;
     } catch (error) {
+      if (isTripNotFoundError(error)) {
+        throw error;
+      }
+
       if (allowStaleOnError) {
         if (cached) {
           console.warn("Using cached trip after refresh failed:", error);
@@ -279,6 +298,51 @@ function updateCachedTripList(userId: string, updatedTrip: Trip): void {
       trip.trip_id === updatedTrip.trip_id ? updatedTrip : trip
     ),
     fetchedAt: cached.fetchedAt,
+  });
+}
+
+function removeCachedTrip(userId: string, tripId: string): void {
+  const cacheKey = getTripCacheKey(userId, tripId);
+
+  tripCache.delete(cacheKey);
+  inFlightTripRequests.delete(cacheKey);
+
+  const cached = tripsCache.get(userId);
+  if (!cached) return;
+
+  tripsCache.set(userId, {
+    trips: cached.trips.filter((trip) => trip.trip_id !== tripId),
+    fetchedAt: cached.fetchedAt,
+  });
+}
+
+export function removeTripFromCache(userId: string, tripId: string): void {
+  removeCachedTrip(userId, tripId);
+}
+
+function replaceCachedTrips(userId: string, trips: Trip[], fetchedAt: number) {
+  tripsCache.set(userId, {
+    trips,
+    fetchedAt,
+  });
+
+  const returnedTripIds = new Set(trips.map((trip) => trip.trip_id));
+
+  [...tripCache.keys()].forEach((key) => {
+    if (!key.startsWith(`${userId}:`)) return;
+
+    const tripId = key.slice(userId.length + 1);
+    if (!returnedTripIds.has(tripId)) {
+      tripCache.delete(key);
+      inFlightTripRequests.delete(key);
+    }
+  });
+
+  trips.forEach((trip) => {
+    tripCache.set(getTripCacheKey(userId, trip.trip_id), {
+      trip,
+      fetchedAt,
+    });
   });
 }
 

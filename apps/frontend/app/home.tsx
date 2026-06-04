@@ -1,5 +1,6 @@
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/src/context/AuthContext";
 import {
   AccessibilityInfo,
@@ -17,8 +18,10 @@ import { colors, spacing, radius, typography } from "@/src/theme";
 import {
   fetchMyTrips,
   invalidateMyTripsCache,
+  removeTripFromCache,
   type Trip,
 } from "@/src/api/trips";
+import { db } from "@/src/lib/firebase";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 import Profile from "@/assets/icons/profile.svg";
@@ -280,6 +283,27 @@ export default function HomeScreen() {
   const lastFetchRef = useRef<number>(tripsCache?.fetchedAt ?? 0);
   const latestUserIdRef = useRef<string | null>(user?.uid ?? null);
 
+  const removeTripFromLocalLists = useCallback((tripId: string) => {
+    const userId = latestUserIdRef.current;
+    const removeTrip = (trips: TripCardItem[]) =>
+      trips.filter((trip) => trip.id !== tripId);
+
+    if (userId) {
+      removeTripFromCache(userId, tripId);
+    }
+
+    setYourTrips((current) => removeTrip(current));
+    setPastTrips((current) => removeTrip(current));
+
+    if (tripsCache && (!userId || tripsCache.userId === userId)) {
+      tripsCache = {
+        ...tripsCache,
+        yourTrips: removeTrip(tripsCache.yourTrips),
+        pastTrips: removeTrip(tripsCache.pastTrips),
+      };
+    }
+  }, []);
+
   useEffect(() => {
     const newUserId = user?.uid ?? null;
     latestUserIdRef.current = newUserId;
@@ -413,6 +437,40 @@ export default function HomeScreen() {
       }
     }, [loadTrips, user?.uid])
   );
+
+  useEffect(() => {
+    const userId = user?.uid ?? null;
+    if (!userId) return;
+
+    const membershipQuery = query(
+      collection(db, "trip_members"),
+      where("user_id", "==", userId)
+    );
+
+    const unsubscribe = onSnapshot(
+      membershipQuery,
+      (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          const data = change.doc.data();
+          const tripId = data.trip_id;
+
+          if (typeof tripId !== "string") return;
+
+          if (
+            change.type === "removed" ||
+            data.invite_status !== "accepted"
+          ) {
+            removeTripFromLocalLists(tripId);
+          }
+        });
+      },
+      (error) => {
+        console.log("Trip membership listener error:", error);
+      }
+    );
+
+    return unsubscribe;
+  }, [removeTripFromLocalLists, user?.uid]);
 
   const trips = activeTab === "your" ? yourTrips : pastTrips;
 
