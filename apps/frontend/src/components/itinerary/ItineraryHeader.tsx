@@ -4,6 +4,7 @@ import { colors, radius, spacing, typography } from "@/src/theme";
 import { formatTripDateRange } from "@/src/utils/itinerary/formatTripToDateRange";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { ItineraryState } from "@/src/types/itinerary";
+import Hourglass1 from "@/assets/icons/hourglass_1.svg";
 
 import Back from "@/assets/icons/back.svg";
 import MascotPlanning from "@/assets/mascots/mascot-planning.svg";
@@ -12,6 +13,10 @@ import MascotFinal from "@/assets/mascots/mascot-final.svg";
 import CalendarIcon from "@/assets/icons/calendar.svg";
 import HourglassIcon from "@/assets/icons/hourglass.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
+
+import Timepoint from "@/assets/icons/timepoint.svg";
+import { Animated } from "react-native";
+import { useRef, useEffect } from "react";
 
 type Props = {
   title: string;
@@ -60,7 +65,33 @@ export function ItineraryHeader({
 }: Props) {
   const heroColor = getHeroColor(state);
   const Mascot = getMascotByState(state);
-  const handleBack = useSinglePress(onBackPress);
+  const handleBack = useSinglePress(onBackPress);  
+  const blinkingDotAnim = useRef(new Animated.Value(1)).current;
+  
+const isActive = state !== "final";  
+const isMuted = state === "planning"; 
+
+
+useEffect(() => {
+  if (!isActive) return;
+
+  Animated.loop(
+    Animated.sequence([
+      Animated.timing(blinkingDotAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(blinkingDotAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ])
+  ).start();
+}, [isActive]);
+
+
 
   return (
     <View style={styles.wrapper}>
@@ -75,29 +106,70 @@ export function ItineraryHeader({
             <Back width={20} height={20} />
           </Pressable>
 
-          {state !== "final" ? (
-            <View
-              style={styles.timerBox}
-              accessible={true}
-              accessibilityLabel={`${daysLeftText} remaining`}
+      {state !== "final" ? (
+  <View
+    style={styles.timerBox}
+    accessible={true}
+    accessibilityLabel={`${daysLeftText} remaining`}
+  >
+    <View style={styles.phaseTimerBlock}>
+      
+      <View
+        style={styles.hourglassCol}
+        {...hiddenFromAccessibility}
+      >
+        {isActive ? (
+          <Hourglass1 width={32} height={32} />
+        ) : (
+          <HourglassIcon
+            width={32}
+            height={32}
+            style={isMuted ? styles.mutedIcon : undefined}
+          />
+        )}
+      </View>
+
+      <View style={styles.phaseTextCol}>
+        <View style={styles.daysRow}>
+          <AppText
+            variant="body"
+            style={[
+              styles.phaseDays,
+              isMuted && styles.phaseDaysMuted,
+            ]}
+          >
+            {daysLeftText}
+          </AppText>
+
+          {isActive && (
+            <Animated.View
+              style={[
+                styles.timepointWrapper,
+                { opacity: blinkingDotAnim },
+              ]}
+              {...hiddenFromAccessibility}
             >
-              <HourglassIcon
-                width={28}
-                height={28}
-                {...hiddenFromAccessibility}
-              />
-              <View accessible={false} style={styles.timerTextWrap}>
-                <AppText variant="body" style={styles.timerValue}>
-                  {daysLeftText}
-                </AppText>
-                <AppText variant="caption" style={styles.timerLabel}>
-                  Timer
-                </AppText>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.timerPlaceholder} />
+              <Timepoint width={7} height={7} />
+            </Animated.View>
           )}
+        </View>
+
+        <AppText
+          variant="caption"
+          style={[
+            styles.timerLabel,
+            isMuted && styles.timerLabelMuted,
+          ]}
+        >
+          Timer
+        </AppText>
+      </View>
+
+    </View>
+  </View>
+) : (
+  <View style={styles.timerPlaceholder} />
+)}
         </View>
 
         <View style={styles.heroContent}>
@@ -235,5 +307,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     paddingBottom: spacing.md,
+  },
+  phaseTimerBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flexShrink: 1,
+  },
+  hourglassCol: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+ mutedIcon: {
+    opacity: 0.35,
+  },
+phaseTextCol: {
+    flexDirection: "column",
+    justifyContent: "center",
+  },
+daysRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 3,
+  },
+  phaseDays: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    color: colors.textPrimary,
+  },
+ phaseDaysMuted: {
+    color: colors.textPrimary,
+    
+  },
+  timepointWrapper: {
+    marginTop: -5,
+  },
+  timerLabelMuted: {
+    color: colors.textPrimary,
+    
   },
 });
