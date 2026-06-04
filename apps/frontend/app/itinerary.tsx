@@ -1181,8 +1181,6 @@ export default function ItineraryScreen() {
     }
 
     setIsSubmittingPlanning(true);
-    // show overlay immediately
-    setIsPreparingVoting(true);
 
     try {
       const result = await finishPlanning({
@@ -1200,13 +1198,14 @@ export default function ItineraryScreen() {
         ),
       }));
 
-      // First immediate refresh
       await refreshTripTimerFields({ forceRefresh: true });
 
-      // Short retry window to catch a state change triggered by someone else
+      if (!result.allDone || result.tripState === "Planning") {
+        return;
+      }
+
       const maxAttempts = 5;
       const delayMs = 1000;
-
       for (let i = 0; i < maxAttempts; i++) {
         if (activeStateRef.current !== "planning") break;
 
@@ -1214,7 +1213,6 @@ export default function ItineraryScreen() {
         await refreshTripTimerFields({ forceRefresh: true });
       }
     } catch (error) {
-      setIsPreparingVoting(false);
       Alert.alert(
         "Could not finish planning",
         error instanceof Error ? error.message : "Please try again."
