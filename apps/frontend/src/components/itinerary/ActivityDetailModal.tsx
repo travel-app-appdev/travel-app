@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   },
   badge: {
     minWidth: 24,
-    height: 24,
+    maxHeight: 24,
     borderRadius: 12,
     paddingHorizontal: 8,
     marginLeft: 8,
