@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AccessibilityInfo,
   ActivityIndicator,
   Alert,
-  findNodeHandle,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,7 +20,6 @@ import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
 import { mapActivitiesToSlots } from "@/src/utils/itinerary/mapActivitiesToSlots";
 import { getActiveTripTimerText } from "@/src/utils/tripTimer";
 import { useAuth } from "@/src/context/AuthContext";
-import { useSinglePress } from "@/src/hooks/useSinglePress";
 
 import type {
   TripItinerary,
@@ -38,6 +34,7 @@ import { PlanningSlotCard } from "@/src/components/itinerary/PlanningSlotCard";
 import { SkeletonSlotCard } from "@/src/components/itinerary/SkeletonSlotCard";
 import { PlanningDoneBar } from "@/src/components/itinerary/PlanningDoneBar";
 import { VotingDoneBar } from "@/src/components/itinerary/VotingDoneBar";
+import { ItineraryInfoModal } from "@/src/components/itinerary/ItineraryInfoModal";
 import { VotingSlotCard } from "@/src/components/itinerary/VoteSlotCard";
 import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
@@ -485,9 +482,6 @@ export default function ItineraryScreen() {
   ] = useState<string[]>([]);
   const [showActivityDetailModal, setShowActivityDetailModal] = useState(false);
 
-  const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
   const finalizingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -500,8 +494,6 @@ export default function ItineraryScreen() {
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
   const [isPreparingVoting, setIsPreparingVoting] = useState(false);
-
-  const popupRef = useRef<View>(null);
 
   const slots = useMemo(() => generateTimeSlots(), []);
 
@@ -585,10 +577,6 @@ export default function ItineraryScreen() {
     if (activeState === "planning") return;
 
     setShowPlanningInfoPopup(false);
-    if (planningInfoTimeoutRef.current) {
-      clearTimeout(planningInfoTimeoutRef.current);
-      planningInfoTimeoutRef.current = null;
-    }
   }, [activeState]);
 
   const refreshTripTimerFields = useCallback(
@@ -789,9 +777,6 @@ export default function ItineraryScreen() {
 
   useEffect(() => {
     return () => {
-      if (planningInfoTimeoutRef.current) {
-        clearTimeout(planningInfoTimeoutRef.current);
-      }
       if (finalizingTimeoutRef.current) {
         clearTimeout(finalizingTimeoutRef.current);
       }
@@ -800,27 +785,6 @@ export default function ItineraryScreen() {
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (!showPlanningInfoPopup || !popupRef.current) {
-      return;
-    }
-
-    if (Platform.OS === "web") {
-      requestAnimationFrame(() => {
-        const popupElement = popupRef.current as unknown as {
-          focus?: () => void;
-        };
-        popupElement?.focus?.();
-      });
-      return;
-    }
-
-    const node = findNodeHandle(popupRef.current);
-    if (node) {
-      AccessibilityInfo.setAccessibilityFocus(node);
-    }
-  }, [showPlanningInfoPopup]);
 
   const refreshFinalItinerary = useCallback(async () => {
     if (!tripId) return;
@@ -1036,23 +1000,7 @@ export default function ItineraryScreen() {
   }, [activeState]);
 
   function handlePlanningInfoPress() {
-    if (showPlanningInfoPopup) {
-      if (planningInfoTimeoutRef.current) {
-        clearTimeout(planningInfoTimeoutRef.current);
-      }
-      setShowPlanningInfoPopup(false);
-      return;
-    }
-
     setShowPlanningInfoPopup(true);
-
-    if (planningInfoTimeoutRef.current) {
-      clearTimeout(planningInfoTimeoutRef.current);
-    }
-
-    planningInfoTimeoutRef.current = setTimeout(() => {
-      setShowPlanningInfoPopup(false);
-    }, 3500);
   }
 
   const lastAppliedActivitySignatureRef = useRef<string | null>(null);
@@ -1799,13 +1747,6 @@ export default function ItineraryScreen() {
     }
   }
 
-  const handleDismissPopup = useSinglePress(() => {
-    if (planningInfoTimeoutRef.current) {
-      clearTimeout(planningInfoTimeoutRef.current);
-    }
-    setShowPlanningInfoPopup(false);
-  });
-
   const stateAccentColor =
     activeState === "voting"
       ? colors.sunsetPink
@@ -1987,40 +1928,15 @@ export default function ItineraryScreen() {
           onClose={handleCloseActivityDetails}
         />
 
-        {activeState === "planning" && showPlanningInfoPopup && (
-          <>
-            <Pressable
-              style={styles.popupDismissArea}
-              onPress={handleDismissPopup}
-              accessibilityRole="button"
-              accessibilityLabel="Dismiss planning information"
-            />
-            <View
-              ref={popupRef}
-              style={[
-                styles.popupWrapper,
-                Platform.OS === "web"
-                  ? ({ outlineStyle: "none" } as any)
-                  : null,
-              ]}
-              accessibilityViewIsModal={true}
-              accessible={true}
-              accessibilityLiveRegion="assertive"
-              accessibilityLabel="Uncheck Planning done to edit or add activities again."
-              {...(Platform.OS === "web" ? ({ tabIndex: -1 } as any) : {})}
-            >
-              <View style={styles.popup}>
-                <AppText
-                  variant="caption"
-                  style={styles.popupText}
-                  accessible={false}
-                >
-                  Uncheck Planning done to edit or add activities again.
-                </AppText>
-              </View>
-            </View>
-          </>
-        )}
+        <ItineraryInfoModal
+          visible={activeState === "planning" && showPlanningInfoPopup}
+          title="Planning done"
+          text="Uncheck Planning done to edit or add activities again."
+          primaryButtonColor={colors.beachYellow}
+          accessibilityLabel="Planning done information"
+          closeAccessibilityLabel="Close planning information"
+          onClose={() => setShowPlanningInfoPopup(false)}
+        />
 
         {activeState === "planning" && (
           <PlanningDoneBar
@@ -2037,51 +1953,22 @@ export default function ItineraryScreen() {
 
         {activeState === "voting" && isAdmin && (
           <VotingDoneBar
+            checked={isSubmittingVoting || isPreparingFinalItinerary}
             disabled={isSubmittingVoting || isPreparingFinalItinerary}
             onPress={handleFinishVoting}
             onInfoPress={handleVotingInfoPress}
           />
         )}
 
-        <Modal
+        <ItineraryInfoModal
           visible={showVotingInfoPopup}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowVotingInfoPopup(false)}
-        >
-          <View style={styles.votingModalOverlay}>
-            <Pressable
-              style={styles.votingModalBackdrop}
-              onPress={() => setShowVotingInfoPopup(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Close voting information"
-            />
-            <View
-              style={styles.votingModalCard}
-              accessibilityViewIsModal={true}
-              accessible={true}
-              accessibilityLabel="Submit voting information"
-            >
-              <AppText variant="subtitle" style={styles.votingModalTitle}>
-                Submit voting
-              </AppText>
-              <AppText variant="body" style={styles.votingModalText}>
-                Only admins can end voting manually. This closes voting for all
-                members and creates the final itinerary.
-              </AppText>
-              <Pressable
-                style={styles.votingModalPrimaryButton}
-                onPress={() => setShowVotingInfoPopup(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Close voting information"
-              >
-                <AppText variant="body" style={styles.votingModalButtonText}>
-                  Got it
-                </AppText>
-              </Pressable>
-            </View>
-          </View>
-        </Modal>
+          title="Submit voting"
+          text="Only admins can end voting manually. This closes voting for all members and creates the final itinerary."
+          primaryButtonColor={colors.sunsetPink}
+          accessibilityLabel="Submit voting information"
+          closeAccessibilityLabel="Close voting information"
+          onClose={() => setShowVotingInfoPopup(false)}
+        />
 
         <Modal
           visible={showVotingConfirmModal}
@@ -2204,31 +2091,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 0,
     height: 110,
     elevation: 4,
-  },
-  popupWrapper: {
-    position: "absolute",
-    bottom: 110,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    paddingHorizontal: spacing.lg,
-    zIndex: 20,
-  },
-  popupDismissArea: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "transparent",
-    zIndex: 15,
-  },
-  popup: {
-    backgroundColor: colors.nightBlack,
-    borderRadius: 16,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    maxWidth: 320,
-  },
-  popupText: {
-    color: colors.white,
-    textAlign: "center",
   },
   votingSection: {
     paddingTop: spacing.md,
