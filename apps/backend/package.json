@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
     "test": "jest",
+    "test:timers:emulator": "npx -y firebase-tools@latest emulators:exec --project demo-travel-app --config ../../firebase.json --only firestore,auth \"jest --runInBand src/__tests__/tripTimerEmulator.test.ts\"",
     "build": "tsc",
     "start": "node dist/index.js"
   },
