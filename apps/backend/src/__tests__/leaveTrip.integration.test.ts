@@ -16,10 +16,10 @@ import app from "../index";
 // Tests mutate this array directly; the mock reads it fresh on every .get() call.
 
 type Membership = {
-    user_id: string;
-    trip_id: string;
-    role: "admin" | "member";
-    invite_status: "accepted" | "pending";
+  user_id: string;
+  trip_id: string;
+  role: "admin" | "member";
+  invite_status: "accepted" | "pending";
 };
 
 let memberships: Membership[] = [];
@@ -30,247 +30,294 @@ const MEMBER_UID = "user-member";
 const OTHER_UID = "user-other";
 
 const TRIP_DATA = {
-    title: "Vienna Trip",
-    destination: "Vienna",
-    start_date: "2026-08-01",
-    end_date: "2026-08-07",
-    state: "Planning",
+  admin_user_id: ADMIN_UID,
+  title: "Vienna Trip",
+  destination: "Vienna",
+  start_date: "2026-08-01",
+  end_date: "2026-08-07",
+  state: "Planning",
 };
 
 // ── Firebase mock ──
 
 jest.mock("../config/firebase", () => {
-    return {
-        __esModule: true,
-        default: {
-            auth: () => ({
-                verifyIdToken: jest.fn().mockImplementation((token: string) => {
-                    const map: Record<string, string> = {
-                        "admin-token": "user-admin",
-                        "member-token": "user-member",
-                        "other-token": "user-other",
-                    };
-                    if (map[token]) return Promise.resolve({ uid: map[token] });
-                    return Promise.reject(new Error("Invalid token"));
-                }),
-            }),
+  return {
+    __esModule: true,
+    default: {
+      auth: () => ({
+        verifyIdToken: jest.fn().mockImplementation((token: string) => {
+          const map: Record<string, string> = {
+            "admin-token": "user-admin",
+            "member-token": "user-member",
+            "other-token": "user-other",
+          };
+          if (map[token]) return Promise.resolve({ uid: map[token] });
+          return Promise.reject(new Error("Invalid token"));
+        }),
+      }),
 
-            firestore: Object.assign(() => ({
-                batch: () => ({
-                    delete: jest.fn(),
-                    commit: jest.fn().mockResolvedValue(undefined),
-                }),
-                collection: (name: string) => {
-
-                    // ── trip_members ──
-                    if (name === "trip_members") {
-                        return {
-                            where: jest.fn().mockImplementation(
-                                (field1: string, _op1: string, value1: string) => ({
-                                    where: jest.fn().mockImplementation(
-                                        (field2: string, _op2: string, value2: string) => ({
-                                            get: jest.fn().mockImplementation(() => {
-                                                // Always read from the live array at call-time
-                                                const matched = memberships.filter(
-                                                    (m) =>
-                                                        m[field1 as keyof Membership] === value1 &&
-                                                        m[field2 as keyof Membership] === value2
-                                                );
-                                                return Promise.resolve({
-                                                    empty: matched.length === 0,
-                                                    docs: matched.map((m) => ({
-                                                        data: () => ({ ...m }),
-                                                        ref: {
-                                                            delete: jest.fn().mockImplementation(() => {
-                                                                // Simulate Firestore delete
-                                                                memberships = memberships.filter(
-                                                                    (x) =>
-                                                                        !(
-                                                                            x.user_id === m.user_id &&
-                                                                            x.trip_id === m.trip_id
-                                                                        )
-                                                                );
-                                                                return Promise.resolve();
-                                                            }),
-                                                        },
-                                                    })),
-                                                });
-                                            }),
-                                        })
-                                    ),
-                                })
-                            ),
-                            doc: jest.fn().mockReturnValue({
-                                set: jest.fn().mockResolvedValue({}),
+      firestore: Object.assign(
+        () => ({
+          batch: () => ({
+            delete: jest.fn(),
+            commit: jest.fn().mockResolvedValue(undefined),
+          }),
+          collection: (name: string) => {
+            // ── trip_members ──
+            if (name === "trip_members") {
+              return {
+                where: jest
+                  .fn()
+                  .mockImplementation(
+                    (field1: string, _op1: string, value1: string) => ({
+                      where: jest
+                        .fn()
+                        .mockImplementation(
+                          (field2: string, _op2: string, value2: string) => ({
+                            get: jest.fn().mockImplementation(() => {
+                              // Always read from the live array at call-time
+                              const matched = memberships.filter(
+                                (m) =>
+                                  m[field1 as keyof Membership] === value1 &&
+                                  m[field2 as keyof Membership] === value2,
+                              );
+                              return Promise.resolve({
+                                empty: matched.length === 0,
+                                docs: matched.map((m) => ({
+                                  data: () => ({ ...m }),
+                                  ref: {
+                                    delete: jest.fn().mockImplementation(() => {
+                                      // Simulate Firestore delete
+                                      memberships = memberships.filter(
+                                        (x) =>
+                                          !(
+                                            x.user_id === m.user_id &&
+                                            x.trip_id === m.trip_id
+                                          ),
+                                      );
+                                      return Promise.resolve();
+                                    }),
+                                  },
+                                })),
+                              });
                             }),
-                        };
-                    }
+                          }),
+                        ),
+                    }),
+                  ),
+                doc: jest.fn().mockReturnValue({
+                  set: jest.fn().mockResolvedValue({}),
+                }),
+              };
+            }
 
-                    // ── trips ──
-                    if (name === "trips") {
-                        return {
-                            doc: jest.fn().mockImplementation((id: string) => ({
-                                get: jest.fn().mockResolvedValue({
-                                    id,
-                                    exists: id === TRIP_ID,
-                                    data: () => (id === TRIP_ID ? TRIP_DATA : null),
-                                }),
-                                set: jest.fn().mockResolvedValue({}),
-                            })),
-                        };
-                    }
+            // ── trips ──
+            if (name === "trips") {
+              return {
+                doc: jest.fn().mockImplementation((id: string) => ({
+                  get: jest.fn().mockResolvedValue({
+                    id,
+                    exists: id === TRIP_ID,
+                    data: () => (id === TRIP_ID ? TRIP_DATA : null),
+                  }),
+                  set: jest.fn().mockResolvedValue({}),
+                })),
+              };
+            }
 
-                    if (name === "activity_votes" || name === "activity_attendance") {
-                        return {
-                            where: jest.fn().mockReturnThis(),
-                            get: jest.fn().mockResolvedValue({
-                                empty: true,
-                                docs: [],
-                            }),
-                        };
-                    }
+            if (name === "users") {
+              return {
+                doc: jest.fn().mockImplementation((id: string) => ({
+                  get: jest.fn().mockResolvedValue({
+                    id,
+                    exists: true,
+                    data: () => ({
+                      name:
+                        id === MEMBER_UID
+                          ? "Member User"
+                          : id === ADMIN_UID
+                            ? "Admin User"
+                            : "Other User",
+                      expoPushToken: undefined,
+                    }),
+                  }),
+                })),
+                where: jest.fn().mockReturnThis(),
+                get: jest.fn().mockResolvedValue({
+                  empty: true,
+                  docs: [],
+                }),
+              };
+            }
 
-                    return {};
-                },
-            }), {
-                Timestamp: {
-                    now: jest.fn(() => ({
-                        toDate: () => new Date("2026-01-01T00:00:00.000Z"),
-                    })),
-                },
-            }),
+            if (name === "activity_votes" || name === "activity_attendance") {
+              return {
+                where: jest.fn().mockReturnThis(),
+                get: jest.fn().mockResolvedValue({
+                  empty: true,
+                  docs: [],
+                }),
+              };
+            }
+
+            return {};
+          },
+        }),
+        {
+          Timestamp: {
+            now: jest.fn(() => ({
+              toDate: () => new Date("2026-01-01T00:00:00.000Z"),
+            })),
+          },
+          FieldPath: {
+            documentId: jest.fn(() => "__name__"),
+          },
         },
-    };
+      ),
+    },
+  };
 });
 
 // ── Helpers ──
 
 function resetMemberships() {
-    memberships = [
-        { user_id: ADMIN_UID,  trip_id: TRIP_ID, role: "admin",  invite_status: "accepted" },
-        { user_id: MEMBER_UID, trip_id: TRIP_ID, role: "member", invite_status: "accepted" },
-        { user_id: OTHER_UID,  trip_id: TRIP_ID, role: "member", invite_status: "accepted" },
-    ];
+  memberships = [
+    {
+      user_id: ADMIN_UID,
+      trip_id: TRIP_ID,
+      role: "admin",
+      invite_status: "accepted",
+    },
+    {
+      user_id: MEMBER_UID,
+      trip_id: TRIP_ID,
+      role: "member",
+      invite_status: "accepted",
+    },
+    {
+      user_id: OTHER_UID,
+      trip_id: TRIP_ID,
+      role: "member",
+      invite_status: "accepted",
+    },
+  ];
 }
 
 // ── Tests ──
 
 describe("POST /trips/:tripId/leave — integration", () => {
+  beforeEach(resetMemberships);
 
-    beforeEach(resetMemberships);
+  afterAll((done) => done());
 
-    afterAll((done) => done());
+  // ── Member leaves successfully ──
 
-    // ── Member leaves successfully ──
+  it("returns 200 when a member successfully leaves", async () => {
+    const res = await request(app)
+      .post(`/trips/${TRIP_ID}/leave`)
+      .send({ idToken: "member-token" });
 
-    it("returns 200 when a member successfully leaves", async () => {
-        const res = await request(app)
-            .post(`/trips/${TRIP_ID}/leave`)
-            .send({ idToken: "member-token" });
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe("Left trip successfully");
+  });
 
-        expect(res.status).toBe(200);
-        expect(res.body.message).toBe("Left trip successfully");
-    });
+  it("removes the leaving member from the memberships list", async () => {
+    await request(app)
+      .post(`/trips/${TRIP_ID}/leave`)
+      .send({ idToken: "member-token" });
 
-    it("removes the leaving member from the memberships list", async () => {
-        await request(app)
-            .post(`/trips/${TRIP_ID}/leave`)
-            .send({ idToken: "member-token" });
+    const memberStillPresent = memberships.some(
+      (m) => m.user_id === MEMBER_UID && m.trip_id === TRIP_ID,
+    );
+    expect(memberStillPresent).toBe(false);
+  });
 
-        const memberStillPresent = memberships.some(
-            (m) => m.user_id === MEMBER_UID && m.trip_id === TRIP_ID
-        );
-        expect(memberStillPresent).toBe(false);
-    });
+  it("admin still has their membership after a member leaves", async () => {
+    await request(app)
+      .post(`/trips/${TRIP_ID}/leave`)
+      .send({ idToken: "member-token" });
 
-    it("admin still has their membership after a member leaves", async () => {
-        await request(app)
-            .post(`/trips/${TRIP_ID}/leave`)
-            .send({ idToken: "member-token" });
+    const adminMembership = memberships.find(
+      (m) => m.user_id === ADMIN_UID && m.trip_id === TRIP_ID,
+    );
+    expect(adminMembership).toBeDefined();
+    expect(adminMembership?.role).toBe("admin");
+  });
 
-        const adminMembership = memberships.find(
-            (m) => m.user_id === ADMIN_UID && m.trip_id === TRIP_ID
-        );
-        expect(adminMembership).toBeDefined();
-        expect(adminMembership?.role).toBe("admin");
-    });
+  it("other members still have their membership after an unrelated member leaves", async () => {
+    await request(app)
+      .post(`/trips/${TRIP_ID}/leave`)
+      .send({ idToken: "member-token" });
 
-    it("other members still have their membership after an unrelated member leaves", async () => {
-        await request(app)
-            .post(`/trips/${TRIP_ID}/leave`)
-            .send({ idToken: "member-token" });
+    const otherMembership = memberships.find(
+      (m) => m.user_id === OTHER_UID && m.trip_id === TRIP_ID,
+    );
+    expect(otherMembership).toBeDefined();
+  });
 
-        const otherMembership = memberships.find(
-            (m) => m.user_id === OTHER_UID && m.trip_id === TRIP_ID
-        );
-        expect(otherMembership).toBeDefined();
-    });
+  it("exactly one membership is removed when a member leaves", async () => {
+    const countBefore = memberships.length;
 
-    it("exactly one membership is removed when a member leaves", async () => {
-        const countBefore = memberships.length;
+    await request(app)
+      .post(`/trips/${TRIP_ID}/leave`)
+      .send({ idToken: "member-token" });
 
-        await request(app)
-            .post(`/trips/${TRIP_ID}/leave`)
-            .send({ idToken: "member-token" });
+    expect(memberships).toHaveLength(countBefore - 1);
+  });
 
-        expect(memberships).toHaveLength(countBefore - 1);
-    });
+  // ── Admin cannot leave ──
 
-    // ── Admin cannot leave ──
+  it("returns 403 when the admin tries to leave", async () => {
+    const res = await request(app)
+      .post(`/trips/${TRIP_ID}/leave`)
+      .send({ idToken: "admin-token" });
 
-    it("returns 403 when the admin tries to leave", async () => {
-        const res = await request(app)
-            .post(`/trips/${TRIP_ID}/leave`)
-            .send({ idToken: "admin-token" });
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe(
+      "Admin cannot leave the trip. Delete it instead.",
+    );
+  });
 
-        expect(res.status).toBe(403);
-        expect(res.body.error).toBe(
-            "Admin cannot leave the trip. Delete it instead."
-        );
-    });
+  it("does not alter memberships when the admin tries to leave", async () => {
+    const snapshot = JSON.stringify(memberships);
 
-    it("does not alter memberships when the admin tries to leave", async () => {
-        const snapshot = JSON.stringify(memberships);
+    await request(app)
+      .post(`/trips/${TRIP_ID}/leave`)
+      .send({ idToken: "admin-token" });
 
-        await request(app)
-            .post(`/trips/${TRIP_ID}/leave`)
-            .send({ idToken: "admin-token" });
+    expect(JSON.stringify(memberships)).toBe(snapshot);
+  });
 
-        expect(JSON.stringify(memberships)).toBe(snapshot);
-    });
+  // ── Missing fields ──
 
-    // ── Missing fields ──
+  it("returns 400 when idToken is missing", async () => {
+    const res = await request(app).post(`/trips/${TRIP_ID}/leave`).send({});
 
-    it("returns 400 when idToken is missing", async () => {
-        const res = await request(app)
-            .post(`/trips/${TRIP_ID}/leave`)
-            .send({});
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("idToken and tripId are required");
+  });
 
-        expect(res.status).toBe(400);
-        expect(res.body.error).toBe("idToken and tripId are required");
-    });
+  // ── Invalid token ──
 
-    // ── Invalid token ──
+  it("returns 401 for an invalid token", async () => {
+    const res = await request(app)
+      .post(`/trips/${TRIP_ID}/leave`)
+      .send({ idToken: "invalid-token" });
 
-    it("returns 401 for an invalid token", async () => {
-        const res = await request(app)
-            .post(`/trips/${TRIP_ID}/leave`)
-            .send({ idToken: "invalid-token" });
+    expect(res.status).toBe(401);
+  });
 
-        expect(res.status).toBe(401);
-    });
+  // ── User not in trip ──
 
-    // ── User not in trip ──
+  it("returns 404 when the user is not a member of the trip", async () => {
+    // Remove MEMBER_UID from memberships before the request
+    memberships = memberships.filter((m) => m.user_id !== MEMBER_UID);
 
-    it("returns 404 when the user is not a member of the trip", async () => {
-        // Remove MEMBER_UID from memberships before the request
-        memberships = memberships.filter((m) => m.user_id !== MEMBER_UID);
+    const res = await request(app)
+      .post(`/trips/${TRIP_ID}/leave`)
+      .send({ idToken: "member-token" });
 
-        const res = await request(app)
-            .post(`/trips/${TRIP_ID}/leave`)
-            .send({ idToken: "member-token" });
-
-        expect(res.status).toBe(404);
-        expect(res.body.error).toBe("You are not a member of this trip");
-    });
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("You are not a member of this trip");
+  });
 });
