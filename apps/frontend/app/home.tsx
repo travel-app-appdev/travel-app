@@ -1,6 +1,6 @@
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/src/context/AuthContext";
 import {
   AccessibilityInfo,
@@ -442,30 +442,35 @@ export default function HomeScreen() {
     const userId = user?.uid ?? null;
     if (!userId) return;
 
-    const tripIds = [
-      ...new Set([...yourTrips, ...pastTrips].map((trip) => trip.id)),
-    ];
-
-    if (tripIds.length === 0) return;
-
-    const unsubscribes = tripIds.map((tripId) =>
-      onSnapshot(
-        doc(db, "trips", tripId),
-        (snapshot) => {
-          if (!snapshot.exists()) {
-            removeTripFromLocalLists(tripId);
-          }
-        },
-        (error) => {
-          console.log("Trip deletion listener error:", error);
-        }
-      )
+    const membershipQuery = query(
+      collection(db, "trip_members"),
+      where("user_id", "==", userId)
     );
 
-    return () => {
-      unsubscribes.forEach((unsubscribe) => unsubscribe());
-    };
-  }, [pastTrips, removeTripFromLocalLists, user?.uid, yourTrips]);
+    const unsubscribe = onSnapshot(
+      membershipQuery,
+      (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          const data = change.doc.data();
+          const tripId = data.trip_id;
+
+          if (typeof tripId !== "string") return;
+
+          if (
+            change.type === "removed" ||
+            data.invite_status !== "accepted"
+          ) {
+            removeTripFromLocalLists(tripId);
+          }
+        });
+      },
+      (error) => {
+        console.log("Trip membership listener error:", error);
+      }
+    );
+
+    return unsubscribe;
+  }, [removeTripFromLocalLists, user?.uid]);
 
   const trips = activeTab === "your" ? yourTrips : pastTrips;
 
