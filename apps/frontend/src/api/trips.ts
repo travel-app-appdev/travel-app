@@ -488,6 +488,39 @@ export async function finishPlanning(
   return data as FinishPlanningResponse;
 }
 
+export type FinishVotingResponse = {
+  tripState: "Planning" | "Voting" | "Final";
+};
+
+type FinishVotingPayload = {
+  idToken: string;
+  tripId: string;
+};
+
+export async function finishVoting(
+  payload: FinishVotingPayload
+): Promise<FinishVotingResponse> {
+  const response = await fetch(
+    `${API_URL}/trips/${payload.tripId}/finish-voting`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: payload.idToken }),
+    }
+  );
+
+  const data: FinishVotingResponse | ApiErrorResponse = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      (data as ApiErrorResponse).error || "Failed to finish voting"
+    );
+  }
+
+  invalidateTripsAfterMutation();
+  return data as FinishVotingResponse;
+}
+
 // ── Fetch public trip preview by invite code (no auth required) ──
 export async function fetchTripByInviteCode(
   inviteCode: string

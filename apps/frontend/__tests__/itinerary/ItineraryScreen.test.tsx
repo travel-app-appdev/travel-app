@@ -1,5 +1,5 @@
 import React from "react";
-import { render, waitFor } from "@testing-library/react-native";
+import { act, render, waitFor } from "@testing-library/react-native";
 
 import ItineraryScreen from "@/app/itinerary";
 
@@ -14,6 +14,7 @@ const mockGetFinalItineraryActivities = jest.fn();
 const mockToggleActivityAttendance = jest.fn();
 const mockVoteForActivity = jest.fn();
 const mockDaySelectorProps = jest.fn();
+const mockPlanningDoneBarProps = jest.fn();
 
 let mockParams: Record<string, string | undefined> = {};
 let mockTripDays = [{ id: "2026-06-01", label: "1 Jun" }];
@@ -107,7 +108,10 @@ jest.mock("@/src/components/itinerary/SkeletonSlotCard", () => ({
 }));
 
 jest.mock("@/src/components/itinerary/PlanningDoneBar", () => ({
-  PlanningDoneBar: () => null,
+  PlanningDoneBar: (props: unknown) => {
+    mockPlanningDoneBarProps(props);
+    return null;
+  },
 }));
 
 jest.mock("@/src/components/itinerary/VoteSlotCard", () => ({
@@ -173,6 +177,70 @@ describe("ItineraryScreen transition overlays", () => {
     mockTripDays = [{ id: "2026-06-01", label: "1 Jun" }];
     mockGetActivitiesBySlot.mockResolvedValue([]);
     mockGetFinalItineraryActivities.mockResolvedValue([]);
+  });
+
+  it("does not show the voting loading overlay when planning submit is not complete for all members", async () => {
+    setBaseParams("planning");
+    mockParams.members = JSON.stringify([
+      { userId: "user-123", hasFinishedPlanning: false },
+      { userId: "user-456", hasFinishedPlanning: false },
+    ]);
+    mockFinishPlanning.mockResolvedValueOnce({
+      allDone: false,
+      tripState: "Planning",
+      completedMembers: 1,
+      totalMembers: 2,
+      planningDone: true,
+    });
+    mockFetchTripForUser.mockResolvedValue({
+      ...backendTrip("Planning"),
+      members: [
+        {
+          id: "user-123",
+          name: "Helen",
+          role: "member",
+          planning_done: true,
+        },
+        {
+          id: "user-456",
+          name: "Sam",
+          role: "admin",
+          planning_done: false,
+        },
+      ],
+    });
+
+    const { queryByText, unmount } = render(<ItineraryScreen />);
+
+    await waitFor(() => {
+      expect(mockPlanningDoneBarProps).toHaveBeenCalled();
+    });
+
+    const uncheckedPlanningProps = mockPlanningDoneBarProps.mock.calls.find(
+      ([props]) => (props as { checked: boolean }).checked === false
+    )?.[0] as { onPress: () => Promise<void> } | undefined;
+
+    expect(uncheckedPlanningProps).toBeTruthy();
+
+    await act(async () => {
+      await uncheckedPlanningProps?.onPress();
+    });
+
+    await waitFor(() => {
+      expect(mockFinishPlanning).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tripId: "trip-123",
+          planningDone: true,
+        })
+      );
+    });
+
+    expect(queryByText("Getting voting ready")).toBeNull();
+    expect(mockSetParams).not.toHaveBeenCalledWith(
+      expect.objectContaining({ state: "voting" })
+    );
+
+    unmount();
   });
 
   it("shows a loading overlay before applying a Planning to Voting refresh", async () => {
