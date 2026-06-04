@@ -181,8 +181,14 @@ function formatPhaseTimerText(
   now: number
 ): string {
   const phaseEnd = combineDateAndTimeToDate(phase.end, phase.time);
-  if (isActive) return formatTripTimerText(phaseEnd, now);
-  return formatTripDurationText(phase.start, phaseEnd);
+
+  if (isActive) {
+    // While active: show remaining time until end
+    return formatTripTimerText(phaseEnd, now);
+  }
+
+  // For past or future phases: no time remaining
+  return "0 hours";
 }
 
 function endOfDay(date: Date): Date {
