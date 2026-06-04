@@ -36,6 +36,19 @@ const MAX_NAME_LENGTH = 200;
 const MAX_DESCRIPTION_LENGTH = 1000;
 const MAX_ADDRESS_LENGTH = 300;
 const MAX_GOOGLE_LINK_LENGTH = 2048;
+const FALLBACK_TIME_PLACEHOLDER = "HH:MM";
+
+const SLOT_TIME_PLACEHOLDERS: Record<
+  string,
+  { startTime: string; endTime: string }
+> = {
+  Breakfast: { startTime: "06:00", endTime: "09:00" },
+  "Morning Activity": { startTime: "09:00", endTime: "12:00" },
+  Lunch: { startTime: "12:00", endTime: "14:00" },
+  "Midday Activity": { startTime: "14:00", endTime: "18:00" },
+  Dinner: { startTime: "18:00", endTime: "21:00" },
+  "Evening Activity": { startTime: "21:00", endTime: "00:00" },
+};
 
 function splitSlotId(value?: string) {
   if (!value) return { dayId: undefined, slotId: undefined };
@@ -60,6 +73,33 @@ function normalizeTimeInput(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 4);
   if (digits.length <= 2) return digits;
   return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+function getSlotTimePlaceholders(slotId?: string): {
+  startTime: string;
+  endTime: string;
+} {
+  const normalizedSlotId = splitSlotId(slotId).slotId;
+
+  if (!normalizedSlotId) {
+    return {
+      startTime: FALLBACK_TIME_PLACEHOLDER,
+      endTime: FALLBACK_TIME_PLACEHOLDER,
+    };
+  }
+
+  return (
+    SLOT_TIME_PLACEHOLDERS[normalizedSlotId] ?? {
+      startTime: FALLBACK_TIME_PLACEHOLDER,
+      endTime: FALLBACK_TIME_PLACEHOLDER,
+    }
+  );
+}
+
+function getUnsetTimeAccessibilityText(placeholder: string) {
+  return placeholder === FALLBACK_TIME_PLACEHOLDER
+    ? "not set"
+    : `not set, suggested ${placeholder}`;
 }
 
 type ActivityTimeField = "start" | "end";
@@ -188,6 +228,14 @@ export default function AddActivityScreen() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackTitle, setFeedbackTitle] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
+  const { startTime: startTimePlaceholder, endTime: endTimePlaceholder } =
+    useMemo(() => getSlotTimePlaceholders(slotId), [slotId]);
+  const activityTimePickerPlaceholder =
+    showActivityTimePicker === "start"
+      ? startTimePlaceholder
+      : showActivityTimePicker === "end"
+        ? endTimePlaceholder
+        : FALLBACK_TIME_PLACEHOLDER;
 
   function openFeedbackModal(title: string, message: string) {
     setFeedbackTitle(title);
@@ -529,7 +577,8 @@ export default function AddActivityScreen() {
                     onPress={() => openActivityTimePicker("start")}
                     accessibilityRole="button"
                     accessibilityLabel={`Activity start time, currently ${
-                      startTime || "not set"
+                      startTime ||
+                      getUnsetTimeAccessibilityText(startTimePlaceholder)
                     }. Tap to change`}
                     accessibilityHint="Opens the time picker"
                   >
@@ -540,7 +589,7 @@ export default function AddActivityScreen() {
                         !startTime && styles.timePlaceholderText,
                       ]}
                     >
-                      {startTime || "HH:MM"}
+                      {startTime || startTimePlaceholder}
                     </AppText>
                     <View {...hiddenFromAccessibility}>
                       <Timer width={20} height={20} />
@@ -560,7 +609,8 @@ export default function AddActivityScreen() {
                     onPress={() => openActivityTimePicker("end")}
                     accessibilityRole="button"
                     accessibilityLabel={`Activity end time, currently ${
-                      endTime || "not set"
+                      endTime ||
+                      getUnsetTimeAccessibilityText(endTimePlaceholder)
                     }. Tap to change`}
                     accessibilityHint="Opens the time picker"
                   >
@@ -571,7 +621,7 @@ export default function AddActivityScreen() {
                         !endTime && styles.timePlaceholderText,
                       ]}
                     >
-                      {endTime || "HH:MM"}
+                      {endTime || endTimePlaceholder}
                     </AppText>
                     <View {...hiddenFromAccessibility}>
                       <Timer width={20} height={20} />
@@ -674,7 +724,7 @@ export default function AddActivityScreen() {
                 onChangeText={(value) =>
                   setTempActivityTime(normalizeTimeInput(value))
                 }
-                placeholder="HH:MM"
+                placeholder={activityTimePickerPlaceholder}
                 placeholderTextColor={colors.textMuted}
                 keyboardType={
                   Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"
