@@ -1919,7 +1919,7 @@ export default function TripOverviewAdminScreen() {
                                         {phase.label}
                                       </AppText>
                                     </View>
-
+-
                                     {phaseId !== "final" ? (
                                       <View style={styles.phaseTimerBlock}>
                                         <View
@@ -1983,7 +1983,7 @@ export default function TripOverviewAdminScreen() {
                                             Timer
                                           </AppText>
                                         </View>
-                                      </View>
+                                      </View> //lol
                                     ) : (
                                       <View
                                         style={styles.finalPlaceholderBlock}
