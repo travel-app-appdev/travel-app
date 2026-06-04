@@ -35,7 +35,7 @@ export function VotingDoneBar({
   }, [onInfoPress]);
 
   return (
-    <View style={styles.wrapper} pointerEvents="box-none">
+    <View style={styles.wrapper}>
       <View style={styles.footer}>
         <Pressable
           style={styles.doneButton}

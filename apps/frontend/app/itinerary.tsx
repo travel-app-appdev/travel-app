@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   findNodeHandle,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -461,6 +462,8 @@ export default function ItineraryScreen() {
   });
 
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
+  const [showVotingInfoPopup, setShowVotingInfoPopup] = useState(false);
+  const [showVotingConfirmModal, setShowVotingConfirmModal] = useState(false);
   const [isSubmittingPlanning, setIsSubmittingPlanning] = useState(false);
   const [isSubmittingVoting, setIsSubmittingVoting] = useState(false);
 
@@ -576,6 +579,16 @@ export default function ItineraryScreen() {
 
   useEffect(() => {
     activeStateRef.current = activeState;
+  }, [activeState]);
+
+  useEffect(() => {
+    if (activeState === "planning") return;
+
+    setShowPlanningInfoPopup(false);
+    if (planningInfoTimeoutRef.current) {
+      clearTimeout(planningInfoTimeoutRef.current);
+      planningInfoTimeoutRef.current = null;
+    }
   }, [activeState]);
 
   const refreshTripTimerFields = useCallback(
@@ -1277,10 +1290,7 @@ export default function ItineraryScreen() {
   }
 
   function handleVotingInfoPress() {
-    Alert.alert(
-      "Submit voting",
-      "Only admins can end voting manually. This closes voting for all members and creates the final itinerary."
-    );
+    setShowVotingInfoPopup(true);
   }
 
   async function submitFinishVoting() {
@@ -1320,21 +1330,12 @@ export default function ItineraryScreen() {
 
   function handleFinishVoting() {
     if (isSubmittingVoting || isPreparingFinalItinerary) return;
+    setShowVotingConfirmModal(true);
+  }
 
-    Alert.alert(
-      "End voting?",
-      "Are you sure you want to end voting for all members?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "End voting",
-          style: "destructive",
-          onPress: () => {
-            void submitFinishVoting();
-          },
-        },
-      ]
-    );
+  function handleConfirmFinishVoting() {
+    setShowVotingConfirmModal(false);
+    void submitFinishVoting();
   }
 
   const votingActivities = useMemo(() => {
@@ -1986,7 +1987,7 @@ export default function ItineraryScreen() {
           onClose={handleCloseActivityDetails}
         />
 
-        {showPlanningInfoPopup && (
+        {activeState === "planning" && showPlanningInfoPopup && (
           <>
             <Pressable
               style={styles.popupDismissArea}
@@ -2041,6 +2042,100 @@ export default function ItineraryScreen() {
             onInfoPress={handleVotingInfoPress}
           />
         )}
+
+        <Modal
+          visible={showVotingInfoPopup}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowVotingInfoPopup(false)}
+        >
+          <View style={styles.votingModalOverlay}>
+            <Pressable
+              style={styles.votingModalBackdrop}
+              onPress={() => setShowVotingInfoPopup(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Close voting information"
+            />
+            <View
+              style={styles.votingModalCard}
+              accessibilityViewIsModal={true}
+              accessible={true}
+              accessibilityLabel="Submit voting information"
+            >
+              <AppText variant="subtitle" style={styles.votingModalTitle}>
+                Submit voting
+              </AppText>
+              <AppText variant="body" style={styles.votingModalText}>
+                Only admins can end voting manually. This closes voting for all
+                members and creates the final itinerary.
+              </AppText>
+              <Pressable
+                style={styles.votingModalPrimaryButton}
+                onPress={() => setShowVotingInfoPopup(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close voting information"
+              >
+                <AppText variant="body" style={styles.votingModalButtonText}>
+                  Got it
+                </AppText>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={showVotingConfirmModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowVotingConfirmModal(false)}
+        >
+          <View style={styles.votingModalOverlay}>
+            <Pressable
+              style={styles.votingModalBackdrop}
+              onPress={() => setShowVotingConfirmModal(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel ending voting"
+            />
+            <View
+              style={styles.votingModalCard}
+              accessibilityViewIsModal={true}
+              accessible={true}
+              accessibilityLabel="End voting confirmation"
+            >
+              <AppText variant="subtitle" style={styles.votingModalTitle}>
+                End voting?
+              </AppText>
+              <AppText variant="body" style={styles.votingModalText}>
+                Are you sure you want to end voting for all members?
+              </AppText>
+              <View style={styles.votingModalActions}>
+                <Pressable
+                  style={styles.votingModalSecondaryButton}
+                  onPress={() => setShowVotingConfirmModal(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel ending voting"
+                >
+                  <AppText
+                    variant="body"
+                    style={styles.votingModalSecondaryButtonText}
+                  >
+                    Cancel
+                  </AppText>
+                </Pressable>
+                <Pressable
+                  style={styles.votingModalPrimaryButton}
+                  onPress={handleConfirmFinishVoting}
+                  accessibilityRole="button"
+                  accessibilityLabel="End voting for everyone"
+                >
+                  <AppText variant="body" style={styles.votingModalButtonText}>
+                    End voting
+                  </AppText>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {isPreparingFinalItinerary && (
           <TransitionOverlay
@@ -2141,6 +2236,65 @@ const styles = StyleSheet.create({
   },
   emptyVoting: {
     paddingVertical: spacing.xxl,
+  },
+  votingModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.32)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+  },
+  votingModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  votingModalCard: {
+    width: "100%",
+    maxWidth: 340,
+    borderRadius: 18,
+    backgroundColor: colors.lightWhite,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+    gap: spacing.md,
+  },
+  votingModalTitle: {
+    color: colors.nightBlack,
+    textAlign: "center",
+  },
+  votingModalText: {
+    color: colors.nightBlack,
+    textAlign: "center",
+  },
+  votingModalActions: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
+  votingModalPrimaryButton: {
+    minHeight: 48,
+    borderRadius: 999,
+    backgroundColor: colors.sunsetPink,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  votingModalSecondaryButton: {
+    minHeight: 48,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.sunsetPink,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  votingModalButtonText: {
+    color: colors.nightBlack,
+    textAlign: "center",
+  },
+  votingModalSecondaryButtonText: {
+    color: colors.nightBlack,
+    textAlign: "center",
   },
   finalizingOverlay: {
     ...StyleSheet.absoluteFillObject,
