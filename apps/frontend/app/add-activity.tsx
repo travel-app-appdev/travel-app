@@ -31,6 +31,12 @@ import { useAuth } from "@/src/context/AuthContext";
 import { auth } from "@/src/lib/firebase";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
+// ---- NEW: length limits ----
+const MAX_NAME_LENGTH = 200;
+const MAX_DESCRIPTION_LENGTH = 1000;
+const MAX_ADDRESS_LENGTH = 300;
+const MAX_GOOGLE_LINK_LENGTH = 2048;
+
 function splitSlotId(value?: string) {
   if (!value) return { dayId: undefined, slotId: undefined };
 
@@ -276,7 +282,14 @@ export default function AddActivityScreen() {
   }
 
   async function handleSaveActivity() {
-    if (!activityName.trim()) {
+    const trimmedName = activityName.trim();
+    const trimmedDescription = description.trim();
+    const trimmedAddress = address.trim();
+    const trimmedGoogleLink = googleLink.trim();
+    const trimmedStartTime = startTime.trim();
+    const trimmedEndTime = endTime.trim();
+
+    if (!trimmedName) {
       openFeedbackModal(
         "Missing activity name",
         "Please enter an activity name."
@@ -284,8 +297,38 @@ export default function AddActivityScreen() {
       return;
     }
 
-    const trimmedStartTime = startTime.trim();
-    const trimmedEndTime = endTime.trim();
+    // NEW: length validations
+    if (trimmedName.length > MAX_NAME_LENGTH) {
+      openFeedbackModal(
+        "Name too long",
+        `Activity name must be shorter than ${MAX_NAME_LENGTH} characters.`
+      );
+      return;
+    }
+
+    if (trimmedDescription.length > MAX_DESCRIPTION_LENGTH) {
+      openFeedbackModal(
+        "Description too long",
+        `Description must be shorter than ${MAX_DESCRIPTION_LENGTH} characters.`
+      );
+      return;
+    }
+
+    if (trimmedAddress.length > MAX_ADDRESS_LENGTH) {
+      openFeedbackModal(
+        "Address too long",
+        `Address must be shorter than ${MAX_ADDRESS_LENGTH} characters.`
+      );
+      return;
+    }
+
+    if (trimmedGoogleLink.length > MAX_GOOGLE_LINK_LENGTH) {
+      openFeedbackModal(
+        "Link too long",
+        `Google link is unusually long. Please shorten it or use a normal Maps URL.`
+      );
+      return;
+    }
 
     if (trimmedStartTime && !isValidTimeString(trimmedStartTime)) {
       openFeedbackModal(
@@ -317,7 +360,17 @@ export default function AddActivityScreen() {
       return;
     }
 
-    const token = idToken ?? (await auth.currentUser?.getIdToken());
+    let token = idToken;
+
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        // Force-refresh the ID token so it's never expired
+        token = await user.getIdToken(true);
+      }
+    } catch {
+      // ignore, will fall back to existing idToken if present
+    }
 
     if (!token) {
       openFeedbackModal("Not logged in", "Please log in again.");
@@ -328,10 +381,10 @@ export default function AddActivityScreen() {
       if (isEditMode && activityId) {
         await updateActivity(activityId, {
           idToken: token,
-          name: activityName.trim(),
-          description: description.trim(),
-          address: address.trim(),
-          googleMapsUrl: googleLink.trim(),
+          name: trimmedName,
+          description: trimmedDescription,
+          address: trimmedAddress,
+          googleMapsUrl: trimmedGoogleLink,
           startTime: trimmedStartTime || undefined,
           endTime: trimmedEndTime || undefined,
         });
@@ -342,10 +395,10 @@ export default function AddActivityScreen() {
           tripId,
           dayId,
           slotId,
-          name: activityName.trim(),
-          description: description.trim(),
-          address: address.trim(),
-          googleMapsUrl: googleLink.trim(),
+          name: trimmedName,
+          description: trimmedDescription,
+          address: trimmedAddress,
+          googleMapsUrl: trimmedGoogleLink,
           startTime: trimmedStartTime || undefined,
           endTime: trimmedEndTime || undefined,
         });
@@ -353,6 +406,7 @@ export default function AddActivityScreen() {
         navigateBackWithActivity(createdActivity.activity_id);
       }
     } catch (error) {
+      console.log("createActivity error:", error);
       openFeedbackModal(
         "Could not save activity",
         error instanceof Error ? error.message : "Please try again."
@@ -418,6 +472,7 @@ export default function AddActivityScreen() {
                 placeholder="Name"
                 placeholderTextColor={colors.textMuted}
                 style={styles.input}
+                maxLength={MAX_NAME_LENGTH}
                 accessibilityLabel="Activity name"
                 accessibilityHint="Enter the name of the activity"
               />
@@ -443,6 +498,7 @@ export default function AddActivityScreen() {
                 style={[styles.input, styles.multilineInput]}
                 multiline
                 textAlignVertical="top"
+                maxLength={MAX_DESCRIPTION_LENGTH}
                 accessibilityLabel="Description"
                 accessibilityHint="Enter the description of the activity"
               />
@@ -543,6 +599,7 @@ export default function AddActivityScreen() {
                 placeholder="Address"
                 placeholderTextColor={colors.textMuted}
                 style={styles.input}
+                maxLength={MAX_ADDRESS_LENGTH}
                 accessibilityLabel="Location"
                 accessibilityHint="Enter the location of the activity"
               />
@@ -568,6 +625,7 @@ export default function AddActivityScreen() {
                 style={styles.input}
                 autoCapitalize="none"
                 keyboardType="url"
+                maxLength={MAX_GOOGLE_LINK_LENGTH}
                 accessibilityLabel="Google Maps link"
                 accessibilityHint="Paste a Google Maps URL for this activity"
               />

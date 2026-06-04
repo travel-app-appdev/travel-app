@@ -16,7 +16,7 @@ import { StatusBar } from "expo-status-bar";
 import { doc, onSnapshot } from "firebase/firestore";
 
 import { colors, spacing } from "@/src/theme";
-import { db } from "@/src/lib/firebase";
+import { db, auth } from "@/src/lib/firebase";
 import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
 import { mapActivitiesToSlots } from "@/src/utils/itinerary/mapActivitiesToSlots";
@@ -1165,10 +1165,12 @@ export default function ItineraryScreen() {
 
     const nextPlanningDone = !hasCurrentUserFinished;
 
+    // Local-only fallback trip
     if (itinerary.tripId === "trip-fallback") {
-      const nextState = nextPlanningDone && shouldSkipVoting(tripMemberCount)
-        ? "final"
-        : "planning";
+      const nextState =
+        nextPlanningDone && shouldSkipVoting(tripMemberCount)
+          ? "final"
+          : "planning";
 
       setItinerary((current) => ({
         ...current,
@@ -1195,16 +1197,30 @@ export default function ItineraryScreen() {
       return;
     }
 
-    if (!authToken) {
+    // Always try to refresh the ID token before calling the API
+    let token = authToken;
+
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        token = await user.getIdToken(true);
+      }
+    } catch {
+      // ignore, will fall back to authToken if present
+    }
+
+    if (!token) {
       Alert.alert("Not logged in", "Please log in again.");
       return;
     }
 
     setIsSubmittingPlanning(true);
+    // show overlay immediately
+    setIsPreparingVoting(true);
 
     try {
       const result = await finishPlanning({
-        idToken: authToken,
+        idToken: token,
         tripId: itinerary.tripId,
         planningDone: nextPlanningDone,
       });
@@ -1218,8 +1234,21 @@ export default function ItineraryScreen() {
         ),
       }));
 
-      void refreshTripTimerFields({ forceRefresh: true });
+      // First immediate refresh
+      await refreshTripTimerFields({ forceRefresh: true });
+
+      // Short retry window to catch a state change triggered by someone else
+      const maxAttempts = 5;
+      const delayMs = 1000;
+
+      for (let i = 0; i < maxAttempts; i++) {
+        if (activeStateRef.current !== "planning") break;
+
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await refreshTripTimerFields({ forceRefresh: true });
+      }
     } catch (error) {
+      setIsPreparingVoting(false);
       Alert.alert(
         "Could not finish planning",
         error instanceof Error ? error.message : "Please try again."

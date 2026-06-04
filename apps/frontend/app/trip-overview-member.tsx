@@ -153,8 +153,14 @@ function formatPhaseTimerText(
   now: number
 ): string {
   const phaseEnd = combineDateAndTimeToDate(phase.end, phase.time);
-  if (isActive) return formatTripTimerText(phaseEnd, now);
-  return formatTripDurationText(phase.start, phaseEnd);
+
+  if (isActive) {
+    // While active, show remaining time until the phase end
+    return formatTripTimerText(phaseEnd, now);
+  }
+
+  // For past or future phases, there is no remaining time
+  return "0 hours";
 }
 
 function parseIsoToDate(value?: string): Date | null {

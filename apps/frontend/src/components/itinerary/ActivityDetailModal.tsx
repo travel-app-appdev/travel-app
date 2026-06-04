@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Linking, Modal, Pressable, StyleSheet, View } from "react-native";
+import {
+  Linking,
+  Modal,
+  Pressable,
+  StyleSheet,
+  View,
+  ScrollView,
+} from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import type { Activity, ItineraryState } from "@/src/types/itinerary";
@@ -16,7 +23,6 @@ import ArrowUpIcon from "@/assets/icons/arrow_up.svg";
 import CheckIcon from "@/assets/icons/check_mark.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
-import { ScrollView } from "react-native-gesture-handler";
 
 type Props = {
   visible: boolean;
@@ -92,14 +98,14 @@ export function ActivityDetailModal({
           accessibilityRole="button"
           accessibilityLabel="Close activity details"
         />
-        
+
         <View style={styles.centerWrap} pointerEvents="box-none">
           <View
             style={styles.modalCard}
             accessibilityViewIsModal={true}
             accessible={true}
             accessibilityLabel={`Activity details for ${activity.name}`}
-          >  
+          >
             <View style={styles.headerRow}>
               <AppText variant="body" style={styles.smallTitle}>
                 {topLabel}
@@ -117,224 +123,223 @@ export function ActivityDetailModal({
               </Pressable>
             </View>
 
-            
-              <ScrollView
-                  style={{ flex: 1 }}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingBottom: 16 }}
-                >
-
-
-            <AppText variant="subtitle" style={styles.title}>
-              {activity.name}
-            </AppText>
-
-            {!!activity.description && (
-              <AppText variant="body" style={styles.description}>
-                {activity.description}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingBottom: 16,
+                paddingTop: spacing.sm,
+              }}
+            >
+              <AppText variant="subtitle" style={styles.title}>
+                {activity.name}
               </AppText>
-            )}
 
-            <View style={styles.infoList}>
-              <View style={styles.infoRow}>
-                <LocationIcon width={24} height={24} />
-                <AppText variant="body" style={styles.infoText}>
-                  {activity.address?.trim() || "No address available"}
+              {!!activity.description && (
+                <AppText variant="body" style={styles.description}>
+                  {activity.description}
                 </AppText>
-              </View>
+              )}
 
-              <View style={styles.infoRow}>
-                <Timer width={24} height={24} />
-                <AppText variant="body" style={styles.infoText}>
-                  {activityTimeRange || "No time available"}
-                </AppText>
-              </View>
-
-              {activity.googleMapsUrl ? (
-                <Pressable
-                  onPress={handleOpenGoogleMaps}
-                  style={styles.infoRow}
-                  accessibilityRole="link"
-                  accessibilityLabel="Open Google Maps link"
-                >
-                  <View {...hiddenFromAccessibility} style={styles.googleRow}>
-                    <GoogleIcon width={20} height={20} />
-                    <AppText variant="body" style={styles.linkText}>
-                      Google-Link
-                    </AppText>
-                  </View>
-                </Pressable>
-              ) : null}
-
-              {showMembers ? (
+              <View style={styles.infoList}>
                 <View style={styles.infoRow}>
-                  <MembersIcon width={20} height={20} />
+                  <LocationIcon width={24} height={24} />
                   <AppText variant="body" style={styles.infoText}>
-                    {activity.joinedMembers?.length
-                      ? activity.joinedMembers
-                          .map((member) => member.name)
-                          .join(", ")
-                      : "No members joined yet"}
+                    {activity.address?.trim() || "No address available"}
                   </AppText>
                 </View>
-              ) : null}
-            </View>
 
-            {hasAlternatives ? (
-              <View style={styles.alternativesSection}>
-                <Pressable
-                  onPress={handleToggleAlternatives}
-                  style={({ pressed }) => [
-                    styles.alternativesHeaderButton,
-                    pressed && styles.alternativesHeaderButtonPressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    isAlternativesExpanded
-                      ? "Hide other suggested activities"
-                      : "Show other suggested activities"
-                  }
-                  accessibilityState={{ expanded: isAlternativesExpanded }}
-                >
-                  <View style={styles.alternativesHeader}>
-                    <View style={styles.alternativesHeaderLeft}>
-                      <AppText variant="body" style={styles.alternativesTitle}>
-                        Other suggested activities
+                <View style={styles.infoRow}>
+                  <Timer width={24} height={24} />
+                  <AppText variant="body" style={styles.infoText}>
+                    {activityTimeRange || "No time available"}
+                  </AppText>
+                </View>
+
+                {activity.googleMapsUrl ? (
+                  <Pressable
+                    onPress={handleOpenGoogleMaps}
+                    style={styles.infoRow}
+                    accessibilityRole="link"
+                    accessibilityLabel="Open Google Maps link"
+                  >
+                    <View {...hiddenFromAccessibility} style={styles.googleRow}>
+                      <GoogleIcon width={20} height={20} />
+                      <AppText variant="body" style={styles.linkText}>
+                        Google-Link
                       </AppText>
-
-                      <View style={styles.badge}>
-                        <AppText variant="caption" style={styles.badgeText}>
-                          {remainingAlternativeCount}
-                        </AppText>
-                      </View>
                     </View>
+                  </Pressable>
+                ) : null}
 
-                    <View {...hiddenFromAccessibility}>
-                      {isAlternativesExpanded ? (
-                        <ArrowUpIcon width={22} height={22} />
-                      ) : (
-                        <ArrowDownIcon width={22} height={22} />
-                      )}
-                    </View>
-                  </View>
-                </Pressable>
-
-                {isAlternativesExpanded ? (
-                  <View style={styles.alternativesList}>
-                    {alternativeActivities.map((alternative) => {
-                      const alternativeTimeRange =
-                        formatActivityTimeRange(alternative);
-                      const joinedLabel = `${alternative.joinedCount ?? 0}`;
-                      const isAlreadyAdded =
-                        addedAlternativeActivityIds.includes(alternative.id);
-
-                      return (
-                        <View
-                          key={alternative.id}
-                          style={styles.alternativeRow}
-                        >
-                          <View style={styles.alternativeCard}>
-                            
-                            <AppText
-                              variant="body"
-                              style={styles.alternativeSlotLabel}
-                            >
-                              {slotLabel || "Activity"}
-                            </AppText>
-
-                            <AppText
-                              variant="subtitle"
-                              style={styles.alternativeName}
-                              numberOfLines={2}
-                            >
-                              {alternative.name}
-                            </AppText>
-
-                            {!!alternative.address?.trim() && (
-                              <View style={styles.alternativeMetaRow}>
-                                <LocationIcon width={16} height={16} />
-                                <AppText
-                                  variant="caption"
-                                  style={styles.alternativeMetaText}
-                                  numberOfLines={1}
-                                >
-                                  {alternative.address.trim()}
-                                </AppText>
-                              </View>
-                            )}
-
-                            {!!alternativeTimeRange && (
-                              <View style={styles.alternativeMetaRow}>
-                                <Timer width={16} height={16} />
-                                <AppText
-                                  variant="caption"
-                                  style={styles.alternativeMetaText}
-                                  numberOfLines={1}
-                                >
-                                  {alternativeTimeRange}
-                                </AppText>
-                              </View>
-                            )}
-
-                            <View style={styles.alternativeJoinedRow}>
-                              <MembersIcon width={16} height={16} />
-                              <AppText
-                                variant="caption"
-                                style={styles.alternativeMetaText}
-                              >
-                                {joinedLabel}
-                              </AppText>
-                            </View>
-                          </View>
-
-                          <Pressable
-                            onPress={() => {
-                              onAddAlternativeToItinerary?.(alternative);
-                            }}
-                            style={({ pressed }) => [
-                              styles.addCta,
-                              isAlreadyAdded && styles.addCtaActive,
-                              pressed && styles.addCtaPressed,
-                            ]}
-                            accessibilityRole="button"
-                            accessibilityLabel={
-                              isAlreadyAdded
-                                ? `Remove ${alternative.name} from itinerary`
-                                : `Add ${alternative.name} to itinerary`
-                            }
-                          >
-                            <View {...hiddenFromAccessibility}>
-                              {isAlreadyAdded ? (
-                                <CheckIcon
-                                  width={24}
-                                  height={24}
-                                  color={colors.nightBlack}
-                                />
-                              ) : (
-                                <JoinGroup width={24} height={24} />
-                              )}
-                            </View>
-
-                            <AppText
-                              variant="caption"
-                              style={styles.addCtaText}
-                            >
-                              {isAlreadyAdded ? "Added" : "Add to\nitinerary"}
-                            </AppText>
-                          </Pressable>
-                        </View>
-                      );
-                    })}
+                {showMembers ? (
+                  <View style={styles.infoRow}>
+                    <MembersIcon width={20} height={20} />
+                    <AppText variant="body" style={styles.infoText}>
+                      {activity.joinedMembers?.length
+                        ? activity.joinedMembers
+                            .map((member) => member.name)
+                            .join(", ")
+                        : "No members joined yet"}
+                    </AppText>
                   </View>
                 ) : null}
               </View>
-            ) : null}
-           </ScrollView>
+
+              {hasAlternatives ? (
+                <View style={styles.alternativesSection}>
+                  <Pressable
+                    onPress={handleToggleAlternatives}
+                    style={({ pressed }) => [
+                      styles.alternativesHeaderButton,
+                      pressed && styles.alternativesHeaderButtonPressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      isAlternativesExpanded
+                        ? "Hide other suggested activities"
+                        : "Show other suggested activities"
+                    }
+                    accessibilityState={{ expanded: isAlternativesExpanded }}
+                  >
+                    <View style={styles.alternativesHeader}>
+                      <View style={styles.alternativesHeaderLeft}>
+                        <AppText
+                          variant="body"
+                          style={styles.alternativesTitle}
+                        >
+                          Other suggested activities
+                        </AppText>
+
+                        <View style={styles.badge}>
+                          <AppText variant="caption" style={styles.badgeText}>
+                            {remainingAlternativeCount}
+                          </AppText>
+                        </View>
+                      </View>
+
+                      <View {...hiddenFromAccessibility}>
+                        {isAlternativesExpanded ? (
+                          <ArrowUpIcon width={22} height={22} />
+                        ) : (
+                          <ArrowDownIcon width={22} height={22} />
+                        )}
+                      </View>
+                    </View>
+                  </Pressable>
+
+                  {isAlternativesExpanded ? (
+                    <View style={styles.alternativesList}>
+                      {alternativeActivities.map((alternative) => {
+                        const alternativeTimeRange =
+                          formatActivityTimeRange(alternative);
+                        const joinedLabel = `${alternative.joinedCount ?? 0}`;
+                        const isAlreadyAdded =
+                          addedAlternativeActivityIds.includes(alternative.id);
+
+                        return (
+                          <View
+                            key={alternative.id}
+                            style={styles.alternativeRow}
+                          >
+                            <View style={styles.alternativeCard}>
+                              <AppText
+                                variant="body"
+                                style={styles.alternativeSlotLabel}
+                              >
+                                {slotLabel || "Activity"}
+                              </AppText>
+
+                              <AppText
+                                variant="subtitle"
+                                style={styles.alternativeName}
+                                numberOfLines={2}
+                              >
+                                {alternative.name}
+                              </AppText>
+
+                              {!!alternative.address?.trim() && (
+                                <View style={styles.alternativeMetaRow}>
+                                  <LocationIcon width={16} height={16} />
+                                  <AppText
+                                    variant="caption"
+                                    style={styles.alternativeMetaText}
+                                    numberOfLines={1}
+                                  >
+                                    {alternative.address.trim()}
+                                  </AppText>
+                                </View>
+                              )}
+
+                              {!!alternativeTimeRange && (
+                                <View style={styles.alternativeMetaRow}>
+                                  <Timer width={16} height={16} />
+                                  <AppText
+                                    variant="caption"
+                                    style={styles.alternativeMetaText}
+                                    numberOfLines={1}
+                                  >
+                                    {alternativeTimeRange}
+                                  </AppText>
+                                </View>
+                              )}
+
+                              <View style={styles.alternativeJoinedRow}>
+                                <MembersIcon width={16} height={16} />
+                                <AppText
+                                  variant="caption"
+                                  style={styles.alternativeMetaText}
+                                >
+                                  {joinedLabel}
+                                </AppText>
+                              </View>
+                            </View>
+
+                            <Pressable
+                              onPress={() => {
+                                onAddAlternativeToItinerary?.(alternative);
+                              }}
+                              style={({ pressed }) => [
+                                styles.addCta,
+                                isAlreadyAdded && styles.addCtaActive,
+                                pressed && styles.addCtaPressed,
+                              ]}
+                              accessibilityRole="button"
+                              accessibilityLabel={
+                                isAlreadyAdded
+                                  ? `Remove ${alternative.name} from itinerary`
+                                  : `Add ${alternative.name} to itinerary`
+                              }
+                            >
+                              <View {...hiddenFromAccessibility}>
+                                {isAlreadyAdded ? (
+                                  <CheckIcon
+                                    width={24}
+                                    height={24}
+                                    color={colors.nightBlack}
+                                  />
+                                ) : (
+                                  <JoinGroup width={24} height={24} />
+                                )}
+                              </View>
+
+                              <AppText
+                                variant="caption"
+                                style={styles.addCtaText}
+                              >
+                                {isAlreadyAdded ? "Added" : "Add to\nitinerary"}
+                              </AppText>
+                            </Pressable>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+            </ScrollView>
           </View>
         </View>
-        
       </View>
-      
     </Modal>
   );
 }
@@ -355,7 +360,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: "100%",
-    height: "90%",
+    maxHeight: "90%",
     maxWidth: 460,
     borderRadius: radius.xl,
     borderWidth: 1,
@@ -518,5 +523,4 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.body,
     lineHeight: typography.lineHeight.xs,
   },
-  
 });

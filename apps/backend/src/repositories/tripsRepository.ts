@@ -4,6 +4,7 @@ import {
     TripDocument,
     TripMembershipDocument,
     UserDocument,
+    TripState,
 } from "../types/trip";
 
 export async function findAcceptedMembershipsByUserId(
@@ -316,9 +317,22 @@ export async function resetPlanningDoneForTrip(tripId: string): Promise<void> {
     await batch.commit();
 }
 
-export async function updateTripState(tripId: string, state: string): Promise<void> {
+export async function updateTripState(
+    tripId: string,
+    state: TripState
+): Promise<void> {
     const db = admin.firestore();
-    await db.collection("trips").doc(tripId).update({ state });
+    const update: Partial<TripDocument> = { state };
+
+    if (state === "Voting") {
+        update.planning_end_at = admin.firestore.Timestamp.now();
+    }
+
+    if (state === "Final") {
+        update.voting_end_at = admin.firestore.Timestamp.now();
+    }
+
+    await db.collection("trips").doc(tripId).update(update);
 }
 
 export async function updateTripById(
