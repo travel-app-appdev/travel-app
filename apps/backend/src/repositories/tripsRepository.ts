@@ -243,21 +243,70 @@ export async function createTripWithInviteCode(data: {
 
 export async function deleteTripById(tripId: string): Promise<void> {
     const db = admin.firestore();
-    const batch = db.batch();
 
     const tripRef = db.collection("trips").doc(tripId);
-    batch.delete(tripRef);
 
-    const membersSnapshot = await db
-        .collection("trip_members")
-        .where("trip_id", "==", tripId)
-        .get();
+    const [
+        membersSnapshot,
+        itinerarySnapshot,
+        finalItinerarySnapshot,
+        votesSnapshot,
+        attendanceSnapshot,
+        activitiesSnapshot,
+    ] = await Promise.all([
+        db.collection("trip_members").where("trip_id", "==", tripId).get(),
+        db.collection("itinerary").where("trip_id", "==", tripId).get(),
+        db
+            .collection("final_itinerary_slots")
+            .where("trip_id", "==", tripId)
+            .get(),
+        db.collection("activity_votes").where("trip_id", "==", tripId).get(),
+        db
+            .collection("activity_attendance")
+            .where("trip_id", "==", tripId)
+            .get(),
+        db.collection("activities").where("trip_id", "==", tripId).get(),
+    ]);
 
-    membersSnapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref);
-    });
+    const activityIds = activitiesSnapshot.docs
+        .map((doc) => doc.id)
+        .filter(Boolean);
+    const timeslotActivityRefs: FirebaseFirestore.DocumentReference[] = [];
 
-    await batch.commit();
+    for (let i = 0; i < activityIds.length; i += 10) {
+        const chunk = activityIds.slice(i, i + 10);
+        const snapshot = await db
+            .collection("timeslot_activities")
+            .where("activity_id", "in", chunk)
+            .get();
+
+        snapshot.docs.forEach((doc) => {
+            timeslotActivityRefs.push(doc.ref);
+        });
+    }
+
+    await deleteDocumentRefsInBatches(db, [
+        tripRef,
+        ...membersSnapshot.docs.map((doc) => doc.ref),
+        ...itinerarySnapshot.docs.map((doc) => doc.ref),
+        ...finalItinerarySnapshot.docs.map((doc) => doc.ref),
+        ...votesSnapshot.docs.map((doc) => doc.ref),
+        ...attendanceSnapshot.docs.map((doc) => doc.ref),
+        ...activitiesSnapshot.docs.map((doc) => doc.ref),
+        ...timeslotActivityRefs,
+    ]);
+}
+
+async function deleteDocumentRefsInBatches(
+    db: FirebaseFirestore.Firestore,
+    refs: FirebaseFirestore.DocumentReference[],
+    batchSize = 450,
+): Promise<void> {
+    for (let i = 0; i < refs.length; i += batchSize) {
+        const batch = db.batch();
+        refs.slice(i, i + batchSize).forEach((ref) => batch.delete(ref));
+        await batch.commit();
+    }
 }
 
 export async function removeTripMember(tripId: string, userId: string): Promise<void> {

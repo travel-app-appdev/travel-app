@@ -42,7 +42,13 @@ import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
 import { FinalSuggestedActivitiesSection } from "@/src/components/itinerary/FinalSuggestedActivitiesSection";
 import { ActivityDetailModal } from "@/src/components/itinerary/ActivityDetailModal";
-import { fetchTripForUser, finishPlanning, type Trip } from "@/src/api/trips";
+import {
+  fetchTripForUser,
+  finishPlanning,
+  isTripNotFoundError,
+  type Trip,
+} from "@/src/api/trips";
+import { invalidateTripsCache } from "./home";
 import {
   getActivitiesBySlot,
   getFinalItineraryActivities,
@@ -671,6 +677,12 @@ export default function ItineraryScreen() {
 
         applyRefreshedTrip(nextState);
       } catch (error) {
+        if (isTripNotFoundError(error)) {
+          invalidateTripsCache();
+          router.replace("/home");
+          return;
+        }
+
         console.log("Could not refresh trip timer:", error);
       }
     },
@@ -830,6 +842,27 @@ export default function ItineraryScreen() {
   }, [tripId, currentUserId]);
 
   useEffect(() => {
+    if (!tripId) {
+      return;
+    }
+
+    const unsubscribe = onSnapshot(
+      doc(db, "trips", tripId),
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          invalidateTripsCache();
+          router.replace("/home");
+        }
+      },
+      (error) => {
+        console.log("Trip deletion listener error:", error);
+      }
+    );
+
+    return unsubscribe;
+  }, [tripId]);
+
+  useEffect(() => {
     if (!tripId || activeState !== "final") {
       return;
     }
@@ -839,6 +872,10 @@ export default function ItineraryScreen() {
     const unsubscribe = onSnapshot(
       tripRef,
       async (snapshot) => {
+        if (!snapshot.exists()) {
+          return;
+        }
+
         const data = snapshot.data();
         const nextValue =
           data?.final_itinerary_updated_at?.toMillis?.()?.toString?.() ?? null;
