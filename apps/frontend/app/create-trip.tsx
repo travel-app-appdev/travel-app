@@ -26,6 +26,7 @@ import { BackLink } from "@/src/components/common/BackLink";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { PressLock } from "@/src/utils/PressLock";
+import { toLocalDateString } from "@/src/utils/tripDate";
 import { invalidateTripsCache } from "./home";
 import Plane from "@/assets/icons/plane.svg";
 import CityScape from "@/assets/visuals/city_scape.svg";
@@ -73,17 +74,6 @@ function formatDateDisplay(date: Date): string {
   const m = (date.getMonth() + 1).toString().padStart(2, "0");
   const y = date.getFullYear();
   return `${d}.${m}.${y}`;
-}
-
-function toDateOnlyString(date: Date): string {
-  return date.toISOString().split("T")[0];
-}
-
-function toLocalDateString(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function fromDateString(dateString: string): Date {
@@ -899,8 +889,8 @@ export default function CreateTripScreen() {
         idToken,
         title: tripName.trim(),
         destination: destination.trim(),
-        start_date: toDateOnlyString(tripStart),
-        end_date: toDateOnlyString(tripEnd),
+        start_date: toLocalDateString(tripStart),
+        end_date: toLocalDateString(tripEnd),
         planning_end_at: combineDateAndTime(
           phaseDates.planning.end,
           phaseDates.planning.time
