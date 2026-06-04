@@ -1950,7 +1950,7 @@ export default function TripOverviewAdminScreen() {
                                         {phase.label}
                                       </AppText>
                                     </View>
--
+
                                     {phaseId !== "final" ? (
                                       <View style={styles.phaseTimerBlock}>
                                         <View
