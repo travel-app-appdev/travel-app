@@ -10,6 +10,21 @@ const mockBack = jest.fn();
 const mockLeaveTrip = jest.fn();
 const mockGetIdToken = jest.fn();
 
+jest.mock("firebase/firestore", () => ({
+  doc: jest.fn(),
+  onSnapshot: jest.fn(() => jest.fn()),
+  collection: jest.fn(),
+  query: jest.fn(),
+  where: jest.fn(),
+  getDoc: jest.fn(),
+  getDocs: jest.fn(),
+  setDoc: jest.fn(),
+  updateDoc: jest.fn(),
+  addDoc: jest.fn(),
+  deleteDoc: jest.fn(),
+  serverTimestamp: jest.fn(() => "mock-server-timestamp"),
+}));
+
 const mockRouter = {
   replace: mockReplace,
   push: mockPush,

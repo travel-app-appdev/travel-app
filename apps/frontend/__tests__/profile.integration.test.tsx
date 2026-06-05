@@ -15,6 +15,15 @@ const mockUpdatePassword = jest.fn();
 const mockReauthenticate = jest.fn();
 const mockSignOut = jest.fn();
 
+// Firebase firestore — avoid loading the real ESM build in tests
+jest.mock("firebase/firestore", () => ({
+  collection: jest.fn(),
+  doc: jest.fn(),
+  onSnapshot: jest.fn(() => jest.fn()),
+  query: jest.fn(),
+  where: jest.fn(),
+}));
+
 // expo-router
 jest.mock("expo-router", () => ({
   useRouter: () => ({
