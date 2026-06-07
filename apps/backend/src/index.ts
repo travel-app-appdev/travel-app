@@ -15,7 +15,7 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(cors());
 app.use(express.json());
 
-// ── Android deep link verification ──────────────────────────────────────────
+// ── Android deep link verification ──
 // Required for Android App Links to work with the invite flow.
 // Must be served at /.well-known/assetlinks.json over HTTPS.
 // Debug SHA256 is used for development builds.
@@ -36,7 +36,7 @@ app.get("/.well-known/assetlinks.json", (_req, res) => {
   ]);
 });
 
-// ── Invite fallback page ─────────────────────────────────────────────────────
+// ── Invite fallback page ──
 // Shown when a user opens the invite link in a browser without the app installed.
 // If the app IS installed, Android intercepts the link and opens the app directly
 // without ever hitting this route.
