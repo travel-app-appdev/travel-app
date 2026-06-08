@@ -1,14 +1,40 @@
+import { Platform } from "react-native";
+
+/**
+ * Temporary no-op while developing in Expo Go.
+ * Keeps the same API so the rest of the app does not need to change.
+ */
+export async function registerForPushNotifications(
+  _idToken: string
+): Promise<void> {
+  if (__DEV__) {
+    console.log(
+      `[notifications] skipped in ${Platform.OS} during Expo Go/dev work`
+    );
+  }
+}
+
+/**
+ * Temporary no-op while notifications are disabled.
+ */
+export function configureNotificationHandler(): void {
+  // intentionally empty
+}
+
+
+
+
+
+// Actual code
+/**
+
+
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
-/**
- * Requests push notification permissions and registers the device's
- * Expo push token with the backend so the server can send notifications.
- *
- * Safe to call multiple times — does nothing if permission is denied.
- */
+
 export async function registerForPushNotifications(idToken: string): Promise<void> {
     // Push notifications don't work on the web or in simulators without
     // physical device credentials, so we bail out silently.
@@ -43,10 +69,7 @@ export async function registerForPushNotifications(idToken: string): Promise<voi
     }
 }
 
-/**
- * Configures how notifications are displayed when the app is in the foreground.
- * Call this once at app startup (e.g. in _layout.tsx).
- */
+
 export function configureNotificationHandler(): void {
     Notifications.setNotificationHandler({
         handleNotification: async () => ({
@@ -58,3 +81,6 @@ export function configureNotificationHandler(): void {
         }),
     });
 }
+
+
+*/
