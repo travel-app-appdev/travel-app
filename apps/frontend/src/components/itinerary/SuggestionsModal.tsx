@@ -23,9 +23,11 @@ type Props = {
   destination?: string;
   suggestions: ActivitySuggestion[];
   loading: boolean;
+  loadingMore?: boolean;
   error?: string | null;
   onClose: () => void;
   onAdd: (suggestion: ActivitySuggestion) => void;
+  onLoadMore?: () => void;
 };
 
 export function SuggestionsModal({
@@ -34,9 +36,11 @@ export function SuggestionsModal({
   destination,
   suggestions,
   loading,
+  loadingMore = false,
   error,
   onClose,
   onAdd,
+  onLoadMore,
 }: Props) {
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
@@ -197,17 +201,22 @@ export function SuggestionsModal({
                 );
               })}
 
-            {/* Load more button (decorative — same cache result, but lets user know there's a way to refresh) */}
-            {!loading && !error && suggestions.length > 0 && (
+            {/* Load more button */}
+            {!loading && !error && suggestions.length > 0 && !!onLoadMore && (
               <Pressable
-                style={styles.loadMoreBtn}
-                onPress={onClose}
+                style={[styles.loadMoreBtn, loadingMore && styles.loadMoreBtnDisabled]}
+                onPress={onLoadMore}
+                disabled={loadingMore}
                 accessibilityRole="button"
-                accessibilityLabel="Close and search again later"
+                accessibilityLabel="Load more suggestions"
               >
-                <AppText variant="body" style={styles.loadMoreText}>
-                  Load more suggestions
-                </AppText>
+                {loadingMore ? (
+                  <ActivityIndicator color={colors.nightBlack} size="small" />
+                ) : (
+                  <AppText variant="body" style={styles.loadMoreText}>
+                    Load more suggestions
+                  </AppText>
+                )}
               </Pressable>
             )}
           </ScrollView>
@@ -365,5 +374,8 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.md,
     color: colors.nightBlack,
+  },
+  loadMoreBtnDisabled: {
+    opacity: 0.5,
   },
 });

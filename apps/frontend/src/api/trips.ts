@@ -601,10 +601,11 @@ export type ActivitySuggestion = {
 export async function fetchActivitySuggestions(
   tripId: string,
   slotType: string,
-  idToken: string
+  idToken: string,
+  offset = 0
 ): Promise<ActivitySuggestion[]> {
   const response = await fetch(
-    `${API_URL}/trips/${encodeURIComponent(tripId)}/suggestions?slotType=${encodeURIComponent(slotType)}`,
+    `${API_URL}/trips/${encodeURIComponent(tripId)}/suggestions?slotType=${encodeURIComponent(slotType)}&offset=${offset}`,
     { headers: { Authorization: `Bearer ${idToken}` } }
   );
 

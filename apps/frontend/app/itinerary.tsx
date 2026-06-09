@@ -549,6 +549,7 @@ export default function ItineraryScreen() {
   const [suggestionsSlotLabel, setSuggestionsSlotLabel] = useState("");
   const [suggestions, setSuggestions] = useState<ActivitySuggestion[]>([]);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
+  const [isSuggestionsLoadingMore, setIsSuggestionsLoadingMore] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
 
   const finalizingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -1256,6 +1257,24 @@ export default function ItineraryScreen() {
       setSuggestionsError("Could not load suggestions. Please try again.");
     } finally {
       setIsSuggestionsLoading(false);
+    }
+  }
+
+  async function handleLoadMoreSuggestions() {
+    if (!authToken || !tripId || !suggestionsSlotId) return;
+    setIsSuggestionsLoadingMore(true);
+    try {
+      const results = await fetchActivitySuggestions(tripId, suggestionsSlotId, authToken, suggestions.length);
+      // Merge, deduplicating by sourcePlaceId
+      setSuggestions((prev) => {
+        const existingIds = new Set(prev.map((s) => s.sourcePlaceId));
+        const fresh = results.filter((s) => !existingIds.has(s.sourcePlaceId));
+        return [...prev, ...fresh];
+      });
+    } catch {
+      // silently fail — existing suggestions stay
+    } finally {
+      setIsSuggestionsLoadingMore(false);
     }
   }
 
@@ -2099,9 +2118,11 @@ export default function ItineraryScreen() {
           destination={itinerary.destination}
           suggestions={suggestions}
           loading={isSuggestionsLoading}
+          loadingMore={isSuggestionsLoadingMore}
           error={suggestionsError}
           onClose={() => setShowSuggestionsModal(false)}
           onAdd={handleAddSuggestion}
+          onLoadMore={handleLoadMoreSuggestions}
         />
 
         <ActivityDetailModal
