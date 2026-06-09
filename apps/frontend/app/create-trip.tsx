@@ -1,8 +1,10 @@
 import { useRouter } from "expo-router";
 import { useAuth } from "@/src/context/AuthContext";
-import { createTrip } from "@/src/api/trips";
+import { createTrip, updateMemberPreferences } from "@/src/api/trips";
+import { PreferenceChips } from "@/src/components/common/PreferenceChips";
 import { auth } from "@/src/lib/firebase";
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -29,6 +31,8 @@ import { PressLock } from "@/src/utils/PressLock";
 import { toLocalDateString } from "@/src/utils/tripDate";
 import { invalidateTripsCache } from "./home";
 import Plane from "@/assets/icons/plane.svg";
+import LeafUp from "@/assets/visuals/leaf_up.svg";
+import LeafDown from "@/assets/visuals/leaf_down.svg";
 import CityScape from "@/assets/visuals/city_scape.svg";
 import CurlyYellow from "@/assets/visuals/curly-yellow.svg";
 import CurlyOrange from "@/assets/visuals/curly-orange.svg";
@@ -324,7 +328,9 @@ function StickyHeader({
 }
 
 export default function CreateTripScreen() {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [preferences, setPreferences] = useState<string[]>([]);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   const [destination, setDestination] = useState("");
   const [tripName, setTripName] = useState("");
@@ -915,7 +921,7 @@ export default function CreateTripScreen() {
     }
   };
 
-  const TOTAL_STEPS = 4;
+  const TOTAL_STEPS = 5;
   const progress = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -928,7 +934,7 @@ export default function CreateTripScreen() {
 
   const progressAnim = progress.interpolate({
     inputRange: [1, TOTAL_STEPS],
-    outputRange: ["25%", "100%"],
+    outputRange: ["20%", "100%"],
   });
 
   if (step === 3) {
@@ -1402,6 +1408,129 @@ export default function CreateTripScreen() {
   }
 
   if (step === 4) {
+    const handlePreferencesContinue = async () => {
+      if (isSavingPrefs) return;
+      if (createdTripId && preferences.length > 0) {
+        try {
+          setIsSavingPrefs(true);
+          const currentUser = auth.currentUser;
+          if (currentUser) {
+            const token = await currentUser.getIdToken();
+            await updateMemberPreferences(createdTripId, preferences, token);
+          }
+        } catch {
+          // non-blocking
+        } finally {
+          setIsSavingPrefs(false);
+        }
+      }
+      setStep(5);
+    };
+
+    return (
+      <View style={styles.prefsScreen}>
+        <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+          {/* Decorative leaves */}
+          <View
+            style={[styles.prefsLeafTopRight, { pointerEvents: "none" }]}
+            {...hiddenFromAccessibility}
+          >
+            <LeafUp width={width * 0.38} height={width * 0.38} />
+          </View>
+          <View
+            style={[styles.prefsLeafBottomLeft, { pointerEvents: "none" }]}
+            {...hiddenFromAccessibility}
+          >
+            <LeafDown width={width * 0.42} height={width * 0.42} />
+          </View>
+
+          {/* Progress bar only — no full StickyHeader */}
+          <View style={styles.prefsProgressBlock}>
+            <ProgressBar
+              progressWidth={progressAnim}
+              currentStep={step}
+              totalSteps={TOTAL_STEPS}
+            />
+          </View>
+
+          <ScrollView
+            style={styles.prefsScroll}
+            contentContainerStyle={styles.prefsContainer}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Back button */}
+            <Pressable
+              onPress={() => setStep(3)}
+              style={styles.prefsBackBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Back to timers"
+            >
+              <View {...hiddenFromAccessibility}>
+                <AppText variant="body" style={styles.prefsBackArrow}>‹</AppText>
+              </View>
+            </Pressable>
+
+            {/* Title block */}
+            <View style={styles.prefsTitleBlock}>
+              <AppText variant="title" style={styles.prefsTitle}>
+                Your preferences
+              </AppText>
+              <AppText variant="body" style={styles.prefsSubtitle}>
+                What do you enjoy{" "}
+                <AppText variant="body" style={styles.prefsSubtitleBold}>
+                  most?
+                </AppText>
+              </AppText>
+              <AppText variant="caption" style={styles.prefsHintText}>
+                {"Pick up to 5 categories. We'll use them to suggest activities for your trip."}
+              </AppText>
+            </View>
+
+            {/* Chips */}
+            <PreferenceChips
+              selected={preferences}
+              onChange={setPreferences}
+              showGroups
+            />
+
+            <View style={styles.prefsSpacer} />
+          </ScrollView>
+
+          {/* Footer */}
+          <View style={styles.prefsFooter}>
+            <Pressable
+              onPress={handlePreferencesContinue}
+              disabled={isSavingPrefs}
+              style={[styles.prefsContinueBtn, isSavingPrefs && styles.prefsContinueBtnDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel="Continue"
+            >
+              {isSavingPrefs ? (
+                <ActivityIndicator color={colors.lightWhite} />
+              ) : (
+                <AppText variant="body" style={styles.prefsContinueBtnText}>
+                  Continue
+                </AppText>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={() => setStep(5)}
+              style={styles.prefsSkipBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Skip"
+            >
+              <AppText variant="body" style={styles.prefsSkipText}>
+                Skip for now
+              </AppText>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  if (step === 5) {
     return (
       <View style={[styles.fullScreen, styles.bgStep1]}>
         <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
@@ -1434,7 +1563,7 @@ export default function CreateTripScreen() {
             >
               <StickyHeader
                 backgroundStyle={styles.headerStep1}
-                onBackPress={() => router.replace("/home")}
+                onBackPress={() => setStep(4)}
                 progressWidth={progressAnim}
                 currentStep={step}
                 totalSteps={TOTAL_STEPS}
@@ -1482,16 +1611,7 @@ export default function CreateTripScreen() {
               <View style={styles.inlineButtonWrapper}>
                 <AppButton
                   title="Continue"
-                  onPress={() => {
-                    if (createdTripId) {
-                      router.replace({
-                        pathname: "/preferences",
-                        params: { tripId: createdTripId },
-                      });
-                    } else {
-                      router.replace("/home");
-                    }
-                  }}
+                  onPress={() => router.replace("/home")}
                   style={styles.backToLandingButton}
                   textStyle={styles.backToLandingText}
                   accessibilityLabel="Continue to preferences"
@@ -2351,5 +2471,116 @@ const styles = StyleSheet.create({
   authModalButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
+  },
+  // ── Preferences step (step 4) ── matches preferences.tsx exactly
+  prefsScreen: {
+    flex: 1,
+    backgroundColor: colors.lightWhite,
+  },
+  prefsLeafTopRight: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    zIndex: 0,
+    opacity: 0.55,
+  },
+  prefsLeafBottomLeft: {
+    position: "absolute",
+    bottom: "8%",
+    left: 0,
+    zIndex: 0,
+    opacity: 0.55,
+    transform: [{ rotate: "5deg" }],
+  },
+  prefsProgressBlock: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs,
+    zIndex: 1,
+  },
+  prefsScroll: {
+    flex: 1,
+    zIndex: 1,
+  },
+  prefsContainer: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.xxl,
+  },
+  prefsBackBtn: {
+    width: 44,
+    height: 44,
+    justifyContent: "center",
+    alignItems: "flex-start",
+  },
+  prefsBackArrow: {
+    fontSize: 32,
+    lineHeight: 36,
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  prefsTitleBlock: {
+    gap: spacing.sm,
+  },
+  prefsTitle: {
+    fontFamily: typography.fontFamily.bodyBlack,
+    fontSize: typography.size.displaySm,
+    lineHeight: typography.lineHeight.displaySm,
+    color: colors.nightBlack,
+  },
+  prefsSubtitle: {
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.xl,
+    color: colors.nightBlack,
+  },
+  prefsSubtitleBold: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    textDecorationLine: "underline",
+    color: colors.nightBlack,
+  },
+  prefsHintText: {
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.md,
+    color: colors.grayedOut,
+    lineHeight: typography.lineHeight.md,
+  },
+  prefsSpacer: {
+    height: spacing.xl,
+  },
+  prefsFooter: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
+    paddingTop: spacing.md,
+    gap: spacing.sm,
+    zIndex: 1,
+    backgroundColor: colors.lightWhite,
+  },
+  prefsContinueBtn: {
+    height: 56,
+    borderRadius: radius.pill,
+    backgroundColor: colors.sunsetOrange,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  prefsContinueBtnDisabled: {
+    opacity: 0.7,
+  },
+  prefsContinueBtnText: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.lg,
+    color: colors.lightWhite,
+  },
+  prefsSkipBtn: {
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  prefsSkipText: {
+    fontFamily: typography.fontFamily.body,
+    fontSize: typography.size.md,
+    color: colors.grayedOut,
+    textDecorationLine: "underline",
   },
 });
