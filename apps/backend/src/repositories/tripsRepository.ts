@@ -323,6 +323,24 @@ export async function removeTripMember(tripId: string, userId: string): Promise<
     await snapshot.docs[0].ref.delete();
 }
 
+export async function setMemberPreferences(
+    tripId: string,
+    userId: string,
+    preferences: string[]
+): Promise<void> {
+    const db = admin.firestore();
+
+    const snapshot = await db
+        .collection("trip_members")
+        .where("trip_id", "==", tripId)
+        .where("user_id", "==", userId)
+        .get();
+
+    if (snapshot.empty) return;
+
+    await snapshot.docs[0].ref.update({ preferences });
+}
+
 export async function setMemberPlanningDone(
     tripId: string,
     userId: string,

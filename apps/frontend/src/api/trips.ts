@@ -585,6 +585,60 @@ export async function finishVoting(
   return data as FinishVotingResponse;
 }
 
+// ── Suggestions ──────────────────────────────────────────────────────────────
+
+export type ActivitySuggestion = {
+  name: string;
+  address?: string;
+  latitude: number;
+  longitude: number;
+  source: "geoapify";
+  sourcePlaceId: string;
+  matchedPreferences: string[];
+};
+
+export async function fetchActivitySuggestions(
+  tripId: string,
+  slotType: string,
+  idToken: string
+): Promise<ActivitySuggestion[]> {
+  const response = await fetch(
+    `${API_URL}/trips/${encodeURIComponent(tripId)}/suggestions?slotType=${encodeURIComponent(slotType)}`,
+    { headers: { Authorization: `Bearer ${idToken}` } }
+  );
+
+  const data = await response.json() as { suggestions: ActivitySuggestion[] } | ApiErrorResponse;
+
+  if (!response.ok) {
+    throw new Error((data as ApiErrorResponse).error || "Failed to fetch suggestions");
+  }
+
+  return (data as { suggestions: ActivitySuggestion[] }).suggestions;
+}
+
+export async function updateMemberPreferences(
+  tripId: string,
+  preferences: string[],
+  idToken: string
+): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/trips/${encodeURIComponent(tripId)}/members/me/preferences`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ preferences }),
+    }
+  );
+
+  if (!response.ok) {
+    const data: ApiErrorResponse = await response.json();
+    throw new Error(data.error || "Failed to update preferences");
+  }
+}
+
 // ── Fetch public trip preview by invite code (no auth required) ──
 export async function fetchTripByInviteCode(
   inviteCode: string

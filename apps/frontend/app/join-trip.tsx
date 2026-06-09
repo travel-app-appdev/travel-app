@@ -83,9 +83,12 @@ export default function JoinTripScreen() {
         return;
       }
       const idToken = await currentUser.getIdToken();
-      await joinTrip({ idToken, inviteCode: code.trim() });
+      const result = await joinTrip({ idToken, inviteCode: code.trim() });
       invalidateTripsCache();
-      router.replace("/home");
+      router.replace({
+        pathname: "/preferences",
+        params: { tripId: result.trip_id },
+      });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to join trip";
