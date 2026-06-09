@@ -15,6 +15,7 @@ const mockToggleActivityAttendance = jest.fn();
 const mockVoteForActivity = jest.fn();
 const mockDaySelectorProps = jest.fn();
 const mockPlanningDoneBarProps = jest.fn();
+const mockPlanningSlotCardProps = jest.fn();
 
 let mockParams: Record<string, string | undefined> = {};
 let mockTripDays = [{ id: "2026-06-01", label: "1 Jun" }];
@@ -73,9 +74,18 @@ jest.mock("@/src/utils/itinerary/generateTripDays", () => ({
 }));
 
 jest.mock("@/src/utils/itinerary/mapActivitiesToSlots", () => ({
-  mapActivitiesToSlots: () => [
-    { slot: { id: "Breakfast", label: "Breakfast" }, activity: undefined },
-  ],
+  mapActivitiesToSlots: (
+    slots: { id: string; label: string }[],
+    activities: { dayId: string; slotId: string }[],
+    selectedDayId: string
+  ) =>
+    slots.map((slot) => ({
+      slot,
+      activity: activities.find(
+        (activity) =>
+          activity.dayId === selectedDayId && activity.slotId === slot.id
+      ),
+    })),
 }));
 
 jest.mock("@/src/components/common/AppText", () => ({
@@ -100,7 +110,10 @@ jest.mock("@/src/components/itinerary/ItineraryDaySelector", () => ({
 }));
 
 jest.mock("@/src/components/itinerary/PlanningSlotCard", () => ({
-  PlanningSlotCard: () => null,
+  PlanningSlotCard: (props: unknown) => {
+    mockPlanningSlotCardProps(props);
+    return null;
+  },
 }));
 
 jest.mock("@/src/components/itinerary/SkeletonSlotCard", () => ({
@@ -346,6 +359,46 @@ describe("ItineraryScreen transition overlays", () => {
           return (
             enabledDayIds?.has("2026-06-02") && !enabledDayIds.has("2026-06-01")
           );
+        })
+      ).toBe(true);
+    });
+
+    unmount();
+  });
+
+  it("shows an edited activity time immediately when returning from add activity", async () => {
+    setBaseParams("planning");
+    mockParams = {
+      ...mockParams,
+      selectedDay: "2026-06-01",
+      newActivityId: "activity-123",
+      newActivityDayId: "2026-06-01",
+      newActivitySlotId: "Breakfast",
+      newActivityName: "Late cafe",
+      newActivityAddress: "Cafe Street",
+      newActivityStartTime: "06:00",
+      newActivityEndTime: "23:00",
+    };
+    mockFetchTripForUser.mockResolvedValue(backendTrip("Planning"));
+    mockGetActivitiesBySlot.mockResolvedValue([
+      {
+        activity_id: "activity-123",
+        slot_id: "2026-06-01_Breakfast",
+        name: "Late cafe",
+        address: "Cafe Street",
+        startTime: "06:00",
+        endTime: "11:00",
+      },
+    ]);
+
+    const { unmount } = render(<ItineraryScreen />);
+
+    await waitFor(() => {
+      expect(
+        mockPlanningSlotCardProps.mock.calls.some(([props]) => {
+          const activity = (props as { activity?: { endTime?: string } })
+            .activity;
+          return activity?.endTime === "23:00";
         })
       ).toBe(true);
     });

@@ -38,10 +38,6 @@ function validateActivityTimes(
         return "endTime must be a valid time in HH:MM format";
     }
 
-    if (startTime && endTime && endTime < startTime) {
-        return "endTime cannot be before startTime";
-    }
-
     return undefined;
 }
 

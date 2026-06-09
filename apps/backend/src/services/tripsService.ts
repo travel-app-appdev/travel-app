@@ -1,4 +1,4 @@
-import admin from "../config/firebase";
+﻿import admin from "../config/firebase";
 import {
     createTripWithAdminMembership,
     findAcceptedMembershipsByUserId,
@@ -639,6 +639,18 @@ export async function advanceTripStateIfNeeded(tripId: string): Promise<Trip> {
         throw { status: 404, message: "Trip not found" };
     }
 
+    if (trip.state !== "Final" && hasTripEndDatePassed(trip.end_date)) {
+        await createFinalItineraryForTrip(tripId);
+        await updateTripState(tripId, "Final");
+
+        const finalizedTrip = await findTripById(tripId);
+        if (!finalizedTrip) {
+            throw { status: 404, message: "Trip not found after end-date finalization" };
+        }
+
+        return finalizedTrip;
+    }
+
     if (trip.state === "Planning") {
         return transitionPlanningToNextState(tripId);
     }
@@ -763,6 +775,31 @@ function parseIsoDate(value?: string): Date | null {
 
 function isPast(date: Date): boolean {
     return date.getTime() <= Date.now();
+}
+
+function hasTripEndDatePassed(endDateString?: string): boolean {
+    if (!endDateString) return false;
+
+    const endDate = parseLocalDate(endDateString);
+    if (!endDate || Number.isNaN(endDate.getTime())) return false;
+
+    endDate.setHours(0, 0, 0, 0);
+
+    const today = new Date(Date.now());
+    today.setHours(0, 0, 0, 0);
+
+    return endDate < today;
+}
+
+function parseLocalDate(dateString: string): Date | null {
+    const [year, month, day] = dateString.split("-").map(Number);
+
+    if (year && month && day) {
+        return new Date(year, month - 1, day);
+    }
+
+    const parsed = new Date(dateString);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 export async function transitionVotingToFinalIfNeeded(tripId: string): Promise<Trip> {

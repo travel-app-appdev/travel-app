@@ -108,6 +108,23 @@ function selectVoteForActivity(
   });
 }
 
+function upsertActivity(
+  activities: Activity[],
+  incoming: Activity
+): Activity[] {
+  const existingIndex = activities.findIndex(
+    (activity) => activity.id === incoming.id
+  );
+
+  if (existingIndex === -1) {
+    return [...activities, incoming];
+  }
+
+  return activities.map((activity, index) =>
+    index === existingIndex ? { ...activity, ...incoming } : activity
+  );
+}
+
 function updateCachedActivities(
   tripId: string,
   updater: (activities: Activity[]) => Activity[]
@@ -432,6 +449,38 @@ export default function ItineraryScreen() {
     () => parsePlanningStatusJson(members),
     [members]
   );
+  const incomingRouteActivity = useMemo<Activity | null>(() => {
+    if (
+      !newActivityId ||
+      !newActivityDayId ||
+      !newActivitySlotId ||
+      !newActivityName
+    ) {
+      return null;
+    }
+
+    return {
+      id: newActivityId,
+      dayId: newActivityDayId,
+      slotId: newActivitySlotId,
+      name: newActivityName,
+      description: newActivityDescription ?? "",
+      address: newActivityAddress ?? "",
+      googleMapsUrl: newActivityGoogleMapsUrl ?? "",
+      startTime: newActivityStartTime ?? "",
+      endTime: newActivityEndTime ?? "",
+    };
+  }, [
+    newActivityId,
+    newActivityDayId,
+    newActivitySlotId,
+    newActivityName,
+    newActivityDescription,
+    newActivityAddress,
+    newActivityGoogleMapsUrl,
+    newActivityStartTime,
+    newActivityEndTime,
+  ]);
 
   const [itinerary, setItinerary] = useState<TripItinerary>(() => ({
     ...buildItineraryFromParams({
@@ -937,14 +986,18 @@ export default function ItineraryScreen() {
             )
           ).flat();
 
+          const nextActivities = incomingRouteActivity
+            ? upsertActivity(allActivities, incomingRouteActivity)
+            : allActivities;
+
           const hasChanged =
-            JSON.stringify(cached) !== JSON.stringify(allActivities);
+            JSON.stringify(cached) !== JSON.stringify(nextActivities);
 
           if (hasChanged) {
-            activitiesCache.set(cacheKey, allActivities);
-            setApiActivities(allActivities);
+            activitiesCache.set(cacheKey, nextActivities);
+            setApiActivities(nextActivities);
           } else if (!cached) {
-            setApiActivities(allActivities);
+            setApiActivities(nextActivities);
           }
 
           setIsLoadingActivities(false);
@@ -971,14 +1024,18 @@ export default function ItineraryScreen() {
           )
         ).flat();
 
+        const nextActivities = incomingRouteActivity
+          ? upsertActivity(allActivities, incomingRouteActivity)
+          : allActivities;
+
         const hasChanged =
-          JSON.stringify(cached) !== JSON.stringify(allActivities);
+          JSON.stringify(cached) !== JSON.stringify(nextActivities);
 
         if (hasChanged) {
-          activitiesCache.set(cacheKey, allActivities);
-          setApiActivities(allActivities);
+          activitiesCache.set(cacheKey, nextActivities);
+          setApiActivities(nextActivities);
         } else if (!cached) {
-          setApiActivities(allActivities);
+          setApiActivities(nextActivities);
         }
 
         setIsLoadingActivities(false);
@@ -999,6 +1056,7 @@ export default function ItineraryScreen() {
     slots,
     itinerary.startDate,
     activityRefreshKey,
+    incomingRouteActivity,
   ]);
 
   useEffect(() => {
@@ -1015,25 +1073,18 @@ export default function ItineraryScreen() {
   const lastAppliedActivitySignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (
-      !newActivityId ||
-      !newActivityDayId ||
-      !newActivitySlotId ||
-      !newActivityName
-    ) {
-      return;
-    }
+    if (!incomingRouteActivity) return;
 
     const incomingSignature = [
-      newActivityId,
-      newActivityDayId,
-      newActivitySlotId,
-      newActivityName,
-      newActivityDescription ?? "",
-      newActivityAddress ?? "",
-      newActivityGoogleMapsUrl ?? "",
-      newActivityStartTime ?? "",
-      newActivityEndTime ?? "",
+      incomingRouteActivity.id,
+      incomingRouteActivity.dayId,
+      incomingRouteActivity.slotId,
+      incomingRouteActivity.name,
+      incomingRouteActivity.description ?? "",
+      incomingRouteActivity.address ?? "",
+      incomingRouteActivity.googleMapsUrl ?? "",
+      incomingRouteActivity.startTime ?? "",
+      incomingRouteActivity.endTime ?? "",
     ].join("|");
 
     if (lastAppliedActivitySignatureRef.current === incomingSignature) {
@@ -1041,17 +1092,21 @@ export default function ItineraryScreen() {
     }
 
     lastAppliedActivitySignatureRef.current = incomingSignature;
-  }, [
-    newActivityId,
-    newActivityDayId,
-    newActivitySlotId,
-    newActivityName,
-    newActivityDescription,
-    newActivityAddress,
-    newActivityGoogleMapsUrl,
-    newActivityStartTime,
-    newActivityEndTime,
-  ]);
+
+    const applyIncomingActivity = (activities: Activity[]) =>
+      upsertActivity(activities, incomingRouteActivity);
+
+    setItinerary((current) => ({
+      ...current,
+      activities: applyIncomingActivity(current.activities),
+    }));
+    setApiActivities((current) => applyIncomingActivity(current));
+    setIsLoadingActivities(false);
+
+    if (tripId) {
+      updateCachedActivities(tripId, applyIncomingActivity);
+    }
+  }, [incomingRouteActivity, tripId]);
 
   const slotItems = useMemo(() => {
     return mapActivitiesToSlots(slots, apiActivities, selectedDayId);
