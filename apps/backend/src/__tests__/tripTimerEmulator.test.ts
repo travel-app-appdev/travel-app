@@ -2,6 +2,8 @@ jest.mock("../services/notificationService", () => ({
   sendPushNotifications: jest.fn(),
 }));
 
+jest.setTimeout(30000);
+
 import admin from "../config/firebase";
 import {
   advanceTripStateIfNeeded,
