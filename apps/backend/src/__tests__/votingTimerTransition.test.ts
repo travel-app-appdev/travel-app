@@ -62,6 +62,7 @@ import {
 import { voteForActivity } from "../services/activityService";
 import {
   finishPlanningForMember,
+  advanceTripStateIfNeeded,
   getTripsForUser,
   transitionPlanningToNextState,
   transitionVotingToFinalIfNeeded,
@@ -346,6 +347,30 @@ describe("trip list state repair", () => {
     ]);
 
     expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Voting");
+  });
+
+  it("finalizes an ended trip even when it was still stored as Planning", async () => {
+    const planningTrip = {
+      trip_id: TRIP_ID,
+      title: "Spain",
+      destination: "Spain",
+      start_date: "2026-04-23",
+      end_date: "2026-04-23",
+      state: "Planning" as const,
+      planning_end_at: FUTURE_DEADLINE,
+      voting_end_at: FUTURE_DEADLINE,
+    };
+    const finalTrip = { ...planningTrip, state: "Final" as const };
+
+    mocked(findTripById)
+      .mockResolvedValueOnce(planningTrip)
+      .mockResolvedValueOnce(finalTrip);
+
+    await expect(advanceTripStateIfNeeded(TRIP_ID)).resolves.toEqual(finalTrip);
+
+    expect(createFinalItineraryForTrip).toHaveBeenCalledWith(TRIP_ID);
+    expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Final");
+    expect(findAcceptedMembersByTripId).not.toHaveBeenCalled();
   });
 });
 
