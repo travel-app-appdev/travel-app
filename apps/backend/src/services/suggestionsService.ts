@@ -164,10 +164,13 @@ async function fetchPlaces(
     return features.map((f): ActivitySuggestion => {
         const props = f.properties ?? {};
         const [lon, lat] = f.geometry?.coordinates ?? [0, 0];
+        const name = props.name ?? props.address_line1 ?? "Unknown place";
+        const address = props.formatted ?? props.address_line2;
 
         return {
-            name: props.name ?? props.address_line1 ?? "Unknown place",
-            address: props.formatted ?? props.address_line2,
+            name,
+            address,
+            googleMapsUrl: buildGoogleMapsUrl(name, address),
             latitude: lat,
             longitude: lon,
             source: "geoapify",
@@ -175,4 +178,9 @@ async function fetchPlaces(
             matchedPreferences: matchedPrefs,
         };
     });
+}
+
+function buildGoogleMapsUrl(name: string, address?: string): string {
+    const query = encodeURIComponent(name + (address ? ", " + address : ""));
+    return "https://www.google.com/maps/search/?api=1&query=" + query;
 }

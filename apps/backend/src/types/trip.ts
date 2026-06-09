@@ -48,6 +48,7 @@ export type TripMembershipDocument = {
 export type ActivitySuggestion = {
     name: string;
     address?: string;
+    googleMapsUrl?: string;
     latitude: number;
     longitude: number;
     source: "geoapify";
