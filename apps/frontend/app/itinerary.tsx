@@ -1311,8 +1311,8 @@ export default function ItineraryScreen() {
       }
     } catch (error) {
       Alert.alert(
-        "Could not finish planning",
-        error instanceof Error ? error.message : "Please try again."
+        "One moment...",
+        error instanceof Error ? error.message : "Your group is all set! We're preparing the next step, hang tight. 🎉"
       );
     } finally {
       setIsSubmittingPlanning(false);
