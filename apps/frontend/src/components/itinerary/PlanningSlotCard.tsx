@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
@@ -49,9 +49,15 @@ export function PlanningSlotCard({
     onSuggest?.(slot.id, slot.label);
   }, [disabled, onSuggest, slot.id, slot.label]);
 
+  const handleGoogleMapsPressRaw = useCallback(() => {
+    if (!activity?.googleMapsUrl) return;
+    Linking.openURL(activity.googleMapsUrl).catch(() => {});
+  }, [activity?.googleMapsUrl]);
+
   const handleAddPress = useSinglePress(handleAddPressRaw);
   const handleEditPress = useSinglePress(handleEditPressRaw);
   const handleSuggestPress = useSinglePress(handleSuggestPressRaw);
+  const handleGoogleMapsPress = useSinglePress(handleGoogleMapsPressRaw);
 
   if (!hasActivity) {
     return (
@@ -168,9 +174,10 @@ export function PlanningSlotCard({
         )}
 
         {!!activity?.googleMapsUrl && (
-          <View
+          <Pressable
+            onPress={handleGoogleMapsPress}
             style={styles.infoRow}
-            accessible={true}
+            accessibilityRole="link"
             accessibilityLabel="Google Maps link available"
           >
             <GoogleIcon
@@ -184,9 +191,9 @@ export function PlanningSlotCard({
               numberOfLines={1}
               accessible={false}
             >
-              {activity.googleMapsUrl}
+              Open in Google Maps
             </AppText>
-          </View>
+          </Pressable>
         )}
       </View>
 

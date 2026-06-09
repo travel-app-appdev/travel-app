@@ -57,7 +57,9 @@ export function SuggestionsModal({
 
   function openMapsForPlace(s: ActivitySuggestion) {
     const query = encodeURIComponent(s.name + (s.address ? ", " + s.address : ""));
-    const url = "https://www.google.com/maps/search/?api=1&query=" + query;
+    const url =
+      s.googleMapsUrl ??
+      "https://www.google.com/maps/search/?api=1&query=" + query;
     Linking.openURL(url).catch(() => {});
   }
 

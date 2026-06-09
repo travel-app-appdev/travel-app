@@ -234,6 +234,11 @@ function mergeAlternativeLists(
   return Array.from(byId.values());
 }
 
+function buildGoogleMapsUrl(name: string, address?: string): string {
+  const query = encodeURIComponent(name + (address ? `, ${address}` : ""));
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
 type RouteMember = {
   id?: string;
   userId?: string;
@@ -1266,6 +1271,9 @@ export default function ItineraryScreen() {
         slotId: fullSlotId,
         name: suggestion.name,
         address: suggestion.address,
+        googleMapsUrl:
+          suggestion.googleMapsUrl ??
+          buildGoogleMapsUrl(suggestion.name, suggestion.address),
       });
 
       const newActivity: Activity = mapBackendActivity(result, {

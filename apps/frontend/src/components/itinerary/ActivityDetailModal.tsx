@@ -351,12 +351,14 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
   },
   centerWrap: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: spacing.lg,
+    zIndex: 1,
   },
   modalCard: {
     width: "100%",
@@ -370,6 +372,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     paddingBottom: spacing.xl,
     gap: spacing.md,
+    elevation: 2,
+    zIndex: 2,
   },
   headerRow: {
     flexDirection: "row",
