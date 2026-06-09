@@ -210,7 +210,7 @@ export async function getFinalActivities(
         throw { status: 404, message: "Trip not found" };
     }
 
-    if (trip.state !== "Final") {
+    if (trip.state !== "Final" && trip.state !== "Memories") {
         throw { status: 400, message: "Trip is not in Final state" };
     }
 
@@ -242,7 +242,7 @@ export async function toggleFinalActivityAttendance(input: {
         throw { status: 404, message: "Trip not found" };
     }
 
-    if (trip.state !== "Final") {
+    if (trip.state !== "Final" && trip.state !== "Memories") {
         throw { status: 400, message: "Trip is not in Final state" };
     }
 
@@ -291,7 +291,7 @@ export async function toggleAddedAlternativeActivity(input: {
         throw { status: 404, message: "Trip not found" };
     }
 
-    if (trip.state !== "Final") {
+    if (trip.state !== "Final" && trip.state !== "Memories") {
         throw { status: 400, message: "Trip is not in Final state" };
     }
 

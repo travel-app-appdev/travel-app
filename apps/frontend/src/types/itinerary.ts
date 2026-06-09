@@ -1,4 +1,4 @@
-export type ItineraryState = "planning" | "voting" | "final";
+export type ItineraryState = "planning" | "voting" | "final" | "memories";
 
 export type TimeSlot = {
   id: string;

@@ -33,6 +33,8 @@ function getHeroColor(state: ItineraryState): string {
   switch (state) {
     case "voting":
       return colors.sunsetPink;
+    case "memories":
+      return colors.seaBlue;
     case "final":
       return colors.neonGreen;
     case "planning":
@@ -46,6 +48,7 @@ function getMascotByState(state: ItineraryState) {
     case "voting":
       return MascotVoting;
     case "final":
+    case "memories":
       return MascotFinal;
     case "planning":
     default:
@@ -68,7 +71,7 @@ export function ItineraryHeader({
   const handleBack = useSinglePress(onBackPress);  
   const blinkingDotAnim = useRef(new Animated.Value(1)).current;
   
-const isActive = state !== "final";  
+const isActive = state !== "final" && state !== "memories";
 const isMuted = state === "planning"; 
 
 
@@ -106,7 +109,7 @@ useEffect(() => {
             <Back width={20} height={20} />
           </Pressable>
 
-      {state !== "final" ? (
+      {state !== "final" && state !== "memories" ? (
   <View
     style={styles.timerBox}
     accessible={true}

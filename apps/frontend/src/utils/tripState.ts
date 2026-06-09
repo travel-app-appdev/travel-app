@@ -1,4 +1,4 @@
-type TripState = "Planning" | "Voting" | "Final";
+type TripState = "Planning" | "Voting" | "Final" | "Memories";
 
 export function parseLocalTripDate(dateString: string): Date {
   const [year, month, day] = dateString.split("-").map(Number);
@@ -27,5 +27,5 @@ export function getEffectiveTripState(
   trip: { state: TripState; end_date: string },
   today = new Date()
 ): TripState {
-  return isPastTripByEndDate(trip.end_date, today) ? "Final" : trip.state;
+  return isPastTripByEndDate(trip.end_date, today) ? "Memories" : trip.state;
 }

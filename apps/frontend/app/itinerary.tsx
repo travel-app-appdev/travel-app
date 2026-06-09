@@ -12,9 +12,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { Image as ExpoImage } from "expo-image";
+import * as ImageManipulator from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
+import { Ionicons } from "@expo/vector-icons";
 import { doc, onSnapshot } from "firebase/firestore";
 
-import { colors, spacing } from "@/src/theme";
+import { colors, spacing, typography } from "@/src/theme";
 import { db, auth } from "@/src/lib/firebase";
 import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
@@ -61,6 +65,12 @@ import {
   createActivity,
   type FinalItineraryResponseDto,
 } from "@/src/services/activityService";
+import {
+  fetchMemories,
+  getMemoryPhotoUrl,
+  uploadMemoryPhoto,
+  type MemoryPhoto,
+} from "@/src/services/memoriesService";
 
 const DEV_FORCE_STATE: ItineraryState | null = null;
 const TRANSITION_OVERLAY_MS = 1800;
@@ -263,12 +273,14 @@ function parsePlanningStatusJson(value?: string) {
   }
 }
 
-function toUiState(state: "Planning" | "Voting" | "Final"): ItineraryState {
+function toUiState(state: Trip["state"]): ItineraryState {
   switch (state) {
     case "Voting":
       return "voting";
     case "Final":
       return "final";
+    case "Memories":
+      return "memories";
     case "Planning":
     default:
       return "planning";
@@ -359,6 +371,8 @@ function getIntroText(state: ItineraryState): string {
       return "Vote on conflicting times of activities here.";
     case "final":
       return "Here you find your final itinerary with your group.";
+    case "memories":
+      return "Here you can upload your photos of the trip and share it to the other members.";
     case "planning":
     default:
       return "You can add your activities here for each day.";
@@ -428,7 +442,7 @@ export default function ItineraryScreen() {
     role,
   } = useLocalSearchParams<{
     tripId?: string;
-    state?: "planning" | "voting" | "final";
+    state?: "planning" | "voting" | "final" | "memories";
     title?: string;
     destination?: string;
     startDate?: string;
@@ -451,7 +465,10 @@ export default function ItineraryScreen() {
   }>();
 
   const routeState: ItineraryState | undefined =
-    state === "planning" || state === "voting" || state === "final"
+    state === "planning" ||
+    state === "voting" ||
+    state === "final" ||
+    state === "memories"
       ? state
       : undefined;
 
@@ -512,6 +529,9 @@ export default function ItineraryScreen() {
   });
 
   const [finalSlots, setFinalSlots] = useState<FinalSlotUi[]>([]);
+  const [memories, setMemories] = useState<MemoryPhoto[]>([]);
+  const [isLoadingMemories, setIsLoadingMemories] = useState(false);
+  const [isUploadingMemories, setIsUploadingMemories] = useState(false);
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const [isLoadingActivities, setIsLoadingActivities] = useState(() => {
     const keys = [...activitiesCache.keys()];
@@ -924,6 +944,11 @@ export default function ItineraryScreen() {
 
       if (!tripId || tripDays.length === 0) return;
 
+      if (activeState === "memories") {
+        setIsLoadingActivities(false);
+        return;
+      }
+
       if (activeState !== "final" && !selectedDayId) {
         return;
       }
@@ -1083,20 +1108,57 @@ export default function ItineraryScreen() {
     void loadActivities();
   }, [activityRefreshKey, loadActivities, newActivityId]);
 
+  const loadMemories = useCallback(
+    async (options: { showLoading?: boolean } = {}) => {
+      if (!tripId || !authToken || activeState !== "memories") return;
+
+      if (options.showLoading !== false) {
+        setIsLoadingMemories(true);
+      }
+
+      try {
+        const nextMemories = await fetchMemories({ tripId, idToken: authToken });
+        setMemories(nextMemories);
+      } catch (error) {
+        Alert.alert(
+          "Could not load memories",
+          error instanceof Error ? error.message : "Please try again."
+        );
+      } finally {
+        setIsLoadingMemories(false);
+      }
+    },
+    [activeState, authToken, tripId]
+  );
+
+  useEffect(() => {
+    if (activeState === "memories") {
+      void loadMemories();
+    } else {
+      setMemories([]);
+    }
+  }, [activeState, loadMemories]);
+
   const handleRefresh = useCallback(async () => {
-    if (isRefreshing || isLoadingActivities) return;
+    if (isRefreshing || isLoadingActivities || isLoadingMemories) return;
 
     setIsRefreshing(true);
     try {
       await refreshTripTimerFields({ forceRefresh: true });
-      await loadActivities({ showLoading: false });
+      if (activeState === "memories") {
+        await loadMemories({ showLoading: false });
+      } else {
+        await loadActivities({ showLoading: false });
+      }
     } finally {
       setIsRefreshing(false);
     }
   }, [
     isLoadingActivities,
+    isLoadingMemories,
     isRefreshing,
     loadActivities,
+    loadMemories,
     refreshTripTimerFields,
     tripId,
     newActivityId,
@@ -1109,6 +1171,71 @@ export default function ItineraryScreen() {
     activityRefreshKey,
     incomingRouteActivity,
   ]);
+
+  const handleUploadMemories = useCallback(async () => {
+    if (!tripId || !authToken || isUploadingMemories) {
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Photo access needed",
+        "Please allow photo library access to upload trip memories."
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
+      quality: 1,
+    });
+
+    if (result.canceled || result.assets.length === 0) {
+      return;
+    }
+
+    setIsUploadingMemories(true);
+    try {
+      for (let index = 0; index < result.assets.length; index += 1) {
+        const asset = result.assets[index];
+        const manipulated = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          [{ resize: { width: 1600 } }],
+          {
+            compress: 0.7,
+            format: ImageManipulator.SaveFormat.JPEG,
+          }
+        );
+
+        await uploadMemoryPhoto({
+          tripId,
+          idToken: authToken,
+          uri: manipulated.uri,
+          name: `memory-${Date.now()}-${index}.jpg`,
+          type: "image/jpeg",
+        });
+      }
+
+      await loadMemories({ showLoading: false });
+    } catch (error) {
+      Alert.alert(
+        "Could not upload memories",
+        error instanceof Error ? error.message : "Please try again."
+      );
+    } finally {
+      setIsUploadingMemories(false);
+    }
+  }, [authToken, isUploadingMemories, loadMemories, tripId]);
+
+  const handleDownloadAllMemories = useCallback(() => {
+    Alert.alert(
+      "Download all",
+      "Download all will be added after the backend zip endpoint is ready."
+    );
+  }, []);
 
   useEffect(() => {
     if (activeState !== "final") {
@@ -1936,14 +2063,18 @@ export default function ItineraryScreen() {
   const stateAccentColor =
     activeState === "voting"
       ? colors.sunsetPink
-      : activeState === "final"
+      : activeState === "memories"
+        ? colors.seaBlue
+        : activeState === "final"
         ? colors.neonGreen
         : colors.beachYellow;
 
   const safeAreaBg =
     activeState === "voting"
       ? colors.sunsetPink
-      : activeState === "final"
+      : activeState === "memories"
+        ? colors.seaBlue
+        : activeState === "final"
         ? colors.neonGreen
         : colors.beachYellow;
 
@@ -1969,7 +2100,7 @@ export default function ItineraryScreen() {
           }
         >
           <ItineraryHeader
-            title="Itinerary"
+            title={activeState === "memories" ? "Memories" : "Itinerary"}
             tripName={itinerary.title}
             startDate={itinerary.startDate}
             endDate={itinerary.endDate}
@@ -1986,15 +2117,107 @@ export default function ItineraryScreen() {
           />
 
           <View style={styles.contentPanel}>
-            <ItineraryDaySelector
-              days={tripDays}
-              selectedDayId={selectedDayId}
-              onSelectDay={setSelectedDayId}
-              enabledDayIds={
-                activeState === "voting" ? daysWithVotingActivities : undefined
-              }
-              accentColor={stateAccentColor}
-            />
+            {activeState !== "memories" && (
+              <ItineraryDaySelector
+                days={tripDays}
+                selectedDayId={selectedDayId}
+                onSelectDay={setSelectedDayId}
+                enabledDayIds={
+                  activeState === "voting"
+                    ? daysWithVotingActivities
+                    : undefined
+                }
+                accentColor={stateAccentColor}
+              />
+            )}
+
+            {activeState === "memories" && (
+              <View style={styles.memoriesSection}>
+                <View style={styles.memoriesActions}>
+                  <Pressable
+                    style={[
+                      styles.memoryActionButton,
+                      styles.uploadMemoryButton,
+                      isUploadingMemories && styles.memoryActionDisabled,
+                    ]}
+                    onPress={handleUploadMemories}
+                    disabled={isUploadingMemories}
+                    accessibilityRole="button"
+                    accessibilityLabel="Upload images"
+                    accessibilityState={{ busy: isUploadingMemories }}
+                  >
+                    {isUploadingMemories ? (
+                      <ActivityIndicator color={colors.nightBlack} />
+                    ) : (
+                      <Ionicons
+                        name="cloud-upload-outline"
+                        size={22}
+                        color={colors.nightBlack}
+                      />
+                    )}
+                    <AppText variant="body" style={styles.memoryActionText}>
+                      Upload images
+                    </AppText>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.memoryActionButton,
+                      styles.downloadMemoryButton,
+                    ]}
+                    onPress={handleDownloadAllMemories}
+                    accessibilityRole="button"
+                    accessibilityLabel="Download all memories"
+                  >
+                    <Ionicons
+                      name="download-outline"
+                      size={22}
+                      color={colors.nightBlack}
+                    />
+                    <AppText variant="body" style={styles.memoryActionText}>
+                      Download all
+                    </AppText>
+                  </Pressable>
+                </View>
+
+                <View style={styles.memoryGrid}>
+                  {isLoadingMemories
+                    ? Array.from({ length: 6 }).map((_, index) => (
+                        <View
+                          key={`memory-loading-${index}`}
+                          style={styles.memoryPlaceholder}
+                        />
+                      ))
+                    : memories.length > 0
+                      ? memories.map((memory) => (
+                          <View
+                            key={memory.memory_id}
+                            style={styles.memoryTile}
+                            accessible={true}
+                            accessibilityLabel={`Memory photo uploaded by ${
+                              memory.uploaded_by_name ?? "a trip member"
+                            }`}
+                          >
+                            <ExpoImage
+                              source={{
+                                uri: authToken
+                                  ? getMemoryPhotoUrl(memory, authToken)
+                                  : "",
+                              }}
+                              style={styles.memoryImage}
+                              contentFit="cover"
+                            />
+                          </View>
+                        ))
+                      : Array.from({ length: 6 }).map((_, index) => (
+                          <View
+                            key={`memory-empty-${index}`}
+                            style={styles.memoryPlaceholder}
+                          />
+                        ))}
+                </View>
+              </View>
+            )}
 
             {activeState === "planning" && (
               <View style={styles.planningContent}>
@@ -2306,6 +2529,62 @@ const styles = StyleSheet.create({
   },
   emptyVoting: {
     paddingVertical: spacing.xxl,
+  },
+  memoriesSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    gap: spacing.md,
+  },
+  memoriesActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  memoryActionButton: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  uploadMemoryButton: {
+    backgroundColor: colors.seaBlue,
+  },
+  downloadMemoryButton: {
+    backgroundColor: colors.sunsetOrange,
+  },
+  memoryActionDisabled: {
+    opacity: 0.65,
+  },
+  memoryActionText: {
+    color: colors.nightBlack,
+    textAlign: "center",
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  memoryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  memoryTile: {
+    width: "48%",
+    aspectRatio: 1,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: colors.border,
+  },
+  memoryPlaceholder: {
+    width: "48%",
+    aspectRatio: 1,
+    borderRadius: 8,
+    backgroundColor: colors.border,
+  },
+  memoryImage: {
+    width: "100%",
+    height: "100%",
   },
   votingModalOverlay: {
     flex: 1,

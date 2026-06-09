@@ -125,7 +125,7 @@ function getUiStatus(
 ): "planning" | "voting" | "final" {
   if (state === "Voting" && memberCount <= 1) return "final";
   if (state === "Voting") return "voting";
-  if (state === "Final") return "final";
+  if (state === "Final" || state === "Memories") return "final";
   return "planning";
 }
 
@@ -774,7 +774,8 @@ export default function HomeScreen() {
                     pathname: "/itinerary",
                     params: {
                       tripId: trip.id,
-                      state: status,
+                      state:
+                        trip.rawState === "Memories" ? "memories" : status,
                       title: trip.title,
                       destination: trip.destination,
                       startDate: trip.rawStartDate,
