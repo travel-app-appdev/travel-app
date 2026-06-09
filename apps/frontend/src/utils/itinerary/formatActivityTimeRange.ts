@@ -1,9 +1,23 @@
 import type { Activity } from "@/src/types/itinerary";
 
-export function formatActivityTimeRange(
-  activity?: Pick<Activity, "startTime" | "endTime">
-) {
+type ActivityTimeRange = Pick<Activity, "startTime" | "endTime">;
+
+export function isOvernightActivityTimeRange(
+  activity?: ActivityTimeRange
+): boolean {
+  return Boolean(
+    activity?.startTime &&
+    activity?.endTime &&
+    activity.endTime < activity.startTime
+  );
+}
+
+export function formatActivityTimeRange(activity?: ActivityTimeRange) {
   if (!activity?.startTime || !activity?.endTime) return "";
 
-  return `${activity.startTime} - ${activity.endTime}`;
+  const nextDaySuffix = isOvernightActivityTimeRange(activity)
+    ? " (+1 day)"
+    : "";
+
+  return `${activity.startTime} - ${activity.endTime}${nextDaySuffix}`;
 }

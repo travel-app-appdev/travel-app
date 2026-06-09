@@ -391,18 +391,6 @@ export default function AddActivityScreen() {
       return;
     }
 
-    if (
-      trimmedStartTime &&
-      trimmedEndTime &&
-      trimmedEndTime < trimmedStartTime
-    ) {
-      openFeedbackModal(
-        "Invalid time range",
-        "End time cannot be before start time."
-      );
-      return;
-    }
-
     if (!tripId || !dayId || !slotId) {
       openFeedbackModal("Missing data", "Trip, day, or time slot is missing.");
       return;

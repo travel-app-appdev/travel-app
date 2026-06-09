@@ -25,6 +25,11 @@ import {
 import { db } from "@/src/lib/firebase";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
+import {
+  getEffectiveTripState,
+  isPastTripByEndDate,
+  parseLocalTripDate,
+} from "@/src/utils/tripState";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
@@ -89,7 +94,7 @@ export function invalidateTripsCache() {
 }
 
 function formatDate(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseLocalTripDate(dateString);
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -134,7 +139,10 @@ function getMemberColor(index: number): string {
   return palette[index % palette.length];
 }
 
-function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
+function mapTripToCardTrip(
+  trip: TripWithMembers,
+  today = new Date()
+): TripCardItem {
   const members = (trip.members ?? []).map(
     (member: TripMemberFromApi, index: number) => ({
       id: member.id,
@@ -145,6 +153,7 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
       color: getMemberColor(index),
     })
   );
+  const effectiveState = getEffectiveTripState(trip, today);
 
   return {
     id: trip.trip_id,
@@ -154,7 +163,7 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     endDate: formatDate(trip.end_date),
     rawStartDate: trip.start_date,
     rawEndDate: trip.end_date,
-    status: getUiStatus(trip.state, members.length),
+    status: getUiStatus(effectiveState, members.length),
     cardColor: getCardColor(trip.trip_id),
     role: trip.role === "admin" ? "admin" : "member",
     inviteCode: trip.invite_code ?? "",
@@ -162,23 +171,20 @@ function mapTripToCardTrip(trip: TripWithMembers): TripCardItem {
     planningStartedAt: trip.planning_started_at,
     planningEndAt: trip.planning_end_at,
     votingEndAt: trip.voting_end_at,
-    rawState: trip.state,
+    rawState: effectiveState,
   };
 }
 
 function mapTripsToLists(backendTrips: TripWithMembers[]) {
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
 
   const upcoming: TripCardItem[] = [];
   const past: TripCardItem[] = [];
 
   backendTrips.forEach((trip) => {
-    const mappedTrip = mapTripToCardTrip(trip);
-    const tripEndDate = new Date(trip.end_date);
-    tripEndDate.setHours(0, 0, 0, 0);
+    const mappedTrip = mapTripToCardTrip(trip, today);
 
-    if (tripEndDate < today) {
+    if (isPastTripByEndDate(trip.end_date, today)) {
       past.push(mappedTrip);
     } else {
       upcoming.push(mappedTrip);
