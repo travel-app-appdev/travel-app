@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
     getMyTrips,
+    getTrip,
     createTrip,
     createTripWithoutAuth,
     joinTrip,
@@ -24,6 +25,7 @@ router.post("/join", joinTrip);
 // ── Public: preview a trip by invite code (no auth)
 router.get("/invite/:inviteCode", getTripPreviewByCode);
 
+router.get("/:tripId", getTrip);
 router.get("/:id/itinerary", getItineraryController);
 router.patch("/:tripId", updateTrip);
 router.delete("/:tripId", deleteTrip);

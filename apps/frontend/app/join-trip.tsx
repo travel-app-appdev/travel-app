@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import {
-  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   View,
   Dimensions,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/common/AppText";
@@ -17,7 +17,7 @@ import { BackLink } from "@/src/components/common/BackLink";
 import { joinTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
 import { invalidateTripsCache } from "./home";
-import { colors, spacing, typography } from "@/src/theme";
+import { colors, radius, spacing, typography } from "@/src/theme";
 import LinkIcon from "@/assets/icons/link.svg";
 import KeyFrame from "@/assets/icons/key_frame.svg";
 import LeafUp from "@/assets/visuals/leaf_up.svg";
@@ -26,17 +26,60 @@ import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
+function ModalShell({ children }: { children: React.ReactNode }) {
+  return (
+    <SafeAreaView
+      style={styles.modalSafeArea}
+      edges={["top", "right", "bottom", "left"]}
+    >
+      <View style={styles.calendarOverlay}>
+        <View style={styles.calendarModal}>{children}</View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function StickyHeader() {
+  const router = useRouter();
+
+  return (
+    <View style={styles.stickyHeaderBlock}>
+      <View style={styles.header}>
+        <View style={styles.backButtonSlot}>
+          <BackLink onPress={() => router.replace("/home")} />
+        </View>
+
+        <View style={styles.headerTitle} {...hiddenFromAccessibility}>
+          <LinkIcon width={20} height={20} />
+          <AppText variant="body" style={styles.headerLabel}>
+            Join Trip
+          </AppText>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function JoinTripScreen() {
   const [code, setCode] = useState("");
   const [isJoining, setIsJoining] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackTitle, setFeedbackTitle] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
   const router = useRouter();
+
+  function openFeedbackModal(title: string, message: string) {
+    setFeedbackTitle(title);
+    setFeedbackMessage(message);
+    setShowFeedbackModal(true);
+  }
 
   const handleJoin = async () => {
     try {
       setIsJoining(true);
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert("Not logged in", "Please log in again.");
+        openFeedbackModal("Not logged in", "Please log in again.");
         return;
       }
       const idToken = await currentUser.getIdToken();
@@ -46,7 +89,7 @@ export default function JoinTripScreen() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to join trip";
-      Alert.alert("Join failed", message);
+      openFeedbackModal("Join failed", message);
     } finally {
       setIsJoining(false);
     }
@@ -80,15 +123,7 @@ export default function JoinTripScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.header}>
-              <BackLink href="/home" />
-              <View style={styles.headerTitle}>
-                <LinkIcon width={20} height={20} />
-                <AppText variant="body" style={styles.headerLabel}>
-                  Join Trip
-                </AppText>
-              </View>
-            </View>
+            <StickyHeader />
 
             <AppText variant="title" style={styles.title}>
               Which trip you wanna join?
@@ -96,7 +131,7 @@ export default function JoinTripScreen() {
 
             <View style={styles.fieldGroup}>
               <View style={styles.fieldLabelRow} {...hiddenFromAccessibility}>
-                <KeyFrame width={20} height={20} />
+                <KeyFrame width={24} height={24} />
                 <AppText variant="body" style={styles.fieldLabel}>
                   Code
                 </AppText>
@@ -128,6 +163,36 @@ export default function JoinTripScreen() {
             />
           </ScrollView>
         </KeyboardAvoidingView>
+
+        <Modal
+          visible={showFeedbackModal}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setShowFeedbackModal(false)}
+        >
+          <ModalShell>
+            <AppText variant="body" style={styles.calendarTitle}>
+              {feedbackTitle}
+            </AppText>
+
+            <View style={styles.timeModalContent}>
+              <AppText variant="caption" style={styles.feedbackMessage}>
+                {feedbackMessage}
+              </AppText>
+            </View>
+
+            <View style={styles.calendarActions}>
+              <AppButton
+                title="Okay"
+                onPress={() => setShowFeedbackModal(false)}
+                style={styles.calendarApplyButton}
+                textStyle={styles.calendarApplyButtonText}
+                accessibilityLabel="Close message"
+              />
+            </View>
+          </ModalShell>
+        </Modal>
       </SafeAreaView>
     </View>
   );
@@ -146,7 +211,7 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: 0,
     paddingBottom: spacing.xxxl,
     gap: spacing.xxl,
   },
@@ -166,29 +231,50 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     transform: [{ rotate: "5deg" }],
   },
+  stickyHeaderBlock: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+    backgroundColor: "transparent",
+    zIndex: 20,
+    elevation: 0,
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+  },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
     position: "relative",
-    zIndex: 1,
-    backgroundColor: colors.plantGreen,
-    elevation: 4,
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backButtonSlot: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-start",
+    zIndex: 2,
   },
   headerTitle: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: spacing.sm,
+    alignSelf: "center",
   },
   headerLabel: {
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
     fontFamily: typography.fontFamily.bodyBold,
     color: colors.textPrimary,
+    textAlignVertical: "center",
   },
   title: {
     fontSize: typography.size.displaySm,
-    lineHeight: typography.lineHeight.displayLg,
+    lineHeight: typography.lineHeight.displaySm,
+    fontFamily: typography.fontFamily.bodyBlack,
     color: colors.textPrimary,
     textAlign: "left",
     alignSelf: "stretch",
@@ -220,6 +306,52 @@ const styles = StyleSheet.create({
     marginTop: spacing.xxxl,
   },
   joinButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  calendarOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+  },
+  calendarModal: {
+    backgroundColor: colors.lightWhite,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+  },
+  calendarTitle: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+  },
+  timeModalContent: {
+    gap: spacing.md,
+  },
+  feedbackMessage: {
+    color: colors.nightBlack,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.md,
+    fontFamily: typography.fontFamily.bodySemiBold,
+  },
+  calendarActions: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  calendarApplyButton: {
+    flex: 1,
+    backgroundColor: colors.neonGreen,
+  },
+  calendarApplyButtonText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
   },

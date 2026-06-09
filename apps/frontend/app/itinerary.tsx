@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AccessibilityInfo,
   ActivityIndicator,
   Alert,
-  findNodeHandle,
-  Platform,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,13 +14,12 @@ import { StatusBar } from "expo-status-bar";
 import { doc, onSnapshot } from "firebase/firestore";
 
 import { colors, spacing } from "@/src/theme";
-import { db } from "@/src/lib/firebase";
+import { db, auth } from "@/src/lib/firebase";
 import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
 import { mapActivitiesToSlots } from "@/src/utils/itinerary/mapActivitiesToSlots";
 import { getActiveTripTimerText } from "@/src/utils/tripTimer";
 import { useAuth } from "@/src/context/AuthContext";
-import { useSinglePress } from "@/src/hooks/useSinglePress";
 
 import type {
   TripItinerary,
@@ -37,12 +34,20 @@ import { PlanningSlotCard } from "@/src/components/itinerary/PlanningSlotCard";
 import { SkeletonSlotCard } from "@/src/components/itinerary/SkeletonSlotCard";
 import { PlanningDoneBar } from "@/src/components/itinerary/PlanningDoneBar";
 import { VotingDoneBar } from "@/src/components/itinerary/VotingDoneBar";
+import { ItineraryInfoModal } from "@/src/components/itinerary/ItineraryInfoModal";
 import { VotingSlotCard } from "@/src/components/itinerary/VoteSlotCard";
 import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
 import { FinalSuggestedActivitiesSection } from "@/src/components/itinerary/FinalSuggestedActivitiesSection";
 import { ActivityDetailModal } from "@/src/components/itinerary/ActivityDetailModal";
-import { fetchMyTrips, finishPlanning, type Trip } from "@/src/api/trips";
+import {
+  fetchTripForUser,
+  finishPlanning,
+  finishVoting,
+  isTripNotFoundError,
+  type Trip,
+} from "@/src/api/trips";
+import { invalidateTripsCache } from "./home";
 import {
   getActivitiesBySlot,
   getFinalItineraryActivities,
@@ -54,7 +59,7 @@ import {
 
 const DEV_FORCE_STATE: ItineraryState | null = null;
 const TRANSITION_OVERLAY_MS = 1800;
-const TRIP_STATE_POLL_INTERVAL_MS = 10 * 1000;
+const TRIP_STATE_POLL_INTERVAL_MS = 30 * 1000;
 
 const activitiesCache = new Map<string, Activity[]>();
 
@@ -244,18 +249,21 @@ function toUiState(state: "Planning" | "Voting" | "Final"): ItineraryState {
   }
 }
 
-function markPlanningDoneForUser(
+function setPlanningDoneForUser(
   planningStatus: TripItinerary["planningStatus"],
-  userId: string
+  userId: string,
+  planningDone: boolean
 ): TripItinerary["planningStatus"] {
   const hasExistingUser = planningStatus.some(
     (member) => member.userId === userId
   );
   if (!hasExistingUser) {
-    return [...planningStatus, { userId, hasFinishedPlanning: true }];
+    return [...planningStatus, { userId, hasFinishedPlanning: planningDone }];
   }
   return planningStatus.map((member) =>
-    member.userId === userId ? { ...member, hasFinishedPlanning: true } : member
+    member.userId === userId
+      ? { ...member, hasFinishedPlanning: planningDone }
+      : member
   );
 }
 
@@ -453,6 +461,8 @@ export default function ItineraryScreen() {
   });
 
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
+  const [showVotingInfoPopup, setShowVotingInfoPopup] = useState(false);
+  const [showVotingConfirmModal, setShowVotingConfirmModal] = useState(false);
   const [isSubmittingPlanning, setIsSubmittingPlanning] = useState(false);
   const [isSubmittingVoting, setIsSubmittingVoting] = useState(false);
 
@@ -463,8 +473,7 @@ export default function ItineraryScreen() {
   );
   const [selectedActivitySlotLabel, setSelectedActivitySlotLabel] =
     useState("");
-  const [selectedAlternativeActivities, setSelectedAlternativeActivities] =
-    useState<Activity[]>([]);
+  const [, setSelectedAlternativeActivities] = useState<Activity[]>([]);
   const [
     selectedDisplayedAlternativeActivities,
     setSelectedDisplayedAlternativeActivities,
@@ -475,9 +484,6 @@ export default function ItineraryScreen() {
   ] = useState<string[]>([]);
   const [showActivityDetailModal, setShowActivityDetailModal] = useState(false);
 
-  const planningInfoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
   const finalizingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -490,8 +496,6 @@ export default function ItineraryScreen() {
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
   const [isPreparingVoting, setIsPreparingVoting] = useState(false);
-
-  const popupRef = useRef<View>(null);
 
   const slots = useMemo(() => generateTimeSlots(), []);
 
@@ -571,17 +575,21 @@ export default function ItineraryScreen() {
     activeStateRef.current = activeState;
   }, [activeState]);
 
+  useEffect(() => {
+    if (activeState === "planning") return;
+
+    setShowPlanningInfoPopup(false);
+  }, [activeState]);
+
   const refreshTripTimerFields = useCallback(
     async (options: { forceRefresh?: boolean } = {}) => {
       if (!currentUserId || !tripId) return;
 
       try {
-        const trips = await fetchMyTrips(currentUserId, {
+        const currentTrip = await fetchTripForUser(currentUserId, tripId, {
           forceRefresh: options.forceRefresh,
           allowStaleOnError: true,
         });
-
-        const currentTrip = trips.find((trip) => trip.trip_id === tripId);
         if (!currentTrip) return;
 
         const refreshedPlanningStatus = mapTripMembersToPlanningStatus(
@@ -625,7 +633,7 @@ export default function ItineraryScreen() {
             members: refreshedPlanningStatus
               ? JSON.stringify(refreshedPlanningStatus)
               : members,
-            role: role ?? "admin",
+            role: currentTrip.role ?? role ?? "member",
           });
         };
 
@@ -671,6 +679,12 @@ export default function ItineraryScreen() {
 
         applyRefreshedTrip(nextState);
       } catch (error) {
+        if (isTripNotFoundError(error)) {
+          invalidateTripsCache();
+          router.replace("/home");
+          return;
+        }
+
         console.log("Could not refresh trip timer:", error);
       }
     },
@@ -771,9 +785,6 @@ export default function ItineraryScreen() {
 
   useEffect(() => {
     return () => {
-      if (planningInfoTimeoutRef.current) {
-        clearTimeout(planningInfoTimeoutRef.current);
-      }
       if (finalizingTimeoutRef.current) {
         clearTimeout(finalizingTimeoutRef.current);
       }
@@ -782,27 +793,6 @@ export default function ItineraryScreen() {
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (!showPlanningInfoPopup || !popupRef.current) {
-      return;
-    }
-
-    if (Platform.OS === "web") {
-      requestAnimationFrame(() => {
-        const popupElement = popupRef.current as unknown as {
-          focus?: () => void;
-        };
-        popupElement?.focus?.();
-      });
-      return;
-    }
-
-    const node = findNodeHandle(popupRef.current);
-    if (node) {
-      AccessibilityInfo.setAccessibilityFocus(node);
-    }
-  }, [showPlanningInfoPopup]);
 
   const refreshFinalItinerary = useCallback(async () => {
     if (!tripId) return;
@@ -830,6 +820,27 @@ export default function ItineraryScreen() {
   }, [tripId, currentUserId]);
 
   useEffect(() => {
+    if (!tripId) {
+      return;
+    }
+
+    const unsubscribe = onSnapshot(
+      doc(db, "trips", tripId),
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          invalidateTripsCache();
+          router.replace("/home");
+        }
+      },
+      (error) => {
+        console.log("Trip deletion listener error:", error);
+      }
+    );
+
+    return unsubscribe;
+  }, [tripId]);
+
+  useEffect(() => {
     if (!tripId || activeState !== "final") {
       return;
     }
@@ -839,6 +850,10 @@ export default function ItineraryScreen() {
     const unsubscribe = onSnapshot(
       tripRef,
       async (snapshot) => {
+        if (!snapshot.exists()) {
+          return;
+        }
+
         const data = snapshot.data();
         const nextValue =
           data?.final_itinerary_updated_at?.toMillis?.()?.toString?.() ?? null;
@@ -1018,23 +1033,7 @@ export default function ItineraryScreen() {
   }, [activeState]);
 
   function handlePlanningInfoPress() {
-    if (showPlanningInfoPopup) {
-      if (planningInfoTimeoutRef.current) {
-        clearTimeout(planningInfoTimeoutRef.current);
-      }
-      setShowPlanningInfoPopup(false);
-      return;
-    }
-
     setShowPlanningInfoPopup(true);
-
-    if (planningInfoTimeoutRef.current) {
-      clearTimeout(planningInfoTimeoutRef.current);
-    }
-
-    planningInfoTimeoutRef.current = setTimeout(() => {
-      setShowPlanningInfoPopup(false);
-    }, 3500);
   }
 
   const lastAppliedActivitySignatureRef = useRef<string | null>(null);
@@ -1160,20 +1159,25 @@ export default function ItineraryScreen() {
   }
 
   async function handleFinishPlanning() {
-    if (hasCurrentUserFinished || isSubmittingPlanning) return;
+    if (isSubmittingPlanning) return;
     if (!currentUserId) return;
 
+    const nextPlanningDone = !hasCurrentUserFinished;
+
+    // Local-only fallback trip
     if (itinerary.tripId === "trip-fallback") {
-      const nextState = shouldSkipVoting(tripMemberCount)
-        ? "final"
-        : "planning";
+      const nextState =
+        nextPlanningDone && shouldSkipVoting(tripMemberCount)
+          ? "final"
+          : "planning";
 
       setItinerary((current) => ({
         ...current,
         state: nextState === "final" ? current.state : nextState,
-        planningStatus: markPlanningDoneForUser(
+        planningStatus: setPlanningDoneForUser(
           current.planningStatus,
-          currentUserId
+          currentUserId,
+          nextPlanningDone
         ),
       }));
 
@@ -1192,7 +1196,19 @@ export default function ItineraryScreen() {
       return;
     }
 
-    if (!authToken) {
+    // Always try to refresh the ID token before calling the API
+    let token = authToken;
+
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        token = await user.getIdToken(true);
+      }
+    } catch {
+      // ignore, will fall back to authToken if present
+    }
+
+    if (!token) {
       Alert.alert("Not logged in", "Please log in again.");
       return;
     }
@@ -1200,20 +1216,35 @@ export default function ItineraryScreen() {
     setIsSubmittingPlanning(true);
 
     try {
-      await finishPlanning({
-        idToken: authToken,
+      const result = await finishPlanning({
+        idToken: token,
         tripId: itinerary.tripId,
+        planningDone: nextPlanningDone,
       });
 
       setItinerary((current) => ({
         ...current,
-        planningStatus: markPlanningDoneForUser(
+        planningStatus: setPlanningDoneForUser(
           current.planningStatus,
-          currentUserId
+          currentUserId,
+          result.planningDone
         ),
       }));
 
-      void refreshTripTimerFields({ forceRefresh: true });
+      await refreshTripTimerFields({ forceRefresh: true });
+
+      if (!result.allDone || result.tripState === "Planning") {
+        return;
+      }
+
+      const maxAttempts = 5;
+      const delayMs = 1000;
+      for (let i = 0; i < maxAttempts; i++) {
+        if (activeStateRef.current !== "planning") break;
+
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await refreshTripTimerFields({ forceRefresh: true });
+      }
     } catch (error) {
       Alert.alert(
         "Could not finish planning",
@@ -1224,40 +1255,7 @@ export default function ItineraryScreen() {
     }
   }
 
-  async function handleFinishVoting() {
-    if (isSubmittingVoting) return;
-
-    if (!authToken || itinerary.tripId === "trip-fallback") {
-      setIsPreparingFinalItinerary(true);
-      if (finalizingTimeoutRef.current) {
-        clearTimeout(finalizingTimeoutRef.current);
-      }
-      finalizingTimeoutRef.current = setTimeout(() => {
-        setItinerary((current) => ({ ...current, state: "final" }));
-        setIsPreparingFinalItinerary(false);
-        setActivityRefreshKey((value) => value + 1);
-        router.setParams({ state: "final" });
-      }, TRANSITION_OVERLAY_MS);
-      return;
-    }
-
-    setIsSubmittingVoting(true);
-    try {
-      await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL}/trips/${itinerary.tripId}/finish-voting`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ idToken: authToken }),
-        }
-      );
-    } catch {
-    } finally {
-      setIsSubmittingVoting(false);
-    }
-
+  function showVotingFinalTransition() {
     setIsPreparingFinalItinerary(true);
     if (finalizingTimeoutRef.current) {
       clearTimeout(finalizingTimeoutRef.current);
@@ -1268,6 +1266,55 @@ export default function ItineraryScreen() {
       setActivityRefreshKey((value) => value + 1);
       router.setParams({ state: "final" });
     }, TRANSITION_OVERLAY_MS);
+  }
+
+  function handleVotingInfoPress() {
+    setShowVotingInfoPopup(true);
+  }
+
+  async function submitFinishVoting() {
+    if (isSubmittingVoting) return;
+
+    if (itinerary.tripId === "trip-fallback") {
+      showVotingFinalTransition();
+      return;
+    }
+
+    if (!authToken) {
+      Alert.alert("Not logged in", "Please log in again.");
+      return;
+    }
+
+    setIsSubmittingVoting(true);
+    try {
+      const result = await finishVoting({
+        idToken: authToken,
+        tripId: itinerary.tripId,
+      });
+
+      if (result.tripState === "Final") {
+        showVotingFinalTransition();
+      } else {
+        void refreshTripTimerFields({ forceRefresh: true });
+      }
+    } catch (error) {
+      Alert.alert(
+        "Could not finish voting",
+        error instanceof Error ? error.message : "Please try again."
+      );
+    } finally {
+      setIsSubmittingVoting(false);
+    }
+  }
+
+  function handleFinishVoting() {
+    if (isSubmittingVoting || isPreparingFinalItinerary) return;
+    setShowVotingConfirmModal(true);
+  }
+
+  function handleConfirmFinishVoting() {
+    setShowVotingConfirmModal(false);
+    void submitFinishVoting();
   }
 
   const votingActivities = useMemo(() => {
@@ -1731,13 +1778,6 @@ export default function ItineraryScreen() {
     }
   }
 
-  const handleDismissPopup = useSinglePress(() => {
-    if (planningInfoTimeoutRef.current) {
-      clearTimeout(planningInfoTimeoutRef.current);
-    }
-    setShowPlanningInfoPopup(false);
-  });
-
   const stateAccentColor =
     activeState === "voting"
       ? colors.sunsetPink
@@ -1919,40 +1959,15 @@ export default function ItineraryScreen() {
           onClose={handleCloseActivityDetails}
         />
 
-        {showPlanningInfoPopup && (
-          <>
-            <Pressable
-              style={styles.popupDismissArea}
-              onPress={handleDismissPopup}
-              accessibilityRole="button"
-              accessibilityLabel="Dismiss planning information"
-            />
-            <View
-              ref={popupRef}
-              style={[
-                styles.popupWrapper,
-                Platform.OS === "web"
-                  ? ({ outlineStyle: "none" } as any)
-                  : null,
-              ]}
-              accessibilityViewIsModal={true}
-              accessible={true}
-              accessibilityLiveRegion="assertive"
-              accessibilityLabel="You can no longer add activities after submitting."
-              {...(Platform.OS === "web" ? ({ tabIndex: -1 } as any) : {})}
-            >
-              <View style={styles.popup}>
-                <AppText
-                  variant="caption"
-                  style={styles.popupText}
-                  accessible={false}
-                >
-                  You can no longer add activities after submitting.
-                </AppText>
-              </View>
-            </View>
-          </>
-        )}
+        <ItineraryInfoModal
+          visible={activeState === "planning" && showPlanningInfoPopup}
+          title="Planning done"
+          text="Uncheck Planning done to edit or add activities again."
+          primaryButtonColor={colors.beachYellow}
+          accessibilityLabel="Planning done information"
+          closeAccessibilityLabel="Close planning information"
+          onClose={() => setShowPlanningInfoPopup(false)}
+        />
 
         {activeState === "planning" && (
           <PlanningDoneBar
@@ -1969,10 +1984,76 @@ export default function ItineraryScreen() {
 
         {activeState === "voting" && isAdmin && (
           <VotingDoneBar
+            checked={isSubmittingVoting || isPreparingFinalItinerary}
             disabled={isSubmittingVoting || isPreparingFinalItinerary}
             onPress={handleFinishVoting}
+            onInfoPress={handleVotingInfoPress}
           />
         )}
+
+        <ItineraryInfoModal
+          visible={showVotingInfoPopup}
+          title="Submit voting"
+          text="Only admins can end voting manually. This closes voting for all members and creates the final itinerary."
+          primaryButtonColor={colors.sunsetPink}
+          accessibilityLabel="Submit voting information"
+          closeAccessibilityLabel="Close voting information"
+          onClose={() => setShowVotingInfoPopup(false)}
+        />
+
+        <Modal
+          visible={showVotingConfirmModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowVotingConfirmModal(false)}
+        >
+          <View style={styles.votingModalOverlay}>
+            <Pressable
+              style={styles.votingModalBackdrop}
+              onPress={() => setShowVotingConfirmModal(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel ending voting"
+            />
+            <View
+              style={styles.votingModalCard}
+              accessibilityViewIsModal={true}
+              accessible={true}
+              accessibilityLabel="End voting confirmation"
+            >
+              <AppText variant="subtitle" style={styles.votingModalTitle}>
+                End voting?
+              </AppText>
+              <AppText variant="body" style={styles.votingModalText}>
+                Are you sure you want to end voting for all members?
+              </AppText>
+              <View style={styles.votingModalActions}>
+                <Pressable
+                  style={styles.votingModalSecondaryButton}
+                  onPress={() => setShowVotingConfirmModal(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel ending voting"
+                >
+                  <AppText
+                    variant="body"
+                    style={styles.votingModalSecondaryButtonText}
+                  >
+                    Cancel
+                  </AppText>
+                </Pressable>
+                <Pressable
+                  style={styles.votingModalPrimaryButton}
+                  onPress={handleConfirmFinishVoting}
+                  accessibilityRole="button"
+                  accessibilityLabel="End voting for everyone"
+                >
+                  <AppText variant="body" style={styles.votingModalButtonText}>
+                    End voting
+                  </AppText>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {isPreparingFinalItinerary && (
           <TransitionOverlay
@@ -2042,37 +2123,71 @@ const styles = StyleSheet.create({
     height: 110,
     elevation: 4,
   },
-  popupWrapper: {
-    position: "absolute",
-    bottom: 110,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    paddingHorizontal: spacing.lg,
-    zIndex: 20,
-  },
-  popupDismissArea: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "transparent",
-    zIndex: 15,
-  },
-  popup: {
-    backgroundColor: colors.nightBlack,
-    borderRadius: 16,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    maxWidth: 320,
-  },
-  popupText: {
-    color: colors.white,
-    textAlign: "center",
-  },
   votingSection: {
     paddingTop: spacing.md,
     gap: spacing.md,
   },
   emptyVoting: {
     paddingVertical: spacing.xxl,
+  },
+  votingModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.32)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+  },
+  votingModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  votingModalCard: {
+    width: "100%",
+    maxWidth: 340,
+    borderRadius: 18,
+    backgroundColor: colors.lightWhite,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+    gap: spacing.md,
+  },
+  votingModalTitle: {
+    color: colors.nightBlack,
+    textAlign: "center",
+  },
+  votingModalText: {
+    color: colors.nightBlack,
+    textAlign: "center",
+  },
+  votingModalActions: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
+  votingModalPrimaryButton: {
+    minHeight: 48,
+    borderRadius: 999,
+    backgroundColor: colors.sunsetPink,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  votingModalSecondaryButton: {
+    minHeight: 48,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.sunsetPink,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  votingModalButtonText: {
+    color: colors.nightBlack,
+    textAlign: "center",
+  },
+  votingModalSecondaryButtonText: {
+    color: colors.nightBlack,
+    textAlign: "center",
   },
   finalizingOverlay: {
     ...StyleSheet.absoluteFillObject,

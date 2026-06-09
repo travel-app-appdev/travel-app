@@ -2,8 +2,8 @@ import { useRouter } from "expo-router";
 import { useState, useEffect, useRef } from "react";
 import {
   AccessibilityInfo,
-  Alert,
   findNodeHandle,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -47,6 +47,40 @@ import {
   nativeImportantForAccessibility,
 } from "@/src/utils/accessibility";
 
+function ModalShell({ children }: { children: React.ReactNode }) {
+  return (
+    <SafeAreaView
+      style={styles.modalSafeArea}
+      edges={["top", "right", "bottom", "left"]}
+    >
+      <View style={styles.calendarOverlay}>
+        <View style={styles.calendarModal}>{children}</View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function StickyHeader() {
+  const router = useRouter();
+
+  return (
+    <View style={styles.stickyHeaderBlock}>
+      <View style={styles.header}>
+        <View style={styles.backButtonSlot}>
+          <BackLink onPress={() => router.replace("/home")} />
+        </View>
+
+        <View style={styles.headerTitle} {...hiddenFromAccessibility}>
+          <Profile width={24} height={24} />
+          <AppText variant="body" style={styles.headerLabel}>
+            Profile
+          </AppText>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
   const { user, setUser } = useAuth();
   const router = useRouter();
@@ -59,6 +93,7 @@ export default function ProfileScreen() {
     timeoutRefs.current.push(id);
     return id;
   };
+
   useEffect(() => {
     const timeouts = timeoutRefs.current;
     return () => {
@@ -110,6 +145,33 @@ export default function ProfileScreen() {
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackTitle, setFeedbackTitle] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackAction, setFeedbackAction] = useState<(() => void) | null>(
+    null
+  );
+
+  function openFeedbackModal(
+    title: string,
+    message: string,
+    action?: () => void
+  ) {
+    setFeedbackTitle(title);
+    setFeedbackMessage(message);
+    setFeedbackAction(() => action ?? null);
+    setShowFeedbackModal(true);
+  }
+
+  const closeFeedbackModal = () => {
+    setShowFeedbackModal(false);
+    const action = feedbackAction;
+    setFeedbackAction(null);
+    if (action) {
+      action();
+    }
+  };
+
   const handleUpdateName = async () => {
     if (isUpdatingName) return;
     try {
@@ -117,7 +179,7 @@ export default function ProfileScreen() {
       setNameError(null);
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert("Not logged in", "Please log in again.");
+        openFeedbackModal("Not logged in", "Please log in again.");
         return;
       }
       const idToken = await currentUser.getIdToken();
@@ -144,25 +206,20 @@ export default function ProfileScreen() {
       setEmailError(null);
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert("Not logged in", "Please log in again.");
+        openFeedbackModal("Not logged in", "Please log in again.");
         return;
       }
       const idToken = await currentUser.getIdToken();
       await updateProfile({ idToken, email: emailInput });
       setEmailUpdated(true);
       safeTimeout(() => {
-        Alert.alert(
+        openFeedbackModal(
           "Email updated",
           "Your email has been changed. Please log in again with your new email address.",
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                setUser(null);
-                router.replace("/");
-              },
-            },
-          ]
+          () => {
+            setUser(null);
+            router.replace("/");
+          }
         );
       }, 1000);
     } catch (error: any) {
@@ -187,7 +244,7 @@ export default function ProfileScreen() {
       setPasswordError(null);
       const currentUser = auth.currentUser;
       if (!currentUser || !currentUser.email) {
-        Alert.alert("Not logged in", "Please log in again.");
+        openFeedbackModal("Not logged in", "Please log in again.");
         return;
       }
       const credential = EmailAuthProvider.credential(
@@ -224,7 +281,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    await auth.signOut(); // triggers onAuthStateChanged → clears user + idToken
+    await auth.signOut();
     router.dismissAll();
     router.replace("/");
   };
@@ -266,9 +323,22 @@ export default function ProfileScreen() {
           style={styles.flex}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
+          <Pressable
+            onPress={skipToLogout}
+            accessibilityRole="button"
+            accessibilityLabel="Skip to logout button"
+            accessibilityHint="Moves focus directly to the logout action"
+            style={styles.skipButton}
+            {...nativeImportantForAccessibility}
+          >
+            <AppText variant="caption" style={styles.skipButtonText}>
+              Skip to logout
+            </AppText>
+          </Pressable>
+
           <ScrollView
             style={styles.flex}
-            stickyHeaderIndices={[1]}
+            stickyHeaderIndices={[0]}
             contentContainerStyle={[
               styles.container,
               {
@@ -280,30 +350,8 @@ export default function ProfileScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            <Pressable
-              onPress={skipToLogout}
-              accessibilityRole="button"
-              accessibilityLabel="Skip to logout button"
-              accessibilityHint="Moves focus directly to the logout action"
-              style={styles.skipButton}
-              {...nativeImportantForAccessibility}
-            >
-              <AppText variant="caption" style={styles.skipButtonText}>
-                Skip to logout
-              </AppText>
-            </Pressable>
+            <StickyHeader />
 
-            <View style={styles.header}>
-              <BackLink href="/home" />
-              <View style={styles.headerTitle} {...hiddenFromAccessibility}>
-                <Profile width={20} height={20} />
-                <AppText variant="body" style={styles.headerLabel}>
-                  Profile
-                </AppText>
-              </View>
-            </View>
-
-            {/* Name */}
             <View style={styles.fieldGroup}>
               {nameOpen ? (
                 <View style={[styles.infoRow, styles.infoRowEditing]}>
@@ -414,7 +462,6 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            {/* Email */}
             <View style={styles.fieldGroup}>
               {emailOpen ? (
                 <View style={[styles.infoRow, styles.infoRowEditing]}>
@@ -531,7 +578,6 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            {/* Password */}
             <View style={styles.fieldGroup}>
               <Pressable
                 style={styles.infoRow}
@@ -705,6 +751,36 @@ export default function ProfileScreen() {
               />
             </View>
           </SafeAreaView>
+
+          <Modal
+            visible={showFeedbackModal}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={closeFeedbackModal}
+          >
+            <ModalShell>
+              <AppText variant="body" style={styles.calendarTitle}>
+                {feedbackTitle}
+              </AppText>
+
+              <View style={styles.timeModalContent}>
+                <AppText variant="caption" style={styles.feedbackMessage}>
+                  {feedbackMessage}
+                </AppText>
+              </View>
+
+              <View style={styles.calendarActions}>
+                <AppButton
+                  title="OK"
+                  onPress={closeFeedbackModal}
+                  style={styles.calendarApplyButton}
+                  textStyle={styles.calendarApplyButtonText}
+                  accessibilityLabel="Close message"
+                />
+              </View>
+            </ModalShell>
+          </Modal>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -724,7 +800,7 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: 0,
     gap: spacing.xl,
   },
   skipButton: {
@@ -736,25 +812,45 @@ const styles = StyleSheet.create({
   skipButtonText: {
     color: colors.textPrimary,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
+  stickyHeaderBlock: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
     backgroundColor: colors.lightWhite,
-    zIndex: 10,
-    elevation: 4,
+    zIndex: 20,
+    elevation: 0,
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  header: {
+    position: "relative",
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backButtonSlot: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-start",
+    zIndex: 2,
   },
   headerTitle: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: spacing.sm,
+    alignSelf: "center",
   },
   headerLabel: {
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
     fontFamily: typography.fontFamily.bodyBold,
     color: colors.textPrimary,
+    textAlignVertical: "center",
   },
   fieldGroup: {
     gap: spacing.md,
@@ -862,5 +958,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
+  },
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  calendarOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+  },
+  calendarModal: {
+    backgroundColor: colors.lightWhite,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+  },
+  calendarTitle: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.xl,
+    lineHeight: typography.lineHeight.xl,
+  },
+  timeModalContent: {
+    gap: spacing.md,
+  },
+  feedbackMessage: {
+    color: colors.nightBlack,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.md,
+    fontFamily: typography.fontFamily.bodySemiBold,
+  },
+  calendarActions: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  calendarApplyButton: {
+    flex: 1,
+    backgroundColor: colors.sunsetOrange,
+  },
+  calendarApplyButtonText: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
   },
 });

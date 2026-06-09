@@ -8,7 +8,6 @@ import {
   StyleSheet,
   View,
   Platform,
-  Dimensions,
   KeyboardAvoidingView,
   Alert,
   Modal,
@@ -27,6 +26,7 @@ import { BackLink } from "@/src/components/common/BackLink";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { PressLock } from "@/src/utils/PressLock";
+import { toLocalDateString } from "@/src/utils/tripDate";
 import { invalidateTripsCache } from "./home";
 import Plane from "@/assets/icons/plane.svg";
 import CityScape from "@/assets/visuals/city_scape.svg";
@@ -74,17 +74,6 @@ function formatDateDisplay(date: Date): string {
   const m = (date.getMonth() + 1).toString().padStart(2, "0");
   const y = date.getFullYear();
   return `${d}.${m}.${y}`;
-}
-
-function toDateOnlyString(date: Date): string {
-  return date.toISOString().split("T")[0];
-}
-
-function toLocalDateString(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function fromDateString(dateString: string): Date {
@@ -215,9 +204,9 @@ function normalizeTimeInput(value: string): string {
 }
 
 const CalendarModalWrapper = ({
-  children,
-  isLandscape,
-}: {
+                                children,
+                                isLandscape,
+                              }: {
   children: React.ReactNode;
   isLandscape: boolean;
 }) => (
@@ -241,6 +230,98 @@ const CalendarModalWrapper = ({
     </View>
   </SafeAreaView>
 );
+
+type ProgressBarProps = {
+  progressWidth: Animated.AnimatedInterpolation<string>;
+  currentStep: number;
+  totalSteps: number;
+};
+
+const ProgressBar: React.FC<ProgressBarProps> = ({
+                                                   progressWidth,
+                                                   currentStep,
+                                                   totalSteps,
+                                                 }) => {
+  return (
+    <View style={styles.progressBarContainer}>
+      <View
+        style={{
+          width: "100%",
+          height: 8,
+          borderRadius: 8,
+          backgroundColor:
+            currentStep === 3 ? colors.grayedOut : colors.lightWhite,
+          overflow: "hidden",
+        }}
+      >
+        <Animated.View
+          style={{
+            height: "100%",
+            borderRadius: 8,
+            backgroundColor: colors.seaBlue,
+            width: progressWidth,
+          }}
+        />
+      </View>
+      <Text
+        style={{
+          marginTop: 6,
+          alignSelf: "center",
+          color: colors.nightBlack,
+          fontSize: 14,
+          fontWeight: "600",
+        }}
+      >
+        {currentStep}/{totalSteps}
+      </Text>
+    </View>
+  );
+};
+
+function StickyHeader({
+  backgroundStyle,
+  showBack = true,
+  onBackPress,
+  progressWidth,
+  currentStep,
+  totalSteps,
+}: {
+  backgroundStyle: any;
+  showBack?: boolean;
+  onBackPress?: () => void;
+  progressWidth: Animated.AnimatedInterpolation<string>;
+  currentStep: number;
+  totalSteps: number;
+}) {
+  return (
+    <View style={[styles.stickyHeaderBlock, backgroundStyle]}>
+      <View style={styles.header}>
+        {showBack && (
+          <View style={styles.backButtonSlot}>
+            <BackLink onPress={onBackPress} />
+          </View>
+        )}
+
+        <View style={styles.headerTitle} {...hiddenFromAccessibility}>
+          <View style={styles.planeWrap}>
+            <Plane width={25} height={25} />
+          </View>
+          <AppText variant="body" style={styles.headerLabel}>
+            Create trip
+          </AppText>
+        </View>
+      </View>
+
+      <View style={styles.progressWrap}>
+        <ProgressBar
+          progressWidth={progressWidth}
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+        />
+      </View>
+    </View>
+  );
+}
 
 export default function CreateTripScreen() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -397,9 +478,7 @@ export default function CreateTripScreen() {
       await Share.share({
         message: `Join my trip on Votey! Use invite code: ${tripCode} or open: https://cc231023-11019.node.ustp.cloud/invite?code=${tripCode}`,
       });
-    } catch {
-      // User dismissed share sheet — no action needed
-    }
+    } catch {}
   });
 
   const syncPhasesFromTripDates = (nextTripStart: Date, nextTripEnd: Date) => {
@@ -586,8 +665,7 @@ export default function CreateTripScreen() {
     );
 
     if (isPlanningEditor) return { ...tripRange, ...planningRange };
-    if (isVotingEditor)
-      return { ...tripRange, ...planningRange, ...votingRange };
+    if (isVotingEditor) return { ...tripRange, ...planningRange, ...votingRange };
     return tripRange;
   }, [
     showPhaseDateCalendar,
@@ -811,8 +889,8 @@ export default function CreateTripScreen() {
         idToken,
         title: tripName.trim(),
         destination: destination.trim(),
-        start_date: toDateOnlyString(tripStart),
-        end_date: toDateOnlyString(tripEnd),
+        start_date: toLocalDateString(tripStart),
+        end_date: toLocalDateString(tripEnd),
         planning_end_at: combineDateAndTime(
           phaseDates.planning.end,
           phaseDates.planning.time
@@ -851,53 +929,6 @@ export default function CreateTripScreen() {
     outputRange: ["25%", "100%"],
   });
 
-  type ProgressBarProps = {
-    progressWidth: Animated.AnimatedInterpolation<string>;
-    currentStep: number;
-    totalSteps: number;
-  };
-
-  const ProgressBar: React.FC<ProgressBarProps> = ({
-    progressWidth,
-    currentStep,
-    totalSteps,
-  }) => {
-    return (
-      <View style={{ width: "100%" }}>
-        <View
-          style={{
-            width: "100%",
-            height: 8,
-            borderRadius: 8,
-            backgroundColor:
-              currentStep === 3 ? colors.grayedOut : colors.lightWhite,
-            overflow: "hidden",
-          }}
-        >
-          <Animated.View
-            style={{
-              height: "100%",
-              borderRadius: 8,
-              backgroundColor: colors.seaBlue,
-              width: progressWidth,
-            }}
-          />
-        </View>
-        <Text
-          style={{
-            marginTop: 6,
-            alignSelf: "center",
-            color: colors.nightBlack,
-            fontSize: 14,
-            fontWeight: "600",
-          }}
-        >
-          {currentStep}/{totalSteps}
-        </Text>
-      </View>
-    );
-  };
-
   if (step === 3) {
     return (
       <View style={[styles.fullScreen, styles.bgStep3]}>
@@ -912,23 +943,13 @@ export default function CreateTripScreen() {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={[styles.header, styles.headerStep3]}>
-                <BackLink onPress={() => setStep(2)} />
-                <View style={styles.headerTitle} {...hiddenFromAccessibility}>
-                  <Plane width={25} height={25} />
-                  <AppText variant="body" style={styles.headerLabel}>
-                    Create trip
-                  </AppText>
-                </View>
-              </View>
-
-              <View style={{ paddingHorizontal: 20, marginVertical: 4 }}>
-                <ProgressBar
-                  progressWidth={progressAnim}
-                  currentStep={step}
-                  totalSteps={TOTAL_STEPS}
-                />
-              </View>
+              <StickyHeader
+                backgroundStyle={styles.headerStep3}
+                onBackPress={() => setStep(2)}
+                progressWidth={progressAnim}
+                currentStep={step}
+                totalSteps={TOTAL_STEPS}
+              />
 
               <AppText variant="title" style={styles.titleStep3}>
                 Set up the timers
@@ -937,10 +958,7 @@ export default function CreateTripScreen() {
               <View style={styles.setupSection}>
                 {showOnboardingHint && (
                   <View style={styles.onboardingTooltip}>
-                    <AppText
-                      variant="body"
-                      style={styles.onboardingTooltipText}
-                    >
+                    <AppText variant="body" style={styles.onboardingTooltipText}>
                       Need a refresher? Open{" "}
                       <AppText
                         variant="body"
@@ -955,44 +973,20 @@ export default function CreateTripScreen() {
                   </View>
                 )}
 
-                <View style={styles.setupSection}>
-                  {showOnboardingHint && (
-                    <View style={styles.onboardingTooltip}>
-                      <AppText
-                        variant="body"
-                        style={styles.onboardingTooltipText}
-                      >
-                        Need a refresher? Open{" "}
-                        <AppText
-                          variant="body"
-                          style={styles.onboardingTooltipLink}
-                          onPress={handleOnboardingPress}
-                          accessibilityRole="link"
-                        >
-                          onboarding
-                        </AppText>{" "}
-                        to see how planning, voting, and the final itinerary
-                        work.
-                      </AppText>
-                    </View>
-                  )}
-
-                  <View style={styles.setupRow}>
-                    <AppText variant="body" style={styles.setupText}>
-                      Set an end time for each state so the next one starts
-                      automatically.
-                    </AppText>
-
-                    <Pressable
-                      style={styles.questionButton}
-                      onPress={handleQuestionPress}
-                      accessibilityRole="button"
-                      accessibilityLabel="Show timer setup help"
-                      accessibilityHint="Shows a short explanation and link to onboarding"
-                    >
-                      <Question width={24} height={24} />
-                    </Pressable>
-                  </View>
+                <View style={styles.setupRow}>
+                  <AppText variant="body" style={styles.setupText}>
+                    Set an end time for each state so the next one starts
+                    automatically.
+                  </AppText>
+                  <Pressable
+                    style={styles.questionButton}
+                    onPress={handleQuestionPress}
+                    accessibilityRole="button"
+                    accessibilityLabel="Show timer setup help"
+                    accessibilityHint="Shows a short explanation and link to onboarding"
+                  >
+                    <Question width={24} height={24} />
+                  </Pressable>
                 </View>
               </View>
 
@@ -1008,9 +1002,13 @@ export default function CreateTripScreen() {
                   <View key={phaseId} style={styles.phaseGroup}>
                     <Pressable
                       style={styles.phaseRow}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       onPress={() => togglePhase(phaseId)}
                       accessibilityRole="button"
-                      accessibilityLabel={`${phase.label} phase, ${dayLabel(days, phase.active)}`}
+                      accessibilityLabel={`${phase.label} phase, ${dayLabel(
+                        days,
+                        phase.active
+                      )}`}
                       accessibilityHint={`Tap to edit ${phase.label} end date and time`}
                       accessibilityState={{ expanded: isOpen }}
                     >
@@ -1052,9 +1050,7 @@ export default function CreateTripScreen() {
                                 <Animated.View
                                   style={[
                                     styles.timepointWrapper,
-                                    phase.active && {
-                                      opacity: blinkingDotAnim,
-                                    },
+                                    { opacity: blinkingDotAnim },
                                   ]}
                                 >
                                   <Timepoint width={7} height={7} />
@@ -1434,22 +1430,13 @@ export default function CreateTripScreen() {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={[styles.header, styles.headerStep1]}>
-                <View style={styles.headerTitle} {...hiddenFromAccessibility}>
-                  <Plane width={25} height={25} />
-                  <AppText variant="body" style={styles.headerLabel}>
-                    Create trip
-                  </AppText>
-                </View>
-              </View>
-
-              <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
-                <ProgressBar
-                  progressWidth={progressAnim}
-                  currentStep={step}
-                  totalSteps={TOTAL_STEPS}
-                />
-              </View>
+              <StickyHeader
+                backgroundStyle={styles.headerStep1}
+                onBackPress={() => router.replace("/home")}
+                progressWidth={progressAnim}
+                currentStep={step}
+                totalSteps={TOTAL_STEPS}
+              />
 
               <AppText variant="title" style={styles.titleStep3}>
                 Add members to the trip
@@ -1530,26 +1517,13 @@ export default function CreateTripScreen() {
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  <View style={[styles.header, styles.headerStep1]}>
-                    <BackLink href="/home" />
-                    <View
-                      style={styles.headerTitle}
-                      {...hiddenFromAccessibility}
-                    >
-                      <Plane width={25} height={25} />
-                      <AppText variant="body" style={styles.headerLabel}>
-                        Create trip
-                      </AppText>
-                    </View>
-                  </View>
-
-                  <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
-                    <ProgressBar
-                      progressWidth={progressAnim}
-                      currentStep={step}
-                      totalSteps={TOTAL_STEPS}
-                    />
-                  </View>
+                  <StickyHeader
+                    backgroundStyle={styles.headerStep1}
+                    onBackPress={() => router.replace("/home")}
+                    progressWidth={progressAnim}
+                    currentStep={step}
+                    totalSteps={TOTAL_STEPS}
+                  />
 
                   <AppText variant="title" style={styles.titleStep1}>
                     Where is your trip taking place?
@@ -1639,26 +1613,13 @@ export default function CreateTripScreen() {
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                 >
-                  <View style={[styles.header, styles.headerStep2]}>
-                    <BackLink onPress={() => setStep(1)} />
-                    <View
-                      style={styles.headerTitle}
-                      {...hiddenFromAccessibility}
-                    >
-                      <Plane width={25} height={25} />
-                      <AppText variant="body" style={styles.headerLabel}>
-                        Create trip
-                      </AppText>
-                    </View>
-                  </View>
-
-                  <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
-                    <ProgressBar
-                      progressWidth={progressAnim}
-                      currentStep={step}
-                      totalSteps={TOTAL_STEPS}
-                    />
-                  </View>
+                  <StickyHeader
+                    backgroundStyle={styles.headerStep2}
+                    onBackPress={() => setStep(1)}
+                    progressWidth={progressAnim}
+                    currentStep={step}
+                    totalSteps={TOTAL_STEPS}
+                  />
 
                   <AppText variant="title" style={styles.titleStep2}>
                     Give your trip a name and choose a date
@@ -1670,7 +1631,7 @@ export default function CreateTripScreen() {
                       {...hiddenFromAccessibility}
                     >
                       <TripTitle width={20} height={20} />
-                      <AppText variant="body" style={styles.fieldGroup}>
+                      <AppText variant="body" style={styles.fieldLabel}>
                         Trip name
                       </AppText>
                     </View>
@@ -1691,7 +1652,7 @@ export default function CreateTripScreen() {
                       {...hiddenFromAccessibility}
                     >
                       <Calendar width={20} height={20} />
-                      <AppText variant="body" style={styles.fieldGroup}>
+                      <AppText variant="body" style={styles.fieldLabel}>
                         Trip date
                       </AppText>
                     </View>
@@ -1857,32 +1818,42 @@ const styles = StyleSheet.create({
   },
   containerStep1: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: 0,
     gap: spacing.sm,
   },
   containerStep2: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: 0,
     gap: spacing.sm,
   },
   containerStep3: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: 0,
     paddingBottom: spacing.xl,
     gap: spacing.sm,
   },
   containerStep4: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: 0,
     gap: spacing.sm,
   },
+  stickyHeaderBlock: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs,
+    backgroundColor: colors.beachYellow,
+    zIndex: 20,
+    elevation: 0,
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+  },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
     position: "relative",
-    zIndex: 10,
-    elevation: 4,
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing.xs,
   },
   headerStep1: {
     backgroundColor: colors.beachYellow,
@@ -1893,16 +1864,40 @@ const styles = StyleSheet.create({
   headerStep3: {
     backgroundColor: colors.lightWhite,
   },
+  backButtonSlot: {
+    position: "absolute",
+    left: 0,
+    top: 2,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-start",
+    zIndex: 2,
+  },
+  planeWrap: {
+    justifyContent: "center",
+    alignItems: "center",
+    transform: [{ translateY: -1 }],
+  },
   headerTitle: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: spacing.sm,
+    alignSelf: "center",
   },
   headerLabel: {
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
     fontFamily: typography.fontFamily.bodyBold,
     color: colors.textPrimary,
+    textAlignVertical: "center",
+  },
+  progressWrap: {
+    width: "100%",
+    marginTop: spacing.xs,
+  },
+  progressBarContainer: {
+    width: "100%",
   },
   titleStep1: {
     fontFamily: typography.fontFamily.bodyBlack,
@@ -2056,6 +2051,7 @@ const styles = StyleSheet.create({
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
     lineHeight: typography.lineHeight.md,
+    marginBottom: spacing.xl,
   },
   phaseRow: {
     flexDirection: "row",
@@ -2285,31 +2281,6 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     textAlignVertical: "center",
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
-  },
-  quickTimeWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-  },
-  quickTimeChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: colors.lightWhite,
-    borderWidth: 2,
-    borderColor: colors.nightBlack,
-  },
-  quickTimeChipActive: {
-    backgroundColor: colors.beachYellow,
-  },
-  quickTimeChipText: {
-    color: colors.nightBlack,
-    fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-  },
-  quickTimeChipTextActive: {
-    color: colors.nightBlack,
   },
   setupRow: {
     flexDirection: "row",

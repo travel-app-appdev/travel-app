@@ -4,6 +4,7 @@ import {
     TripDocument,
     TripMembershipDocument,
     UserDocument,
+    TripState,
 } from "../types/trip";
 
 export async function findAcceptedMembershipsByUserId(
@@ -242,21 +243,70 @@ export async function createTripWithInviteCode(data: {
 
 export async function deleteTripById(tripId: string): Promise<void> {
     const db = admin.firestore();
-    const batch = db.batch();
 
     const tripRef = db.collection("trips").doc(tripId);
-    batch.delete(tripRef);
 
-    const membersSnapshot = await db
-        .collection("trip_members")
-        .where("trip_id", "==", tripId)
-        .get();
+    const [
+        membersSnapshot,
+        itinerarySnapshot,
+        finalItinerarySnapshot,
+        votesSnapshot,
+        attendanceSnapshot,
+        activitiesSnapshot,
+    ] = await Promise.all([
+        db.collection("trip_members").where("trip_id", "==", tripId).get(),
+        db.collection("itinerary").where("trip_id", "==", tripId).get(),
+        db
+            .collection("final_itinerary_slots")
+            .where("trip_id", "==", tripId)
+            .get(),
+        db.collection("activity_votes").where("trip_id", "==", tripId).get(),
+        db
+            .collection("activity_attendance")
+            .where("trip_id", "==", tripId)
+            .get(),
+        db.collection("activities").where("trip_id", "==", tripId).get(),
+    ]);
 
-    membersSnapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref);
-    });
+    const activityIds = activitiesSnapshot.docs
+        .map((doc) => doc.id)
+        .filter(Boolean);
+    const timeslotActivityRefs: FirebaseFirestore.DocumentReference[] = [];
 
-    await batch.commit();
+    for (let i = 0; i < activityIds.length; i += 10) {
+        const chunk = activityIds.slice(i, i + 10);
+        const snapshot = await db
+            .collection("timeslot_activities")
+            .where("activity_id", "in", chunk)
+            .get();
+
+        snapshot.docs.forEach((doc) => {
+            timeslotActivityRefs.push(doc.ref);
+        });
+    }
+
+    await deleteDocumentRefsInBatches(db, [
+        tripRef,
+        ...membersSnapshot.docs.map((doc) => doc.ref),
+        ...itinerarySnapshot.docs.map((doc) => doc.ref),
+        ...finalItinerarySnapshot.docs.map((doc) => doc.ref),
+        ...votesSnapshot.docs.map((doc) => doc.ref),
+        ...attendanceSnapshot.docs.map((doc) => doc.ref),
+        ...activitiesSnapshot.docs.map((doc) => doc.ref),
+        ...timeslotActivityRefs,
+    ]);
+}
+
+async function deleteDocumentRefsInBatches(
+    db: FirebaseFirestore.Firestore,
+    refs: FirebaseFirestore.DocumentReference[],
+    batchSize = 450,
+): Promise<void> {
+    for (let i = 0; i < refs.length; i += batchSize) {
+        const batch = db.batch();
+        refs.slice(i, i + batchSize).forEach((ref) => batch.delete(ref));
+        await batch.commit();
+    }
 }
 
 export async function removeTripMember(tripId: string, userId: string): Promise<void> {
@@ -273,7 +323,11 @@ export async function removeTripMember(tripId: string, userId: string): Promise<
     await snapshot.docs[0].ref.delete();
 }
 
-export async function markMemberPlanningDone(tripId: string, userId: string): Promise<void> {
+export async function setMemberPlanningDone(
+    tripId: string,
+    userId: string,
+    planningDone: boolean
+): Promise<void> {
     const db = admin.firestore();
 
     const snapshot = await db
@@ -285,8 +339,12 @@ export async function markMemberPlanningDone(tripId: string, userId: string): Pr
     if (snapshot.empty) return;
 
     await snapshot.docs[0].ref.update({
-        planning_done: true,
+        planning_done: planningDone,
     });
+}
+
+export async function markMemberPlanningDone(tripId: string, userId: string): Promise<void> {
+    await setMemberPlanningDone(tripId, userId, true);
 }
 
 export async function resetPlanningDoneForTrip(tripId: string): Promise<void> {
@@ -308,9 +366,22 @@ export async function resetPlanningDoneForTrip(tripId: string): Promise<void> {
     await batch.commit();
 }
 
-export async function updateTripState(tripId: string, state: string): Promise<void> {
+export async function updateTripState(
+    tripId: string,
+    state: TripState
+): Promise<void> {
     const db = admin.firestore();
-    await db.collection("trips").doc(tripId).update({ state });
+    const update: Partial<TripDocument> = { state };
+
+    if (state === "Voting") {
+        update.planning_end_at = admin.firestore.Timestamp.now();
+    }
+
+    if (state === "Final") {
+        update.voting_end_at = admin.firestore.Timestamp.now();
+    }
+
+    await db.collection("trips").doc(tripId).update(update);
 }
 
 export async function updateTripById(
@@ -319,6 +390,65 @@ export async function updateTripById(
 ): Promise<void> {
     const db = admin.firestore();
     await db.collection("trips").doc(tripId).update(data);
+}
+
+/**
+ * Saves or updates an Expo push token for a user.
+ * Stored on the user document under `expoPushToken`.
+ */
+export async function saveExpoPushToken(
+    userId: string,
+    token: string
+): Promise<void> {
+    const db = admin.firestore();
+    await db.collection("users").doc(userId).set(
+        { expoPushToken: token },
+        { merge: true }
+    );
+}
+
+/**
+ * Retrieves Expo push tokens for a list of user IDs.
+ * Skips users with no token stored.
+ */
+export async function getExpoPushTokensByUserIds(
+    userIds: string[]
+): Promise<string[]> {
+    if (userIds.length === 0) return [];
+
+    const db = admin.firestore();
+
+    const chunkSize = 10;
+    const tokens: string[] = [];
+
+    for (let i = 0; i < userIds.length; i += chunkSize) {
+        const chunk = userIds.slice(i, i + chunkSize);
+        const snapshot = await db
+            .collection("users")
+            .where(admin.firestore.FieldPath.documentId(), "in", chunk)
+            .get();
+
+        snapshot.docs.forEach((doc) => {
+            const token = doc.data()?.expoPushToken;
+            if (typeof token === "string" && token.length > 0) {
+                tokens.push(token);
+            }
+        });
+    }
+
+    return tokens;
+}
+
+/**
+ * Finds the admin user ID for a trip.
+ */
+export async function findTripAdminUserId(tripId: string): Promise<string | null> {
+    const db = admin.firestore();
+    const tripDoc = await db.collection("trips").doc(tripId).get();
+
+    if (!tripDoc.exists) return null;
+
+    return tripDoc.data()?.admin_user_id ?? null;
 }
 
 function normalizeDateTime(value: any): string | undefined {

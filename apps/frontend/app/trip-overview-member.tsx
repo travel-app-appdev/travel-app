@@ -1,5 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
+import { doc, onSnapshot } from "firebase/firestore";
 import {
   AccessibilityInfo,
   Alert,
@@ -23,8 +24,13 @@ import {
   ACTION_CARD_HEIGHT,
 } from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
-import { fetchMyTrips, leaveTrip, type Trip } from "@/src/api/trips";
-import { auth } from "@/src/lib/firebase";
+import {
+  fetchTripForUser,
+  isTripNotFoundError,
+  leaveTrip,
+  type Trip,
+} from "@/src/api/trips";
+import { auth, db } from "@/src/lib/firebase";
 import { invalidateTripsCache } from "./home";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import {
@@ -153,8 +159,14 @@ function formatPhaseTimerText(
   now: number
 ): string {
   const phaseEnd = combineDateAndTimeToDate(phase.end, phase.time);
-  if (isActive) return formatTripTimerText(phaseEnd, now);
-  return formatTripDurationText(phase.start, phaseEnd);
+
+  if (isActive) {
+    // While active, show remaining time until the phase end
+    return formatTripTimerText(phaseEnd, now);
+  }
+
+  // For past or future phases, there is no remaining time
+  return "0 hours";
 }
 
 function parseIsoToDate(value?: string): Date | null {
@@ -170,7 +182,7 @@ function parseIsoToTimeString(value?: string): string {
 
 const CHECKBOX_SIZE = 24;
 const TIMELINE_LINE_WIDTH = 2;
-const TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS = 10 * 1000;
+const TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS = 30 * 1000;
 
 function isDeadlinePast(deadline?: string): boolean {
   if (!deadline) return false;
@@ -218,6 +230,27 @@ function ModalShell({ children }: { children: React.ReactNode }) {
         <View style={styles.calendarModal}>{children}</View>
       </View>
     </SafeAreaView>
+  );
+}
+
+function StickyHeader() {
+  const router = useRouter();
+
+  return (
+    <View style={styles.stickyHeaderBlock}>
+      <View style={styles.header}>
+        <View style={styles.backButtonSlot}>
+          <BackLink onPress={() => router.replace("/home")} />
+        </View>
+
+        <View style={styles.headerTitle} {...hiddenFromAccessibility}>
+          <Plane width={24} height={24} />
+          <AppText variant="body" style={styles.headerLabel}>
+            Trip Overview
+          </AppText>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -304,7 +337,8 @@ export default function TripOverviewMemberScreen() {
   };
 
   useEffect(() => {
-    return () => timeoutRefs.current.forEach(clearTimeout);
+    const timeouts = timeoutRefs.current;
+    return () => timeouts.forEach(clearTimeout);
   }, []);
 
   const refreshTripSnapshot = useCallback(
@@ -318,11 +352,10 @@ export default function TripOverviewMemberScreen() {
       if (!currentUser?.uid || !tripId) return null;
 
       try {
-        const trips = await fetchMyTrips(currentUser.uid, {
-          forceRefresh: options.forceRefresh ?? true,
+        const currentTrip = await fetchTripForUser(currentUser.uid, tripId, {
+          forceRefresh: options.forceRefresh ?? false,
           allowStaleOnError: true,
         });
-        const currentTrip = trips.find((trip) => trip.trip_id === tripId);
         if (!currentTrip || options.shouldApply?.() === false) return null;
 
         setTripSnapshot({
@@ -336,11 +369,19 @@ export default function TripOverviewMemberScreen() {
 
         return currentTrip;
       } catch (error) {
+        if (isTripNotFoundError(error)) {
+          invalidateTripsCache();
+          if (options.shouldApply?.() !== false) {
+            router.replace("/home");
+          }
+          return null;
+        }
+
         console.log("Could not refresh trip overview:", error);
         return null;
       }
     },
-    [tripId]
+    [router, tripId]
   );
 
   useFocusEffect(
@@ -354,6 +395,27 @@ export default function TripOverviewMemberScreen() {
       };
     }, [refreshTripSnapshot])
   );
+
+  useEffect(() => {
+    if (!tripId) {
+      return;
+    }
+
+    const unsubscribe = onSnapshot(
+      doc(db, "trips", tripId),
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          invalidateTripsCache();
+          router.replace("/home");
+        }
+      },
+      (error) => {
+        console.log("Trip deletion listener error:", error);
+      }
+    );
+
+    return unsubscribe;
+  }, [router, tripId]);
 
   useEffect(() => {
     if (!tripId || (tripState !== "Planning" && tripState !== "Voting")) {
@@ -513,6 +575,7 @@ export default function TripOverviewMemberScreen() {
         members: membersParam,
         planningEndAt: tripSnapshot.planningEndAt,
         votingEndAt: tripSnapshot.votingEndAt,
+        role: "member",
       },
     });
   });
@@ -555,9 +618,22 @@ export default function TripOverviewMemberScreen() {
           style={styles.flex}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
+          <Pressable
+            onPress={skipToLeave}
+            accessibilityRole="button"
+            accessibilityLabel="Skip to leave trip button"
+            accessibilityHint="Moves focus directly to the leave trip action"
+            style={styles.skipButton}
+            {...nativeImportantForAccessibility}
+          >
+            <AppText variant="caption" style={styles.skipButtonText}>
+              Skip to leave trip
+            </AppText>
+          </Pressable>
+
           <ScrollView
             style={styles.flex}
-            stickyHeaderIndices={[1]}
+            stickyHeaderIndices={[0]}
             contentContainerStyle={[
               styles.container,
               {
@@ -568,28 +644,7 @@ export default function TripOverviewMemberScreen() {
             ]}
             showsVerticalScrollIndicator={false}
           >
-            <Pressable
-              onPress={skipToLeave}
-              accessibilityRole="button"
-              accessibilityLabel="Skip to leave trip button"
-              accessibilityHint="Moves focus directly to the leave trip action"
-              style={styles.skipButton}
-              {...nativeImportantForAccessibility}
-            >
-              <AppText variant="caption" style={styles.skipButtonText}>
-                Skip to leave trip
-              </AppText>
-            </Pressable>
-
-            <View style={styles.header}>
-              <BackLink href="/home" />
-              <View style={styles.headerTitle} {...hiddenFromAccessibility}>
-                <Plane width={22} height={22} />
-                <AppText variant="body" style={styles.headerLabel}>
-                  Trip Overview
-                </AppText>
-              </View>
-            </View>
+            <StickyHeader />
 
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
@@ -928,7 +983,6 @@ export default function TripOverviewMemberScreen() {
                                         >
                                           Itinerary shown
                                         </AppText>
-
                                         <AppText
                                           variant="caption"
                                           style={[
@@ -1064,9 +1118,10 @@ const styles = StyleSheet.create({
   fullScreen: { flex: 1, backgroundColor: colors.lightWhite },
   safeArea: { flex: 1 },
   flex: { flex: 1 },
+
   container: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: 0,
     gap: spacing.xl,
   },
   skipButton: {
@@ -1077,25 +1132,45 @@ const styles = StyleSheet.create({
   },
   skipButtonText: { color: colors.textPrimary },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
+  stickyHeaderBlock: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
     backgroundColor: colors.lightWhite,
-    zIndex: 10,
-    elevation: 4,
+    zIndex: 20,
+    elevation: 0,
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  header: {
+    position: "relative",
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backButtonSlot: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-start",
+    zIndex: 2,
   },
   headerTitle: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: spacing.sm,
+    alignSelf: "center",
   },
   headerLabel: {
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
     fontFamily: typography.fontFamily.bodyBold,
     color: colors.textPrimary,
+    textAlignVertical: "center",
   },
 
   fieldGroup: { gap: spacing.sm },
@@ -1215,7 +1290,6 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     borderColor: "transparent",
   },
-
   phaseCardShadowPlanning: {
     shadowColor: "#ebb822",
     shadowOpacity: 0.16,

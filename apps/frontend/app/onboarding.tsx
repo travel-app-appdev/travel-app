@@ -9,6 +9,7 @@ import {
   Platform,
   Text,
   useWindowDimensions,
+  Image,
 } from "react-native";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { AppButton } from "@/src/components/common/AppButton";
@@ -39,6 +40,25 @@ function lerp(start: number, end: number, t: number) {
 }
 
 type Step = 1 | 2 | 3 | 4 | 5;
+
+const TOTAL_STEPS: Step = 5;
+
+function StickyHeader({ topPadding }: { topPadding: number }) {
+  return (
+    <View style={[Styles.stickyHeaderBlock, { paddingTop: topPadding }]}>
+      <View style={Styles.header}>
+        <View
+          style={Styles.headerTitle}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Plane width={24} height={24} />
+          <Text style={Styles.headerLabel}>Onboarding</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export default function Onboarding() {
   const [step, setStep] = useState<Step>(1);
@@ -86,7 +106,11 @@ export default function Onboarding() {
 
   const curlyProgress = clamp((width - 390) / (1920 - 390), 0, 1);
   const curlyTopSize = lerp(width * 1.05, 700, curlyProgress);
-  const curlyTopTop = lerp(height * 0.01 - 100, height * 0.04 - 120, curlyProgress);
+  const curlyTopTop = lerp(
+    height * 0.01 - 100,
+    height * 0.04 - 120,
+    curlyProgress
+  );
   const curlyTopLeft = lerp(-width * 0.48, -800, curlyProgress);
 
   const mascotBaseSize = isLandscape ? 70 : 110;
@@ -94,32 +118,30 @@ export default function Onboarding() {
     clamp(mascotBaseSize * scale, isLandscape ? 72 : 96, mascotBaseSize)
   );
 
-  const contentMaxWidth = Math.min(width - spacing.xl * 2, isLandscape ? 760 : 520);
-  const mainBlockWidth = Math.min(width - spacing.xl * 2, isLandscape ? 520 : 350);
+  const contentMaxWidth = Math.min(
+    width - spacing.xl * 2,
+    isLandscape ? 760 : 520
+  );
+  const mainBlockWidth = Math.min(
+    width - spacing.xl * 2,
+    isLandscape ? 520 : 350
+  );
   const verticalPagePadding = isLandscape ? spacing.xl : spacing.xl;
   const bottomPagePadding = isLandscape ? spacing.xl : spacing.xxxl;
-  const containerStyle = [Styles.container, isLandscape && Styles.containerLandscape];
-  const TOTAL_STEPS = 5;
-
-  const renderHeader = () => (
-    <View style={Styles.header}>
-      <View style={Styles.headerSide} />
-      <View
-        style={Styles.headerTitle}
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
-      >
-        <Plane width={25} height={25} />
-        <Text style={Styles.headerLabel}>Onboarding</Text>
-      </View>
-      <View style={Styles.headerSide} />
-    </View>
-  );
+  const containerStyle = [
+    Styles.container,
+    isLandscape && Styles.containerLandscape,
+  ];
 
   const renderMascot = (
     Mascot: ComponentType<{ width: number; height: number }>
   ) => (
-    <View style={[Styles.mascotSection, isLandscape && Styles.mascotSectionLandscape]}>
+    <View
+      style={[
+        Styles.mascotSection,
+        isLandscape && Styles.mascotSectionLandscape,
+      ]}
+    >
       <View
         style={Styles.mascotInlineWrapper}
         {...(Platform.OS !== "web" ? { accessible: false } : {})}
@@ -134,7 +156,9 @@ export default function Onboarding() {
     buttonStyle?: object,
     buttonTextStyle?: object
   ) => (
-    <View style={[Styles.footerBlock, isLandscape && Styles.footerBlockLandscape]}>
+    <View
+      style={[Styles.footerBlock, isLandscape && Styles.footerBlockLandscape]}
+    >
       <View style={[Styles.ArrowWrapper, { width: mainBlockWidth }]}>
         {current > 1 ? (
           <Pressable
@@ -198,10 +222,11 @@ export default function Onboarding() {
         <View style={Styles.root}>
           <ScrollView
             style={Styles.scrollView}
+            stickyHeaderIndices={[0]}
             contentContainerStyle={[
               Styles.scrollContent,
               {
-                paddingTop: insets.top + verticalPagePadding,
+                paddingTop: 0,
                 paddingBottom: insets.bottom + bottomPagePadding,
                 ...(isLandscape ? {} : { minHeight: height }),
               },
@@ -209,6 +234,8 @@ export default function Onboarding() {
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
+            <StickyHeader topPadding={insets.top + verticalPagePadding} />
+
             <View
               style={[
                 Styles.contentTop,
@@ -218,13 +245,14 @@ export default function Onboarding() {
             >
               {step === 1 && (
                 <>
-                  {renderHeader()}
-
                   <View
                     pointerEvents="none"
                     style={[
                       Styles.curlyGreenWrapper2,
-                      { top: curlyTopTop, left: curlyTopLeft },
+                      {
+                        top: curlyTopTop - insets.top - spacing.xs,
+                        left: curlyTopLeft,
+                      },
                     ]}
                     {...hiddenFromAccessibility}
                   >
@@ -234,7 +262,9 @@ export default function Onboarding() {
                   {renderMascot(GreenVotey)}
 
                   <View style={containerStyle}>
-                    <View style={[Styles.titleBlock, { marginBottom: spacing.sm }]}>
+                    <View
+                      style={[Styles.titleBlock, { marginBottom: spacing.sm }]}
+                    >
                       <Text
                         style={Styles.title}
                         onLayout={(e) =>
@@ -270,7 +300,9 @@ export default function Onboarding() {
                   <View style={[Styles.phasesCard, { width: mainBlockWidth }]}>
                     <View style={Styles.phaseRow}>
                       <View style={Styles.phaseLeft}>
-                        <View style={[Styles.phasePill, Styles.phasePillYellow]}>
+                        <View
+                          style={[Styles.phasePill, Styles.phasePillYellow]}
+                        >
                           <Text style={Styles.phasePillTextDark}>Planning</Text>
                         </View>
                         <View style={Styles.phaseConnector} />
@@ -314,12 +346,12 @@ export default function Onboarding() {
 
               {step === 2 && (
                 <>
-                  {renderHeader()}
-
                   {renderMascot(BlueVotey)}
 
                   <View style={containerStyle}>
-                    <View style={[Styles.titleBlock, { marginBottom: spacing.sm }]}>
+                    <View
+                      style={[Styles.titleBlock, { marginBottom: spacing.sm }]}
+                    >
                       <Text
                         style={Styles.title}
                         onLayout={(e) =>
@@ -344,40 +376,16 @@ export default function Onboarding() {
                       { marginTop: spacing.xl, width: mainBlockWidth },
                     ]}
                   >
-                    Set a <Text style={Styles.InfoTextBold}>timer</Text> for each
-                    phase. The app moves forward automatically. The admin can
-                    always end Voting early.
+                    Set a <Text style={Styles.InfoTextBold}>timer</Text> for
+                    each phase. The app moves forward automatically. The admin
+                    can always end Voting early.
                   </Text>
 
-                  <View style={[Styles.timersRows, { width: mainBlockWidth }]}>
-                    <View style={Styles.timerRow}>
-                      <View style={[Styles.timerPill, Styles.timerPillYellow]}>
-                        <Text style={Styles.timerPillTextDark}>Planning</Text>
-                      </View>
-                      <HourglassIcon width={20} height={20} />
-                      <View style={Styles.timerValueBlock}>
-                        <Text style={Styles.timerValue}>190 days</Text>
-                        <Text style={Styles.timerLabel}>Timer</Text>
-                      </View>
-                      <View style={Styles.timerChevronIcon} {...hiddenFromAccessibility}>
-                        <ArrowDownIcon width={16} height={16} />
-                      </View>
-                    </View>
-
-                    <View style={Styles.timerRow}>
-                      <View style={[Styles.timerPill, Styles.timerPillPink]}>
-                        <Text style={Styles.timerPillTextLight}>Voting</Text>
-                      </View>
-                      <HourglassIcon width={20} height={20} />
-                      <View style={Styles.timerValueBlock}>
-                        <Text style={Styles.timerValue}>0 days</Text>
-                        <Text style={Styles.timerLabel}>Timer</Text>
-                      </View>
-                      <View style={Styles.timerChevronIcon} {...hiddenFromAccessibility}>
-                        <ArrowDownIcon width={16} height={16} />
-                      </View>
-                    </View>
-                  </View>
+                  <Image
+                    source={require("../assets/images/Timer.Screenshot.png")}
+                    style={Styles.Image}
+                    resizeMode="contain"
+                  />
 
                   <View style={Styles.flexSpacer} />
 
@@ -387,12 +395,12 @@ export default function Onboarding() {
 
               {step === 3 && (
                 <>
-                  {renderHeader()}
-
                   {renderMascot(YellowVotey)}
 
                   <View style={containerStyle}>
-                    <View style={[Styles.titleBlock, { marginBottom: spacing.sm }]}>
+                    <View
+                      style={[Styles.titleBlock, { marginBottom: spacing.sm }]}
+                    >
                       <Text
                         style={Styles.title}
                         onLayout={(e) =>
@@ -419,43 +427,27 @@ export default function Onboarding() {
                     ]}
                   >
                     Plan your trip with your travel companions.{" "}
-                    <Text style={Styles.InfoTextBold}>Add activities</Text> to the
-                    itinerary and collaborate in one place.
+                    <Text style={Styles.InfoTextBold}>Add activities</Text> to
+                    the itinerary and collaborate in one place.
                   </Text>
 
-                  <View style={[Styles.activityCardRow, { width: mainBlockWidth }]}>
-                    <View
-                      style={[
-                        Styles.activityCard,
-                        { backgroundColor: colors.beachYellow + "33" },
-                      ]}
-                    >
-                      <View style={Styles.activityTimeRow}>
-                        <LocationHeartIcon width={16} height={16} />
-                        <Text style={Styles.activityTimeText}>06:00-08:00</Text>
-                      </View>
-
-                      <Text style={Styles.activityName}>
-                        Tempel of Hephaistos
-                      </Text>
-
-                      <View style={Styles.activityInfoRow}>
-                        <LocationPinIcon width={14} height={14} />
-                        <Text style={Styles.activityInfoText}>Athina 105 55</Text>
-                      </View>
-
-                      <View style={Styles.activityInfoRow}>
-                        <GoogleIcon width={14} height={14} />
-                        <Text style={Styles.activityLinkText}>Google-Link</Text>
-                      </View>
-                    </View>
-
-                    <View style={[Styles.activityAddBtn, Styles.activityAddBtnYellow]}>
-                      <EditIcon width={30} height={30} />
-                      <Text style={Styles.activityAddBtnText}>
-                        Add{"\n"}Activity
-                      </Text>
-                    </View>
+                  {/* Updated: wrap the two images to control the gap */}
+                  <View
+                    style={[
+                      Styles.planTogetherImages,
+                      { width: mainBlockWidth },
+                    ]}
+                  >
+                    <Image
+                      source={require("../assets/images/EmptyActivity.png")}
+                      style={Styles.planImageTop}
+                      resizeMode="contain"
+                    />
+                    <Image
+                      source={require("../assets/images/DetailWindow.png")}
+                      style={Styles.planImageBottom}
+                      resizeMode="contain"
+                    />
                   </View>
 
                   <View style={Styles.flexSpacer} />
@@ -470,12 +462,12 @@ export default function Onboarding() {
 
               {step === 4 && (
                 <>
-                  {renderHeader()}
-
                   {renderMascot(FunnyMascot)}
 
                   <View style={containerStyle}>
-                    <View style={[Styles.titleBlock, { marginBottom: spacing.sm }]}>
+                    <View
+                      style={[Styles.titleBlock, { marginBottom: spacing.sm }]}
+                    >
                       <View style={Styles.titleRow}>
                         <Text style={Styles.title}>Decide </Text>
                         <View style={Styles.titleWordWrapper}>
@@ -507,44 +499,16 @@ export default function Onboarding() {
                     ]}
                   >
                     Say goodbye to endless debates. Use the{" "}
-                    <Text style={Styles.InfoTextBold}>voting feature</Text> to let
-                    everyone have a say in choosing activities for each slot.
+                    <Text style={Styles.InfoTextBold}>voting feature</Text> to
+                    let everyone have a say in choosing activities for each
+                    slot.
                   </Text>
 
-                  <View style={[Styles.activityCardRow, { width: mainBlockWidth }]}>
-                    <View
-                      style={[
-                        Styles.activityCard,
-                        { backgroundColor: colors.sunsetPink + "33" },
-                      ]}
-                    >
-                      <View style={Styles.activityTimeRow}>
-                        <LocationHeartIcon width={16} height={16} />
-                        <Text style={Styles.activityTimeText}>06:00-08:00</Text>
-                      </View>
-
-                      <Text style={Styles.activityName}>
-                        Tempel of Hephaistos
-                      </Text>
-
-                      <View style={Styles.activityInfoRow}>
-                        <LocationPinIcon width={14} height={14} />
-                        <Text style={Styles.activityInfoText}>Athina 105 55</Text>
-                      </View>
-
-                      <View style={Styles.activityInfoRow}>
-                        <GoogleIcon width={14} height={14} />
-                        <Text style={Styles.activityLinkText}>Google-Link</Text>
-                      </View>
-                    </View>
-
-                    <View style={[Styles.activityAddBtn, Styles.activityAddBtnPink]}>
-                      <EditIcon width={30} height={30} />
-                      <Text style={Styles.activityAddBtnText}>
-                        Add{"\n"}Vote
-                      </Text>
-                    </View>
-                  </View>
+                  <Image
+                    source={require("../assets/images/VotingScreen.png")}
+                    style={Styles.Image2}
+                    resizeMode="contain"
+                  />
 
                   <View style={Styles.flexSpacer} />
 
@@ -558,12 +522,12 @@ export default function Onboarding() {
 
               {step === 5 && (
                 <>
-                  {renderHeader()}
-
                   {renderMascot(GreenVotey)}
 
                   <View style={containerStyle}>
-                    <View style={[Styles.titleBlock, { marginBottom: spacing.sm }]}>
+                    <View
+                      style={[Styles.titleBlock, { marginBottom: spacing.sm }]}
+                    >
                       <View style={Styles.titleRow}>
                         <Text style={Styles.title}>Travel </Text>
                         <View style={Styles.titleWordWrapper}>
@@ -599,47 +563,11 @@ export default function Onboarding() {
                     locked and ready - access it on the go.
                   </Text>
 
-                  <View style={[Styles.activityCardRow, { width: mainBlockWidth }]}>
-                    <View
-                      style={[
-                        Styles.activityCard,
-                        { backgroundColor: colors.neonGreen + "33" },
-                      ]}
-                    >
-                      <View style={Styles.activityTimeRow}>
-                        <LocationHeartIcon width={16} height={16} />
-                        <Text style={Styles.activityTimeText}>06:00-08:00</Text>
-                      </View>
-
-                      <View style={Styles.activityNameRow}>
-                        <Text style={[Styles.activityName, Styles.activityNameInRow]}>
-                          Tempel of Hephaistos
-                        </Text>
-
-                        <View style={Styles.activityParticipants}>
-                          <ProfileIcon width={14} height={14} />
-                          <Text style={Styles.activityParticipantText}>4</Text>
-                        </View>
-                      </View>
-
-                      <View style={Styles.activityInfoRow}>
-                        <LocationPinIcon width={14} height={14} />
-                        <Text style={Styles.activityInfoText}>Athina 105 55</Text>
-                      </View>
-
-                      <View style={Styles.activityInfoRow}>
-                        <GoogleIcon width={14} height={14} />
-                        <Text style={Styles.activityLinkText}>Google-Link</Text>
-                      </View>
-                    </View>
-
-                    <View style={[Styles.activityAddBtn, Styles.activityAddBtnGreen]}>
-                      <JoinGroupIcon width={28} height={28} />
-                        <Text style={Styles.activityAddBtnText}>
-                          Join{"\n"}group
-                        </Text>
-                    </View>
-                  </View>
+                  <Image
+                    source={require("../assets/images/FinalScreen.png")}
+                    style={Styles.Image2}
+                    resizeMode="contain"
+                  />
 
                   <View style={Styles.flexSpacer} />
 
@@ -671,17 +599,30 @@ const Styles = StyleSheet.create({
   },
   flexSpacer: { flex: 1 },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
+  stickyHeaderBlock: {
+    width: "100%",
+    paddingBottom: spacing.lg,
+    backgroundColor: "transparent",
+    zIndex: 30,
+    elevation: 0,
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
   },
-  headerSide: { width: 80 },
+  header: {
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: spacing.xl,
+    backgroundColor: "transparent",
+  },
   headerTitle: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: spacing.sm,
+    alignSelf: "center",
   },
   headerLabel: {
     fontSize: typography.size.xxl,
@@ -738,7 +679,7 @@ const Styles = StyleSheet.create({
   titleHighlightGreen: { backgroundColor: colors.neonGreen },
 
   mascotSection: {
-    marginTop: spacing.xxxxl2 + spacing.lg,
+    marginTop: spacing.xxxxl2,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -812,10 +753,7 @@ const Styles = StyleSheet.create({
   },
   InfoTextWide: {},
   InfoTextBold: {
-    fontSize: typography.size.lg,
-    lineHeight: typography.lineHeight.lg,
     color: colors.textPrimary,
-    fontWeight: "bold",
     fontFamily: typography.fontFamily.bodyBold,
   },
   StepIndicator: {
@@ -848,12 +786,12 @@ const Styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: spacing.md,
   },
-  phaseLeft: { alignItems: "center", width: 90 },
+  phaseLeft: { alignItems: "center", width: 100 },
   phasePill: {
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    width: 90,
+    width: 100,
     alignItems: "center",
   },
   phaseConnector: {
@@ -1026,5 +964,38 @@ const Styles = StyleSheet.create({
     color: colors.nightBlack,
     textAlign: "center",
     lineHeight: typography.lineHeight.md,
-  }
+  },
+
+  Image: {
+    width: "100%",
+    aspectRatio: 2.55,
+    marginTop: spacing.xl,
+    alignSelf: "center",
+    borderRadius: 5,
+  },
+  Image2: {
+    width: "100%",
+    aspectRatio: 2,
+    alignSelf: "center",
+    borderRadius: 5,
+    marginTop: spacing.xl,
+  },
+
+  planTogetherImages: {
+    alignSelf: "center",
+    marginTop: spacing.xl,
+    gap: 0,
+  },
+  planImageTop: {
+    width: "90%",
+    aspectRatio: 2.55,
+    borderRadius: 5,
+    alignSelf: "center",
+  },
+  planImageBottom: {
+    width: "90%",
+    aspectRatio: 2.3,
+    borderRadius: 5,
+    alignSelf: "center",
+  },
 });

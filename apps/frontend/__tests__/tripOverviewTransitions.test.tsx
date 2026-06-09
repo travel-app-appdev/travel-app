@@ -6,7 +6,7 @@ import TripOverviewMemberScreen from "@/app/trip-overview-member";
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
-const mockFetchMyTrips = jest.fn();
+const mockFetchTripForUser = jest.fn();
 const mockGetCachedMyTrips = jest.fn();
 const mockUpdateTrip = jest.fn();
 const mockGetIdToken = jest.fn();
@@ -16,7 +16,10 @@ let mockParams: Record<string, string | undefined> = {};
 jest.mock("expo-router", () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
     const React = require("react");
-    React.useEffect(callback, [callback]);
+    React.useEffect(() => {
+      const cleanup = callback();
+      return typeof cleanup === "function" ? cleanup : undefined;
+    }, []);
   },
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({
@@ -33,6 +36,11 @@ jest.mock("react-native-calendars", () => ({
   Calendar: () => null,
 }));
 
+jest.mock("firebase/firestore", () => ({
+  doc: jest.fn(),
+  onSnapshot: jest.fn(() => jest.fn()),
+}));
+
 jest.mock("react-native-safe-area-context", () => ({
   SafeAreaView: ({ children, ...props }: any) => {
     const { View } = require("react-native");
@@ -41,8 +49,8 @@ jest.mock("react-native-safe-area-context", () => ({
 }));
 
 jest.mock("@/src/api/trips", () => ({
-  fetchMyTrips: (userId: unknown, options: unknown) =>
-    mockFetchMyTrips(userId, options),
+  fetchTripForUser: (userId: unknown, tripId: unknown, options: unknown) =>
+    mockFetchTripForUser(userId, tripId, options),
   getCachedMyTrips: (userId: unknown) => mockGetCachedMyTrips(userId),
   updateTrip: (payload: unknown) => mockUpdateTrip(payload),
   deleteTrip: jest.fn(),
@@ -57,6 +65,7 @@ jest.mock("@/src/lib/firebase", () => ({
       getIdToken: () => mockGetIdToken(),
     },
   },
+  db: {},
 }));
 
 jest.mock("@/app/home", () => ({
@@ -190,34 +199,38 @@ describe("trip overview checklist timer transitions", () => {
   });
 
   afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 
   it("updates member overview from Planning to Voting when the planning timer expires", async () => {
     setOverviewParams("Planning");
-    mockFetchMyTrips
-      .mockResolvedValueOnce([backendTrip("Planning")])
-      .mockResolvedValueOnce([backendTrip("Voting")]);
+    mockFetchTripForUser
+      .mockResolvedValueOnce(backendTrip("Planning"))
+      .mockResolvedValueOnce(backendTrip("Voting"));
 
     const screen = render(<TripOverviewMemberScreen />);
 
-    expect(
-      screen.getByText(
-        "Let's plan your trip step by step by adding activities to your itinerary."
-      )
-    ).toBeTruthy();
-
-    await act(async () => {
-      jest.advanceTimersByTime(2500);
-    });
-
-    await waitFor(() => {
+    try {
       expect(
-        screen.getByText("Vote on conflicting activities in the itinerary.")
+        screen.getByText(
+          "Let's plan your trip step by step by adding activities to your itinerary."
+        )
       ).toBeTruthy();
-    });
 
-    screen.unmount();
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(2500);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Vote on conflicting activities in the itinerary.")
+        ).toBeTruthy();
+      });
+    } finally {
+      screen.unmount();
+    }
   });
 
   it("does not let stale cached member data mask a forced Voting refresh", async () => {
@@ -225,97 +238,106 @@ describe("trip overview checklist timer transitions", () => {
       planningEndAt: "2026-06-02T09:59:00.000Z",
     });
     mockGetCachedMyTrips.mockReturnValue([backendTrip("Planning")]);
-    mockFetchMyTrips.mockResolvedValue([backendTrip("Voting")]);
+    mockFetchTripForUser.mockResolvedValue(backendTrip("Voting"));
 
     const screen = render(<TripOverviewMemberScreen />);
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("Vote on conflicting activities in the itinerary.")
-      ).toBeTruthy();
-    });
+    try {
+      await waitFor(() => {
+        expect(
+          screen.getByText("Vote on conflicting activities in the itinerary.")
+        ).toBeTruthy();
+      });
 
-    expect(mockGetCachedMyTrips).not.toHaveBeenCalled();
-    screen.unmount();
+      expect(mockGetCachedMyTrips).not.toHaveBeenCalled();
+    } finally {
+      screen.unmount();
+    }
   });
 
   it("updates admin overview from Planning to Voting when the planning timer expires", async () => {
     setOverviewParams("Planning");
-    mockFetchMyTrips
-      .mockResolvedValueOnce([backendTrip("Planning")])
-      .mockResolvedValueOnce([backendTrip("Voting")]);
+    mockFetchTripForUser
+      .mockResolvedValueOnce(backendTrip("Planning"))
+      .mockResolvedValueOnce(backendTrip("Voting"));
 
     const screen = render(<TripOverviewAdminScreen />);
 
-    await act(async () => {
-      jest.advanceTimersByTime(2500);
-    });
+    try {
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(2500);
+      });
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("Vote on conflicting activities in the itinerary.")
-      ).toBeTruthy();
-    });
-
-    screen.unmount();
+      await waitFor(() => {
+        expect(
+          screen.getByText("Vote on conflicting activities in the itinerary.")
+        ).toBeTruthy();
+      });
+    } finally {
+      screen.unmount();
+    }
   });
 
   it("updates admin overview from Voting to Final when the voting timer expires", async () => {
     setOverviewParams("Voting", {
       votingEndAt: PLANNING_END,
     });
-    mockFetchMyTrips
-      .mockResolvedValueOnce([backendTrip("Voting")])
-      .mockResolvedValueOnce([backendTrip("Final")]);
+    mockFetchTripForUser
+      .mockResolvedValueOnce(backendTrip("Voting"))
+      .mockResolvedValueOnce(backendTrip("Final"));
 
     const screen = render(<TripOverviewAdminScreen />);
 
-    await act(async () => {
-      jest.advanceTimersByTime(2500);
-    });
+    try {
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(2500);
+      });
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("Here you find your final itinerary of your group.")
-      ).toBeTruthy();
-    });
-
-    screen.unmount();
+      await waitFor(() => {
+        expect(
+          screen.getByText("Here you find your final itinerary of your group.")
+        ).toBeTruthy();
+      });
+    } finally {
+      screen.unmount();
+    }
   });
 
   it("updates admin checklist immediately from the timer edit response", async () => {
     setOverviewParams("Planning");
-    mockFetchMyTrips.mockResolvedValue([backendTrip("Planning")]);
+    mockFetchTripForUser.mockResolvedValue(backendTrip("Planning"));
     mockUpdateTrip.mockResolvedValue(backendTrip("Voting"));
 
     const screen = render(<TripOverviewAdminScreen />);
 
-    await act(async () => {
-      fireEvent.press(screen.getByLabelText(/Planning phase, .*remaining/));
-    });
+    try {
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText(/Planning phase, .*remaining/));
+      });
 
-    const { TouchableOpacity } = require("react-native");
-    const updateButton = await waitFor(() => {
-      const match = screen
-        .UNSAFE_getAllByType(TouchableOpacity)
-        .find(
-          (node) => node.props.accessibilityLabel === "Update Planning phase"
-        );
-      expect(match).toBeTruthy();
-      return match;
-    });
+      const { TouchableOpacity } = require("react-native");
+      const updateButton = await waitFor(() => {
+        const match = screen
+          .UNSAFE_getAllByType(TouchableOpacity)
+          .find(
+            (node) => node.props.accessibilityLabel === "Update Planning phase"
+          );
+        expect(match).toBeTruthy();
+        return match;
+      });
 
-    await act(async () => {
-      updateButton?.props.onPress();
-    });
+      await act(async () => {
+        updateButton?.props.onPress();
+      });
 
-    await waitFor(() => {
-      expect(mockUpdateTrip).toHaveBeenCalled();
-      expect(
-        screen.getByText("Vote on conflicting activities in the itinerary.")
-      ).toBeTruthy();
-    });
-
-    screen.unmount();
+      await waitFor(() => {
+        expect(mockUpdateTrip).toHaveBeenCalled();
+        expect(
+          screen.getByText("Vote on conflicting activities in the itinerary.")
+        ).toBeTruthy();
+      });
+    } finally {
+      screen.unmount();
+    }
   });
 });

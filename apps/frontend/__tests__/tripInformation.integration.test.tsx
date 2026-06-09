@@ -10,6 +10,21 @@ const mockBack = jest.fn();
 const mockLeaveTrip = jest.fn();
 const mockGetIdToken = jest.fn();
 
+jest.mock("firebase/firestore", () => ({
+  doc: jest.fn(),
+  onSnapshot: jest.fn(() => jest.fn()),
+  collection: jest.fn(),
+  query: jest.fn(),
+  where: jest.fn(),
+  getDoc: jest.fn(),
+  getDocs: jest.fn(),
+  setDoc: jest.fn(),
+  updateDoc: jest.fn(),
+  addDoc: jest.fn(),
+  deleteDoc: jest.fn(),
+  serverTimestamp: jest.fn(() => "mock-server-timestamp"),
+}));
+
 const mockRouter = {
   replace: mockReplace,
   push: mockPush,
@@ -142,32 +157,19 @@ describe("TripInformationScreen — leave trip flow", () => {
 
   // ── Leave trip — happy path ────────────────────────────────────────────────
 
-  it("shows a confirmation Alert when 'Leave trip' is pressed", () => {
-    const { Alert } = require("react-native");
-    const alertSpy = jest.spyOn(Alert, "alert");
-
+  it("shows a confirmation modal when 'Leave trip' is pressed", () => {
     const { getByText } = render(<TripInformationScreen />);
     fireEvent.press(getByText("Leave trip"));
 
-    expect(alertSpy).toHaveBeenCalledWith(
-      "Leave trip",
-      "Are you sure you want to leave this trip?",
-      expect.any(Array)
-    );
+    expect(getByText("Are you sure you want to leave this trip?")).toBeTruthy();
   });
 
   it("calls leaveTrip with the correct idToken and tripId after confirming", async () => {
     mockLeaveTrip.mockResolvedValueOnce(undefined);
 
-    const { Alert } = require("react-native");
-    jest
-      .spyOn(Alert, "alert")
-      .mockImplementationOnce((_title: any, _msg: any, buttons: any) => {
-        buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
-      });
-
     const { getByText } = render(<TripInformationScreen />);
     fireEvent.press(getByText("Leave trip"));
+    fireEvent.press(getByText("Leave"));
 
     await waitFor(() => {
       expect(mockLeaveTrip).toHaveBeenCalledWith({
@@ -178,15 +180,9 @@ describe("TripInformationScreen — leave trip flow", () => {
   });
 
   it("does NOT call leaveTrip when the user presses Cancel", async () => {
-    const { Alert } = require("react-native");
-    jest
-      .spyOn(Alert, "alert")
-      .mockImplementationOnce((_title: any, _msg: any, buttons: any) => {
-        buttons?.find((b: any) => b.text === "Cancel")?.onPress?.();
-      });
-
     const { getByText } = render(<TripInformationScreen />);
     fireEvent.press(getByText("Leave trip"));
+    fireEvent.press(getByText("Cancel"));
 
     await waitFor(() => {
       expect(mockLeaveTrip).not.toHaveBeenCalled();
@@ -204,17 +200,15 @@ describe("TripInformationScreen — leave trip flow", () => {
     const { Alert } = require("react-native");
     const alertSpy = jest
       .spyOn(Alert, "alert")
-      .mockImplementationOnce((_title: any, _msg: any, buttons: any) => {
-        buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
-      })
       .mockImplementationOnce(() => {});
 
     const { getByText } = render(<TripInformationScreen />);
     fireEvent.press(getByText("Leave trip"));
+    fireEvent.press(getByText("Leave"));
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledTimes(2);
-      expect(alertSpy).toHaveBeenLastCalledWith(
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(alertSpy).toHaveBeenCalledWith(
         "Leave failed",
         "Admin cannot leave the trip. Delete it instead."
       );
@@ -229,16 +223,14 @@ describe("TripInformationScreen — leave trip flow", () => {
     const { Alert } = require("react-native");
     const alertSpy = jest
       .spyOn(Alert, "alert")
-      .mockImplementationOnce((_title: any, _msg: any, buttons: any) => {
-        buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
-      })
       .mockImplementationOnce(() => {});
 
     const { getByText } = render(<TripInformationScreen />);
     fireEvent.press(getByText("Leave trip"));
+    fireEvent.press(getByText("Leave"));
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenLastCalledWith(
+      expect(alertSpy).toHaveBeenCalledWith(
         "Leave failed",
         "Failed to leave trip"
       );
@@ -253,13 +245,11 @@ describe("TripInformationScreen — leave trip flow", () => {
     const { Alert } = require("react-native");
     const alertSpy = jest
       .spyOn(Alert, "alert")
-      .mockImplementationOnce((_title: any, _msg: any, buttons: any) => {
-        buttons?.find((b: any) => b.text === "Leave")?.onPress?.();
-      })
       .mockImplementationOnce(() => {});
 
     const { getByText } = render(<TripInformationScreen />);
     fireEvent.press(getByText("Leave trip"));
+    fireEvent.press(getByText("Leave"));
 
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith(

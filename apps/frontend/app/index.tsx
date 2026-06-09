@@ -1,18 +1,11 @@
 import { Link, router } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  StyleSheet,
-  View,
-  ScrollView,
-  Dimensions,
-  Pressable,
-} from "react-native";
+import { StyleSheet, View, ScrollView, Dimensions } from "react-native";
 import * as Linking from "expo-linking";
 import { AppButton } from "@/src/components/common/AppButton";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography, shadows } from "@/src/theme";
 import { useGoogleLogin } from "@/src/lib/googleAuth";
-import { loginWithToken } from "@/src/api/auth";
 import { useAuth } from "@/src/context/AuthContext";
 import VoteyLogo from "@/assets/logos/votey-logo1.svg";
 import CurlyGreen from "@/assets/visuals/curly-green.svg";
@@ -20,7 +13,6 @@ import PalmLeaf from "@/assets/visuals/palm-leaf.svg";
 import PalmTree from "@/assets/visuals/palm-tree.svg";
 import Google from "@/assets/icons/google.svg";
 import Stars from "@/assets/visuals/stars.svg";
-import JoinTest from "@/assets/icons/join_test.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 // TODO: Deep linking — remaining steps when ready for production:
@@ -95,10 +87,14 @@ export default function StartPage() {
 
         if (!googleIdToken) return;
 
-        const { firebaseIdToken } = await signInWithGoogleToken(googleIdToken);
-        const backendUser = await loginWithToken(firebaseIdToken);
+        const { firebaseIdToken, firebaseUser } =
+          await signInWithGoogleToken(googleIdToken);
 
-        setUser(backendUser);
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: firebaseUser.displayName ?? null,
+        });
         setIdToken(firebaseIdToken);
 
         router.replace("/onboarding");

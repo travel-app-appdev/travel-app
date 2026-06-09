@@ -1,5 +1,5 @@
 import React from "react";
-import { render, waitFor } from "@testing-library/react-native";
+import { act, render, waitFor } from "@testing-library/react-native";
 
 import ItineraryScreen from "@/app/itinerary";
 
@@ -7,13 +7,14 @@ const mockSetParams = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
-const mockFetchMyTrips = jest.fn();
+const mockFetchTripForUser = jest.fn();
 const mockFinishPlanning = jest.fn();
 const mockGetActivitiesBySlot = jest.fn();
 const mockGetFinalItineraryActivities = jest.fn();
 const mockToggleActivityAttendance = jest.fn();
 const mockVoteForActivity = jest.fn();
 const mockDaySelectorProps = jest.fn();
+const mockPlanningDoneBarProps = jest.fn();
 
 let mockParams: Record<string, string | undefined> = {};
 let mockTripDays = [{ id: "2026-06-01", label: "1 Jun" }];
@@ -45,8 +46,8 @@ jest.mock("@/src/context/AuthContext", () => ({
 }));
 
 jest.mock("@/src/api/trips", () => ({
-  fetchMyTrips: (userId: unknown, options: unknown) =>
-    mockFetchMyTrips(userId, options),
+  fetchTripForUser: (userId: unknown, tripId: unknown, options: unknown) =>
+    mockFetchTripForUser(userId, tripId, options),
   finishPlanning: (payload: unknown) => mockFinishPlanning(payload),
 }));
 
@@ -107,7 +108,10 @@ jest.mock("@/src/components/itinerary/SkeletonSlotCard", () => ({
 }));
 
 jest.mock("@/src/components/itinerary/PlanningDoneBar", () => ({
-  PlanningDoneBar: () => null,
+  PlanningDoneBar: (props: unknown) => {
+    mockPlanningDoneBarProps(props);
+    return null;
+  },
 }));
 
 jest.mock("@/src/components/itinerary/VoteSlotCard", () => ({
@@ -175,9 +179,73 @@ describe("ItineraryScreen transition overlays", () => {
     mockGetFinalItineraryActivities.mockResolvedValue([]);
   });
 
+  it("does not show the voting loading overlay when planning submit is not complete for all members", async () => {
+    setBaseParams("planning");
+    mockParams.members = JSON.stringify([
+      { userId: "user-123", hasFinishedPlanning: false },
+      { userId: "user-456", hasFinishedPlanning: false },
+    ]);
+    mockFinishPlanning.mockResolvedValueOnce({
+      allDone: false,
+      tripState: "Planning",
+      completedMembers: 1,
+      totalMembers: 2,
+      planningDone: true,
+    });
+    mockFetchTripForUser.mockResolvedValue({
+      ...backendTrip("Planning"),
+      members: [
+        {
+          id: "user-123",
+          name: "Helen",
+          role: "member",
+          planning_done: true,
+        },
+        {
+          id: "user-456",
+          name: "Sam",
+          role: "admin",
+          planning_done: false,
+        },
+      ],
+    });
+
+    const { queryByText, unmount } = render(<ItineraryScreen />);
+
+    await waitFor(() => {
+      expect(mockPlanningDoneBarProps).toHaveBeenCalled();
+    });
+
+    const uncheckedPlanningProps = mockPlanningDoneBarProps.mock.calls.find(
+      ([props]) => (props as { checked: boolean }).checked === false
+    )?.[0] as { onPress: () => Promise<void> } | undefined;
+
+    expect(uncheckedPlanningProps).toBeTruthy();
+
+    await act(async () => {
+      await uncheckedPlanningProps?.onPress();
+    });
+
+    await waitFor(() => {
+      expect(mockFinishPlanning).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tripId: "trip-123",
+          planningDone: true,
+        })
+      );
+    });
+
+    expect(queryByText("Getting voting ready")).toBeNull();
+    expect(mockSetParams).not.toHaveBeenCalledWith(
+      expect.objectContaining({ state: "voting" })
+    );
+
+    unmount();
+  });
+
   it("shows a loading overlay before applying a Planning to Voting refresh", async () => {
     setBaseParams("planning");
-    mockFetchMyTrips.mockResolvedValueOnce([backendTrip("Voting")]);
+    mockFetchTripForUser.mockResolvedValueOnce(backendTrip("Voting"));
 
     const { getByText, unmount } = render(<ItineraryScreen />);
 
@@ -189,18 +257,21 @@ describe("ItineraryScreen transition overlays", () => {
       expect.objectContaining({ state: "voting" })
     );
 
-    await waitFor(() => {
-      expect(mockSetParams).toHaveBeenCalledWith(
-        expect.objectContaining({ state: "voting" })
-      );
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(mockSetParams).toHaveBeenCalledWith(
+          expect.objectContaining({ state: "voting" })
+        );
+      },
+      { timeout: 2500 }
+    );
 
     unmount();
   });
 
   it("shows a loading overlay before applying a Voting to Final refresh", async () => {
     setBaseParams("voting");
-    mockFetchMyTrips.mockResolvedValueOnce([backendTrip("Final")]);
+    mockFetchTripForUser.mockResolvedValueOnce(backendTrip("Final"));
 
     const { getByText, unmount } = render(<ItineraryScreen />);
 
@@ -212,11 +283,14 @@ describe("ItineraryScreen transition overlays", () => {
       expect.objectContaining({ state: "final" })
     );
 
-    await waitFor(() => {
-      expect(mockSetParams).toHaveBeenCalledWith(
-        expect.objectContaining({ state: "final" })
-      );
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(mockSetParams).toHaveBeenCalledWith(
+          expect.objectContaining({ state: "final" })
+        );
+      },
+      { timeout: 2500 }
+    );
 
     unmount();
   });
@@ -227,7 +301,7 @@ describe("ItineraryScreen transition overlays", () => {
       { id: "2026-06-02", label: "2 Jun" },
     ];
     setBaseParams("voting");
-    mockFetchMyTrips.mockResolvedValue([backendTrip("Voting")]);
+    mockFetchTripForUser.mockResolvedValue(backendTrip("Voting"));
     mockGetActivitiesBySlot.mockImplementation(
       (_tripId: unknown, slotId: unknown) => {
         if (slotId === "2026-06-02_Breakfast") {
@@ -270,8 +344,7 @@ describe("ItineraryScreen transition overlays", () => {
         calls.some(([props]) => {
           const enabledDayIds = (props as any).enabledDayIds as Set<string>;
           return (
-            enabledDayIds?.has("2026-06-02") &&
-            !enabledDayIds.has("2026-06-01")
+            enabledDayIds?.has("2026-06-02") && !enabledDayIds.has("2026-06-01")
           );
         })
       ).toBe(true);

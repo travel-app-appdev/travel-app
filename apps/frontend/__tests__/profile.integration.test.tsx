@@ -15,6 +15,15 @@ const mockUpdatePassword = jest.fn();
 const mockReauthenticate = jest.fn();
 const mockSignOut = jest.fn();
 
+// Firebase firestore — avoid loading the real ESM build in tests
+jest.mock("firebase/firestore", () => ({
+  collection: jest.fn(),
+  doc: jest.fn(),
+  onSnapshot: jest.fn(() => jest.fn()),
+  query: jest.fn(),
+  where: jest.fn(),
+}));
+
 // expo-router
 jest.mock("expo-router", () => ({
   useRouter: () => ({
@@ -515,11 +524,8 @@ describe("ProfileScreen", () => {
 
   // ── Not logged in ─────────────────────────────────────────────────────────
 
-  it("shows 'Not logged in' alert and skips API call when currentUser is null", async () => {
+  it("shows 'Not logged in' message and skips API call when currentUser is null", async () => {
     getMockedAuth().currentUser = null;
-
-    const { Alert } = require("react-native");
-    const alertSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
 
     const { getByLabelText, getByPlaceholderText, getByText } = render(
       <ProfileScreen />
@@ -533,10 +539,8 @@ describe("ProfileScreen", () => {
     fireEvent.press(getByText("Update"));
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(
-        "Not logged in",
-        "Please log in again."
-      );
+      expect(getByText("Not logged in")).toBeTruthy();
+      expect(getByText("Please log in again.")).toBeTruthy();
     });
 
     expect(mockUpdateProfile).not.toHaveBeenCalled();

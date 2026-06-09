@@ -1,6 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -32,6 +31,25 @@ import { useAuth } from "@/src/context/AuthContext";
 import { auth } from "@/src/lib/firebase";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
+// ---- NEW: length limits ----
+const MAX_NAME_LENGTH = 200;
+const MAX_DESCRIPTION_LENGTH = 1000;
+const MAX_ADDRESS_LENGTH = 300;
+const MAX_GOOGLE_LINK_LENGTH = 2048;
+const FALLBACK_TIME_PLACEHOLDER = "HH:MM";
+
+const SLOT_TIME_PLACEHOLDERS: Record<
+  string,
+  { startTime: string; endTime: string }
+> = {
+  Breakfast: { startTime: "06:00", endTime: "09:00" },
+  "Morning Activity": { startTime: "09:00", endTime: "12:00" },
+  Lunch: { startTime: "12:00", endTime: "14:00" },
+  "Midday Activity": { startTime: "14:00", endTime: "18:00" },
+  Dinner: { startTime: "18:00", endTime: "21:00" },
+  "Evening Activity": { startTime: "21:00", endTime: "00:00" },
+};
+
 function splitSlotId(value?: string) {
   if (!value) return { dayId: undefined, slotId: undefined };
 
@@ -57,6 +75,33 @@ function normalizeTimeInput(value: string): string {
   return `${digits.slice(0, 2)}:${digits.slice(2)}`;
 }
 
+function getSlotTimePlaceholders(slotId?: string): {
+  startTime: string;
+  endTime: string;
+} {
+  const normalizedSlotId = splitSlotId(slotId).slotId;
+
+  if (!normalizedSlotId) {
+    return {
+      startTime: FALLBACK_TIME_PLACEHOLDER,
+      endTime: FALLBACK_TIME_PLACEHOLDER,
+    };
+  }
+
+  return (
+    SLOT_TIME_PLACEHOLDERS[normalizedSlotId] ?? {
+      startTime: FALLBACK_TIME_PLACEHOLDER,
+      endTime: FALLBACK_TIME_PLACEHOLDER,
+    }
+  );
+}
+
+function getUnsetTimeAccessibilityText(placeholder: string) {
+  return placeholder === FALLBACK_TIME_PLACEHOLDER
+    ? "not set"
+    : `not set, suggested ${placeholder}`;
+}
+
 type ActivityTimeField = "start" | "end";
 
 const CalendarModalWrapper = ({
@@ -66,21 +111,58 @@ const CalendarModalWrapper = ({
   children: ReactNode;
   isLandscape: boolean;
 }) => (
-  <View style={styles.calendarOverlay}>
-    <ScrollView
-      contentContainerStyle={[
-        { flexGrow: 1 },
-        isLandscape
-          ? { justifyContent: "flex-start" }
-          : { justifyContent: "center" },
-      ]}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.calendarModal}>{children}</View>
-    </ScrollView>
-  </View>
+  <SafeAreaView
+    style={styles.modalSafeArea}
+    edges={["top", "right", "bottom", "left"]}
+  >
+    <View style={styles.calendarOverlay}>
+      <ScrollView
+        contentContainerStyle={[
+          { flexGrow: 1 },
+          isLandscape
+            ? { justifyContent: "flex-start" }
+            : { justifyContent: "center" },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.calendarModal}>{children}</View>
+      </ScrollView>
+    </View>
+  </SafeAreaView>
 );
+
+function StickyHeader({
+  isEditMode,
+  onBack,
+}: {
+  isEditMode: boolean;
+  onBack: () => void;
+}) {
+  return (
+    <View style={styles.stickyHeaderBlock}>
+      <View style={styles.header}>
+        <View style={styles.backButtonSlot}>
+          <Pressable
+            onPress={onBack}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Back width={20} height={20} />
+          </Pressable>
+        </View>
+
+        <View style={styles.headerTitleRow} {...hiddenFromAccessibility}>
+          <LocationHeartIcon width={24} height={24} />
+          <AppText variant="body" style={styles.headerTitle}>
+            {isEditMode ? "Edit activity" : "Add activity"}
+          </AppText>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export default function AddActivityScreen() {
   const { idToken } = useAuth();
@@ -143,6 +225,24 @@ export default function AddActivityScreen() {
     useState<ActivityTimeField | null>(null);
   const [tempActivityTime, setTempActivityTime] = useState("");
 
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackTitle, setFeedbackTitle] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const { startTime: startTimePlaceholder, endTime: endTimePlaceholder } =
+    useMemo(() => getSlotTimePlaceholders(slotId), [slotId]);
+  const activityTimePickerPlaceholder =
+    showActivityTimePicker === "start"
+      ? startTimePlaceholder
+      : showActivityTimePicker === "end"
+        ? endTimePlaceholder
+        : FALLBACK_TIME_PLACEHOLDER;
+
+  function openFeedbackModal(title: string, message: string) {
+    setFeedbackTitle(title);
+    setFeedbackMessage(message);
+    setShowFeedbackModal(true);
+  }
+
   function openActivityTimePicker(field: ActivityTimeField) {
     setTempActivityTime(field === "start" ? startTime : endTime);
     setShowActivityTimePicker(field);
@@ -154,7 +254,7 @@ export default function AddActivityScreen() {
     const normalizedTime = tempActivityTime.trim();
 
     if (normalizedTime && !isValidTimeString(normalizedTime)) {
-      Alert.alert("Invalid time", "Please enter a valid time as HH:MM.");
+      openFeedbackModal("Invalid time", "Please enter a valid time as HH:MM.");
       return;
     }
 
@@ -230,21 +330,64 @@ export default function AddActivityScreen() {
   }
 
   async function handleSaveActivity() {
-    if (!activityName.trim()) {
-      Alert.alert("Missing activity name", "Please enter an activity name.");
-      return;
-    }
-
+    const trimmedName = activityName.trim();
+    const trimmedDescription = description.trim();
+    const trimmedAddress = address.trim();
+    const trimmedGoogleLink = googleLink.trim();
     const trimmedStartTime = startTime.trim();
     const trimmedEndTime = endTime.trim();
 
+    if (!trimmedName) {
+      openFeedbackModal(
+        "Missing activity name",
+        "Please enter an activity name."
+      );
+      return;
+    }
+
+    // NEW: length validations
+    if (trimmedName.length > MAX_NAME_LENGTH) {
+      openFeedbackModal(
+        "Name too long",
+        `Activity name must be shorter than ${MAX_NAME_LENGTH} characters.`
+      );
+      return;
+    }
+
+    if (trimmedDescription.length > MAX_DESCRIPTION_LENGTH) {
+      openFeedbackModal(
+        "Description too long",
+        `Description must be shorter than ${MAX_DESCRIPTION_LENGTH} characters.`
+      );
+      return;
+    }
+
+    if (trimmedAddress.length > MAX_ADDRESS_LENGTH) {
+      openFeedbackModal(
+        "Address too long",
+        `Address must be shorter than ${MAX_ADDRESS_LENGTH} characters.`
+      );
+      return;
+    }
+
+    if (trimmedGoogleLink.length > MAX_GOOGLE_LINK_LENGTH) {
+      openFeedbackModal(
+        "Link too long",
+        `Google link is unusually long. Please shorten it or use a normal Maps URL.`
+      );
+      return;
+    }
+
     if (trimmedStartTime && !isValidTimeString(trimmedStartTime)) {
-      Alert.alert("Invalid start time", "Please enter start time as HH:MM.");
+      openFeedbackModal(
+        "Invalid start time",
+        "Please enter start time as HH:MM."
+      );
       return;
     }
 
     if (trimmedEndTime && !isValidTimeString(trimmedEndTime)) {
-      Alert.alert("Invalid end time", "Please enter end time as HH:MM.");
+      openFeedbackModal("Invalid end time", "Please enter end time as HH:MM.");
       return;
     }
 
@@ -253,7 +396,7 @@ export default function AddActivityScreen() {
       trimmedEndTime &&
       trimmedEndTime < trimmedStartTime
     ) {
-      Alert.alert(
+      openFeedbackModal(
         "Invalid time range",
         "End time cannot be before start time."
       );
@@ -261,14 +404,24 @@ export default function AddActivityScreen() {
     }
 
     if (!tripId || !dayId || !slotId) {
-      Alert.alert("Missing data", "Trip, day, or time slot is missing.");
+      openFeedbackModal("Missing data", "Trip, day, or time slot is missing.");
       return;
     }
 
-    const token = idToken ?? (await auth.currentUser?.getIdToken());
+    let token = idToken;
+
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        // Force-refresh the ID token so it's never expired
+        token = await user.getIdToken(true);
+      }
+    } catch {
+      // ignore, will fall back to existing idToken if present
+    }
 
     if (!token) {
-      Alert.alert("Not logged in", "Please log in again.");
+      openFeedbackModal("Not logged in", "Please log in again.");
       return;
     }
 
@@ -276,10 +429,10 @@ export default function AddActivityScreen() {
       if (isEditMode && activityId) {
         await updateActivity(activityId, {
           idToken: token,
-          name: activityName.trim(),
-          description: description.trim(),
-          address: address.trim(),
-          googleMapsUrl: googleLink.trim(),
+          name: trimmedName,
+          description: trimmedDescription,
+          address: trimmedAddress,
+          googleMapsUrl: trimmedGoogleLink,
           startTime: trimmedStartTime || undefined,
           endTime: trimmedEndTime || undefined,
         });
@@ -290,10 +443,10 @@ export default function AddActivityScreen() {
           tripId,
           dayId,
           slotId,
-          name: activityName.trim(),
-          description: description.trim(),
-          address: address.trim(),
-          googleMapsUrl: googleLink.trim(),
+          name: trimmedName,
+          description: trimmedDescription,
+          address: trimmedAddress,
+          googleMapsUrl: trimmedGoogleLink,
           startTime: trimmedStartTime || undefined,
           endTime: trimmedEndTime || undefined,
         });
@@ -301,7 +454,8 @@ export default function AddActivityScreen() {
         navigateBackWithActivity(createdActivity.activity_id);
       }
     } catch (error) {
-      Alert.alert(
+      console.log("createActivity error:", error);
+      openFeedbackModal(
         "Could not save activity",
         error instanceof Error ? error.message : "Please try again."
       );
@@ -344,25 +498,7 @@ export default function AddActivityScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <Pressable
-            onPress={handleBack}
-            style={styles.backButton}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Back width={20} height={20} />
-          </Pressable>
-
-          <View style={styles.headerTitleRow}>
-            <LocationHeartIcon width={24} height={24} />
-            <AppText variant="body" style={styles.headerTitle}>
-              {isEditMode ? "Edit activity" : "Add activity"}
-            </AppText>
-          </View>
-
-          <View style={styles.headerSpacer} />
-        </View>
+        <StickyHeader isEditMode={isEditMode} onBack={handleBack} />
 
         <View style={styles.form}>
           <View style={styles.fields}>
@@ -381,9 +517,10 @@ export default function AddActivityScreen() {
               <TextInput
                 value={activityName}
                 onChangeText={setActivityName}
-                placeholder="Roman Agora"
+                placeholder="Name"
                 placeholderTextColor={colors.textMuted}
                 style={styles.input}
+                maxLength={MAX_NAME_LENGTH}
                 accessibilityLabel="Activity name"
                 accessibilityHint="Enter the name of the activity"
               />
@@ -409,6 +546,7 @@ export default function AddActivityScreen() {
                 style={[styles.input, styles.multilineInput]}
                 multiline
                 textAlignVertical="top"
+                maxLength={MAX_DESCRIPTION_LENGTH}
                 accessibilityLabel="Description"
                 accessibilityHint="Enter the description of the activity"
               />
@@ -439,7 +577,8 @@ export default function AddActivityScreen() {
                     onPress={() => openActivityTimePicker("start")}
                     accessibilityRole="button"
                     accessibilityLabel={`Activity start time, currently ${
-                      startTime || "not set"
+                      startTime ||
+                      getUnsetTimeAccessibilityText(startTimePlaceholder)
                     }. Tap to change`}
                     accessibilityHint="Opens the time picker"
                   >
@@ -450,7 +589,7 @@ export default function AddActivityScreen() {
                         !startTime && styles.timePlaceholderText,
                       ]}
                     >
-                      {startTime || "HH:MM"}
+                      {startTime || startTimePlaceholder}
                     </AppText>
                     <View {...hiddenFromAccessibility}>
                       <Timer width={20} height={20} />
@@ -470,7 +609,8 @@ export default function AddActivityScreen() {
                     onPress={() => openActivityTimePicker("end")}
                     accessibilityRole="button"
                     accessibilityLabel={`Activity end time, currently ${
-                      endTime || "not set"
+                      endTime ||
+                      getUnsetTimeAccessibilityText(endTimePlaceholder)
                     }. Tap to change`}
                     accessibilityHint="Opens the time picker"
                   >
@@ -481,7 +621,7 @@ export default function AddActivityScreen() {
                         !endTime && styles.timePlaceholderText,
                       ]}
                     >
-                      {endTime || "HH:MM"}
+                      {endTime || endTimePlaceholder}
                     </AppText>
                     <View {...hiddenFromAccessibility}>
                       <Timer width={20} height={20} />
@@ -509,6 +649,7 @@ export default function AddActivityScreen() {
                 placeholder="Address"
                 placeholderTextColor={colors.textMuted}
                 style={styles.input}
+                maxLength={MAX_ADDRESS_LENGTH}
                 accessibilityLabel="Location"
                 accessibilityHint="Enter the location of the activity"
               />
@@ -534,6 +675,7 @@ export default function AddActivityScreen() {
                 style={styles.input}
                 autoCapitalize="none"
                 keyboardType="url"
+                maxLength={MAX_GOOGLE_LINK_LENGTH}
                 accessibilityLabel="Google Maps link"
                 accessibilityHint="Paste a Google Maps URL for this activity"
               />
@@ -562,6 +704,7 @@ export default function AddActivityScreen() {
         visible={showActivityTimePicker !== null}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={() => setShowActivityTimePicker(null)}
       >
         <CalendarModalWrapper isLandscape={isLandscape}>
@@ -581,7 +724,7 @@ export default function AddActivityScreen() {
                 onChangeText={(value) =>
                   setTempActivityTime(normalizeTimeInput(value))
                 }
-                placeholder="HH:MM"
+                placeholder={activityTimePickerPlaceholder}
                 placeholderTextColor={colors.textMuted}
                 keyboardType={
                   Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric"
@@ -613,6 +756,36 @@ export default function AddActivityScreen() {
           </View>
         </CalendarModalWrapper>
       </Modal>
+
+      <Modal
+        visible={showFeedbackModal}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowFeedbackModal(false)}
+      >
+        <CalendarModalWrapper isLandscape={isLandscape}>
+          <AppText variant="body" style={styles.calendarTitle}>
+            {feedbackTitle}
+          </AppText>
+
+          <View style={styles.timeModalContent}>
+            <AppText variant="caption" style={styles.timeModalHint}>
+              {feedbackMessage}
+            </AppText>
+          </View>
+
+          <View style={styles.calendarActions}>
+            <AppButton
+              title="Okay"
+              onPress={() => setShowFeedbackModal(false)}
+              style={styles.calendarApplyButton}
+              textStyle={styles.calendarApplyButtonText}
+              accessibilityLabel="Close message"
+            />
+          </View>
+        </CalendarModalWrapper>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -630,38 +803,56 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     backgroundColor: colors.beachYellow,
     paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: spacing.xl,
+  },
+  stickyHeaderBlock: {
     paddingTop: spacing.xxl,
     paddingBottom: spacing.xl,
+    backgroundColor: colors.beachYellow,
+    zIndex: 20,
+    elevation: 0,
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
   },
   header: {
     width: "100%",
-    flexDirection: "row",
+    minHeight: 44,
+    position: "relative",
+    justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xxl,
     backgroundColor: colors.beachYellow,
-    zIndex: 10,
-    elevation: 4,
+  },
+  backButtonSlot: {
+    position: "absolute",
+    left: spacing.lg,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-start",
+    zIndex: 2,
   },
   backButton: {
     justifyContent: "center",
-    paddingLeft: spacing.md,
+    alignItems: "center",
+    minWidth: 44,
+    minHeight: 44,
   },
   headerTitleRow: {
-    flex: 1,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: spacing.sm,
+    alignSelf: "center",
   },
   headerTitle: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.xxl,
     lineHeight: typography.lineHeight.xxl,
-  },
-  headerSpacer: {
-    width: 44,
   },
   form: {
     flex: 1,
@@ -745,10 +936,14 @@ const styles = StyleSheet.create({
   timePlaceholderText: {
     color: colors.textMuted,
   },
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
   calendarOverlay: {
     flex: 1,
+    justifyContent: "center",
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
   },
   calendarModal: {
     backgroundColor: colors.lightWhite,
@@ -789,8 +984,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   timeModalHint: {
-    color: colors.textMuted,
-    fontSize: typography.size.sm,
+    color: colors.nightBlack,
+    fontSize: typography.size.lg,
     lineHeight: typography.lineHeight.sm,
     fontFamily: typography.fontFamily.body,
   },

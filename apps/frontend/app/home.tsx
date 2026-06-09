@@ -1,5 +1,6 @@
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/src/context/AuthContext";
 import {
   AccessibilityInfo,
@@ -14,7 +15,13 @@ import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { TripCard } from "@/src/components/common/TripCard";
 import { colors, spacing, radius, typography } from "@/src/theme";
-import { fetchMyTrips, invalidateMyTripsCache, type Trip } from "@/src/api/trips";
+import {
+  fetchMyTrips,
+  invalidateMyTripsCache,
+  removeTripFromCache,
+  type Trip,
+} from "@/src/api/trips";
+import { db } from "@/src/lib/firebase";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 import Profile from "@/assets/icons/profile.svg";
@@ -68,8 +75,8 @@ type TripsCache = {
   fetchedAt: number;
 };
 
-const TRIPS_STALE_TIME_MS = 30_000;
-const TRIPS_FOCUS_REFRESH_THROTTLE_MS = 5_000;
+const TRIPS_STALE_TIME_MS = 60_000;
+const TRIPS_FOCUS_REFRESH_THROTTLE_MS = 60_000;
 let tripsCache: TripsCache | null = null;
 
 let tripsCacheForceNext = false;
@@ -276,6 +283,62 @@ export default function HomeScreen() {
   const lastFetchRef = useRef<number>(tripsCache?.fetchedAt ?? 0);
   const latestUserIdRef = useRef<string | null>(user?.uid ?? null);
 
+  // NEW: keep latest lists in a ref to avoid stale closures in snapshot listeners
+  const listsRef = useRef<{
+    yourTrips: TripCardItem[];
+    pastTrips: TripCardItem[];
+  }>({
+    yourTrips: tripsCache?.yourTrips ?? [],
+    pastTrips: tripsCache?.pastTrips ?? [],
+  });
+
+  useEffect(() => {
+    listsRef.current = { yourTrips, pastTrips };
+  }, [yourTrips, pastTrips]);
+
+  const removeTripFromLocalLists = useCallback((tripId: string) => {
+    const userId = latestUserIdRef.current;
+    const removeTrip = (trips: TripCardItem[]) =>
+      trips.filter((trip) => trip.id !== tripId);
+
+    if (userId) {
+      removeTripFromCache(userId, tripId);
+    }
+
+    setYourTrips((current) => removeTrip(current));
+    setPastTrips((current) => removeTrip(current));
+
+    if (tripsCache && (!userId || tripsCache.userId === userId)) {
+      tripsCache = {
+        ...tripsCache,
+        yourTrips: removeTrip(tripsCache.yourTrips),
+        pastTrips: removeTrip(tripsCache.pastTrips),
+      };
+    }
+  }, []);
+
+  // NEW: helper to patch a single trip in lists and cache
+  const patchTripInLocalLists = useCallback(
+    (tripId: string, patch: Partial<TripCardItem>) => {
+      const patchTrips = (trips: TripCardItem[]) =>
+        trips.map((trip) =>
+          trip.id === tripId ? { ...trip, ...patch } : trip
+        );
+
+      setYourTrips((current) => patchTrips(current));
+      setPastTrips((current) => patchTrips(current));
+
+      if (tripsCache) {
+        tripsCache = {
+          ...tripsCache,
+          yourTrips: patchTrips(tripsCache.yourTrips),
+          pastTrips: patchTrips(tripsCache.pastTrips),
+        };
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     const newUserId = user?.uid ?? null;
     latestUserIdRef.current = newUserId;
@@ -336,7 +399,9 @@ export default function HomeScreen() {
       setIsLoading(true);
 
       try {
-        const backendTrips = (await fetchMyTrips(userId, { forceRefresh: true })) as TripWithMembers[];
+        const backendTrips = (await fetchMyTrips(userId, {
+          forceRefresh: force,
+        })) as TripWithMembers[];
 
         if (latestUserIdRef.current !== userId) {
           return;
@@ -399,13 +464,100 @@ export default function HomeScreen() {
         lastFetchRef.current = 0;
       }
       const timeSinceLastFetch = Date.now() - lastFetchRef.current;
-      const shouldRefresh = shouldForce || timeSinceLastFetch > TRIPS_FOCUS_REFRESH_THROTTLE_MS;
+      const shouldRefresh =
+        shouldForce || timeSinceLastFetch > TRIPS_FOCUS_REFRESH_THROTTLE_MS;
       if (shouldRefresh) {
         invalidateMyTripsCache(userId);
         void loadTrips(true);
       }
     }, [loadTrips, user?.uid])
   );
+
+  // UPDATED: extend listener to also watch trip docs and patch badge state immediately
+  useEffect(() => {
+    const userId = user?.uid ?? null;
+    if (!userId) return;
+
+    const membershipQuery = query(
+      collection(db, "trip_members"),
+      where("user_id", "==", userId)
+    );
+
+    const tripUnsubscribers = new Map<string, () => void>();
+
+    const unsubscribeMemberships = onSnapshot(
+      membershipQuery,
+      (snapshot) => {
+        const activeTripIds = new Set<string>();
+
+        snapshot.docChanges().forEach((change) => {
+          const data = change.doc.data();
+          const tripId = data.trip_id;
+
+          if (typeof tripId !== "string") return;
+
+          if (change.type === "removed" || data.invite_status !== "accepted") {
+            removeTripFromLocalLists(tripId);
+            return;
+          }
+
+          activeTripIds.add(tripId);
+
+          if (tripUnsubscribers.has(tripId)) return;
+
+          const unsubscribeTrip = onSnapshot(
+            doc(db, "trips", tripId),
+            (tripSnap) => {
+              if (!tripSnap.exists()) {
+                removeTripFromLocalLists(tripId);
+                return;
+              }
+
+              const tripData = tripSnap.data() as Partial<TripWithMembers>;
+              const nextState = (tripData.state as Trip["state"]) ?? "Planning";
+
+              const existingTrip =
+                listsRef.current.yourTrips.find((t) => t.id === tripId) ??
+                listsRef.current.pastTrips.find((t) => t.id === tripId);
+
+              const memberCount = existingTrip?.members.length ?? 0;
+
+              patchTripInLocalLists(tripId, {
+                rawState: nextState,
+                status: getUiStatus(nextState, memberCount),
+                planningStartedAt: tripData.planning_started_at,
+                planningEndAt: tripData.planning_end_at,
+                votingEndAt: tripData.voting_end_at,
+              });
+            },
+            (error) => {
+              console.log("Trip listener error:", error);
+            }
+          );
+
+          tripUnsubscribers.set(tripId, unsubscribeTrip);
+        });
+
+        for (const [tripId, unsubscribeTrip] of tripUnsubscribers.entries()) {
+          if (!activeTripIds.has(tripId)) {
+            unsubscribeTrip();
+            tripUnsubscribers.delete(tripId);
+          }
+        }
+      },
+      (error) => {
+        console.log("Trip membership listener error:", error);
+      }
+    );
+
+    return () => {
+      unsubscribeMemberships();
+      for (const unsubscribeTrip of tripUnsubscribers.values()) {
+        unsubscribeTrip();
+      }
+      tripUnsubscribers.clear();
+    };
+  }, [removeTripFromLocalLists, user?.uid, patchTripInLocalLists]);
 
   const trips = activeTab === "your" ? yourTrips : pastTrips;
 
@@ -621,7 +773,6 @@ export default function HomeScreen() {
       </ScrollView>
     </SafeAreaView>
   );
-  
 }
 
 const styles = StyleSheet.create({
