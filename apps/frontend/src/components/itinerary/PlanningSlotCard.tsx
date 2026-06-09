@@ -19,6 +19,7 @@ type Props = {
   activity?: Activity;
   onAddActivity: (slotId: string) => void;
   onEditActivity: (activity: Activity) => void;
+  onSuggest?: (slotId: string, slotLabel: string) => void;
   disabled?: boolean;
 };
 
@@ -27,6 +28,7 @@ export function PlanningSlotCard({
   activity,
   onAddActivity,
   onEditActivity,
+  onSuggest,
   disabled = false,
 }: Props) {
   const hasActivity = Boolean(activity);
@@ -42,38 +44,68 @@ export function PlanningSlotCard({
     onEditActivity(activity);
   }, [disabled, activity, onEditActivity]);
 
+  const handleSuggestPressRaw = useCallback(() => {
+    if (disabled) return;
+    onSuggest?.(slot.id, slot.label);
+  }, [disabled, onSuggest, slot.id, slot.label]);
+
   const handleAddPress = useSinglePress(handleAddPressRaw);
   const handleEditPress = useSinglePress(handleEditPressRaw);
+  const handleSuggestPress = useSinglePress(handleSuggestPressRaw);
 
   if (!hasActivity) {
     return (
-      <Pressable
-        onPress={handleAddPress}
-        style={({ pressed }) => [
-          styles.emptyCard,
-          pressed && styles.cardPressed,
-          disabled && styles.cardDisabled,
-        ]}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={`Add activity at ${slot.label}`}
-        accessibilityHint="Opens the add activity screen"
-        accessibilityState={{ disabled }}
-      >
-        <AppText variant="body" style={styles.emptyTimeLabel}>
-          {slot.label}
-        </AppText>
-
-        <View style={styles.emptyContent}>
-          <View {...hiddenFromAccessibility}>
-            <AddIcon width={32} height={32} color={colors.nightBlack} />
-          </View>
-
-          <AppText variant="body" style={styles.emptyTitle}>
-            Empty Activity
+      <View style={styles.emptyColumn}>
+        <Pressable
+          onPress={handleAddPress}
+          style={({ pressed }) => [
+            styles.emptyCard,
+            pressed && styles.cardPressed,
+            disabled && styles.cardDisabled,
+          ]}
+          disabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={`Add activity at ${slot.label}`}
+          accessibilityHint="Opens the add activity screen"
+          accessibilityState={{ disabled }}
+        >
+          <AppText variant="body" style={styles.emptyTimeLabel}>
+            {slot.label}
           </AppText>
-        </View>
-      </Pressable>
+
+          <View style={styles.emptyContent}>
+            <View {...hiddenFromAccessibility}>
+              <AddIcon width={28} height={28} color={colors.nightBlack} />
+            </View>
+            <AppText variant="body" style={styles.emptyTitle}>
+              Add activity
+            </AppText>
+          </View>
+        </Pressable>
+
+        {!!onSuggest && (
+          <Pressable
+            onPress={handleSuggestPress}
+            disabled={disabled}
+            style={({ pressed }) => [
+              styles.suggestFullWidth,
+              pressed && styles.cardPressed,
+              disabled && styles.cardDisabled,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`Suggest activity at ${slot.label}`}
+            accessibilityHint="Shows real place suggestions"
+            accessibilityState={{ disabled }}
+          >
+            <View {...hiddenFromAccessibility}>
+              <LocationHeart width={18} height={18} />
+            </View>
+            <AppText variant="body" style={styles.suggestFullWidthText} accessible={false}>
+              ✦ Suggest activity
+            </AppText>
+          </Pressable>
+        )}
+      </View>
     );
   }
 
@@ -207,8 +239,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     overflow: "hidden",
   },
+  emptyColumn: {
+    flexDirection: "column",
+    gap: spacing.sm,
+  },
   emptyCard: {
-    alignSelf: "stretch",
     minHeight: 90,
     borderRadius: radius.md,
     borderWidth: 1,
@@ -297,6 +332,21 @@ const styles = StyleSheet.create({
   },
   editCta: {
     backgroundColor: colors.border,
+  },
+  suggestFullWidth: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.sunsetOrange,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  suggestFullWidthText: {
+    color: colors.lightWhite,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
   },
   ctaPressed: {
     opacity: 0.85,

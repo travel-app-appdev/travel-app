@@ -14,6 +14,7 @@ import {
     getTripPreviewByCode,
 } from "../controllers/tripsController";
 import { getItineraryController } from "../controllers/itineraryController";
+import { getSuggestionsController, updatePreferencesController } from "../controllers/suggestionsController";
 
 const router = Router();
 
@@ -33,5 +34,7 @@ router.post("/:tripId/leave", leaveTrip);
 router.delete("/:tripId/members/:memberId", removeMember);
 router.post("/:tripId/finish-planning", finishPlanning);
 router.post("/:tripId/finish-voting", finishVoting);
+router.patch("/:tripId/members/me/preferences", updatePreferencesController);
+router.get("/:tripId/suggestions", getSuggestionsController);
 
 export default router;

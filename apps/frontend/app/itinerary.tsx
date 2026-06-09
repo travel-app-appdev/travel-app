@@ -41,12 +41,15 @@ import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
 import { FinalSuggestedActivitiesSection } from "@/src/components/itinerary/FinalSuggestedActivitiesSection";
 import { ActivityDetailModal } from "@/src/components/itinerary/ActivityDetailModal";
+import { SuggestionsModal } from "@/src/components/itinerary/SuggestionsModal";
 import {
   fetchTripForUser,
   finishPlanning,
   finishVoting,
   isTripNotFoundError,
+  fetchActivitySuggestions,
   type Trip,
+  type ActivitySuggestion,
 } from "@/src/api/trips";
 import { invalidateTripsCache } from "./home";
 import {
@@ -55,6 +58,7 @@ import {
   toggleActivityAttendance,
   toggleAddedAlternativeToItinerary,
   voteForActivity,
+  createActivity,
   type FinalItineraryResponseDto,
 } from "@/src/services/activityService";
 
@@ -533,6 +537,14 @@ export default function ItineraryScreen() {
     setSelectedAddedAlternativeActivityIds,
   ] = useState<string[]>([]);
   const [showActivityDetailModal, setShowActivityDetailModal] = useState(false);
+
+  // Suggestions modal state
+  const [showSuggestionsModal, setShowSuggestionsModal] = useState(false);
+  const [suggestionsSlotId, setSuggestionsSlotId] = useState("");
+  const [suggestionsSlotLabel, setSuggestionsSlotLabel] = useState("");
+  const [suggestions, setSuggestions] = useState<ActivitySuggestion[]>([]);
+  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
 
   const finalizingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
@@ -1220,6 +1232,58 @@ export default function ItineraryScreen() {
         votingEndAt: timerDeadlines.votingEndAt ?? "",
       },
     });
+  }
+
+  async function handleSuggest(slotId: string, slotLabel: string) {
+    if (!authToken || !tripId) return;
+
+    setSuggestionsSlotId(slotId);
+    setSuggestionsSlotLabel(slotLabel);
+    setSuggestions([]);
+    setSuggestionsError(null);
+    setIsSuggestionsLoading(true);
+    setShowSuggestionsModal(true);
+
+    try {
+      const results = await fetchActivitySuggestions(tripId, slotId, authToken);
+      setSuggestions(results);
+    } catch (err) {
+      setSuggestionsError("Could not load suggestions. Please try again.");
+    } finally {
+      setIsSuggestionsLoading(false);
+    }
+  }
+
+  async function handleAddSuggestion(suggestion: ActivitySuggestion) {
+    if (!authToken || !tripId || !selectedDayId || !suggestionsSlotId) return;
+
+    try {
+      const fullSlotId = `${selectedDayId}_${suggestionsSlotId}`;
+      const result = await createActivity({
+        idToken: authToken,
+        tripId,
+        dayId: selectedDayId,
+        slotId: fullSlotId,
+        name: suggestion.name,
+        address: suggestion.address,
+      });
+
+      const newActivity: Activity = mapBackendActivity(result, {
+        dayId: selectedDayId,
+        slotId: suggestionsSlotId,
+      });
+
+      const applyNew = (activities: Activity[]) =>
+        upsertActivity(activities, newActivity);
+
+      setApiActivities((current) => applyNew(current));
+      if (tripId) updateCachedActivities(tripId, applyNew);
+    } catch (err) {
+      Alert.alert(
+        "Could not add activity",
+        err instanceof Error ? err.message : "Please try again."
+      );
+    }
   }
 
   async function handleFinishPlanning() {
@@ -1917,6 +1981,7 @@ export default function ItineraryScreen() {
                           activity={activity}
                           onAddActivity={handleAddActivity}
                           onEditActivity={handleEditActivity}
+                          onSuggest={handleSuggest}
                           disabled={hasCurrentUserFinished}
                         />
                       ))}
@@ -2019,6 +2084,17 @@ export default function ItineraryScreen() {
         {activeState === "planning" && (
           <View style={[styles.footerBackground, { pointerEvents: "none" }]} />
         )}
+
+        <SuggestionsModal
+          visible={showSuggestionsModal}
+          slotLabel={suggestionsSlotLabel}
+          destination={itinerary.destination}
+          suggestions={suggestions}
+          loading={isSuggestionsLoading}
+          error={suggestionsError}
+          onClose={() => setShowSuggestionsModal(false)}
+          onAdd={handleAddSuggestion}
+        />
 
         <ActivityDetailModal
           visible={showActivityDetailModal}
