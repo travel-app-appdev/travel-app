@@ -6,6 +6,7 @@ import {
   AccessibilityInfo,
   Animated,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -285,6 +286,7 @@ export default function HomeScreen() {
     tripsCache?.pastTrips ?? []
   );
   const [isLoading, setIsLoading] = useState(!tripsCache);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const lastFetchRef = useRef<number>(tripsCache?.fetchedAt ?? 0);
   const latestUserIdRef = useRef<string | null>(user?.uid ?? null);
@@ -373,7 +375,7 @@ export default function HomeScreen() {
   }, [user?.uid]);
 
   const loadTrips = useCallback(
-    async (force = false) => {
+    async (force = false, showLoading = true) => {
       const userId = user?.uid ?? null;
 
       if (!userId) {
@@ -402,7 +404,9 @@ export default function HomeScreen() {
         return;
       }
 
-      setIsLoading(true);
+      if (showLoading) {
+        setIsLoading(true);
+      }
 
       try {
         const backendTrips = (await fetchMyTrips(userId, {
@@ -570,6 +574,16 @@ export default function HomeScreen() {
   const handleProfile = useSinglePress(() => router.push("/profile"));
   const handleYourTab = useSinglePress(() => setActiveTab("your"));
   const handlePastTab = useSinglePress(() => setActiveTab("past"));
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing || isLoading) return;
+
+    setIsRefreshing(true);
+    try {
+      await loadTrips(true, false);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isLoading, isRefreshing, loadTrips]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -578,6 +592,14 @@ export default function HomeScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.nightBlack}
+            colors={[colors.nightBlack]}
+          />
+        }
       >
         <View style={styles.headerRow}>
           <Pressable

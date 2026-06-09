@@ -6,6 +6,7 @@ import {
   Alert,
   findNodeHandle,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -500,6 +501,7 @@ export default function TripOverviewAdminScreen() {
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   const [tripState, setTripState] = useState<Trip["state"]>(initialTripState);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [tripTiming, setTripTiming] = useState({
     planningStartedAt,
     planningEndAt,
@@ -1323,6 +1325,35 @@ export default function TripOverviewAdminScreen() {
     setShowDeleteTripModal(true);
   });
 
+  const handleRefresh = useCallback(async () => {
+    if (
+      isRefreshing ||
+      isDeleting ||
+      isUpdatingName ||
+      isUpdatingDate ||
+      isUpdatingDestination ||
+      removingMemberId
+    ) {
+      return;
+    }
+
+    setIsRefreshing(true);
+    try {
+      setTimerNow(Date.now());
+      await refreshTripSnapshot({ forceRefresh: true });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [
+    isDeleting,
+    isRefreshing,
+    isUpdatingDate,
+    isUpdatingDestination,
+    isUpdatingName,
+    refreshTripSnapshot,
+    removingMemberId,
+  ]);
+
   async function handleConfirmDeleteTrip() {
     try {
       setIsDeleting(true);
@@ -1377,6 +1408,14 @@ export default function TripOverviewAdminScreen() {
             ]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={colors.nightBlack}
+                colors={[colors.nightBlack]}
+              />
+            }
           >
             <StickyHeader />
 
