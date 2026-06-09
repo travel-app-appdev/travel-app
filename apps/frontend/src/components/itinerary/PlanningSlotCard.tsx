@@ -103,9 +103,6 @@ export function PlanningSlotCard({
             accessibilityHint="Shows real place suggestions"
             accessibilityState={{ disabled }}
           >
-            <View {...hiddenFromAccessibility}>
-              <LocationHeart width={18} height={18} />
-            </View>
             <AppText variant="body" style={styles.suggestFullWidthText} accessible={false}>
               ✦ Suggest activity
             </AppText>
@@ -351,7 +348,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   suggestFullWidthText: {
-    color: colors.lightWhite,
+    color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.md,
   },

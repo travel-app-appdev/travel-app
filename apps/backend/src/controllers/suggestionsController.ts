@@ -7,6 +7,7 @@ export async function getSuggestionsController(req: Request, res: Response) {
     try {
         const { tripId } = req.params;
         const slotType = (req.query.slotType as string) ?? "any";
+        const offset = parseInt((req.query.offset as string) ?? "0", 10) || 0;
         const idToken = req.headers.authorization?.replace("Bearer ", "");
 
         if (!idToken) return res.status(401).json({ error: "Unauthorized" });
@@ -15,7 +16,7 @@ export async function getSuggestionsController(req: Request, res: Response) {
         const membership = await findMembership(tripId as string, decoded.uid);
         if (!membership) return res.status(403).json({ error: "Not a member of this trip" });
 
-        const suggestions = await getActivitySuggestions(tripId as string, slotType);
+        const suggestions = await getActivitySuggestions(tripId as string, slotType, offset);
         return res.json({ suggestions });
     } catch (err: any) {
         return res.status(err.status ?? 500).json({ error: err.message ?? "Internal server error" });

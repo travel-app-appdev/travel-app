@@ -27,7 +27,8 @@ const PREFERENCE_TO_CATEGORIES: Record<string, string[]> = {
 
 export async function getActivitySuggestions(
     tripId: string,
-    slotType: string
+    slotType: string,
+    offset: number = 0
 ): Promise<ActivitySuggestion[]> {
     const apiKey = process.env.GEOAPIFY_API_KEY;
     if (!apiKey) throw { status: 500, message: "Geoapify API key not configured" };
@@ -41,10 +42,12 @@ export async function getActivitySuggestions(
     const allPrefs = members.flatMap((m) => (m as any).preferences ?? []);
     const uniquePrefs = [...new Set<string>(allPrefs)];
 
-    // 3. Check cache
-    const cacheKey = buildCacheKey(tripId, slotType, uniquePrefs);
-    const cached = await readCache(cacheKey);
-    if (cached) return cached;
+    // 3. Check cache (only for first page)
+    if (offset === 0) {
+        const cacheKey = buildCacheKey(tripId, slotType, uniquePrefs);
+        const cached = await readCache(cacheKey);
+        if (cached) return cached;
+    }
 
     // 4. Geocode destination
     const coords = await geocodeDestination(trip.destination, apiKey);
@@ -63,10 +66,14 @@ export async function getActivitySuggestions(
     }
 
     // 6. Fetch places from Geoapify
-    const suggestions = await fetchPlaces(coords, categories, uniquePrefs, apiKey);
+    const suggestions = await fetchPlaces(coords, categories, uniquePrefs, apiKey, offset);
 
-    // 7. Cache and return
-    await writeCache(cacheKey, tripId, suggestions);
+    // 7. Cache first-page results only
+    if (offset === 0) {
+        const cacheKey = buildCacheKey(tripId, slotType, uniquePrefs);
+        await writeCache(cacheKey, tripId, suggestions);
+    }
+
     return suggestions;
 }
 
@@ -145,11 +152,13 @@ async function fetchPlaces(
     coords: { lat: number; lon: number },
     categories: string[],
     matchedPrefs: string[],
-    apiKey: string
+    apiKey: string,
+    offset: number = 0
 ): Promise<ActivitySuggestion[]> {
     const categoryParam = categories.slice(0, 8).join(",");
     const radius = 5000; // 5km radius
-    const url = "https://api.geoapify.com/v2/places?categories=" + encodeURIComponent(categoryParam) + "&filter=circle:" + coords.lon + "," + coords.lat + "," + radius + "&limit=5&apiKey=" + apiKey;
+    const limit = 10;
+    const url = "https://api.geoapify.com/v2/places?categories=" + encodeURIComponent(categoryParam) + "&filter=circle:" + coords.lon + "," + coords.lat + "," + radius + "&limit=" + limit + "&offset=" + offset + "&apiKey=" + apiKey;
 
     const res = await fetch(url);
     if (!res.ok) {
