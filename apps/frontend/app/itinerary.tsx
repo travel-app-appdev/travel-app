@@ -4,6 +4,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -459,6 +460,7 @@ export default function ItineraryScreen() {
     const keys = [...activitiesCache.keys()];
     return !keys.some((k) => k.startsWith(`${tripId}_`));
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
   const [showVotingInfoPopup, setShowVotingInfoPopup] = useState(false);
@@ -873,8 +875,10 @@ export default function ItineraryScreen() {
     return unsubscribe;
   }, [tripId, activeState, refreshFinalItinerary]);
 
-  useEffect(() => {
-    async function loadActivities() {
+  const loadActivities = useCallback(
+    async (options: { showLoading?: boolean } = {}) => {
+      const { showLoading = true } = options;
+
       if (!tripId || tripDays.length === 0) return;
 
       if (activeState !== "final" && !selectedDayId) {
@@ -899,8 +903,10 @@ export default function ItineraryScreen() {
 
       if (cached) {
         setApiActivities(cached);
-        setIsLoadingActivities(false);
-      } else {
+        if (showLoading) {
+          setIsLoadingActivities(false);
+        }
+      } else if (showLoading) {
         setIsLoadingActivities(true);
       }
 
@@ -1010,19 +1016,37 @@ export default function ItineraryScreen() {
         console.log("Could not load activities:", error);
         setIsLoadingActivities(false);
       }
-    }
+    },
+    [
+      activeState,
+      currentUserId,
+      itinerary.startDate,
+      selectedDayId,
+      slots,
+      tripDays,
+      tripId,
+    ]
+  );
 
+  useEffect(() => {
     void loadActivities();
+  }, [activityRefreshKey, loadActivities, newActivityId]);
+
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing || isLoadingActivities) return;
+
+    setIsRefreshing(true);
+    try {
+      await refreshTripTimerFields({ forceRefresh: true });
+      await loadActivities({ showLoading: false });
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [
-    tripId,
-    newActivityId,
-    activeState,
-    currentUserId,
-    selectedDayId,
-    tripDays,
-    slots,
-    itinerary.startDate,
-    activityRefreshKey,
+    isLoadingActivities,
+    isRefreshing,
+    loadActivities,
+    refreshTripTimerFields,
   ]);
 
   useEffect(() => {
@@ -1804,6 +1828,14 @@ export default function ItineraryScreen() {
           style={styles.scroll}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.nightBlack}
+              colors={[colors.nightBlack]}
+            />
+          }
         >
           <ItineraryHeader
             title="Itinerary"
