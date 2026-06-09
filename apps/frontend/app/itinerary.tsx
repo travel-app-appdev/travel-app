@@ -4,6 +4,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -106,6 +107,23 @@ function selectVoteForActivity(
       voteCount: Math.max(0, (activity.voteCount ?? 0) + voteDelta),
     };
   });
+}
+
+function upsertActivity(
+  activities: Activity[],
+  incoming: Activity
+): Activity[] {
+  const existingIndex = activities.findIndex(
+    (activity) => activity.id === incoming.id
+  );
+
+  if (existingIndex === -1) {
+    return [...activities, incoming];
+  }
+
+  return activities.map((activity, index) =>
+    index === existingIndex ? { ...activity, ...incoming } : activity
+  );
 }
 
 function updateCachedActivities(
@@ -432,6 +450,38 @@ export default function ItineraryScreen() {
     () => parsePlanningStatusJson(members),
     [members]
   );
+  const incomingRouteActivity = useMemo<Activity | null>(() => {
+    if (
+      !newActivityId ||
+      !newActivityDayId ||
+      !newActivitySlotId ||
+      !newActivityName
+    ) {
+      return null;
+    }
+
+    return {
+      id: newActivityId,
+      dayId: newActivityDayId,
+      slotId: newActivitySlotId,
+      name: newActivityName,
+      description: newActivityDescription ?? "",
+      address: newActivityAddress ?? "",
+      googleMapsUrl: newActivityGoogleMapsUrl ?? "",
+      startTime: newActivityStartTime ?? "",
+      endTime: newActivityEndTime ?? "",
+    };
+  }, [
+    newActivityId,
+    newActivityDayId,
+    newActivitySlotId,
+    newActivityName,
+    newActivityDescription,
+    newActivityAddress,
+    newActivityGoogleMapsUrl,
+    newActivityStartTime,
+    newActivityEndTime,
+  ]);
 
   const [itinerary, setItinerary] = useState<TripItinerary>(() => ({
     ...buildItineraryFromParams({
@@ -458,6 +508,7 @@ export default function ItineraryScreen() {
     const keys = [...activitiesCache.keys()];
     return !keys.some((k) => k.startsWith(`${tripId}_`));
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
   const [showVotingInfoPopup, setShowVotingInfoPopup] = useState(false);
@@ -849,8 +900,10 @@ export default function ItineraryScreen() {
     return unsubscribe;
   }, [activeState, refreshFinalItinerary, refreshTripTimerFields, tripId]);
 
-  useEffect(() => {
-    async function loadActivities() {
+  const loadActivities = useCallback(
+    async (options: { showLoading?: boolean } = {}) => {
+      const { showLoading = true } = options;
+
       if (!tripId || tripDays.length === 0) return;
 
       if (activeState !== "final" && !selectedDayId) {
@@ -875,8 +928,10 @@ export default function ItineraryScreen() {
 
       if (cached) {
         setApiActivities(cached);
-        setIsLoadingActivities(false);
-      } else {
+        if (showLoading) {
+          setIsLoadingActivities(false);
+        }
+      } else if (showLoading) {
         setIsLoadingActivities(true);
       }
 
@@ -937,14 +992,18 @@ export default function ItineraryScreen() {
             )
           ).flat();
 
+          const nextActivities = incomingRouteActivity
+            ? upsertActivity(allActivities, incomingRouteActivity)
+            : allActivities;
+
           const hasChanged =
-            JSON.stringify(cached) !== JSON.stringify(allActivities);
+            JSON.stringify(cached) !== JSON.stringify(nextActivities);
 
           if (hasChanged) {
-            activitiesCache.set(cacheKey, allActivities);
-            setApiActivities(allActivities);
+            activitiesCache.set(cacheKey, nextActivities);
+            setApiActivities(nextActivities);
           } else if (!cached) {
-            setApiActivities(allActivities);
+            setApiActivities(nextActivities);
           }
 
           setIsLoadingActivities(false);
@@ -971,14 +1030,18 @@ export default function ItineraryScreen() {
           )
         ).flat();
 
+        const nextActivities = incomingRouteActivity
+          ? upsertActivity(allActivities, incomingRouteActivity)
+          : allActivities;
+
         const hasChanged =
-          JSON.stringify(cached) !== JSON.stringify(allActivities);
+          JSON.stringify(cached) !== JSON.stringify(nextActivities);
 
         if (hasChanged) {
-          activitiesCache.set(cacheKey, allActivities);
-          setApiActivities(allActivities);
+          activitiesCache.set(cacheKey, nextActivities);
+          setApiActivities(nextActivities);
         } else if (!cached) {
-          setApiActivities(allActivities);
+          setApiActivities(nextActivities);
         }
 
         setIsLoadingActivities(false);
@@ -986,10 +1049,37 @@ export default function ItineraryScreen() {
         console.log("Could not load activities:", error);
         setIsLoadingActivities(false);
       }
-    }
+    },
+    [
+      activeState,
+      currentUserId,
+      itinerary.startDate,
+      selectedDayId,
+      slots,
+      tripDays,
+      tripId,
+    ]
+  );
 
+  useEffect(() => {
     void loadActivities();
+  }, [activityRefreshKey, loadActivities, newActivityId]);
+
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing || isLoadingActivities) return;
+
+    setIsRefreshing(true);
+    try {
+      await refreshTripTimerFields({ forceRefresh: true });
+      await loadActivities({ showLoading: false });
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [
+    isLoadingActivities,
+    isRefreshing,
+    loadActivities,
+    refreshTripTimerFields,
     tripId,
     newActivityId,
     activeState,
@@ -999,6 +1089,7 @@ export default function ItineraryScreen() {
     slots,
     itinerary.startDate,
     activityRefreshKey,
+    incomingRouteActivity,
   ]);
 
   useEffect(() => {
@@ -1015,25 +1106,18 @@ export default function ItineraryScreen() {
   const lastAppliedActivitySignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (
-      !newActivityId ||
-      !newActivityDayId ||
-      !newActivitySlotId ||
-      !newActivityName
-    ) {
-      return;
-    }
+    if (!incomingRouteActivity) return;
 
     const incomingSignature = [
-      newActivityId,
-      newActivityDayId,
-      newActivitySlotId,
-      newActivityName,
-      newActivityDescription ?? "",
-      newActivityAddress ?? "",
-      newActivityGoogleMapsUrl ?? "",
-      newActivityStartTime ?? "",
-      newActivityEndTime ?? "",
+      incomingRouteActivity.id,
+      incomingRouteActivity.dayId,
+      incomingRouteActivity.slotId,
+      incomingRouteActivity.name,
+      incomingRouteActivity.description ?? "",
+      incomingRouteActivity.address ?? "",
+      incomingRouteActivity.googleMapsUrl ?? "",
+      incomingRouteActivity.startTime ?? "",
+      incomingRouteActivity.endTime ?? "",
     ].join("|");
 
     if (lastAppliedActivitySignatureRef.current === incomingSignature) {
@@ -1041,17 +1125,21 @@ export default function ItineraryScreen() {
     }
 
     lastAppliedActivitySignatureRef.current = incomingSignature;
-  }, [
-    newActivityId,
-    newActivityDayId,
-    newActivitySlotId,
-    newActivityName,
-    newActivityDescription,
-    newActivityAddress,
-    newActivityGoogleMapsUrl,
-    newActivityStartTime,
-    newActivityEndTime,
-  ]);
+
+    const applyIncomingActivity = (activities: Activity[]) =>
+      upsertActivity(activities, incomingRouteActivity);
+
+    setItinerary((current) => ({
+      ...current,
+      activities: applyIncomingActivity(current.activities),
+    }));
+    setApiActivities((current) => applyIncomingActivity(current));
+    setIsLoadingActivities(false);
+
+    if (tripId) {
+      updateCachedActivities(tripId, applyIncomingActivity);
+    }
+  }, [incomingRouteActivity, tripId]);
 
   const slotItems = useMemo(() => {
     return mapActivitiesToSlots(slots, apiActivities, selectedDayId);
@@ -1223,8 +1311,8 @@ export default function ItineraryScreen() {
       }
     } catch (error) {
       Alert.alert(
-        "Could not finish planning",
-        error instanceof Error ? error.message : "Please try again."
+        "One moment...",
+        error instanceof Error ? error.message : "Your group is all set! We're preparing the next step, hang tight. 🎉"
       );
     } finally {
       setIsSubmittingPlanning(false);
@@ -1780,6 +1868,14 @@ export default function ItineraryScreen() {
           style={styles.scroll}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.nightBlack}
+              colors={[colors.nightBlack]}
+            />
+          }
         >
           <ItineraryHeader
             title="Itinerary"

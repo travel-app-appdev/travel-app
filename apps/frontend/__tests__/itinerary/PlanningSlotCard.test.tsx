@@ -94,6 +94,19 @@ describe("PlanningSlotCard", () => {
     expect(getByText("08:00 - 11:00")).toBeTruthy();
   });
 
+  it("renders an overnight activity time range", () => {
+    const { getByText } = render(
+      <PlanningSlotCard
+        slot={slot}
+        activity={{ ...activity, startTime: "18:00", endTime: "02:00" }}
+        onAddActivity={jest.fn()}
+        onEditActivity={jest.fn()}
+      />
+    );
+
+    expect(getByText("18:00 - 02:00 (+1 day)")).toBeTruthy();
+  });
+
   it("does not render a time range when only one time exists", () => {
     const { queryByText } = render(
       <PlanningSlotCard

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -15,7 +16,11 @@ import { StatusBar } from "expo-status-bar";
 import { AppText } from "@/src/components/common/AppText";
 import { AppButton } from "@/src/components/common/AppButton";
 import { colors, spacing, radius, typography } from "@/src/theme";
-import { fetchTripByInviteCode, joinTrip, type TripPreview } from "@/src/api/trips";
+import {
+  fetchTripByInviteCode,
+  joinTrip,
+  type TripPreview,
+} from "@/src/api/trips";
 import { useAuth } from "@/src/context/AuthContext";
 import { auth } from "@/src/lib/firebase";
 import { invalidateTripsCache } from "./home";
@@ -61,45 +66,76 @@ export default function InviteScreen() {
   const [trip, setTrip] = useState<TripPreview | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [isJoining, setIsJoining] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const inviteCode = (code ?? "").trim().toUpperCase();
 
+  const loadPreview = useCallback(
+    async (
+      options: {
+        setLoading?: boolean;
+        shouldApply?: () => boolean;
+      } = {}
+    ) => {
+      const { setLoading = true, shouldApply } = options;
+      const canApply = () => shouldApply?.() !== false;
+
+      if (!inviteCode) {
+        if (canApply()) {
+          setErrorMessage("No invite code provided.");
+          setScreenState("error");
+        }
+        return;
+      }
+
+      if (setLoading && canApply()) {
+        setScreenState("loading");
+      }
+
+      try {
+        const preview = await fetchTripByInviteCode(inviteCode);
+        if (!canApply()) return;
+        setTrip(preview);
+        setScreenState("preview");
+      } catch (err) {
+        if (!canApply()) return;
+        setErrorMessage(
+          err instanceof Error
+            ? err.message
+            : "This invite link is invalid or has expired."
+        );
+        setScreenState("error");
+      }
+    },
+    [inviteCode]
+  );
+
   // ── Load trip preview ──
   useEffect(() => {
-    if (!inviteCode) {
-      setErrorMessage("No invite code provided.");
-      setScreenState("error");
-      return;
-    }
-
     let cancelled = false;
 
     async function load() {
-      try {
-        const preview = await fetchTripByInviteCode(inviteCode);
-        if (!cancelled) {
-          setTrip(preview);
-          setScreenState("preview");
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setErrorMessage(
-            err instanceof Error
-              ? err.message
-              : "This invite link is invalid or has expired."
-          );
-          setScreenState("error");
-        }
-      }
+      await loadPreview({ shouldApply: () => !cancelled });
     }
 
     load();
     return () => {
       cancelled = true;
     };
-  }, [inviteCode]);
+  }, [loadPreview]);
 
   // ── Join trip ──
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing || isJoining) return;
+
+    setIsRefreshing(true);
+    try {
+      await loadPreview({ setLoading: false });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isJoining, isRefreshing, loadPreview]);
+
   async function handleJoin() {
     if (!user) {
       router.push({
@@ -229,6 +265,14 @@ export default function InviteScreen() {
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.nightBlack}
+              colors={[colors.nightBlack]}
+            />
+          }
         >
           {/* Header */}
           <View style={styles.header} {...hiddenFromAccessibility}>
@@ -240,10 +284,10 @@ export default function InviteScreen() {
 
           {/* Hero text */}
           <AppText variant="title" style={styles.heroTitle}>
-            You're invited!
+            {"You're invited!"}
           </AppText>
           <AppText variant="body" style={styles.heroSubtitle}>
-            Someone wants you on their trip. Here's what's planned:
+            {"Someone wants you on their trip. Here's what's planned:"}
           </AppText>
 
           {/* Trip card */}
@@ -303,7 +347,7 @@ export default function InviteScreen() {
           {!user && (
             <View style={styles.authNotice}>
               <AppText variant="body" style={styles.authNoticeText}>
-                You'll need to create an account or log in before joining.
+                {"You'll need to create an account or log in before joining."}
               </AppText>
             </View>
           )}

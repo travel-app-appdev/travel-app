@@ -6,6 +6,7 @@ import {
   Alert,
   findNodeHandle,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -287,6 +288,7 @@ export default function TripOverviewMemberScreen() {
   const [showLeaveTripModal, setShowLeaveTripModal] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const blinkingDotAnim = useRef(new Animated.Value(1)).current;
 
   const [tripSnapshot, setTripSnapshot] = useState({
@@ -587,6 +589,18 @@ export default function TripOverviewMemberScreen() {
     setShowLeaveTripModal(true);
   });
 
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing || isLeaving) return;
+
+    setIsRefreshing(true);
+    try {
+      setTimerNow(Date.now());
+      await refreshTripSnapshot({ forceRefresh: true });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isLeaving, isRefreshing, refreshTripSnapshot]);
+
   async function handleConfirmLeaveTrip() {
     try {
       setIsLeaving(true);
@@ -645,6 +659,14 @@ export default function TripOverviewMemberScreen() {
               },
             ]}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={colors.nightBlack}
+                colors={[colors.nightBlack]}
+              />
+            }
           >
             <StickyHeader />
 

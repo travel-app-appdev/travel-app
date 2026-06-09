@@ -83,19 +83,40 @@ describe('POST /itinerary/:tripId/slots/:slotId/activities', () => {
         expect(activityService.suggestActivity).not.toHaveBeenCalled();
     });
 
-    it('should return 400 if endTime is before startTime', async () => {
+    it('should accept an overnight activity time range', async () => {
+        (activityService.suggestActivity as jest.Mock).mockResolvedValueOnce({
+            activity_id: 'activity-overnight',
+            trip_id: 'trip-123',
+            user_id: 'user-123',
+            slot_id: SLOT_ID,
+            name: 'Night train',
+            startTime: '18:00',
+            endTime: '02:00',
+            source_type: 'manual',
+        });
+
         const res = await request(app)
             .post(`/itinerary/trip-123/slots/${ENCODED_SLOT_ID}/activities`)
             .send({
                 idToken: 'valid-token',
-                name: 'Visit Palace',
-                startTime: '14:00',
-                endTime: '11:00',
+                name: 'Night train',
+                startTime: '18:00',
+                endTime: '02:00',
             });
 
-        expect(res.status).toBe(400);
-        expect(res.body.error).toBe('endTime cannot be before startTime');
-        expect(activityService.suggestActivity).not.toHaveBeenCalled();
+        expect(activityService.suggestActivity).toHaveBeenCalledWith(
+            'trip-123',
+            SLOT_ID,
+            expect.objectContaining({
+                idToken: 'valid-token',
+                name: 'Night train',
+                startTime: '18:00',
+                endTime: '02:00',
+            })
+        );
+        expect(res.status).toBe(201);
+        expect(res.body.startTime).toBe('18:00');
+        expect(res.body.endTime).toBe('02:00');
     });
 
     it('should return 400 if trip is not in Planning state', async () => {
@@ -211,19 +232,38 @@ describe('PATCH /activities/:activityId', () => {
         expect(activityService.updateSuggestedActivity).not.toHaveBeenCalled();
     });
 
-    it('should return 400 if endTime is before startTime', async () => {
+    it('should accept an overnight activity time range', async () => {
+        (activityService.updateSuggestedActivity as jest.Mock).mockResolvedValueOnce({
+            activity_id: 'activity-123',
+            trip_id: 'trip-123',
+            user_id: 'user-123',
+            name: 'Night train',
+            startTime: '18:00',
+            endTime: '02:00',
+            source_type: 'manual',
+        });
+
         const res = await request(app)
             .patch('/activities/activity-123')
             .send({
                 idToken: 'valid-token',
-                name: 'Visit Palace',
-                startTime: '14:00',
-                endTime: '11:00',
+                name: 'Night train',
+                startTime: '18:00',
+                endTime: '02:00',
             });
 
-        expect(res.status).toBe(400);
-        expect(res.body.error).toBe('endTime cannot be before startTime');
-        expect(activityService.updateSuggestedActivity).not.toHaveBeenCalled();
+        expect(activityService.updateSuggestedActivity).toHaveBeenCalledWith(
+            'activity-123',
+            expect.objectContaining({
+                idToken: 'valid-token',
+                name: 'Night train',
+                startTime: '18:00',
+                endTime: '02:00',
+            })
+        );
+        expect(res.status).toBe(200);
+        expect(res.body.startTime).toBe('18:00');
+        expect(res.body.endTime).toBe('02:00');
     });
 
     it('should update activity time fields on success', async () => {
