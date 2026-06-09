@@ -59,7 +59,6 @@ import {
 
 const DEV_FORCE_STATE: ItineraryState | null = null;
 const TRANSITION_OVERLAY_MS = 1800;
-const TRIP_STATE_POLL_INTERVAL_MS = 30 * 1000;
 
 const activitiesCache = new Map<string, Activity[]>();
 
@@ -491,7 +490,7 @@ export default function ItineraryScreen() {
     typeof setTimeout
   > | null>(null);
   const initialTripRefreshKeyRef = useRef<string | null>(null);
-  const lastFinalUpdateRef = useRef<string | null>(null);
+  const lastFinalUpdateRef = useRef<string | null | undefined>(undefined);
 
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
@@ -752,22 +751,6 @@ export default function ItineraryScreen() {
   ]);
 
   useEffect(() => {
-    if (
-      !currentUserId ||
-      !tripId ||
-      (activeState !== "planning" && activeState !== "voting")
-    ) {
-      return;
-    }
-
-    const interval = setInterval(() => {
-      void refreshTripTimerFields({ forceRefresh: true });
-    }, TRIP_STATE_POLL_INTERVAL_MS);
-
-    return () => clearInterval(interval);
-  }, [activeState, currentUserId, refreshTripTimerFields, tripId]);
-
-  useEffect(() => {
     const updateTimer = () => {
       setTimerText(
         getActiveTripTimerText(
@@ -824,54 +807,47 @@ export default function ItineraryScreen() {
       return;
     }
 
+    let isInitialSnapshot = true;
     const unsubscribe = onSnapshot(
       doc(db, "trips", tripId),
-      (snapshot) => {
+      async (snapshot) => {
         if (!snapshot.exists()) {
           invalidateTripsCache();
           router.replace("/home");
-        }
-      },
-      (error) => {
-        console.log("Trip deletion listener error:", error);
-      }
-    );
-
-    return unsubscribe;
-  }, [tripId]);
-
-  useEffect(() => {
-    if (!tripId || activeState !== "final") {
-      return;
-    }
-
-    const tripRef = doc(db, "trips", tripId);
-
-    const unsubscribe = onSnapshot(
-      tripRef,
-      async (snapshot) => {
-        if (!snapshot.exists()) {
           return;
         }
 
         const data = snapshot.data();
-        const nextValue =
-          data?.final_itinerary_updated_at?.toMillis?.()?.toString?.() ?? null;
 
-        if (nextValue && nextValue === lastFinalUpdateRef.current) {
+        if (activeState === "final") {
+          const nextValue =
+            data?.final_itinerary_updated_at?.toMillis?.()?.toString?.() ??
+            null;
+
+          if (lastFinalUpdateRef.current === undefined) {
+            lastFinalUpdateRef.current = nextValue;
+          } else if (nextValue !== lastFinalUpdateRef.current) {
+            lastFinalUpdateRef.current = nextValue;
+            await refreshFinalItinerary();
+          }
+        }
+
+        if (isInitialSnapshot) {
+          isInitialSnapshot = false;
           return;
         }
 
-        lastFinalUpdateRef.current = nextValue;
-        await refreshFinalItinerary();
+        if (activeState === "planning" || activeState === "voting") {
+          void refreshTripTimerFields({ forceRefresh: true });
+        }
       },
       (error) => {
-        console.log("Final itinerary listener error:", error);
+        console.log("Trip listener error:", error);
       }
     );
 
     return unsubscribe;
-  }, [tripId, activeState, refreshFinalItinerary]);
+  }, [activeState, refreshFinalItinerary, refreshTripTimerFields, tripId]);
 
   useEffect(() => {
     async function loadActivities() {
@@ -1028,7 +1004,7 @@ export default function ItineraryScreen() {
   useEffect(() => {
     if (activeState !== "final") {
       setFinalSlots([]);
-      lastFinalUpdateRef.current = null;
+      lastFinalUpdateRef.current = undefined;
     }
   }, [activeState]);
 

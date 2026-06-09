@@ -182,7 +182,6 @@ function parseIsoToTimeString(value?: string): string {
 
 const CHECKBOX_SIZE = 24;
 const TIMELINE_LINE_WIDTH = 2;
-const TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS = 30 * 1000;
 
 function isDeadlinePast(deadline?: string): boolean {
   if (!deadline) return false;
@@ -192,9 +191,9 @@ function isDeadlinePast(deadline?: string): boolean {
 }
 
 function PhaseCheckbox({
-                         phaseId,
-                         status,
-                       }: {
+  phaseId,
+  status,
+}: {
   phaseId: PhaseKey;
   status: PhaseStatus;
 }) {
@@ -401,13 +400,22 @@ export default function TripOverviewMemberScreen() {
       return;
     }
 
+    let isInitialSnapshot = true;
     const unsubscribe = onSnapshot(
       doc(db, "trips", tripId),
       (snapshot) => {
         if (!snapshot.exists()) {
           invalidateTripsCache();
           router.replace("/home");
+          return;
         }
+
+        if (isInitialSnapshot) {
+          isInitialSnapshot = false;
+          return;
+        }
+
+        void refreshTripSnapshot({ forceRefresh: true });
       },
       (error) => {
         console.log("Trip deletion listener error:", error);
@@ -415,7 +423,7 @@ export default function TripOverviewMemberScreen() {
     );
 
     return unsubscribe;
-  }, [router, tripId]);
+  }, [refreshTripSnapshot, router, tripId]);
 
   useEffect(() => {
     if (!tripId || (tripState !== "Planning" && tripState !== "Voting")) {
@@ -445,14 +453,8 @@ export default function TripOverviewMemberScreen() {
       }
     }
 
-    const pollInterval = setInterval(
-      forceRefresh,
-      TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS
-    );
-
     return () => {
       if (deadlineTimeout) clearTimeout(deadlineTimeout);
-      clearInterval(pollInterval);
     };
   }, [
     refreshTripSnapshot,
@@ -827,15 +829,15 @@ export default function TripOverviewMemberScreen() {
                       accessibilityLabel={
                         phaseId === "final"
                           ? `Final phase, starts ${formatDateDisplay(
-                            dates.start
-                          )}`
+                              dates.start
+                            )}`
                           : `${phase.label} phase, ${timerText}, ${
-                            isActive
-                              ? "in progress"
-                              : isPast
-                                ? "completed"
-                                : "upcoming"
-                          }`
+                              isActive
+                                ? "in progress"
+                                : isPast
+                                  ? "completed"
+                                  : "upcoming"
+                            }`
                       }
                     >
                       <View
@@ -935,7 +937,7 @@ export default function TripOverviewMemberScreen() {
                                               style={[
                                                 styles.phaseDays,
                                                 isMuted &&
-                                                styles.phaseDaysMuted,
+                                                  styles.phaseDaysMuted,
                                               ]}
                                             >
                                               {timerText}
@@ -961,8 +963,7 @@ export default function TripOverviewMemberScreen() {
                                             variant="caption"
                                             style={[
                                               styles.timerLabel,
-                                              isMuted &&
-                                              styles.timerLabelMuted,
+                                              isMuted && styles.timerLabelMuted,
                                             ]}
                                           >
                                             Timer
@@ -978,7 +979,7 @@ export default function TripOverviewMemberScreen() {
                                           style={[
                                             styles.finalPlaceholderTopLine,
                                             isMuted &&
-                                            styles.phaseDateLabelMuted,
+                                              styles.phaseDateLabelMuted,
                                           ]}
                                         >
                                           Itinerary shown
@@ -988,7 +989,7 @@ export default function TripOverviewMemberScreen() {
                                           style={[
                                             styles.finalPlaceholderBottomLine,
                                             isMuted &&
-                                            styles.phaseDateLabelMuted,
+                                              styles.phaseDateLabelMuted,
                                           ]}
                                         >
                                           {`${formatDateDisplay(dates.start)} at ${dates.time}`}

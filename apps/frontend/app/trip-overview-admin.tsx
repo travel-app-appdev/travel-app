@@ -95,7 +95,6 @@ type PhaseStatus = "past" | "active" | "future";
 
 const CHECKBOX_SIZE = 24;
 const TIMELINE_LINE_WIDTH = 1;
-const TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS = 30 * 1000;
 
 function getChecklistSubtitle(tripState: Trip["state"]): string {
   switch (tripState) {
@@ -655,13 +654,22 @@ export default function TripOverviewAdminScreen() {
       return;
     }
 
+    let isInitialSnapshot = true;
     const unsubscribe = onSnapshot(
       doc(db, "trips", tripId),
       (snapshot) => {
         if (!snapshot.exists()) {
           invalidateTripsCache();
           router.replace("/home");
+          return;
         }
+
+        if (isInitialSnapshot) {
+          isInitialSnapshot = false;
+          return;
+        }
+
+        void refreshTripSnapshot({ forceRefresh: true });
       },
       (error) => {
         console.log("Trip deletion listener error:", error);
@@ -669,7 +677,7 @@ export default function TripOverviewAdminScreen() {
     );
 
     return unsubscribe;
-  }, [router, tripId]);
+  }, [refreshTripSnapshot, router, tripId]);
 
   useEffect(() => {
     if (!tripId || (tripState !== "Planning" && tripState !== "Voting")) {
@@ -699,14 +707,8 @@ export default function TripOverviewAdminScreen() {
       }
     }
 
-    const pollInterval = setInterval(
-      forceRefresh,
-      TRIP_OVERVIEW_STATE_POLL_INTERVAL_MS
-    );
-
     return () => {
       if (deadlineTimeout) clearTimeout(deadlineTimeout);
-      clearInterval(pollInterval);
     };
   }, [
     refreshTripSnapshot,
