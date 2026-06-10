@@ -1,5 +1,19 @@
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+export async function fetchDestinationSuggestions(query: string): Promise<string[]> {
+  if (query.trim().length < 1) return [];
+  try {
+    const response = await fetch(
+      `${API_URL}/autocomplete/destinations?q=${encodeURIComponent(query)}`
+    );
+    if (!response.ok) return [];
+    const data = await response.json() as { results: string[] };
+    return data.results;
+  } catch {
+    return [];
+  }
+}
+
 export type TripMember = {
   id: string;
   name: string;

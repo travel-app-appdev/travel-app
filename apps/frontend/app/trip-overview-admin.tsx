@@ -39,6 +39,7 @@ import {
   type Trip,
 } from "@/src/api/trips";
 import { PreferenceChips } from "@/src/components/common/PreferenceChips";
+import { DestinationAutocomplete } from "@/src/components/common/DestinationAutocomplete";
 import { auth, db } from "@/src/lib/firebase";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
@@ -1673,16 +1674,15 @@ export default function TripOverviewAdminScreen() {
                         Destination
                       </AppText>
                     </View>
-                    <AppInput
+                    <DestinationAutocomplete
                       value={destinationInput}
-                      onChangeText={(t) => {
+                      onChange={(t) => {
                         setDestinationInput(t);
                         setDestinationUpdated(false);
                       }}
                       placeholder="Enter destination"
-                      autoFocus
+                      inputStyle={[styles.inputBlackStroke, styles.inlineInput]}
                       accessibilityLabel="Destination"
-                      style={[styles.inputBlackStroke, styles.inlineInput]}
                     />
                   </View>
                   <Pressable

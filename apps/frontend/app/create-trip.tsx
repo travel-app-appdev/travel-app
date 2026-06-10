@@ -23,6 +23,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar as RangeCalendar } from "react-native-calendars";
 import { AppText } from "@/src/components/common/AppText";
 import { AppInput } from "@/src/components/common/AppInput";
+import { DestinationAutocomplete } from "@/src/components/common/DestinationAutocomplete";
 import { AppButton } from "@/src/components/common/AppButton";
 import { BackLink } from "@/src/components/common/BackLink";
 import { colors, spacing, radius, typography } from "@/src/theme";
@@ -921,7 +922,7 @@ export default function CreateTripScreen() {
     }
   };
 
-  const TOTAL_STEPS = 4;
+  const TOTAL_STEPS = 5;
   const progress = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -1670,13 +1671,12 @@ export default function CreateTripScreen() {
                       </AppText>
                     </View>
 
-                    <AppInput
-                      placeholder="Enter city or country"
+                    <DestinationAutocomplete
                       value={destination}
-                      onChangeText={setDestination}
+                      onChange={setDestination}
+                      placeholder="Enter city or country"
+                      inputStyle={styles.inputBlackStroke}
                       accessibilityLabel="Destination"
-                      accessibilityHint="Enter the city or country for the trip"
-                      style={styles.inputBlackStroke}
                     />
                   </View>
 
