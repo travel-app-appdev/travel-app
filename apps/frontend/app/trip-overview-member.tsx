@@ -647,9 +647,10 @@ export default function TripOverviewMemberScreen() {
             </AppText>
           </Pressable>
 
+          <StickyHeader />
+
           <ScrollView
             style={styles.flex}
-            stickyHeaderIndices={[0]}
             contentContainerStyle={[
               styles.container,
               {
@@ -668,8 +669,6 @@ export default function TripOverviewMemberScreen() {
               />
             }
           >
-            <StickyHeader />
-
             <View style={styles.fieldGroup}>
               <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
                 <TripTitle width={20} height={20} />

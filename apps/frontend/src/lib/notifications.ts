@@ -1,16 +1,18 @@
-import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 export async function registerForPushNotifications(
   idToken: string
 ): Promise<void> {
-  // Push notifications don't work on the web or in simulators without
-  // physical device credentials, so we bail out silently.
   if (Platform.OS === "web") return;
+  if (isExpoGo) return; // not supported in Expo Go since SDK 53
 
   try {
+    const Notifications = await import("expo-notifications");
+
     const { status: existingStatus } =
       await Notifications.getPermissionsAsync();
 
@@ -22,7 +24,6 @@ export async function registerForPushNotifications(
     }
 
     if (finalStatus !== "granted") {
-      // User declined — respect their choice, don't throw
       return;
     }
 
@@ -35,19 +36,22 @@ export async function registerForPushNotifications(
       body: JSON.stringify({ idToken, expoPushToken }),
     });
   } catch (error) {
-    // Never let notification registration break the login flow
     console.warn("[notifications] registerForPushNotifications failed:", error);
   }
 }
 
 export function configureNotificationHandler(): void {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
+  if (isExpoGo) return; // not supported in Expo Go since SDK 53
+
+  import("expo-notifications").then((Notifications) => {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
   });
 }
