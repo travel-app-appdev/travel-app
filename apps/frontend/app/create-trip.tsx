@@ -1182,14 +1182,14 @@ export default function CreateTripScreen() {
 
             <View style={styles.step3Footer}>
               <AppButton
-                title={isCreating ? "Creating..." : "Create trip"}
+                title={isCreating ? "Continuing..." : "Continue"}
                 onPress={handleCreateTrip}
                 loading={isCreating}
                 disabled={isCreating}
                 style={styles.nextButton}
                 textStyle={styles.nextButtonText}
                 accessibilityLabel={
-                  isCreating ? "Creating trip" : "Create trip"
+                  isCreating ? "Continuing" : "Continue"
                 }
               />
             </View>
@@ -1610,11 +1610,11 @@ export default function CreateTripScreen() {
 
               <View style={styles.inlineButtonWrapper}>
                 <AppButton
-                  title="Continue"
+                  title="Create trip"
                   onPress={() => router.replace("/home")}
                   style={styles.backToLandingButton}
                   textStyle={styles.backToLandingText}
-                  accessibilityLabel="Continue to preferences"
+                  accessibilityLabel="Create trip"
                 />
               </View>
             </ScrollView>
