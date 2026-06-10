@@ -42,6 +42,18 @@ export type TripMembershipDocument = {
     role: string;
     invite_status: string;
     planning_done?: boolean;
+    preferences?: string[];
+};
+
+export type ActivitySuggestion = {
+    name: string;
+    address?: string;
+    googleMapsUrl?: string;
+    latitude: number;
+    longitude: number;
+    source: "geoapify";
+    sourcePlaceId: string;
+    matchedPreferences: string[];
 };
 
 export type UserDocument = {

@@ -338,6 +338,7 @@ export default function CreateTripScreen() {
   const [rangeEnd, setRangeEnd] = useState<string | null>(null);
 
   const [tripCode, setTripCode] = useState("");
+  const [createdTripId, setCreatedTripId] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [showOnboardingHint, setShowOnboardingHint] = useState(false);
   const [showNotLoggedInModal, setShowNotLoggedInModal] = useState(false);
@@ -903,6 +904,7 @@ export default function CreateTripScreen() {
 
       invalidateTripsCache();
       setTripCode(result.invite_code ?? "");
+      setCreatedTripId(result.trip_id ?? "");
       setStep(4);
     } catch (error) {
       const message =
@@ -1479,12 +1481,20 @@ export default function CreateTripScreen() {
 
               <View style={styles.inlineButtonWrapper}>
                 <AppButton
-                  title="Back to Landing Page"
-                  onPress={() => router.replace("/home")}
+                  title="Continue"
+                  onPress={() => {
+                    if (createdTripId) {
+                      router.replace({
+                        pathname: "/preferences",
+                        params: { tripId: createdTripId },
+                      });
+                    } else {
+                      router.replace("/home");
+                    }
+                  }}
                   style={styles.backToLandingButton}
                   textStyle={styles.backToLandingText}
-                  accessibilityLabel="Back to landing page"
-                  accessibilityHint="Goes back to the home screen"
+                  accessibilityLabel="Continue to preferences"
                 />
               </View>
             </ScrollView>
