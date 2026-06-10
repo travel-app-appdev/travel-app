@@ -431,6 +431,9 @@ export default function CreateTripScreen() {
   const [showPhaseTimePicker, setShowPhaseTimePicker] =
     useState<PhaseKey | null>(null);
   const [tempPhaseTime, setTempPhaseTime] = useState("12:00");
+  const [preferences, setPreferences] = useState<string[]>([]);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
+  const [createdTripId, setCreatedTripId] = useState<string | null>(null);
 
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const { user } = useAuth();
@@ -907,6 +910,7 @@ export default function CreateTripScreen() {
 
       invalidateTripsCache();
       setTripCode(result.invite_code ?? "");
+      setCreatedTripId(result.trip_id ?? null);
       setStep(4);
     } catch (error) {
       const message =
