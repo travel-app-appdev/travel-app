@@ -7,18 +7,47 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 // Maps preference chip -> Geoapify categories
 const PREFERENCE_TO_CATEGORIES: Record<string, string[]> = {
     // Food & Drink
-    coffee:     ["catering.cafe", "catering.cafe.coffee_shop"],
-    food:       ["catering.restaurant", "catering.fast_food", "catering.food_court"],
+    coffee:     ["catering.cafe", "catering.cafe.coffee_shop", "catering.cafe.coffee"],
+    food:       ["catering.restaurant", "catering.food_court"],
+    quickbites: ["catering.fast_food", "catering.food_court"],
+    desserts:   ["catering.cafe.dessert", "catering.cafe.ice_cream", "catering.cafe.cake"],
     nightlife:  ["catering.bar", "catering.pub", "catering.biergarten"],
     // Explore
     museums:    ["entertainment.museum", "entertainment.culture.gallery"],
-    nature:     ["leisure.park", "natural", "national_park"],
+    galleries:  ["entertainment.culture.gallery", "commercial.art"],
+    viewpoints: ["tourism.attraction.viewpoint", "tourism.attraction"],
+    heritage:   ["heritage", "building.historic", "tourism.sights"],
     citywalks:  ["tourism.sights", "tourism.attraction"],
-    shopping:   ["commercial.shopping_mall", "commercial.marketplace", "commercial.gift_and_souvenir"],
-    // Activities
-    culture:    ["entertainment.culture", "tourism.attraction", "heritage"],
-    sports:     ["sport", "activity.sport_club"],
     sightseeing:["tourism.sights", "tourism.attraction"],
+    // Outdoors
+    nature:     ["leisure.park", "natural", "national_park"],
+    parks:      ["leisure.park", "leisure.park.nature_reserve"],
+    gardens:    ["leisure.park.garden", "leisure.park"],
+    beaches:    ["beach", "beach.beach_resort"],
+    camping:    ["camping", "camping.camp_site", "camping.camp_pitch"],
+    water:      ["natural.water", "natural.water.hot_spring", "tourism.attraction.viewpoint"],
+    // Fun
+    culture:    ["entertainment.culture", "tourism.attraction", "heritage"],
+    cinema:     ["entertainment.cinema"],
+    theatre:    ["entertainment.culture.theatre"],
+    amusement:  ["entertainment.theme_park", "entertainment.activity_park", "entertainment.water_park"],
+    zoo_aquarium: ["entertainment.zoo", "entertainment.aquarium"],
+    bowling:    ["entertainment.bowling_alley"],
+    escape_rooms: ["entertainment.escape_game"],
+    // Active
+    sports:     ["sport", "activity.sport_club"],
+    fitness:    ["sport.fitness", "sport.fitness.gym", "sport.fitness.fitness_centre"],
+    swimming:   ["sport.swimming_pool"],
+    skiing:     ["ski", "rental.ski", "commercial.outdoor_and_sport.ski"],
+    cycling:    ["rental.bicycle", "commercial.outdoor_and_sport.bicycle"],
+    water_sports: ["commercial.outdoor_and_sport.water_sports", "rental.boat", "sport.dive_centre"],
+    spa:        ["leisure.spa", "service.beauty.spa", "service.beauty.massage"],
+    // Shopping
+    shopping:   ["commercial.shopping_mall", "commercial.department_store"],
+    markets:    ["commercial.marketplace"],
+    souvenirs:  ["commercial.gift_and_souvenir"],
+    books:      ["commercial.books"],
+    vintage:    ["commercial.second_hand", "commercial.antiques"],
     // Legacy keys (backwards compat)
     relaxing:   ["leisure.spa", "beach.beach_resort", "leisure.park"],
     adventure:  ["sport", "activity", "natural", "camping"],
@@ -175,6 +204,12 @@ async function fetchPlaces(
         const [lon, lat] = f.geometry?.coordinates ?? [0, 0];
         const name = props.name ?? props.address_line1 ?? "Unknown place";
         const address = props.formatted ?? props.address_line2;
+        const placeCategories = Array.isArray(props.categories)
+            ? props.categories.filter((category: unknown): category is string => typeof category === "string")
+            : [];
+        const placeMatchedPrefs = matchedPrefs.filter((pref) =>
+            categoryMatchesPreference(placeCategories, pref)
+        );
 
         return {
             name,
@@ -184,9 +219,21 @@ async function fetchPlaces(
             longitude: lon,
             source: "geoapify",
             sourcePlaceId: props.place_id ?? "",
-            matchedPreferences: matchedPrefs,
+            matchedPreferences: placeMatchedPrefs,
+            categories: placeCategories,
         };
     });
+}
+
+function categoryMatchesPreference(placeCategories: string[], preference: string): boolean {
+    const preferenceCategories = PREFERENCE_TO_CATEGORIES[preference] ?? [];
+    return preferenceCategories.some((preferenceCategory) =>
+        placeCategories.some((placeCategory) =>
+            placeCategory === preferenceCategory ||
+            placeCategory.startsWith(preferenceCategory + ".") ||
+            preferenceCategory.startsWith(placeCategory + ".")
+        )
+    );
 }
 
 function buildGoogleMapsUrl(name: string, address?: string): string {
