@@ -56,7 +56,7 @@ type TripCardItem = {
   endDate: string;
   rawStartDate: string;
   rawEndDate: string;
-  status: "planning" | "voting" | "final";
+  status: "planning" | "voting" | "final" | "memories";
   cardColor: string;
   role: "admin" | "member";
   inviteCode: string;
@@ -122,10 +122,11 @@ function getCardColor(tripId: string): string {
 function getUiStatus(
   state: Trip["state"],
   memberCount: number
-): "planning" | "voting" | "final" {
+): "planning" | "voting" | "final" | "memories" {
+  if (state === "Memories") return "memories";
   if (state === "Voting" && memberCount <= 1) return "final";
   if (state === "Voting") return "voting";
-  if (state === "Final" || state === "Memories") return "final";
+  if (state === "Final") return "final";
   return "planning";
 }
 

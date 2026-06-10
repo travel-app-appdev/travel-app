@@ -4,7 +4,7 @@ import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import CardArrow from "@/assets/icons/card_arrow.svg";
 
-type TripStatus = "planning" | "voting" | "final";
+type TripStatus = "planning" | "voting" | "final" | "memories";
 type TripRole = "admin" | "member";
 
 type Member = {
@@ -31,12 +31,14 @@ const STATUS_COLORS: Record<TripStatus, { bg: string; text: string }> = {
   planning: { bg: colors.beachYellow, text: colors.nightBlack },
   voting: { bg: colors.sunsetPink, text: colors.nightBlack },
   final: { bg: colors.neonGreen, text: colors.nightBlack },
+  memories: { bg: colors.seaBlue, text: colors.nightBlack },
 };
 
 const STATUS_LABELS: Record<TripStatus, string> = {
   planning: "Planning",
   voting: "Voting",
   final: "Final",
+  memories: "Memories",
 };
 
 export function TripCard({
