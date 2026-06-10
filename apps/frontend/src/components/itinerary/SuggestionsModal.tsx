@@ -562,8 +562,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   filterScroller: {
-    height: 36,
     marginBottom: spacing.sm,
+    flexShrink: 0,
   },
   filterRow: {
     flexDirection: "row",
@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   cardBody: {
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   placeName: {
     fontFamily: typography.fontFamily.bodyBold,
@@ -638,14 +638,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.beachYellow,
     backgroundColor: "#FFF4C2",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   placeLabelText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodySemiBold,
-    fontSize: typography.size.xs,
-    lineHeight: typography.lineHeight.xs,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
   },
   infoRow: {
     flexDirection: "row",
@@ -673,9 +673,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xs,
-    backgroundColor: colors.neonGreen,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
+    backgroundColor: colors.beachYellow,
+    borderRadius: radius.pill,
+    height: 56,
     paddingHorizontal: spacing.md,
   },
   addBtnDone: {
