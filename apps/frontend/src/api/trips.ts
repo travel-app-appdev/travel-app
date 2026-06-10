@@ -1,19 +1,40 @@
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
-export async function fetchDestinationSuggestions(query: string): Promise<string[]> {
-  if (query.trim().length < 1) return [];
+export async function fetchDestinationSuggestions(
+  query: string
+): Promise<string[]> {
+  const trimmed = query.trim();
+
+  if (trimmed.length < 1) {
+    return [];
+  }
+
+  if (!API_URL) {
+    console.warn("[autocomplete] EXPO_PUBLIC_API_URL is not configured");
+    return [];
+  }
+
   try {
     const response = await fetch(
-      `${API_URL}/autocomplete/destinations?q=${encodeURIComponent(query)}`
+      `${API_URL}/autocomplete/destinations?q=${encodeURIComponent(trimmed)}`
     );
+
     if (!response.ok) {
       console.warn("[autocomplete] response not ok:", response.status);
       return [];
     }
-    const data = await response.json() as { results: string[] };
-    return data.results;
-  } catch (e) {
-    console.warn("[autocomplete] fetch error:", e);
+
+    const data = (await response.json()) as { results?: unknown };
+
+    if (!Array.isArray(data.results)) {
+      return [];
+    }
+
+    return data.results.filter(
+      (item): item is string => typeof item === "string"
+    );
+  } catch (error) {
+    console.warn("[autocomplete] fetch error:", error);
     return [];
   }
 }

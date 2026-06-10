@@ -13,7 +13,12 @@ type Props = {
   accessibilityLabel?: string;
 };
 
-type Layout = { x: number; y: number; width: number; height: number };
+type Layout = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 export function DestinationAutocomplete({
   value,
@@ -24,40 +29,98 @@ export function DestinationAutocomplete({
 }: Props) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [layout, setLayout] = useState<Layout | null>(null);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestIdRef = useRef(0);
   const skipFetchRef = useRef(false);
   const containerRef = useRef<View>(null);
 
   const measure = useCallback(() => {
     containerRef.current?.measureInWindow((x, y, width, height) => {
-      if (width > 0) setLayout({ x, y, width, height });
+      if (width > 0 && height > 0) {
+        setLayout({ x, y, width, height });
+      }
     });
   }, []);
 
+  const hideSuggestions = useCallback(() => {
+    setSuggestions([]);
+  }, []);
+
   useEffect(() => {
-    if (skipFetchRef.current) { skipFetchRef.current = false; return; }
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (value.trim().length < 1) { setSuggestions([]); return; }
+    if (skipFetchRef.current) {
+      skipFetchRef.current = false;
+      return;
+    }
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    const query = value.trim();
+
+    if (query.length < 1) {
+      setSuggestions([]);
+      return;
+    }
+
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
 
     debounceRef.current = setTimeout(async () => {
-      const results = await fetchDestinationSuggestions(value);
-      if (results.length === 0) { setSuggestions([]); return; }
-      // measure position first, then show
-      containerRef.current?.measureInWindow((x, y, width, height) => {
-        setLayout({ x, y, width, height });
-        setSuggestions(results);
-      });
+      try {
+        const results = await fetchDestinationSuggestions(query);
+
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
+        if (query !== value.trim()) {
+          return;
+        }
+
+        if (results.length === 0) {
+          setSuggestions([]);
+          return;
+        }
+
+        containerRef.current?.measureInWindow((x, y, width, height) => {
+          if (requestId !== requestIdRef.current) {
+            return;
+          }
+
+          if (width > 0 && height > 0) {
+            setLayout({ x, y, width, height });
+          }
+
+          setSuggestions(results);
+        });
+      } catch (error) {
+        console.warn("[autocomplete] failed to load suggestions:", error);
+
+        if (requestId === requestIdRef.current) {
+          setSuggestions([]);
+        }
+      }
     }, 300);
 
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
   }, [value]);
 
-  const handleSelect = useCallback((suggestion: string) => {
-    skipFetchRef.current = true;
-    setSuggestions([]);
-    onChange(suggestion);
-    Keyboard.dismiss();
-  }, [onChange]);
+  const handleSelect = useCallback(
+    (suggestion: string) => {
+      skipFetchRef.current = true;
+      requestIdRef.current += 1;
+      setSuggestions([]);
+      onChange(suggestion);
+      Keyboard.dismiss();
+    },
+    [onChange]
+  );
 
   return (
     <View ref={containerRef} onLayout={measure}>
@@ -66,7 +129,6 @@ export function DestinationAutocomplete({
         value={value}
         onChangeText={onChange}
         onFocus={measure}
-        onBlur={() => setTimeout(() => setSuggestions([]), 150)}
         accessibilityLabel={accessibilityLabel}
         style={inputStyle}
         autoCorrect={false}
@@ -74,8 +136,18 @@ export function DestinationAutocomplete({
       />
 
       {suggestions.length > 0 && layout && (
-        <Modal transparent visible animationType="none" statusBarTranslucent>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSuggestions([])} />
+        <Modal
+          transparent
+          visible
+          animationType="none"
+          statusBarTranslucent
+          onRequestClose={hideSuggestions}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={hideSuggestions}
+          />
+
           <View
             style={[
               styles.dropdown,
@@ -86,14 +158,20 @@ export function DestinationAutocomplete({
               },
             ]}
           >
-            {suggestions.map((s) => (
+            {suggestions.map((suggestion) => (
               <Pressable
-                key={s}
-                style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-                onPress={() => handleSelect(s)}
+                key={suggestion}
+                style={({ pressed }) => [
+                  styles.item,
+                  pressed && styles.itemPressed,
+                ]}
+                onPress={() => handleSelect(suggestion)}
                 accessibilityRole="button"
+                accessibilityLabel={`Select ${suggestion}`}
               >
-                <AppText variant="body" style={styles.itemText}>{s}</AppText>
+                <AppText variant="body" style={styles.itemText}>
+                  {suggestion}
+                </AppText>
               </Pressable>
             ))}
           </View>

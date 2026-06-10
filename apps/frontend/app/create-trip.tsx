@@ -329,7 +329,7 @@ function StickyHeader({
 }
 
 export default function CreateTripScreen() {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 
   const [destination, setDestination] = useState("");
   const [tripName, setTripName] = useState("");
