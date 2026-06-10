@@ -561,19 +561,22 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   filterScroller: {
+    marginTop: spacing.xs,
     marginBottom: spacing.sm,
     flexShrink: 0,
+    overflow: "visible",
   },
   filterRow: {
     flexDirection: "row",
     gap: spacing.sm,
     alignItems: "center",
+    paddingVertical: spacing.xs,
     paddingRight: spacing.lg,
   },
   filterChip: {
     minHeight: 34,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.sm,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.nightBlack,
