@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import admin from "../config/firebase";
 import { getActivitySuggestions, saveMemberPreferences } from "../services/suggestionsService";
-import { findMembership } from "../repositories/tripsRepository";
+import { findMembership, getMemberPreferences } from "../repositories/tripsRepository";
 
 export async function getSuggestionsController(req: Request, res: Response) {
     try {
@@ -18,6 +18,24 @@ export async function getSuggestionsController(req: Request, res: Response) {
 
         const suggestions = await getActivitySuggestions(tripId as string, slotType, offset);
         return res.json({ suggestions });
+    } catch (err: any) {
+        return res.status(err.status ?? 500).json({ error: err.message ?? "Internal server error" });
+    }
+}
+
+export async function getPreferencesController(req: Request, res: Response) {
+    try {
+        const { tripId } = req.params;
+        const idToken = req.headers.authorization?.replace("Bearer ", "");
+
+        if (!idToken) return res.status(401).json({ error: "Unauthorized" });
+
+        const decoded = await admin.auth().verifyIdToken(idToken as string);
+        const membership = await findMembership(tripId as string, decoded.uid);
+        if (!membership) return res.status(403).json({ error: "Not a member of this trip" });
+
+        const preferences = await getMemberPreferences(tripId as string, decoded.uid);
+        return res.json({ preferences });
     } catch (err: any) {
         return res.status(err.status ?? 500).json({ error: err.message ?? "Internal server error" });
     }

@@ -619,6 +619,22 @@ export async function fetchActivitySuggestions(
   return (data as { suggestions: ActivitySuggestion[] }).suggestions;
 }
 
+export async function getMemberPreferences(
+  tripId: string,
+  idToken: string
+): Promise<string[]> {
+  const response = await fetch(
+    `${API_URL}/trips/${encodeURIComponent(tripId)}/members/me/preferences`,
+    { headers: { Authorization: `Bearer ${idToken}` } }
+  );
+  if (!response.ok) {
+    const data: ApiErrorResponse = await response.json();
+    throw new Error(data.error || "Failed to fetch preferences");
+  }
+  const data = await response.json() as { preferences: string[] };
+  return data.preferences;
+}
+
 export async function updateMemberPreferences(
   tripId: string,
   preferences: string[],

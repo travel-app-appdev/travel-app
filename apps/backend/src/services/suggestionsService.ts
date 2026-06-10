@@ -147,7 +147,7 @@ async function writeCache(cacheKey: string, tripId: string, suggestions: Activit
     });
 }
 
-async function invalidateTripSuggestionsCache(tripId: string): Promise<void> {
+export async function invalidateTripSuggestionsCache(tripId: string): Promise<void> {
     const db = admin.firestore();
     const snapshot = await db
         .collection("suggestion_cache")
