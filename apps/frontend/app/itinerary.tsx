@@ -55,6 +55,7 @@ import {
   type Trip,
   type ActivitySuggestion,
 } from "@/src/api/trips";
+import CloseIcon from "@/assets/icons/close.svg";
 import { invalidateTripsCache } from "./home";
 import {
   getActivitiesBySlot,
@@ -530,6 +531,9 @@ export default function ItineraryScreen() {
 
   const [finalSlots, setFinalSlots] = useState<FinalSlotUi[]>([]);
   const [memories, setMemories] = useState<MemoryPhoto[]>([]);
+  const [selectedMemory, setSelectedMemory] = useState<MemoryPhoto | null>(
+    null
+  );
   const [isLoadingMemories, setIsLoadingMemories] = useState(false);
   const [isUploadingMemories, setIsUploadingMemories] = useState(false);
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
@@ -1203,9 +1207,9 @@ export default function ItineraryScreen() {
         const asset = result.assets[index];
         const manipulated = await ImageManipulator.manipulateAsync(
           asset.uri,
-          [{ resize: { width: 1600 } }],
+          [{ resize: { width: 1400 } }],
           {
-            compress: 0.7,
+            compress: 0.6,
             format: ImageManipulator.SaveFormat.JPEG,
           }
         );
@@ -1235,6 +1239,10 @@ export default function ItineraryScreen() {
       "Download all",
       "Download all will be added after the backend zip endpoint is ready."
     );
+  }, []);
+
+  const handleCloseMemoryPreview = useCallback(() => {
+    setSelectedMemory(null);
   }, []);
 
   useEffect(() => {
@@ -2188,33 +2196,46 @@ export default function ItineraryScreen() {
                           style={styles.memoryPlaceholder}
                         />
                       ))
-                    : memories.length > 0
-                      ? memories.map((memory) => (
-                          <View
-                            key={memory.memory_id}
+                    : [
+                        ...memories.map((memory) => ({
+                          type: "memory" as const,
+                          memory,
+                        })),
+                        ...Array.from({
+                          length: Math.max(0, 6 - memories.length),
+                        }).map((_, index) => ({
+                          type: "placeholder" as const,
+                          index,
+                        })),
+                      ].map((item) =>
+                        item.type === "memory" ? (
+                          <Pressable
+                            key={item.memory.memory_id}
                             style={styles.memoryTile}
-                            accessible={true}
+                            onPress={() => setSelectedMemory(item.memory)}
+                            accessibilityRole="imagebutton"
                             accessibilityLabel={`Memory photo uploaded by ${
-                              memory.uploaded_by_name ?? "a trip member"
+                              item.memory.uploaded_by_name ?? "a trip member"
                             }`}
+                            accessibilityHint="Opens a larger preview"
                           >
                             <ExpoImage
                               source={{
                                 uri: authToken
-                                  ? getMemoryPhotoUrl(memory, authToken)
+                                  ? getMemoryPhotoUrl(item.memory, authToken)
                                   : "",
                               }}
                               style={styles.memoryImage}
                               contentFit="cover"
                             />
-                          </View>
-                        ))
-                      : Array.from({ length: 6 }).map((_, index) => (
+                          </Pressable>
+                        ) : (
                           <View
-                            key={`memory-empty-${index}`}
+                            key={`memory-empty-${item.index}`}
                             style={styles.memoryPlaceholder}
                           />
-                        ))}
+                        )
+                      )}
                 </View>
               </View>
             )}
@@ -2358,6 +2379,43 @@ export default function ItineraryScreen() {
           onAddAlternativeToItinerary={handleAddAlternativeToItinerary}
           onClose={handleCloseActivityDetails}
         />
+
+        <Modal
+          visible={selectedMemory !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={handleCloseMemoryPreview}
+        >
+          <View style={styles.memoryPreviewOverlay}>
+            <Pressable
+              style={styles.memoryPreviewBackdrop}
+              onPress={handleCloseMemoryPreview}
+              accessibilityRole="button"
+              accessibilityLabel="Close memory preview"
+            />
+
+            <View style={styles.memoryPreviewContent}>
+              <Pressable
+                style={styles.memoryPreviewCloseButton}
+                onPress={handleCloseMemoryPreview}
+                accessibilityRole="button"
+                accessibilityLabel="Close memory preview"
+              >
+                <CloseIcon width={32} height={32} />
+              </Pressable>
+
+              {selectedMemory && authToken && (
+                <ExpoImage
+                  source={{
+                    uri: getMemoryPhotoUrl(selectedMemory, authToken),
+                  }}
+                  style={styles.memoryPreviewImage}
+                  contentFit="contain"
+                />
+              )}
+            </View>
+          </View>
+        </Modal>
 
         <ItineraryInfoModal
           visible={activeState === "planning" && showPlanningInfoPopup}
@@ -2575,16 +2633,56 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: colors.border,
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
   },
   memoryPlaceholder: {
     width: "48%",
     aspectRatio: 1,
     borderRadius: 8,
     backgroundColor: colors.border,
+    borderWidth: 2,
+    borderColor: colors.border,
   },
   memoryImage: {
     width: "100%",
     height: "100%",
+  },
+  memoryPreviewOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+  },
+  memoryPreviewBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  memoryPreviewContent: {
+    width: "100%",
+    maxWidth: 520,
+    maxHeight: "82%",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.nightBlack,
+    backgroundColor: colors.lightWhite,
+    overflow: "hidden",
+  },
+  memoryPreviewCloseButton: {
+    position: "absolute",
+    right: spacing.sm,
+    top: spacing.sm,
+    zIndex: 2,
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  memoryPreviewImage: {
+    width: "100%",
+    aspectRatio: 1,
+    maxHeight: "100%",
   },
   votingModalOverlay: {
     flex: 1,

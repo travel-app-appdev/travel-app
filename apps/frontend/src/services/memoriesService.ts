@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export type MemoryPhoto = {
@@ -29,6 +31,29 @@ function authHeaders(idToken: string) {
   return {
     Authorization: `Bearer ${idToken}`,
   };
+}
+
+async function appendPhotoToFormData(
+  formData: FormData,
+  payload: { uri: string; name: string; type: string }
+) {
+  if (Platform.OS === "web") {
+    const photoResponse = await fetch(payload.uri);
+    const blob = await photoResponse.blob();
+    const typedBlob =
+      blob.type === payload.type
+        ? blob
+        : new Blob([blob], { type: payload.type || blob.type || "image/jpeg" });
+
+    formData.append("photo", typedBlob, payload.name);
+    return;
+  }
+
+  formData.append("photo", {
+    uri: payload.uri,
+    name: payload.name,
+    type: payload.type,
+  } as unknown as Blob);
 }
 
 export function getMemoryPhotoUrl(memory: MemoryPhoto, idToken: string): string {
@@ -63,11 +88,7 @@ export async function uploadMemoryPhoto(payload: {
   type: string;
 }): Promise<MemoryPhoto> {
   const formData = new FormData();
-  formData.append("photo", {
-    uri: payload.uri,
-    name: payload.name,
-    type: payload.type,
-  } as unknown as Blob);
+  await appendPhotoToFormData(formData, payload);
 
   const response = await fetch(`${API_URL}/trips/${payload.tripId}/memories`, {
     method: "POST",

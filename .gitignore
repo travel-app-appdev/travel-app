@@ -20,6 +20,9 @@ yarn-debug.log*
 coverage
 .nyc_output
 
+# Local uploaded memory photos
+/apps/backend/uploads/
+
 # Build output
 dist
 build/Release
