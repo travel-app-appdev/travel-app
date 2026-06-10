@@ -54,6 +54,7 @@ export type ActivitySuggestion = {
     source: "geoapify";
     sourcePlaceId: string;
     matchedPreferences: string[];
+    categories?: string[];
 };
 
 export type UserDocument = {

@@ -204,6 +204,12 @@ async function fetchPlaces(
         const [lon, lat] = f.geometry?.coordinates ?? [0, 0];
         const name = props.name ?? props.address_line1 ?? "Unknown place";
         const address = props.formatted ?? props.address_line2;
+        const placeCategories = Array.isArray(props.categories)
+            ? props.categories.filter((category: unknown): category is string => typeof category === "string")
+            : [];
+        const placeMatchedPrefs = matchedPrefs.filter((pref) =>
+            categoryMatchesPreference(placeCategories, pref)
+        );
 
         return {
             name,
@@ -213,9 +219,21 @@ async function fetchPlaces(
             longitude: lon,
             source: "geoapify",
             sourcePlaceId: props.place_id ?? "",
-            matchedPreferences: matchedPrefs,
+            matchedPreferences: placeMatchedPrefs,
+            categories: placeCategories,
         };
     });
+}
+
+function categoryMatchesPreference(placeCategories: string[], preference: string): boolean {
+    const preferenceCategories = PREFERENCE_TO_CATEGORIES[preference] ?? [];
+    return preferenceCategories.some((preferenceCategory) =>
+        placeCategories.some((placeCategory) =>
+            placeCategory === preferenceCategory ||
+            placeCategory.startsWith(preferenceCategory + ".") ||
+            preferenceCategory.startsWith(placeCategory + ".")
+        )
+    );
 }
 
 function buildGoogleMapsUrl(name: string, address?: string): string {

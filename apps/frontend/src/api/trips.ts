@@ -596,6 +596,7 @@ export type ActivitySuggestion = {
   source: "geoapify";
   sourcePlaceId: string;
   matchedPreferences: string[];
+  categories?: string[];
 };
 
 export async function fetchActivitySuggestions(
