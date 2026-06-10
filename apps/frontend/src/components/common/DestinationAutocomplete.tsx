@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Keyboard, Modal, Pressable, StyleSheet, View } from "react-native";
 import { AppInput } from "./AppInput";
 import { AppText } from "./AppText";
 import { fetchDestinationSuggestions } from "@/src/api/trips";
@@ -13,6 +13,8 @@ type Props = {
   accessibilityLabel?: string;
 };
 
+type Layout = { x: number; y: number; width: number; height: number };
+
 export function DestinationAutocomplete({
   value,
   onChange,
@@ -21,74 +23,81 @@ export function DestinationAutocomplete({
   accessibilityLabel = "Destination",
 }: Props) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [layout, setLayout] = useState<Layout | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipFetchRef = useRef(false);
+  const containerRef = useRef<View>(null);
+
+  const measure = useCallback(() => {
+    containerRef.current?.measureInWindow((x, y, width, height) => {
+      if (width > 0) setLayout({ x, y, width, height });
+    });
+  }, []);
 
   useEffect(() => {
-    if (skipFetchRef.current) {
-      skipFetchRef.current = false;
-      return;
-    }
-
+    if (skipFetchRef.current) { skipFetchRef.current = false; return; }
     if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    if (value.trim().length < 1) {
-      setSuggestions([]);
-      return;
-    }
+    if (value.trim().length < 1) { setSuggestions([]); return; }
 
     debounceRef.current = setTimeout(async () => {
       const results = await fetchDestinationSuggestions(value);
-      setSuggestions(results);
+      if (results.length === 0) { setSuggestions([]); return; }
+      // measure position first, then show
+      containerRef.current?.measureInWindow((x, y, width, height) => {
+        setLayout({ x, y, width, height });
+        setSuggestions(results);
+      });
     }, 300);
 
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [value]);
 
-  const handleSelect = useCallback(
-    (suggestion: string) => {
-      skipFetchRef.current = true;
-      setSuggestions([]);
-      onChange(suggestion);
-    },
-    [onChange]
-  );
+  const handleSelect = useCallback((suggestion: string) => {
+    skipFetchRef.current = true;
+    setSuggestions([]);
+    onChange(suggestion);
+    Keyboard.dismiss();
+  }, [onChange]);
 
   return (
-    <View>
+    <View ref={containerRef} onLayout={measure}>
       <AppInput
         placeholder={placeholder}
         value={value}
-        onChangeText={(t) => {
-          onChange(t);
-        }}
+        onChangeText={onChange}
+        onFocus={measure}
+        onBlur={() => setTimeout(() => setSuggestions([]), 150)}
         accessibilityLabel={accessibilityLabel}
         style={inputStyle}
         autoCorrect={false}
         autoCapitalize="words"
       />
-      {suggestions.length > 0 && (
-        <View style={styles.dropdown}>
-          {suggestions.map((s, i) => (
-            <Pressable
-              key={s}
-              style={({ pressed }) => [
-                styles.item,
-                i === suggestions.length - 1 && styles.itemLast,
-                pressed && styles.itemPressed,
-              ]}
-              onPress={() => handleSelect(s)}
-              accessibilityRole="button"
-              accessibilityLabel={`Select ${s}`}
-            >
-              <AppText variant="body" style={styles.itemText}>
-                {s}
-              </AppText>
-            </Pressable>
-          ))}
-        </View>
+
+      {suggestions.length > 0 && layout && (
+        <Modal transparent visible animationType="none" statusBarTranslucent>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSuggestions([])} />
+          <View
+            style={[
+              styles.dropdown,
+              {
+                top: layout.y + layout.height + 4,
+                left: layout.x,
+                width: layout.width,
+              },
+            ]}
+          >
+            {suggestions.map((s) => (
+              <Pressable
+                key={s}
+                style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+                onPress={() => handleSelect(s)}
+                accessibilityRole="button"
+              >
+                <AppText variant="body" style={styles.itemText}>{s}</AppText>
+              </Pressable>
+            ))}
+          </View>
+        </Modal>
       )}
     </View>
   );
@@ -96,25 +105,23 @@ export function DestinationAutocomplete({
 
 const styles = StyleSheet.create({
   dropdown: {
-    marginTop: 4,
+    position: "absolute",
     backgroundColor: colors.white,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
     shadowColor: colors.nightBlack,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 9999,
   },
   item: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-  },
-  itemLast: {
-    borderBottomWidth: 0,
   },
   itemPressed: {
     backgroundColor: "#FFF4C2",

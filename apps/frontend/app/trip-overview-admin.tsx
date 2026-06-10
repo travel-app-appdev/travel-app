@@ -1663,8 +1663,8 @@ export default function TripOverviewAdminScreen() {
 
             <View style={styles.fieldGroup}>
               {openField === "destination" ? (
-                <View style={[styles.infoRow, styles.infoRowEditing]}>
-                  <View style={styles.infoLeft}>
+                <View style={[styles.infoRow, styles.infoRowEditing, { zIndex: 9999 }]}>
+                  <View style={[styles.infoLeft, { zIndex: 9999 }]}>
                     <View
                       style={styles.infoLabelRow}
                       {...hiddenFromAccessibility}

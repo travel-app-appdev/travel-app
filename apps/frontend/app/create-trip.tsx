@@ -1660,7 +1660,7 @@ export default function CreateTripScreen() {
                     Where is your trip taking place?
                   </AppText>
 
-                  <View style={[styles.fieldGroup, { marginTop: 20 }]}>
+                  <View style={[styles.fieldGroup, { marginTop: 20, zIndex: 9999 }]}>
                     <View
                       style={styles.fieldLabelRow}
                       {...hiddenFromAccessibility}

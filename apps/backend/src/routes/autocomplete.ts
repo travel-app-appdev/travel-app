@@ -15,7 +15,7 @@ router.get("/destinations", async (req: Request, res: Response) => {
         const url =
             "https://api.geoapify.com/v1/geocode/autocomplete?text=" +
             encodeURIComponent(query) +
-            "&type=city&limit=5&format=json&apiKey=" +
+            "&type=city,country&limit=5&format=json&apiKey=" +
             apiKey;
 
         const response = await fetch(url);
@@ -27,8 +27,10 @@ router.get("/destinations", async (req: Request, res: Response) => {
         for (const result of data.results ?? []) {
             const city = result.city ?? result.county ?? result.state;
             const country = result.country;
-            if (!city) continue;
-            const label = country ? `${city}, ${country}` : city;
+            const label = city && country
+                ? `${city}, ${country}`
+                : city ?? country;
+            if (!label) continue;
             if (!results.includes(label)) results.push(label);
         }
 

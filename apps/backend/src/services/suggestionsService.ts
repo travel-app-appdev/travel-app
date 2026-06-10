@@ -85,20 +85,25 @@ export async function getActivitySuggestions(
         return [];
     }
 
-    // 5. Build category list
-    const categories = uniquePrefs.length > 0
-        ? [...new Set(uniquePrefs.flatMap((p) => PREFERENCE_TO_CATEGORIES[p] ?? []))]
-        : ["entertainment", "catering.restaurant", "leisure.park"];
+    const defaultCategories = ["tourism.sights", "catering.restaurant", "entertainment", "leisure.park"];
 
-    if (categories.length === 0) {
-        categories.push("entertainment", "catering.restaurant");
-    }
+    // 5. Build category list from preferences, fall back to defaults
+    let categories = uniquePrefs.length > 0
+        ? [...new Set(uniquePrefs.flatMap((p) => PREFERENCE_TO_CATEGORIES[p] ?? []))]
+        : defaultCategories;
+
+    if (categories.length === 0) categories = defaultCategories;
 
     // 6. Fetch places from Geoapify
-    const suggestions = await fetchPlaces(coords, categories, uniquePrefs, apiKey, offset);
+    let suggestions = await fetchPlaces(coords, categories, uniquePrefs, apiKey, offset);
 
-    // 7. Cache first-page results only
-    if (offset === 0) {
+    // If specific preferences returned nothing, fall back to defaults
+    if (suggestions.length === 0 && uniquePrefs.length > 0) {
+        suggestions = await fetchPlaces(coords, defaultCategories, [], apiKey, offset);
+    }
+
+    // 7. Cache first-page results only (only if we got results)
+    if (offset === 0 && suggestions.length > 0) {
         const cacheKey = buildCacheKey(tripId, slotType, uniquePrefs);
         await writeCache(cacheKey, tripId, suggestions);
     }
@@ -184,8 +189,8 @@ async function fetchPlaces(
     apiKey: string,
     offset: number = 0
 ): Promise<ActivitySuggestion[]> {
-    const categoryParam = categories.slice(0, 8).join(",");
-    const radius = 5000; // 5km radius
+    const categoryParam = categories.slice(0, 15).join(",");
+    const radius = 10000; // 10km radius
     const limit = 10;
     const url = "https://api.geoapify.com/v2/places?categories=" + encodeURIComponent(categoryParam) + "&filter=circle:" + coords.lon + "," + coords.lat + "," + radius + "&limit=" + limit + "&offset=" + offset + "&apiKey=" + apiKey;
 

@@ -6,10 +6,14 @@ export async function fetchDestinationSuggestions(query: string): Promise<string
     const response = await fetch(
       `${API_URL}/autocomplete/destinations?q=${encodeURIComponent(query)}`
     );
-    if (!response.ok) return [];
+    if (!response.ok) {
+      console.warn("[autocomplete] response not ok:", response.status);
+      return [];
+    }
     const data = await response.json() as { results: string[] };
     return data.results;
-  } catch {
+  } catch (e) {
+    console.warn("[autocomplete] fetch error:", e);
     return [];
   }
 }
