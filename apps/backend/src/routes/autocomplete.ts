@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 
 const router = Router();
 
-type GeoapifyAutocompleteResult = {
+type GeoapifyResult = {
   result_type?: string;
   city?: string;
   name?: string;
@@ -13,40 +13,34 @@ type GeoapifyAutocompleteResult = {
   address_line1?: string;
 };
 
-type GeoapifyAutocompleteResponse = {
-  results?: GeoapifyAutocompleteResult[];
+type GeoapifyResponse = {
+  results?: GeoapifyResult[];
 };
 
 function getQuery(req: Request): string {
   const q = req.query.q;
 
-  if (typeof q === "string") {
-    return q.trim();
-  }
-
-  if (Array.isArray(q) && typeof q[0] === "string") {
-    return q[0].trim();
-  }
+  if (typeof q === "string") return q.trim();
+  if (Array.isArray(q) && typeof q[0] === "string") return q[0].trim();
 
   return "";
 }
 
-function text(value: unknown): string {
+function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function buildLabel(result: GeoapifyAutocompleteResult): string | null {
-  const country = text(result.country);
+function buildLabel(result: GeoapifyResult): string | null {
+  const country = clean(result.country);
+  const city = clean(result.city) || clean(result.name);
+  const state = clean(result.state);
+  const county = clean(result.county);
+  const formatted = clean(result.formatted);
+  const addressLine = clean(result.address_line1);
 
   if (result.result_type === "country" && country) {
     return country;
   }
-
-  const city = text(result.city) || text(result.name);
-  const state = text(result.state);
-  const county = text(result.county);
-  const formatted = text(result.formatted);
-  const addressLine = text(result.address_line1);
 
   if (city && country) return `${city}, ${country}`;
   if (city && state) return `${city}, ${state}`;
@@ -54,19 +48,21 @@ function buildLabel(result: GeoapifyAutocompleteResult): string | null {
 
   if (county && country) return `${county}, ${country}`;
   if (state && country) return `${state}, ${country}`;
+  if (country) return country;
 
-  return formatted || addressLine || country || null;
+  return formatted || addressLine || null;
 }
 
-async function fetchGeoapifyAutocomplete(
+async function fetchGeoapify(
   query: string,
   type: "city" | "country",
   apiKey: string
-): Promise<GeoapifyAutocompleteResult[]> {
+): Promise<GeoapifyResult[]> {
   const params = new URLSearchParams({
     text: query,
     type,
     limit: "5",
+    lang: "en",
     format: "json",
     apiKey,
   });
@@ -78,14 +74,14 @@ async function fetchGeoapifyAutocomplete(
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
     console.warn(
-      `[autocomplete] Geoapify request failed for type=${type}:`,
+      `[autocomplete] Geoapify failed type=${type}:`,
       response.status,
       errorText
     );
     return [];
   }
 
-  const data = (await response.json()) as GeoapifyAutocompleteResponse;
+  const data = (await response.json()) as GeoapifyResponse;
 
   return Array.isArray(data.results) ? data.results : [];
 }
@@ -100,18 +96,18 @@ router.get("/destinations", async (req: Request, res: Response) => {
   const apiKey = process.env.GEOAPIFY_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: "API key not configured" });
+    return res.status(500).json({ error: "GEOAPIFY_API_KEY is not configured" });
   }
 
   try {
-    const [cityResults, countryResults] = await Promise.all([
-      fetchGeoapifyAutocomplete(query, "city", apiKey),
-      fetchGeoapifyAutocomplete(query, "country", apiKey),
+    const [countries, cities] = await Promise.all([
+      fetchGeoapify(query, "country", apiKey),
+      fetchGeoapify(query, "city", apiKey),
     ]);
 
     const labels: string[] = [];
 
-    for (const result of [...cityResults, ...countryResults]) {
+    for (const result of [...countries, ...cities]) {
       const label = buildLabel(result);
 
       if (!label) continue;
