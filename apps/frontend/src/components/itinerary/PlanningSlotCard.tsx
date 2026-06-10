@@ -13,7 +13,7 @@ import AddIcon from "@/assets/icons/add.svg";
 import EditIcon from "@/assets/icons/edit.svg";
 import Timer from "@/assets/icons/timer.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
-
+// suggestions
 type Props = {
   slot: TimeSlot;
   activity?: Activity;
