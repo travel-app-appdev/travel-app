@@ -1395,9 +1395,10 @@ export default function TripOverviewAdminScreen() {
             </AppText>
           </Pressable>
 
+          <StickyHeader />
+
           <ScrollView
             style={styles.flex}
-            stickyHeaderIndices={[0]}
             contentContainerStyle={[
               styles.container,
               {
@@ -1417,8 +1418,6 @@ export default function TripOverviewAdminScreen() {
               />
             }
           >
-            <StickyHeader />
-
             <View style={styles.fieldGroup}>
               {openField === "name" ? (
                 <View style={[styles.infoRow, styles.infoRowEditing]}>
