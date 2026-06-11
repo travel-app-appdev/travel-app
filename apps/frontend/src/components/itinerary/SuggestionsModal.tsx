@@ -406,19 +406,19 @@ export function SuggestionsModal({
 
           {/* Content */}
           <View style={styles.listFrame}>
-          <ScrollView
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-            onScroll={handleSuggestionScroll}
-            scrollEventThrottle={16}
-            onLayout={(event) => {
-              const viewportHeight = event.nativeEvent.layout.height;
-              setScrollMetrics((prev) => ({ ...prev, viewportHeight }));
-            }}
-            onContentSizeChange={(_, contentHeight) => {
-              setScrollMetrics((prev) => ({ ...prev, contentHeight }));
-            }}
-          >
+            <ScrollView
+              contentContainerStyle={styles.list}
+              showsVerticalScrollIndicator={false}
+              onScroll={handleSuggestionScroll}
+              scrollEventThrottle={16}
+              onLayout={(event) => {
+                const viewportHeight = event.nativeEvent.layout.height;
+                setScrollMetrics((prev) => ({ ...prev, viewportHeight }));
+              }}
+              onContentSizeChange={(_, contentHeight) => {
+                setScrollMetrics((prev) => ({ ...prev, contentHeight }));
+              }}
+            >
             {loading && (
               <View style={styles.centerState}>
                 <ActivityIndicator color={colors.nightBlack} size="large" />
@@ -540,24 +540,24 @@ export function SuggestionsModal({
                 )}
               </Pressable>
             )}
-          </ScrollView>
-          {scrollbarVisible && (
-            <View
-              pointerEvents="none"
-              style={styles.scrollbarTrack}
-              {...hiddenFromAccessibility}
-            >
+            </ScrollView>
+            {scrollbarVisible && (
               <View
-                style={[
-                  styles.scrollbarThumb,
-                  {
-                    height: scrollbarThumbHeight,
-                    transform: [{ translateY: scrollbarThumbTop }],
-                  },
-                ]}
-              />
-            </View>
-          )}
+                pointerEvents="none"
+                style={styles.scrollbarTrack}
+                {...hiddenFromAccessibility}
+              >
+                <View
+                  style={[
+                    styles.scrollbarThumb,
+                    {
+                      height: scrollbarThumbHeight,
+                      transform: [{ translateY: scrollbarThumbTop }],
+                    },
+                  ]}
+                />
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -651,9 +651,29 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     fontFamily: typography.fontFamily.bodyBold,
   },
+  listFrame: {
+    flex: 1,
+    minHeight: 0,
+    position: "relative",
+  },
   list: {
     gap: spacing.md,
     paddingBottom: spacing.md,
+    paddingRight: spacing.sm,
+  },
+  scrollbarTrack: {
+    position: "absolute",
+    top: spacing.xs,
+    right: 0,
+    bottom: spacing.xs,
+    width: 5,
+    borderRadius: radius.pill,
+    backgroundColor: "#E7E0D2",
+  },
+  scrollbarThumb: {
+    width: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.nightBlack,
   },
   centerState: {
     alignItems: "center",
