@@ -25,11 +25,13 @@ import EditIcon from "@/assets/icons/edit.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 import YellowVotey from "@/assets/mascots/Votey_Yellow.svg";
 import GreenVotey from "@/assets/mascots/Votey_Green.svg";
+import VoteyBlueMemory from "@/assets/mascots/Votey-Blue-Memory.svg";
 import BlueVotey from "@/assets/mascots/mascot-emotional.svg";
 import FunnyMascot from "@/assets/mascots/mascot-funny.svg";
 import ArrowDownIcon from "@/assets/icons/arrow_down.svg";
 import ProfileIcon from "@/assets/icons/members.svg";
 import JoinGroupIcon from "@/assets/icons/join-group.svg";
+import { Ionicons } from "@expo/vector-icons";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -39,9 +41,9 @@ function lerp(start: number, end: number, t: number) {
   return start + (end - start) * t;
 }
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
-const TOTAL_STEPS: Step = 5;
+const TOTAL_STEPS: Step = 6;
 
 function StickyHeader({ topPadding }: { topPadding: number }) {
   return (
@@ -68,6 +70,7 @@ export default function Onboarding() {
     3: 0,
     4: 0,
     5: 0,
+    6: 0,
   });
 
   const { width, height } = useWindowDimensions();
@@ -290,9 +293,9 @@ export default function Onboarding() {
                       { marginTop: spacing.xl, width: mainBlockWidth },
                     ]}
                   >
-                    Every trip goes through 3 phases.{" "}
+                    Every trip goes through 4 phases.{" "}
                     <Text style={Styles.InfoTextBold}>
-                      Planning, Voting, and Final,
+                      Planning, Voting, Final, and Memory,
                     </Text>{" "}
                     each one brings you closer to your perfect trip.
                   </Text>
@@ -329,8 +332,20 @@ export default function Onboarding() {
                         <View style={[Styles.phasePill, Styles.phasePillGreen]}>
                           <Text style={Styles.phasePillTextDark}>Final</Text>
                         </View>
+                        <View style={Styles.phaseConnector} />
                       </View>
                       <Text style={Styles.phaseDesc}>Your final itinerary</Text>
+                    </View>
+
+                    <View style={Styles.phaseRow}>
+                      <View style={Styles.phaseLeft}>
+                        <View style={[Styles.phasePill, Styles.phasePillBlue]}>
+                          <Text style={Styles.phasePillTextDark}>Memory</Text>
+                        </View>
+                      </View>
+                      <Text style={Styles.phaseDesc}>
+                        Add and share trip photos
+                      </Text>
                     </View>
                   </View>
 
@@ -578,6 +593,75 @@ export default function Onboarding() {
                   )}
                 </>
               )}
+
+              {step === 6 && (
+                <>
+                  {renderMascot(VoteyBlueMemory)}
+
+                  <View style={containerStyle}>
+                    <View
+                      style={[Styles.titleBlock, { marginBottom: spacing.sm }]}
+                    >
+                      <View style={Styles.titleRow}>
+                        <Text style={Styles.title}>Share </Text>
+                        <View style={Styles.titleWordWrapper}>
+                          <Text
+                            style={Styles.title}
+                            onLayout={(e) =>
+                              setTitleWidth(6, e.nativeEvent.layout.width)
+                            }
+                          >
+                            memories
+                          </Text>
+                          <View
+                            style={[
+                              Styles.titleHighlight,
+                              Styles.titleHighlightBlue,
+                              Styles.titleWordHighlight,
+                              { width: getHighlightWidth(6) },
+                            ]}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  <Text
+                    style={[
+                      Styles.InfoText,
+                      Styles.InfoTextWide,
+                      { marginTop: spacing.xl, width: mainBlockWidth },
+                    ]}
+                  >
+                    As soon as your trip starts, you can{" "}
+                    <Text style={Styles.InfoTextBold}>upload photos</Text> and
+                    share them with everyone in your group. Relive the best
+                    moments together.
+                  </Text>
+
+                  <View
+                    style={[
+                      Styles.memoryUploadButton,
+                      { width: mainBlockWidth },
+                    ]}
+                    accessibilityRole="image"
+                    accessibilityLabel="Upload images"
+                  >
+                    <Ionicons
+                      name="cloud-upload-outline"
+                      size={22}
+                      color={colors.nightBlack}
+                    />
+                    <Text style={Styles.memoryUploadButtonText}>
+                      Upload images
+                    </Text>
+                  </View>
+
+                  <View style={Styles.flexSpacer} />
+
+                  {renderFooter(6, Styles.continueButtonBlue, undefined)}
+                </>
+              )}
             </View>
           </ScrollView>
         </View>
@@ -803,6 +887,7 @@ const Styles = StyleSheet.create({
   phasePillYellow: { backgroundColor: colors.beachYellow },
   phasePillPink: { backgroundColor: colors.sunsetPink },
   phasePillGreen: { backgroundColor: colors.neonGreen },
+  phasePillBlue: { backgroundColor: colors.seaBlue },
   phasePillTextDark: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.md,
@@ -997,5 +1082,24 @@ const Styles = StyleSheet.create({
     aspectRatio: 2.3,
     borderRadius: 5,
     alignSelf: "center",
+  },
+
+  memoryUploadButton: {
+    alignSelf: "center",
+    marginTop: spacing.xl + spacing.md,
+    minHeight: 56,
+    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.seaBlue,
+  },
+  memoryUploadButtonText: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    color: colors.nightBlack,
+    textAlign: "center",
   },
 });

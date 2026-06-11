@@ -56,7 +56,7 @@ type TripCardItem = {
   endDate: string;
   rawStartDate: string;
   rawEndDate: string;
-  status: "planning" | "voting" | "final";
+  status: "planning" | "voting" | "final" | "memories";
   cardColor: string;
   role: "admin" | "member";
   inviteCode: string;
@@ -109,7 +109,7 @@ function getInitials(name: string): string {
 }
 
 function getCardColor(tripId: string): string {
-  const palette = [colors.plantGreen, colors.sunsetOrange, colors.seaBlue];
+  const palette = [colors.plantGreen, colors.sunsetOrange, colors.sunsetPink];
   let hash = 0;
 
   for (let i = 0; i < tripId.length; i++) {
@@ -121,8 +121,11 @@ function getCardColor(tripId: string): string {
 
 function getUiStatus(
   state: Trip["state"],
-  memberCount: number
-): "planning" | "voting" | "final" {
+  memberCount: number,
+  isPast: boolean
+): "planning" | "voting" | "final" | "memories" {
+  if (isPast) return "memories";
+  if (state === "Memories") return "final";
   if (state === "Voting" && memberCount <= 1) return "final";
   if (state === "Voting") return "voting";
   if (state === "Final") return "final";
@@ -154,6 +157,7 @@ function mapTripToCardTrip(
     })
   );
   const effectiveState = getEffectiveTripState(trip, today);
+  const isPast = isPastTripByEndDate(trip.end_date, today);
 
   return {
     id: trip.trip_id,
@@ -163,7 +167,7 @@ function mapTripToCardTrip(
     endDate: formatDate(trip.end_date),
     rawStartDate: trip.start_date,
     rawEndDate: trip.end_date,
-    status: getUiStatus(effectiveState, members.length),
+    status: getUiStatus(effectiveState, members.length, isPast),
     cardColor: getCardColor(trip.trip_id),
     role: trip.role === "admin" ? "admin" : "member",
     inviteCode: trip.invite_code ?? "",
@@ -532,9 +536,20 @@ export default function HomeScreen() {
 
               const memberCount = existingTrip?.members.length ?? 0;
 
+              const rawEndDate = existingTrip?.rawEndDate ?? "";
+              const effectiveState = rawEndDate
+                ? getEffectiveTripState({
+                    state: nextState,
+                    end_date: rawEndDate,
+                  })
+                : nextState;
+              const isPast = rawEndDate
+                ? isPastTripByEndDate(rawEndDate)
+                : false;
+
               patchTripInLocalLists(tripId, {
-                rawState: nextState,
-                status: getUiStatus(nextState, memberCount),
+                rawState: effectiveState,
+                status: getUiStatus(effectiveState, memberCount, isPast),
                 planningStartedAt: tripData.planning_started_at,
                 planningEndAt: tripData.planning_end_at,
                 votingEndAt: tripData.voting_end_at,
@@ -774,7 +789,7 @@ export default function HomeScreen() {
                     pathname: "/itinerary",
                     params: {
                       tripId: trip.id,
-                      state: status,
+                      state: status === "memories" ? "memories" : status,
                       title: trip.title,
                       destination: trip.destination,
                       startDate: trip.rawStartDate,

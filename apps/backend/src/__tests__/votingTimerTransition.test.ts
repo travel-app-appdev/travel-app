@@ -349,7 +349,7 @@ describe("trip list state repair", () => {
     expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Voting");
   });
 
-  it("finalizes an ended trip even when it was still stored as Planning", async () => {
+  it("moves an ended trip to Memories even when it was still stored as Planning", async () => {
     const planningTrip = {
       trip_id: TRIP_ID,
       title: "Spain",
@@ -360,16 +360,16 @@ describe("trip list state repair", () => {
       planning_end_at: FUTURE_DEADLINE,
       voting_end_at: FUTURE_DEADLINE,
     };
-    const finalTrip = { ...planningTrip, state: "Final" as const };
+    const memoriesTrip = { ...planningTrip, state: "Memories" as const };
 
     mocked(findTripById)
       .mockResolvedValueOnce(planningTrip)
-      .mockResolvedValueOnce(finalTrip);
+      .mockResolvedValueOnce(memoriesTrip);
 
-    await expect(advanceTripStateIfNeeded(TRIP_ID)).resolves.toEqual(finalTrip);
+    await expect(advanceTripStateIfNeeded(TRIP_ID)).resolves.toEqual(memoriesTrip);
 
     expect(createFinalItineraryForTrip).toHaveBeenCalledWith(TRIP_ID);
-    expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Final");
+    expect(updateTripState).toHaveBeenCalledWith(TRIP_ID, "Memories");
     expect(findAcceptedMembersByTripId).not.toHaveBeenCalled();
   });
 });

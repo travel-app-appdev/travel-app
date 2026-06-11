@@ -639,13 +639,28 @@ export async function advanceTripStateIfNeeded(tripId: string): Promise<Trip> {
         throw { status: 404, message: "Trip not found" };
     }
 
-    if (trip.state !== "Final" && hasTripEndDatePassed(trip.end_date)) {
+    if (trip.state === "Final" && hasTripEndDatePassed(trip.end_date)) {
+        await updateTripState(tripId, "Memories");
+
+        const memoriesTrip = await findTripById(tripId);
+        if (!memoriesTrip) {
+            throw { status: 404, message: "Trip not found after memories transition" };
+        }
+
+        return memoriesTrip;
+    }
+
+    if (
+        trip.state !== "Final" &&
+        trip.state !== "Memories" &&
+        hasTripEndDatePassed(trip.end_date)
+    ) {
         await createFinalItineraryForTrip(tripId);
-        await updateTripState(tripId, "Final");
+        await updateTripState(tripId, "Memories");
 
         const finalizedTrip = await findTripById(tripId);
         if (!finalizedTrip) {
-            throw { status: 404, message: "Trip not found after end-date finalization" };
+            throw { status: 404, message: "Trip not found after end-date memories transition" };
         }
 
         return finalizedTrip;

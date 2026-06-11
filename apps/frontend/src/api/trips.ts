@@ -1,3 +1,7 @@
+import type { TripState } from "@/src/types/trip";
+
+export type { TripState };
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export async function fetchDestinationSuggestions(
@@ -53,7 +57,7 @@ export type Trip = {
   destination: string;
   start_date: string;
   end_date: string;
-  state: "Planning" | "Voting" | "Final";
+  state: TripState;
   role: "admin" | "member";
   members?: TripMember[];
   invite_code?: string;
@@ -69,7 +73,7 @@ export type TripPreview = {
   destination: string;
   start_date: string;
   end_date: string;
-  state: "Planning" | "Voting" | "Final";
+  state: TripState;
 };
 
 type ApiErrorResponse = {
@@ -511,7 +515,7 @@ type UpdateTripPayload = {
   end_date?: string;
   planning_end_at?: string;
   voting_end_at?: string;
-  state?: "Planning" | "Voting" | "Final";
+  state?: TripState;
 };
 
 export async function updateTrip(payload: UpdateTripPayload): Promise<Trip> {
@@ -550,7 +554,7 @@ export async function updateTrip(payload: UpdateTripPayload): Promise<Trip> {
 
 export type FinishPlanningResponse = {
   allDone: boolean;
-  tripState: "Planning" | "Voting" | "Final";
+  tripState: TripState;
   completedMembers: number;
   totalMembers: number;
   planningDone: boolean;
@@ -592,7 +596,7 @@ export async function finishPlanning(
 }
 
 export type FinishVotingResponse = {
-  tripState: "Planning" | "Voting" | "Final";
+  tripState: TripState;
 };
 
 type FinishVotingPayload = {

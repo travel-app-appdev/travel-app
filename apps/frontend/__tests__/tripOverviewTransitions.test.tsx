@@ -137,6 +137,8 @@ jest.mock("@/assets/icons/key_frame.svg", () => () => null);
 jest.mock("@/assets/icons/copy.svg", () => () => null);
 jest.mock("@/assets/icons/timer.svg", () => () => null);
 jest.mock("@/assets/icons/arrow-itinerary.svg", () => () => null);
+jest.mock("@/assets/icons/image.svg", () => () => null);
+jest.mock("@/assets/icons/image-active.svg", () => () => null);
 jest.mock("@/assets/icons/exit.svg", () => () => null);
 jest.mock("@/assets/mascots/Votey_Yellow.svg", () => () => null);
 jest.mock("@/assets/mascots/Votey_Pink.svg", () => () => null);

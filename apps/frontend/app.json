@@ -56,6 +56,11 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "notification": {
+      "icon": "./assets/images/notification_icon.png",
+      "color": "#FFFEF5",
+      "androidMode": "default"
+    },
     "plugins": [
       "expo-router",
       [
@@ -79,7 +84,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icons/notification_icon.png",
+          "icon": "./assets/images/notification_icon.png",
           "color": "#FFFEF5",
           "defaultChannel": "default"
         }
