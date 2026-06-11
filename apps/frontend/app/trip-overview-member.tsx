@@ -58,11 +58,10 @@ import KeyFrame from "@/assets/icons/key_frame.svg";
 import Copy from "@/assets/icons/copy.svg";
 import Exit from "@/assets/icons/exit.svg";
 import ArrowItinerary from "@/assets/icons/arrow-itinerary.svg";
-import ImageIcon from "@/assets/icons/image.svg";
-import ImageActiveIcon from "@/assets/icons/image-active.svg";
 import VoteyYellow from "@/assets/mascots/Votey_Yellow.svg";
 import VoteyPink from "@/assets/mascots/Votey_Pink.svg";
 import VoteyGreen from "@/assets/mascots/Votey_Green.svg";
+import VoteyBlueMemory from "@/assets/mascots/Votey-Blue-Memory.svg";
 
 type PhaseKey = "planning" | "voting" | "final" | "memories";
 type PhaseStatus = "past" | "active" | "future";
@@ -125,7 +124,7 @@ function getChecklistSubtitle(tripState: Trip["state"]): string {
 function getChecklistMascot(tripState: Trip["state"]) {
   switch (tripState) {
     case "Memories":
-      return VoteyGreen;
+      return VoteyBlueMemory;
     case "Voting":
       return VoteyPink;
     case "Final":
@@ -207,19 +206,24 @@ function isDeadlinePast(deadline?: string): boolean {
 function PhaseCheckbox({
   phaseId,
   status,
+  isTripPast,
 }: {
   phaseId: PhaseKey;
   status: PhaseStatus;
+  isTripPast?: boolean;
 }) {
   const isChecked =
     status === "past" || (status === "active" && phaseId !== "voting");
+  const isMuted =
+    status === "past" ||
+    (phaseId === "final" && status === "active" && isTripPast);
 
   if (isChecked) {
     return (
       <CheckMark
         width={CHECKBOX_SIZE}
         height={CHECKBOX_SIZE}
-        style={status === "past" ? styles.mutedIcon : undefined}
+        style={isMuted ? styles.mutedIcon : undefined}
       />
     );
   }
@@ -952,6 +956,7 @@ export default function TripOverviewMemberScreen() {
                           <PhaseCheckbox
                             phaseId={phaseId}
                             status={phase.status}
+                            isTripPast={isTripEnded}
                           />
                         </View>
 
@@ -1138,17 +1143,13 @@ export default function TripOverviewMemberScreen() {
                                       <View
                                         style={styles.memoriesPlaceholderBlock}
                                       >
-                                        {isActive ? (
-                                          <ImageActiveIcon
-                                            width={32}
-                                            height={32}
-                                          />
-                                        ) : (
-                                          <ImageIcon width={32} height={32} />
-                                        )}
                                         <AppText
                                           variant="caption"
-                                          style={styles.memoriesPlaceholderText}
+                                          style={[
+                                            styles.memoriesPlaceholderText,
+                                            isMuted &&
+                                              styles.phaseDateLabelMuted,
+                                          ]}
                                         >
                                           Image folder
                                         </AppText>
@@ -1322,7 +1323,7 @@ const styles = StyleSheet.create({
   },
   backButtonSlot: {
     position: "absolute",
-    left: 0,
+    left: spacing.md,
     top: 0,
     bottom: 0,
     justifyContent: "center",
@@ -1614,9 +1615,7 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
   },
   memoriesPlaceholderBlock: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
+    justifyContent: "center",
     flexShrink: 1,
   },
   memoriesPlaceholderText: {
