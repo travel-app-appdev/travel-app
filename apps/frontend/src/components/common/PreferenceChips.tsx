@@ -103,6 +103,8 @@ export function PreferenceChips({
       onChange(selected.filter((p) => p !== key));
     } else if (selected.length < maxSelect) {
       onChange([...selected, key]);
+    } else {
+      onChange([...selected.slice(0, maxSelect - 1), key]);
     }
   }
 
@@ -115,13 +117,12 @@ export function PreferenceChips({
       >
         {ALL_PREFERENCES.map(({ key, label }) => {
           const active = selected.includes(key);
-          const disabled = !active && selected.length >= maxSelect;
           return (
             <Chip
               key={key}
               label={label}
               active={active}
-              disabled={disabled}
+              disabled={false}
               onPress={() => toggle(key)}
             />
           );
@@ -140,13 +141,12 @@ export function PreferenceChips({
           <View style={styles.chipRow}>
             {items.map(({ key, label }) => {
               const active = selected.includes(key);
-              const disabled = !active && selected.length >= maxSelect;
               return (
                 <Chip
                   key={key}
                   label={label}
                   active={active}
-                  disabled={disabled}
+                  disabled={false}
                   onPress={() => toggle(key)}
                 />
               );
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     fontSize: typography.size.md,
   },
   chipLabelActive: {
-    color: colors.lightWhite,
+    color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
   },
 });

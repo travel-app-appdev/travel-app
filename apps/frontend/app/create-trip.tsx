@@ -2535,7 +2535,7 @@ const styles = StyleSheet.create({
   prefsHintText: {
     fontFamily: typography.fontFamily.body,
     fontSize: typography.size.md,
-    color: colors.grayedOut,
+    color: colors.nightBlack,
     lineHeight: typography.lineHeight.md,
   },
   prefsSpacer: {
@@ -2562,7 +2562,7 @@ const styles = StyleSheet.create({
   prefsContinueBtnText: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.lg,
-    color: colors.lightWhite,
+    color: colors.nightBlack,
   },
   prefsSkipBtn: {
     height: 44,
@@ -2572,7 +2572,7 @@ const styles = StyleSheet.create({
   prefsSkipText: {
     fontFamily: typography.fontFamily.body,
     fontSize: typography.size.md,
-    color: colors.grayedOut,
+    color: colors.nightBlack,
     textDecorationLine: "underline",
   },
 });

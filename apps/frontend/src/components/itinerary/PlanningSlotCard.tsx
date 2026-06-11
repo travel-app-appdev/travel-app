@@ -93,11 +93,7 @@ export function PlanningSlotCard({
           <Pressable
             onPress={handleSuggestPress}
             disabled={disabled}
-            style={({ pressed }) => [
-              styles.suggestPill,
-              pressed && styles.cardPressed,
-              disabled && styles.cardDisabled,
-            ]}
+            style={[styles.suggestPill, disabled && styles.cardDisabled]}
             accessibilityRole="button"
             accessibilityLabel={`Suggest activity at ${slot.label}`}
             accessibilityHint="Shows real place suggestions"

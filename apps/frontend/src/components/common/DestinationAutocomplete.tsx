@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Keyboard, Modal, Pressable, StyleSheet, View } from "react-native";
+import { Keyboard, Pressable, StyleSheet, View } from "react-native";
 import { AppInput } from "./AppInput";
 import { AppText } from "./AppText";
 import { fetchDestinationSuggestions } from "@/src/api/trips";
@@ -13,13 +13,6 @@ type Props = {
   accessibilityLabel?: string;
 };
 
-type Layout = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
 export function DestinationAutocomplete({
   value,
   onChange,
@@ -28,24 +21,10 @@ export function DestinationAutocomplete({
   accessibilityLabel = "Destination",
 }: Props) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [layout, setLayout] = useState<Layout | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
   const skipFetchRef = useRef(false);
-  const containerRef = useRef<View>(null);
-
-  const measure = useCallback(() => {
-    containerRef.current?.measureInWindow((x, y, width, height) => {
-      if (width > 0 && height > 0) {
-        setLayout({ x, y, width, height });
-      }
-    });
-  }, []);
-
-  const hideSuggestions = useCallback(() => {
-    setSuggestions([]);
-  }, []);
 
   useEffect(() => {
     if (skipFetchRef.current) {
@@ -84,17 +63,7 @@ export function DestinationAutocomplete({
           return;
         }
 
-        containerRef.current?.measureInWindow((x, y, width, height) => {
-          if (requestId !== requestIdRef.current) {
-            return;
-          }
-
-          if (width > 0 && height > 0) {
-            setLayout({ x, y, width, height });
-          }
-
-          setSuggestions(results);
-        });
+        setSuggestions(results);
       } catch (error) {
         console.warn("[autocomplete] failed to load suggestions:", error);
 
@@ -123,71 +92,52 @@ export function DestinationAutocomplete({
   );
 
   return (
-    <View ref={containerRef} onLayout={measure}>
+    <View style={styles.container}>
       <AppInput
         placeholder={placeholder}
         value={value}
         onChangeText={onChange}
-        onFocus={measure}
         accessibilityLabel={accessibilityLabel}
         style={inputStyle}
         autoCorrect={false}
         autoCapitalize="words"
       />
 
-      {suggestions.length > 0 && layout && (
-        <Modal
-          transparent
-          visible
-          animationType="none"
-          statusBarTranslucent
-          onRequestClose={hideSuggestions}
-        >
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={hideSuggestions}
-          />
-
-          <View
-            style={[
-              styles.dropdown,
-              {
-                top: layout.y + layout.height + 4,
-                left: layout.x,
-                width: layout.width,
-              },
-            ]}
-          >
-            {suggestions.map((suggestion) => (
-              <Pressable
-                key={suggestion}
-                style={({ pressed }) => [
-                  styles.item,
-                  pressed && styles.itemPressed,
-                ]}
-                onPress={() => handleSelect(suggestion)}
-                accessibilityRole="button"
-                accessibilityLabel={`Select ${suggestion}`}
-              >
-                <AppText variant="body" style={styles.itemText}>
-                  {suggestion}
-                </AppText>
-              </Pressable>
-            ))}
-          </View>
-        </Modal>
+      {suggestions.length > 0 && (
+        <View style={styles.dropdown}>
+          {suggestions.map((suggestion) => (
+            <Pressable
+              key={suggestion}
+              style={({ pressed }) => [
+                styles.item,
+                pressed && styles.itemPressed,
+              ]}
+              onPress={() => handleSelect(suggestion)}
+              accessibilityRole="button"
+              accessibilityLabel={`Select ${suggestion}`}
+            >
+              <AppText variant="body" style={styles.itemText}>
+                {suggestion}
+              </AppText>
+            </Pressable>
+          ))}
+        </View>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    zIndex: 9999,
+  },
   dropdown: {
-    position: "absolute",
+    marginTop: 2,
     backgroundColor: colors.white,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: "hidden",
     shadowColor: colors.nightBlack,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,

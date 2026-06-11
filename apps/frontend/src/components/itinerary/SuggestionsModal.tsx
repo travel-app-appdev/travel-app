@@ -8,6 +8,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import type { NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
@@ -196,6 +197,11 @@ export function SuggestionsModal({
 }: Props) {
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [activeFilter, setActiveFilter] = useState(ALL_FILTER);
+  const [scrollMetrics, setScrollMetrics] = useState({
+    contentHeight: 0,
+    viewportHeight: 0,
+    offsetY: 0,
+  });
 
   useEffect(() => {
     if (visible) setActiveFilter(ALL_FILTER);
@@ -278,19 +284,48 @@ export function SuggestionsModal({
     Linking.openURL(url).catch(() => {});
   }
 
+  function handleSuggestionScroll(
+    event: NativeSyntheticEvent<NativeScrollEvent>
+  ) {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    setScrollMetrics((prev) => ({ ...prev, offsetY }));
+  }
+
+  const scrollbarVisible =
+    scrollMetrics.contentHeight > scrollMetrics.viewportHeight + 8;
+  const scrollbarThumbHeight = scrollbarVisible
+    ? Math.max(
+        40,
+        (scrollMetrics.viewportHeight / scrollMetrics.contentHeight) *
+          scrollMetrics.viewportHeight
+      )
+    : 0;
+  const scrollbarMaxOffset = Math.max(
+    scrollMetrics.contentHeight - scrollMetrics.viewportHeight,
+    1
+  );
+  const scrollbarMaxThumbOffset = Math.max(
+    scrollMetrics.viewportHeight - scrollbarThumbHeight,
+    0
+  );
+  const scrollbarThumbTop = scrollbarVisible
+    ? Math.min(
+        scrollbarMaxThumbOffset,
+        (Math.max(scrollMetrics.offsetY, 0) / scrollbarMaxOffset) *
+          scrollbarMaxThumbOffset
+      )
+    : 0;
+
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent
     >
       <View style={styles.overlay}>
         <View style={styles.sheet}>
-          {/* Handle bar */}
-          <View style={styles.handleBar} />
-
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerText}>
@@ -339,7 +374,7 @@ export function SuggestionsModal({
                     effectiveFilter === ALL_FILTER && styles.filterChipTextActive,
                   ]}
                 >
-                  All {suggestions.length}
+                  All ({suggestions.length})
                 </AppText>
               </Pressable>
 
@@ -361,7 +396,7 @@ export function SuggestionsModal({
                         active && styles.filterChipTextActive,
                       ]}
                     >
-                      {label} {count}
+                      {label} ({count})
                     </AppText>
                   </Pressable>
                 );
@@ -370,9 +405,19 @@ export function SuggestionsModal({
           )}
 
           {/* Content */}
+          <View style={styles.listFrame}>
           <ScrollView
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
+            onScroll={handleSuggestionScroll}
+            scrollEventThrottle={16}
+            onLayout={(event) => {
+              const viewportHeight = event.nativeEvent.layout.height;
+              setScrollMetrics((prev) => ({ ...prev, viewportHeight }));
+            }}
+            onContentSizeChange={(_, contentHeight) => {
+              setScrollMetrics((prev) => ({ ...prev, contentHeight }));
+            }}
           >
             {loading && (
               <View style={styles.centerState}>
@@ -426,8 +471,8 @@ export function SuggestionsModal({
                       {!!s.address && (
                         <View style={styles.infoRow}>
                           <LocationPin
-                            width={14}
-                            height={14}
+                            width={18}
+                            height={18}
                             {...hiddenFromAccessibility}
                           />
                           <AppText
@@ -463,7 +508,7 @@ export function SuggestionsModal({
                     >
                       {!added && (
                         <View {...hiddenFromAccessibility}>
-                          <AddIcon width={16} height={16} color={colors.nightBlack} />
+                          <AddIcon width={20} height={20} color={colors.nightBlack} />
                         </View>
                       )}
                       <AppText
@@ -496,6 +541,24 @@ export function SuggestionsModal({
               </Pressable>
             )}
           </ScrollView>
+          {scrollbarVisible && (
+            <View
+              pointerEvents="none"
+              style={styles.scrollbarTrack}
+              {...hiddenFromAccessibility}
+            >
+              <View
+                style={[
+                  styles.scrollbarThumb,
+                  {
+                    height: scrollbarThumbHeight,
+                    transform: [{ translateY: scrollbarThumbTop }],
+                  },
+                ]}
+              />
+            </View>
+          )}
+          </View>
         </View>
       </View>
     </Modal>
@@ -505,7 +568,7 @@ export function SuggestionsModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "transparent",
     justifyContent: "flex-end",
   },
   sheet: {
@@ -513,17 +576,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xxxl,
     maxHeight: "80%",
-  },
-  handleBar: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    alignSelf: "center",
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
   },
   header: {
     flexDirection: "row",
@@ -546,14 +601,13 @@ const styles = StyleSheet.create({
   titleSlot: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.xl,
-    color: colors.sunsetOrange,
+    color: colors.nightBlack,
     lineHeight: typography.lineHeight.xl,
   },
   subtitleText: {
     fontFamily: typography.fontFamily.body,
     fontSize: typography.size.sm,
     color: colors.nightBlack,
-    opacity: 0.6,
     lineHeight: typography.lineHeight.sm,
   },
   closeBtn: {
@@ -611,11 +665,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: typography.size.md,
     lineHeight: typography.lineHeight.md,
-    opacity: 0.7,
   },
   card: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.nightBlack,
     borderRadius: radius.md,
     padding: spacing.md,
     backgroundColor: colors.lightWhite,
@@ -658,7 +711,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.size.sm,
     color: colors.nightBlack,
-    opacity: 0.7,
     lineHeight: typography.lineHeight.sm,
   },
   mapsLink: {
@@ -666,7 +718,7 @@ const styles = StyleSheet.create({
   },
   mapsLinkText: {
     fontSize: typography.size.sm,
-    color: colors.seaBlue,
+    color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodySemiBold,
     textDecorationLine: "underline",
   },
@@ -690,7 +742,6 @@ const styles = StyleSheet.create({
   },
   addBtnTextDone: {
     color: colors.nightBlack,
-    opacity: 0.5,
   },
   loadMoreBtn: {
     alignItems: "center",
