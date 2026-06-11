@@ -19,7 +19,9 @@ type ApiErrorResponse = {
   error?: string;
 };
 
-async function readApiJson<T>(response: Response): Promise<T | ApiErrorResponse> {
+async function readApiJson<T>(
+  response: Response
+): Promise<T | ApiErrorResponse> {
   try {
     return (await response.json()) as T | ApiErrorResponse;
   } catch {
@@ -56,7 +58,10 @@ async function appendPhotoToFormData(
   } as unknown as Blob);
 }
 
-export function getMemoryPhotoUrl(memory: MemoryPhoto, idToken: string): string {
+export function getMemoryPhotoUrl(
+  memory: MemoryPhoto,
+  idToken: string
+): string {
   const separator = memory.file_url.includes("?") ? "&" : "?";
   return `${API_URL}${memory.file_url}${separator}idToken=${encodeURIComponent(
     idToken
@@ -74,7 +79,9 @@ export async function fetchMemories(payload: {
   const data = await readApiJson<MemoryPhoto[]>(response);
 
   if (!response.ok) {
-    throw new Error((data as ApiErrorResponse).error || "Could not load memories");
+    throw new Error(
+      (data as ApiErrorResponse).error || "Could not load memories"
+    );
   }
 
   return data as MemoryPhoto[];
@@ -99,8 +106,34 @@ export async function uploadMemoryPhoto(payload: {
   const data = await readApiJson<MemoryPhoto>(response);
 
   if (!response.ok) {
-    throw new Error((data as ApiErrorResponse).error || "Could not upload memory");
+    throw new Error(
+      (data as ApiErrorResponse).error || "Could not upload memory"
+    );
   }
 
   return data as MemoryPhoto;
+}
+
+export async function deleteMemoryPhoto(payload: {
+  tripId: string;
+  memoryId: string;
+  idToken: string;
+}): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/trips/${payload.tripId}/memories/${payload.memoryId}`,
+    {
+      method: "DELETE",
+      headers: authHeaders(payload.idToken),
+    }
+  );
+
+  if (response.status === 204) return;
+
+  const data = await readApiJson<never>(response);
+
+  if (!response.ok) {
+    throw new Error(
+      (data as ApiErrorResponse).error || "Could not delete memory"
+    );
+  }
 }

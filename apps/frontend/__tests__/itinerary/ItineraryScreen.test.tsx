@@ -15,12 +15,18 @@ const mockToggleActivityAttendance = jest.fn();
 const mockVoteForActivity = jest.fn();
 const mockFetchMemories = jest.fn();
 const mockUploadMemoryPhoto = jest.fn();
+const mockDeleteMemoryPhoto = jest.fn();
 const mockDaySelectorProps = jest.fn();
 const mockPlanningDoneBarProps = jest.fn();
 const mockPlanningSlotCardProps = jest.fn();
 
 let mockParams: Record<string, string | undefined> = {};
 let mockTripDays = [{ id: "2026-06-01", label: "1 Jun" }];
+
+jest.mock("@/assets/icons/delete.svg", () => () => null);
+jest.mock("@/assets/icons/image.svg", () => () => null);
+jest.mock("@/assets/icons/not-select-image.svg", () => () => null);
+jest.mock("@/assets/icons/select-image.svg", () => () => null);
 
 jest.mock("expo-router", () => ({
   router: {
@@ -69,6 +75,7 @@ jest.mock("@/src/services/activityService", () => ({
 }));
 
 jest.mock("@/src/services/memoriesService", () => ({
+  deleteMemoryPhoto: (payload: unknown) => mockDeleteMemoryPhoto(payload),
   fetchMemories: (payload: unknown) => mockFetchMemories(payload),
   uploadMemoryPhoto: (payload: unknown) => mockUploadMemoryPhoto(payload),
   getMemoryPhotoUrl: () => "https://example.com/memory.jpg",
@@ -431,18 +438,20 @@ describe("ItineraryScreen transition overlays", () => {
     unmount();
   });
 
-  it("renders the memories screen with empty photo placeholders", async () => {
+  it("renders the memories screen with the empty upload state", async () => {
     setBaseParams("memories");
     mockFetchTripForUser.mockResolvedValue(backendTrip("Memories"));
     mockFetchMemories.mockResolvedValue([]);
 
-    const { getByText, unmount } = render(<ItineraryScreen />);
+    const { getByText, queryByText, unmount } = render(<ItineraryScreen />);
 
     await waitFor(() => {
       expect(getByText("Memories")).toBeTruthy();
       expect(getByText("Upload images")).toBeTruthy();
-      expect(getByText("Download all")).toBeTruthy();
+      expect(getByText("No images here yet")).toBeTruthy();
     });
+
+    expect(queryByText("Download all")).toBeNull();
 
     expect(mockFetchMemories).toHaveBeenCalledWith({
       tripId: "trip-123",
