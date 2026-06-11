@@ -43,7 +43,13 @@ import {
   hiddenFromAccessibility,
 } from "@/src/utils/accessibility";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
-import { isPastTripByEndDate, isTripStartedByStartDate } from "@/src/utils/tripState";
+import {
+  getChecklistDisplayState,
+  getPhaseStatus,
+  isPastTripByEndDate,
+  isTripStartedByStartDate,
+} from "@/src/utils/tripState";
+import type { TripState } from "@/src/types/trip";
 import Plane from "@/assets/icons/plane.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
 import Calendar from "@/assets/icons/calendar.svg";
@@ -81,33 +87,7 @@ type MemberParam = {
   color: string;
 };
 
-function getPhaseStatus(
-  phaseId: PhaseKey,
-  tripState: Trip["state"],
-  tripEnded: boolean
-): PhaseStatus {
-  if (tripState === "Planning") {
-    if (phaseId === "planning") return "active";
-    return "future";
-  }
-  if (tripState === "Voting") {
-    if (phaseId === "planning") return "past";
-    if (phaseId === "voting") return "active";
-    return "future";
-  }
-  if (tripState === "Memories" || tripEnded) {
-    if (phaseId === "final" || phaseId === "memories") return "active";
-    return "past";
-  }
-  if (tripState === "Final") {
-    if (phaseId === "final") return "active";
-    if (phaseId === "memories") return "future";
-    return "past";
-  }
-  return "future";
-}
-
-function getChecklistSubtitle(tripState: Trip["state"]): string {
+function getChecklistSubtitle(tripState: TripState): string {
   switch (tripState) {
     case "Memories":
       return "Here you can upload your photos of the trip and share it to the other members.";
@@ -121,7 +101,7 @@ function getChecklistSubtitle(tripState: Trip["state"]): string {
   }
 }
 
-function getChecklistMascot(tripState: Trip["state"]) {
+function getChecklistMascot(tripState: TripState) {
   switch (tripState) {
     case "Memories":
       return VoteyBlueMemory;
@@ -279,7 +259,7 @@ export default function TripOverviewMemberScreen() {
     startDate: string;
     endDate: string;
     members: string;
-    state?: "Planning" | "Voting" | "Final";
+    state?: TripState;
     planningStartedAt?: string;
     planningEndAt?: string;
     votingEndAt?: string;
@@ -292,7 +272,7 @@ export default function TripOverviewMemberScreen() {
   const startDate = String(raw.startDate ?? "");
   const endDate = String(raw.endDate ?? "");
   const membersParam = String(raw.members ?? "");
-  const initialTripState = (raw.state ?? "Planning") as Trip["state"];
+  const initialTripState: TripState = raw.state ?? "Planning";
   const planningStartedAt = String(raw.planningStartedAt ?? "");
   const planningEndAt = String(raw.planningEndAt ?? "");
   const votingEndAt = String(raw.votingEndAt ?? "");
@@ -523,6 +503,10 @@ export default function TripOverviewMemberScreen() {
 
   const isTripStarted = isTripStartedByStartDate(tripSnapshot.startDate);
   const isTripEnded = isPastTripByEndDate(tripSnapshot.endDate);
+  const checklistDisplayState = getChecklistDisplayState(
+    tripState,
+    isTripStarted
+  );
 
   const phases: {
     id: PhaseKey;
@@ -536,28 +520,28 @@ export default function TripOverviewMemberScreen() {
       label: "Planning",
       color: colors.beachYellow,
       disabledColor: "#F6E08F",
-      status: getPhaseStatus("planning", tripState, isTripEnded),
+      status: getPhaseStatus("planning", tripState, isTripEnded, isTripStarted),
     },
     {
       id: "voting",
       label: "Voting",
       color: colors.sunsetPink,
       disabledColor: "#F0B8FB",
-      status: getPhaseStatus("voting", tripState, isTripEnded),
+      status: getPhaseStatus("voting", tripState, isTripEnded, isTripStarted),
     },
     {
       id: "final",
       label: "Final",
       color: colors.neonGreen,
       disabledColor: "#C8F5BE",
-      status: getPhaseStatus("final", tripState, isTripEnded),
+      status: getPhaseStatus("final", tripState, isTripEnded, isTripStarted),
     },
     {
       id: "memories",
       label: "Memory",
       color: colors.seaBlue,
       disabledColor: "#A8D4F0",
-      status: getPhaseStatus("memories", tripState, isTripEnded),
+      status: getPhaseStatus("memories", tripState, isTripEnded, isTripStarted),
     },
   ];
 
@@ -684,7 +668,7 @@ export default function TripOverviewMemberScreen() {
     }
   }
 
-  const Mascot = getChecklistMascot(tripState);
+  const Mascot = getChecklistMascot(checklistDisplayState);
 
   return (
     <View style={styles.fullScreen}>
@@ -852,7 +836,7 @@ export default function TripOverviewMemberScreen() {
                 accessible
                 accessibilityRole="header"
                 accessibilityLabel={`Checklist. ${getChecklistSubtitle(
-                  tripState
+                  checklistDisplayState
                 )}`}
               >
                 <View style={styles.checklistTitleBlock}>
@@ -868,7 +852,7 @@ export default function TripOverviewMemberScreen() {
                     style={styles.checklistSubtitle}
                     accessible={false}
                   >
-                    {getChecklistSubtitle(tripState)}
+                    {getChecklistSubtitle(checklistDisplayState)}
                   </AppText>
                 </View>
 
@@ -893,8 +877,7 @@ export default function TripOverviewMemberScreen() {
                     ? phase.disabledColor
                     : phase.color;
                   const isLast = index === phases.length - 1;
-                  const showItineraryLink =
-                    isActive || (phaseId === "memories" && isTripStarted);
+                  const showItineraryLink = isActive;
 
                   const activeShadowStyle =
                     phaseId === "planning"
@@ -906,10 +889,21 @@ export default function TripOverviewMemberScreen() {
                           : styles.phaseCardShadowFinal;
 
                   const nextPhase = phases[index + 1];
+                  const prevPhase = phases[index - 1];
                   const extendLineToNextCheckbox =
                     !isLast &&
                     nextPhase?.status === "active" &&
                     (nextPhase.id === "final" || nextPhase.id === "memories");
+                  const isFinalBeforeActiveMemory =
+                    phaseId === "final" &&
+                    isActive &&
+                    nextPhase?.status === "active" &&
+                    nextPhase.id === "memories";
+                  const isMemoryAfterActiveFinal =
+                    phaseId === "memories" &&
+                    isActive &&
+                    prevPhase?.status === "active" &&
+                    prevPhase.id === "final";
 
                   const alignsCheckboxToBadge =
                     isActive && (phaseId === "final" || phaseId === "memories");
@@ -918,7 +912,13 @@ export default function TripOverviewMemberScreen() {
                   return (
                     <View
                       key={phaseId}
-                      style={styles.timelineItem}
+                      style={[
+                        styles.timelineItem,
+                        isFinalBeforeActiveMemory &&
+                          styles.timelineItemAboveMemoryGlow,
+                        isMemoryAfterActiveFinal &&
+                          styles.timelineItemBelowFinalGlow,
+                      ]}
                       accessibilityRole="text"
                       accessibilityLabel={
                         phaseId === "final"
@@ -984,7 +984,10 @@ export default function TripOverviewMemberScreen() {
                         <View
                           style={
                             isActive
-                              ? [styles.phaseCardShadowWrap, activeShadowStyle]
+                              ? [
+                                  styles.phaseCardShadowWrap,
+                                  activeShadowStyle,
+                                ]
                               : undefined
                           }
                         >
@@ -1413,6 +1416,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "stretch",
     gap: spacing.md,
+  },
+  timelineItemAboveMemoryGlow: {
+    position: "relative",
+    zIndex: 1,
+  },
+  timelineItemBelowFinalGlow: {
+    position: "relative",
+    zIndex: 2,
   },
   timelineLeft: {
     width: CHECKBOX_SIZE,

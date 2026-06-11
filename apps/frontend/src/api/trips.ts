@@ -1,6 +1,9 @@
+import type { TripState } from "@/src/types/trip";
+
+export type { TripState };
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
-<<<<<<< HEAD
 export async function fetchDestinationSuggestions(
   query: string
 ): Promise<string[]> {
@@ -39,9 +42,6 @@ export async function fetchDestinationSuggestions(
     return [];
   }
 }
-=======
-export type TripState = "Planning" | "Voting" | "Final" | "Memories";
->>>>>>> 99faea7 (feat: memories trip created)
 
 export type TripMember = {
   id: string;

@@ -75,7 +75,13 @@ import {
   hiddenFromAccessibility,
   nativeImportantForAccessibility,
 } from "@/src/utils/accessibility";
-import { isPastTripByEndDate, isTripStartedByStartDate } from "@/src/utils/tripState";
+import {
+  getChecklistDisplayState,
+  getPhaseStatus,
+  isPastTripByEndDate,
+  isTripStartedByStartDate,
+} from "@/src/utils/tripState";
+import type { TripState } from "@/src/types/trip";
 
 type FieldKey = "name" | "date" | "destination" | "members" | "code" | "preferences";
 type PhaseKey = "planning" | "voting" | "final" | "memories";
@@ -104,7 +110,7 @@ type PhaseStatus = "past" | "active" | "future";
 const CHECKBOX_SIZE = 24;
 const TIMELINE_LINE_WIDTH = 1;
 
-function getChecklistSubtitle(tripState: Trip["state"]): string {
+function getChecklistSubtitle(tripState: TripState): string {
   switch (tripState) {
     case "Memories":
       return "Here you can upload your photos of the trip and share it to the other members.";
@@ -118,7 +124,7 @@ function getChecklistSubtitle(tripState: Trip["state"]): string {
   }
 }
 
-function getChecklistMascot(tripState: Trip["state"]) {
+function getChecklistMascot(tripState: TripState) {
   switch (tripState) {
     case "Memories":
       return VoteyBlueMemory;
@@ -130,32 +136,6 @@ function getChecklistMascot(tripState: Trip["state"]) {
     default:
       return VoteyYellow;
   }
-}
-
-function getPhaseStatus(
-  phaseId: PhaseKey,
-  tripState: Trip["state"],
-  tripEnded: boolean
-): PhaseStatus {
-  if (tripState === "Planning") {
-    if (phaseId === "planning") return "active";
-    return "future";
-  }
-  if (tripState === "Voting") {
-    if (phaseId === "planning") return "past";
-    if (phaseId === "voting") return "active";
-    return "future";
-  }
-  if (tripState === "Memories" || tripEnded) {
-    if (phaseId === "final" || phaseId === "memories") return "active";
-    return "past";
-  }
-  if (tripState === "Final") {
-    if (phaseId === "final") return "active";
-    if (phaseId === "memories") return "future";
-    return "past";
-  }
-  return "future";
 }
 
 function formatDateDisplay(date: Date): string {
@@ -402,7 +382,7 @@ export default function TripOverviewAdminScreen() {
     endDate: string;
     members: string;
     inviteCode: string;
-    state?: "Planning" | "Voting" | "Final";
+    state?: TripState;
     planningStartedAt?: string;
     planningEndAt?: string;
     votingEndAt?: string;
@@ -415,7 +395,7 @@ export default function TripOverviewAdminScreen() {
   const endDate = String(raw.endDate ?? "");
   const membersParam = String(raw.members ?? "");
   const inviteCodeParam = String(raw.inviteCode ?? "");
-  const initialTripState = (raw.state ?? "Planning") as Trip["state"];
+  const initialTripState: TripState = raw.state ?? "Planning";
   const planningStartedAt = String(raw.planningStartedAt ?? "");
   const planningEndAt = String(raw.planningEndAt ?? "");
   const votingEndAt = String(raw.votingEndAt ?? "");
@@ -524,7 +504,7 @@ export default function TripOverviewAdminScreen() {
   const [preferences, setPreferences] = useState<string[]>([]);
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
-  const [tripState, setTripState] = useState<Trip["state"]>(initialTripState);
+  const [tripState, setTripState] = useState<TripState>(initialTripState);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [tripTiming, setTripTiming] = useState({
     planningStartedAt,
@@ -535,6 +515,10 @@ export default function TripOverviewAdminScreen() {
   const checklistTripState = tripState;
   const isTripStarted = isTripStartedByStartDate(toLocalDateString(tripStart));
   const isTripEnded = isPastTripByEndDate(toLocalDateString(tripEnd));
+  const checklistDisplayState = getChecklistDisplayState(
+    checklistTripState,
+    isTripStarted
+  );
 
   const planningStartDate = parseIsoToDate(tripTiming.planningStartedAt);
   const planningEndDate = parseIsoToDate(tripTiming.planningEndAt);
@@ -554,28 +538,28 @@ export default function TripOverviewAdminScreen() {
       label: "Planning",
       color: colors.beachYellow,
       disabledColor: "#F6E08F",
-      status: getPhaseStatus("planning", checklistTripState),
+      status: getPhaseStatus("planning", checklistTripState, isTripEnded, isTripStarted),
     },
     {
       id: "voting",
       label: "Voting",
       color: colors.sunsetPink,
       disabledColor: "#F0B8FB",
-      status: getPhaseStatus("voting", checklistTripState),
+      status: getPhaseStatus("voting", checklistTripState, isTripEnded, isTripStarted),
     },
     {
       id: "final",
       label: "Final",
       color: colors.neonGreen,
       disabledColor: "#C8F5BE",
-      status: getPhaseStatus("final", checklistTripState, isTripEnded),
+      status: getPhaseStatus("final", checklistTripState, isTripEnded, isTripStarted),
     },
     {
       id: "memories",
       label: "Memory",
       color: colors.seaBlue,
       disabledColor: "#A8D4F0",
-      status: getPhaseStatus("memories", checklistTripState, isTripEnded),
+      status: getPhaseStatus("memories", checklistTripState, isTripEnded, isTripStarted),
     },
   ];
 
@@ -879,6 +863,38 @@ export default function TripOverviewAdminScreen() {
   const handleDateRow = useSinglePress(() => toggleField("date"));
   const handleDestRow = useSinglePress(() => toggleField("destination"));
   const handleMembersRow = useSinglePress(() => toggleField("members"));
+  const handlePrefsRow = useSinglePress(async () => {
+    if (openField === "preferences") {
+      toggleField("preferences");
+      return;
+    }
+    const idToken = await getIdToken();
+    if (idToken) {
+      try {
+        const prefs = await getMemberPreferences(tripId, idToken);
+        setPreferences(prefs);
+      } catch {}
+    }
+    toggleField("preferences");
+  });
+
+  const handleSavePreferences = async () => {
+    if (isSavingPrefs) return;
+    const idToken = await getIdToken();
+    if (!idToken) return;
+    try {
+      setIsSavingPrefs(true);
+      await updateMemberPreferences(tripId, preferences, idToken);
+      setOpenField(null);
+    } catch (error) {
+      Alert.alert(
+        "Update failed",
+        error instanceof Error ? error.message : "Failed to update preferences"
+      );
+    } finally {
+      setIsSavingPrefs(false);
+    }
+  };
   const handlePlanningPhase = useSinglePress(() => togglePhase("planning"));
   const handleVotingPhase = useSinglePress(() => togglePhase("voting"));
 
@@ -1994,7 +2010,7 @@ export default function TripOverviewAdminScreen() {
                 accessible
                 accessibilityRole="header"
                 accessibilityLabel={`Checklist. ${getChecklistSubtitle(
-                  checklistTripState
+                  checklistDisplayState
                 )}`}
               >
                 <View style={styles.checklistTitleBlock}>
@@ -2010,13 +2026,13 @@ export default function TripOverviewAdminScreen() {
                     style={styles.checklistSubtitle}
                     accessible={false}
                   >
-                    {getChecklistSubtitle(checklistTripState)}
+                    {getChecklistSubtitle(checklistDisplayState)}
                   </AppText>
                 </View>
 
                 <View style={styles.mascotWrapper} {...hiddenFromAccessibility}>
                   {(() => {
-                    const Mascot = getChecklistMascot(checklistTripState);
+                    const Mascot = getChecklistMascot(checklistDisplayState);
                     return <Mascot width={80} height={80} />;
                   })()}
                 </View>
@@ -2041,8 +2057,7 @@ export default function TripOverviewAdminScreen() {
                   const isLast = index === phases.length - 1;
                   const canExpand =
                     isActive && phaseId !== "final" && phaseId !== "memories";
-                  const showItineraryLink =
-                    isActive || (phaseId === "memories" && isTripStarted);
+                  const showItineraryLink = isActive;
 
                   const activeShadowStyle =
                     phaseId === "planning"
@@ -2054,17 +2069,37 @@ export default function TripOverviewAdminScreen() {
                           : styles.phaseCardShadowFinal;
 
                   const nextPhase = phases[index + 1];
+                  const prevPhase = phases[index - 1];
                   const extendLineToNextCheckbox =
                     !isLast &&
                     nextPhase?.status === "active" &&
                     (nextPhase.id === "final" || nextPhase.id === "memories");
+                  const isFinalBeforeActiveMemory =
+                    phaseId === "final" &&
+                    isActive &&
+                    nextPhase?.status === "active" &&
+                    nextPhase.id === "memories";
+                  const isMemoryAfterActiveFinal =
+                    phaseId === "memories" &&
+                    isActive &&
+                    prevPhase?.status === "active" &&
+                    prevPhase.id === "final";
 
                   const alignsCheckboxToBadge =
                     isActive && (phaseId === "final" || phaseId === "memories");
                   const checkboxTopOffset = spacing.xl + 32;
 
                   return (
-                    <View key={phaseId} style={styles.timelineItem}>
+                    <View
+                      key={phaseId}
+                      style={[
+                        styles.timelineItem,
+                        isFinalBeforeActiveMemory &&
+                          styles.timelineItemAboveMemoryGlow,
+                        isMemoryAfterActiveFinal &&
+                          styles.timelineItemBelowFinalGlow,
+                      ]}
+                    >
                       <View
                         style={[
                           styles.timelineLeft,
@@ -3017,6 +3052,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  saveBtn: {
+    backgroundColor: colors.beachYellow,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.sm,
+  },
+  saveBtnText: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    color: colors.nightBlack,
+  },
 
   dateTimeRow: {
     flexDirection: "row",
@@ -3131,6 +3179,14 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     gap: spacing.md,
   },
+  timelineItemAboveMemoryGlow: {
+    position: "relative",
+    zIndex: 1,
+  },
+  timelineItemBelowFinalGlow: {
+    position: "relative",
+    zIndex: 2,
+  },
   timelineLeft: {
     width: CHECKBOX_SIZE,
     alignItems: "center",
@@ -3144,6 +3200,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     zIndex: 2,
+  },
+  checkboxAlignerBadgeRow: {
+    height: 32,
+    marginTop: spacing.lg,
+    justifyContent: "center",
   },
   checkboxAlignerActive: {
     marginTop: 0,
@@ -3160,6 +3221,9 @@ const styles = StyleSheet.create({
   },
   timelineLineDashed: {
     opacity: 0.35,
+  },
+  timelineLineExtended: {
+    bottom: -spacing.lg,
   },
   timelineContent: {
     flex: 1,
@@ -3203,6 +3267,14 @@ const styles = StyleSheet.create({
     elevation: 0,
     boxShadow: "0px 10px 40px rgba(149, 235, 122, 0.85)",
   },
+  phaseCardShadowMemories: {
+    shadowColor: colors.seaBlue,
+    shadowOpacity: 0.85,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 0,
+    boxShadow: "0px 10px 40px rgba(120, 196, 232, 0.85)",
+  },
   phaseTopPressable: {
     width: "100%",
   },
@@ -3223,6 +3295,9 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: spacing.md,
     minWidth: 0,
+  },
+  phaseTopLeftBadgeRow: {
+    alignItems: "center",
   },
   phaseBadge: {
     paddingHorizontal: spacing.lg,
@@ -3309,8 +3384,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
   },
-<<<<<<< HEAD
-=======
   memoriesPlaceholderBlock: {
     justifyContent: "center",
     flexShrink: 1,
@@ -3336,9 +3409,6 @@ const styles = StyleSheet.create({
     color: colors.grayedOut,
     opacity: 0.5,
   },
->>>>>>> 0c93b37 (fix: change mascot when memory state active)
-type FieldKey = "name" | "date" | "destination" | "members" | "code";
-type PhaseKey = "planning" | "voting" | "final" | "memories";
   itineraryLinkRow: {
     alignSelf: "flex-start",
     marginTop: spacing.lg,

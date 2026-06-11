@@ -37,6 +37,7 @@ import type {
   ItineraryState,
   Activity,
 } from "@/src/types/itinerary";
+import type { TripState } from "@/src/types/trip";
 
 import { AppText } from "@/src/components/common/AppText";
 import { FeedbackModal } from "@/src/components/common/FeedbackModal";
@@ -266,6 +267,21 @@ function buildGoogleMapsUrl(name: string, address?: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${query}`;
 }
 
+async function getPhotoByteSize(uri: string): Promise<number> {
+  if (Platform.OS === "web") {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    return blob.size;
+  }
+
+  const info = await FileSystem.getInfoAsync(uri);
+  if (!info.exists) {
+    throw new Error("Could not read the selected photo.");
+  }
+
+  return info.size ?? 0;
+}
+
 async function prepareMemoryPhotoForUpload(sourceUri: string) {
   let width = 1400;
   let compress = 0.6;
@@ -280,20 +296,20 @@ async function prepareMemoryPhotoForUpload(sourceUri: string) {
   );
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    const info = await FileSystem.getInfoAsync(manipulated.uri);
+    const size = await getPhotoByteSize(manipulated.uri);
 
-    if (!info.exists) {
-      throw new Error("Could not read the selected photo.");
+    if (size <= MAX_MEMORY_UPLOAD_BYTES) {
+      break;
     }
 
-    if (!info.size || info.size <= MAX_MEMORY_UPLOAD_BYTES) {
-      break;
+    if (attempt === 3) {
+      throw new Error("Photo must be 1 MB or smaller.");
     }
 
     width = Math.max(720, Math.round(width * 0.8));
     compress = Math.max(0.35, compress - 0.1);
     manipulated = await ImageManipulator.manipulateAsync(
-      manipulated.uri,
+      sourceUri,
       [{ resize: { width } }],
       {
         compress,
@@ -329,7 +345,7 @@ function parsePlanningStatusJson(value?: string) {
   }
 }
 
-function toUiState(state: Trip["state"]): ItineraryState {
+function toUiState(state: TripState): ItineraryState {
   switch (state) {
     case "Voting":
       return "voting";
@@ -871,7 +887,8 @@ export default function ItineraryScreen() {
           return;
         }
 
-        applyRefreshedTrip(nextState);
+        // Keep explicit route state (e.g. final from checklist) when backend is Memories.
+        applyRefreshedTrip(routeState ?? nextState);
       } catch (error) {
         if (isTripNotFoundError(error)) {
           invalidateTripsCache();
@@ -886,6 +903,7 @@ export default function ItineraryScreen() {
       currentUserId,
       members,
       planningEndAt,
+      routeState,
       timerDeadlines.planningEndAt,
       tripId,
       votingEndAt,
@@ -1297,21 +1315,30 @@ export default function ItineraryScreen() {
       return;
     }
 
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(
-        "Photo access needed",
-        "Please allow photo library access to upload trip memories."
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
+    const pickerOptions: ImagePicker.ImagePickerOptions = {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       selectionLimit: 10,
       quality: 1,
-    });
+    };
+
+    let result: ImagePicker.ImagePickerResult;
+
+    if (Platform.OS === "web") {
+      // Web browsers only allow the file picker during the original click gesture.
+      result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
+    } else {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Photo access needed",
+          "Please allow photo library access to upload trip memories."
+        );
+        return;
+      }
+
+      result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
+    }
 
     if (result.canceled || result.assets.length === 0) {
       return;

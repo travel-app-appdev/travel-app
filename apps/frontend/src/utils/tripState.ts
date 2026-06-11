@@ -1,4 +1,37 @@
-type TripState = "Planning" | "Voting" | "Final" | "Memories";
+import type { TripState } from "@/src/types/trip";
+
+export type { TripState };
+
+export type PhaseKey = "planning" | "voting" | "final" | "memories";
+export type PhaseStatus = "past" | "active" | "future";
+
+export function getPhaseStatus(
+  phaseId: PhaseKey,
+  tripState: TripState,
+  tripEnded: boolean,
+  isTripStarted: boolean
+): PhaseStatus {
+  if (tripState === "Planning") {
+    if (phaseId === "planning") return "active";
+    return "future";
+  }
+  if (tripState === "Voting") {
+    if (phaseId === "planning") return "past";
+    if (phaseId === "voting") return "active";
+    return "future";
+  }
+  if (tripState === "Memories" || tripEnded) {
+    if (phaseId === "final") return "active";
+    if (phaseId === "memories") return isTripStarted ? "active" : "future";
+    return "past";
+  }
+  if (tripState === "Final") {
+    if (phaseId === "final") return "active";
+    if (phaseId === "memories") return isTripStarted ? "active" : "future";
+    return "past";
+  }
+  return "future";
+}
 
 export function parseLocalTripDate(dateString: string): Date {
   const [year, month, day] = dateString.split("-").map(Number);
@@ -41,4 +74,15 @@ export function getEffectiveTripState(
   today = new Date()
 ): TripState {
   return isPastTripByEndDate(trip.end_date, today) ? "Memories" : trip.state;
+}
+
+export function getChecklistDisplayState(
+  tripState: TripState,
+  isTripStarted: boolean
+): TripState {
+  if (tripState === "Final" || tripState === "Memories") {
+    return isTripStarted ? "Memories" : "Final";
+  }
+
+  return tripState;
 }
