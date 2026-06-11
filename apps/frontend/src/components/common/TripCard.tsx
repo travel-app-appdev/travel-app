@@ -38,7 +38,7 @@ const STATUS_LABELS: Record<TripStatus, string> = {
   planning: "Planning",
   voting: "Voting",
   final: "Final",
-  memories: "Memories",
+  memories: "Memory",
 };
 
 export function TripCard({

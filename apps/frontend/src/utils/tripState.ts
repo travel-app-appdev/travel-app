@@ -10,6 +10,19 @@ export function parseLocalTripDate(dateString: string): Date {
   return new Date(dateString);
 }
 
+export function isTripStartedByStartDate(
+  startDateString: string,
+  today = new Date()
+): boolean {
+  const todayStart = new Date(today);
+  todayStart.setHours(0, 0, 0, 0);
+
+  const tripStartDate = parseLocalTripDate(startDateString);
+  tripStartDate.setHours(0, 0, 0, 0);
+
+  return tripStartDate <= todayStart;
+}
+
 export function isPastTripByEndDate(
   endDateString: string,
   today = new Date()

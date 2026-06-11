@@ -43,6 +43,7 @@ import {
   hiddenFromAccessibility,
 } from "@/src/utils/accessibility";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
+import { isPastTripByEndDate, isTripStartedByStartDate } from "@/src/utils/tripState";
 import Plane from "@/assets/icons/plane.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
 import Calendar from "@/assets/icons/calendar.svg";
@@ -57,11 +58,13 @@ import KeyFrame from "@/assets/icons/key_frame.svg";
 import Copy from "@/assets/icons/copy.svg";
 import Exit from "@/assets/icons/exit.svg";
 import ArrowItinerary from "@/assets/icons/arrow-itinerary.svg";
+import ImageIcon from "@/assets/icons/image.svg";
+import ImageActiveIcon from "@/assets/icons/image-active.svg";
 import VoteyYellow from "@/assets/mascots/Votey_Yellow.svg";
 import VoteyPink from "@/assets/mascots/Votey_Pink.svg";
 import VoteyGreen from "@/assets/mascots/Votey_Green.svg";
 
-type PhaseKey = "planning" | "voting" | "final";
+type PhaseKey = "planning" | "voting" | "final" | "memories";
 type PhaseStatus = "past" | "active" | "future";
 
 type PhaseValue = {
@@ -81,7 +84,8 @@ type MemberParam = {
 
 function getPhaseStatus(
   phaseId: PhaseKey,
-  tripState: Trip["state"]
+  tripState: Trip["state"],
+  tripEnded: boolean
 ): PhaseStatus {
   if (tripState === "Planning") {
     if (phaseId === "planning") return "active";
@@ -92,8 +96,13 @@ function getPhaseStatus(
     if (phaseId === "voting") return "active";
     return "future";
   }
+  if (tripState === "Memories" || tripEnded) {
+    if (phaseId === "final" || phaseId === "memories") return "active";
+    return "past";
+  }
   if (tripState === "Final") {
     if (phaseId === "final") return "active";
+    if (phaseId === "memories") return "future";
     return "past";
   }
   return "future";
@@ -101,6 +110,8 @@ function getPhaseStatus(
 
 function getChecklistSubtitle(tripState: Trip["state"]): string {
   switch (tripState) {
+    case "Memories":
+      return "Here you can upload your photos of the trip and share it to the other members.";
     case "Voting":
       return "Vote on conflicting activities in the itinerary.";
     case "Final":
@@ -113,6 +124,8 @@ function getChecklistSubtitle(tripState: Trip["state"]): string {
 
 function getChecklistMascot(tripState: Trip["state"]) {
   switch (tripState) {
+    case "Memories":
+      return VoteyGreen;
     case "Voting":
       return VoteyPink;
     case "Final":
@@ -504,6 +517,9 @@ export default function TripOverviewMemberScreen() {
     [tripSnapshot.endDate]
   );
 
+  const isTripStarted = isTripStartedByStartDate(tripSnapshot.startDate);
+  const isTripEnded = isPastTripByEndDate(tripSnapshot.endDate);
+
   const phases: {
     id: PhaseKey;
     label: string;
@@ -516,21 +532,28 @@ export default function TripOverviewMemberScreen() {
       label: "Planning",
       color: colors.beachYellow,
       disabledColor: "#F6E08F",
-      status: getPhaseStatus("planning", tripState),
+      status: getPhaseStatus("planning", tripState, isTripEnded),
     },
     {
       id: "voting",
       label: "Voting",
       color: colors.sunsetPink,
       disabledColor: "#F0B8FB",
-      status: getPhaseStatus("voting", tripState),
+      status: getPhaseStatus("voting", tripState, isTripEnded),
     },
     {
       id: "final",
       label: "Final",
       color: colors.neonGreen,
       disabledColor: "#C8F5BE",
-      status: getPhaseStatus("final", tripState),
+      status: getPhaseStatus("final", tripState, isTripEnded),
+    },
+    {
+      id: "memories",
+      label: "Memory",
+      color: colors.seaBlue,
+      disabledColor: "#A8D4F0",
+      status: getPhaseStatus("memories", tripState, isTripEnded),
     },
   ];
 
@@ -557,6 +580,11 @@ export default function TripOverviewMemberScreen() {
         end: finalDisplayDate,
         time: parseIsoToTimeString(tripSnapshot.votingEndAt),
       },
+      memories: {
+        start: tripEnd,
+        end: tripEnd,
+        time: "00:00",
+      },
     };
   }, [
     tripSnapshot.planningStartedAt,
@@ -566,22 +594,49 @@ export default function TripOverviewMemberScreen() {
     tripEnd,
   ]);
 
+  const navigateToItinerary = useCallback(
+    (targetState: "planning" | "voting" | "final" | "memories") => {
+      router.push({
+        pathname: "/itinerary",
+        params: {
+          tripId,
+          state: targetState,
+          title,
+          destination,
+          startDate: tripSnapshot.startDate,
+          endDate: tripSnapshot.endDate,
+          members: membersParam,
+          planningEndAt: tripSnapshot.planningEndAt,
+          votingEndAt: tripSnapshot.votingEndAt,
+          role: "member",
+        },
+      });
+    },
+    [
+      destination,
+      membersParam,
+      router,
+      title,
+      tripId,
+      tripSnapshot.endDate,
+      tripSnapshot.planningEndAt,
+      tripSnapshot.startDate,
+      tripSnapshot.votingEndAt,
+    ]
+  );
+
   const handleNavigateToItinerary = useSinglePress(() => {
-    router.push({
-      pathname: "/itinerary",
-      params: {
-        tripId,
-        state: tripState.toLowerCase() as "planning" | "voting" | "final",
-        title,
-        destination,
-        startDate: tripSnapshot.startDate,
-        endDate: tripSnapshot.endDate,
-        members: membersParam,
-        planningEndAt: tripSnapshot.planningEndAt,
-        votingEndAt: tripSnapshot.votingEndAt,
-        role: "member",
-      },
-    });
+    navigateToItinerary(
+      tripState.toLowerCase() as "planning" | "voting" | "final" | "memories"
+    );
+  });
+
+  const handleNavigateToFinal = useSinglePress(() => {
+    navigateToItinerary("final");
+  });
+
+  const handleNavigateToMemories = useSinglePress(() => {
+    navigateToItinerary("memories");
   });
 
   const openLeaveTripModal = useSinglePress(() => {
@@ -834,13 +889,27 @@ export default function TripOverviewMemberScreen() {
                     ? phase.disabledColor
                     : phase.color;
                   const isLast = index === phases.length - 1;
+                  const showItineraryLink =
+                    isActive || (phaseId === "memories" && isTripStarted);
 
                   const activeShadowStyle =
                     phaseId === "planning"
                       ? styles.phaseCardShadowPlanning
                       : phaseId === "voting"
                         ? styles.phaseCardShadowVoting
-                        : styles.phaseCardShadowFinal;
+                        : phaseId === "memories"
+                          ? styles.phaseCardShadowMemories
+                          : styles.phaseCardShadowFinal;
+
+                  const nextPhase = phases[index + 1];
+                  const extendLineToNextCheckbox =
+                    !isLast &&
+                    nextPhase?.status === "active" &&
+                    (nextPhase.id === "final" || nextPhase.id === "memories");
+
+                  const alignsCheckboxToBadge =
+                    isActive && (phaseId === "final" || phaseId === "memories");
+                  const checkboxTopOffset = spacing.lg + 32;
 
                   return (
                     <View
@@ -852,20 +921,34 @@ export default function TripOverviewMemberScreen() {
                           ? `Final phase, starts ${formatDateDisplay(
                               dates.start
                             )}`
-                          : `${phase.label} phase, ${timerText}, ${
-                              isActive
-                                ? "in progress"
-                                : isPast
-                                  ? "completed"
-                                  : "upcoming"
-                            }`
+                          : phaseId === "memories"
+                            ? `${phase.label} phase, ${
+                                isActive
+                                  ? "upload trip photos"
+                                  : isTripStarted
+                                    ? "upload available"
+                                    : "available when trip starts"
+                              }`
+                            : `${phase.label} phase, ${timerText}, ${
+                                isActive
+                                  ? "in progress"
+                                  : isPast
+                                    ? "completed"
+                                    : "upcoming"
+                              }`
                       }
                     >
                       <View
                         style={styles.timelineLeft}
                         {...hiddenFromAccessibility}
                       >
-                        <View style={styles.checkboxAligner}>
+                        <View
+                          style={[
+                            styles.checkboxAligner,
+                            alignsCheckboxToBadge &&
+                              styles.checkboxAlignerBadgeRow,
+                          ]}
+                        >
                           <PhaseCheckbox
                             phaseId={phaseId}
                             status={phase.status}
@@ -876,6 +959,11 @@ export default function TripOverviewMemberScreen() {
                           <View
                             style={[
                               styles.timelineLine,
+                              alignsCheckboxToBadge && {
+                                top: checkboxTopOffset,
+                              },
+                              extendLineToNextCheckbox &&
+                                styles.timelineLineExtended,
                               isPast
                                 ? styles.timelineLineSolid
                                 : styles.timelineLineDashed,
@@ -904,7 +992,14 @@ export default function TripOverviewMemberScreen() {
                             <View style={styles.phaseTopPressable}>
                               <View style={styles.phaseRowInner}>
                                 <View style={styles.phaseTopRow}>
-                                  <View style={styles.phaseTopLeft}>
+                                  <View
+                                    style={[
+                                      styles.phaseTopLeft,
+                                      (phaseId === "final" ||
+                                        phaseId === "memories") &&
+                                        styles.phaseTopLeftBadgeRow,
+                                    ]}
+                                  >
                                     <View
                                       style={[
                                         styles.phaseBadge,
@@ -922,7 +1017,7 @@ export default function TripOverviewMemberScreen() {
                                       </AppText>
                                     </View>
 
-                                    {phaseId !== "final" ? (
+                                    {phaseId === "planning" || phaseId === "voting" ? (
                                       <View style={styles.phaseTimerBlock}>
                                         <View
                                           style={styles.hourglassCol}
@@ -991,7 +1086,7 @@ export default function TripOverviewMemberScreen() {
                                           </AppText>
                                         </View>
                                       </View>
-                                    ) : (
+                                    ) : phaseId === "final" ? (
                                       <View
                                         style={styles.finalPlaceholderBlock}
                                       >
@@ -1016,11 +1111,53 @@ export default function TripOverviewMemberScreen() {
                                           {`${formatDateDisplay(dates.start)} at ${dates.time}`}
                                         </AppText>
                                       </View>
+                                    ) : !isTripStarted ? (
+                                      <View
+                                        style={styles.memoriesInactiveTextBlock}
+                                      >
+                                        <AppText
+                                          variant="caption"
+                                          style={[
+                                            styles.memoriesInactiveLine,
+                                            styles.memoriesInactiveLineMuted,
+                                          ]}
+                                        >
+                                          Available when
+                                        </AppText>
+                                        <AppText
+                                          variant="caption"
+                                          style={[
+                                            styles.memoriesInactiveLine,
+                                            styles.memoriesInactiveLineMuted,
+                                          ]}
+                                        >
+                                          trip starts
+                                        </AppText>
+                                      </View>
+                                    ) : (
+                                      <View
+                                        style={styles.memoriesPlaceholderBlock}
+                                      >
+                                        {isActive ? (
+                                          <ImageActiveIcon
+                                            width={32}
+                                            height={32}
+                                          />
+                                        ) : (
+                                          <ImageIcon width={32} height={32} />
+                                        )}
+                                        <AppText
+                                          variant="caption"
+                                          style={styles.memoriesPlaceholderText}
+                                        >
+                                          Image folder
+                                        </AppText>
+                                      </View>
                                     )}
                                   </View>
                                 </View>
 
-                                {phaseId !== "final" ? (
+                                {phaseId === "planning" || phaseId === "voting" ? (
                                   <AppText
                                     variant="caption"
                                     style={[
@@ -1038,11 +1175,21 @@ export default function TripOverviewMemberScreen() {
                               </View>
                             </View>
 
-                            {isActive ? (
+                            {showItineraryLink ? (
                               <Pressable
-                                onPress={handleNavigateToItinerary}
+                                onPress={
+                                  phaseId === "memories"
+                                    ? handleNavigateToMemories
+                                    : phaseId === "final"
+                                      ? handleNavigateToFinal
+                                      : handleNavigateToItinerary
+                                }
                                 accessibilityRole="button"
-                                accessibilityLabel={`Go to itinerary for ${phase.label} phase`}
+                                accessibilityLabel={
+                                  phaseId === "memories"
+                                    ? "Go to memories"
+                                    : `Go to itinerary for ${phase.label} phase`
+                                }
                                 style={styles.itineraryLinkRow}
                                 hitSlop={{
                                   top: 24,
@@ -1060,7 +1207,9 @@ export default function TripOverviewMemberScreen() {
                                     variant="body"
                                     style={styles.itineraryLinkText}
                                   >
-                                    Go to Itinerary
+                                    {phaseId === "memories"
+                                      ? "Go to Memories"
+                                      : "Go to Itinerary"}
                                   </AppText>
                                 </View>
                               </Pressable>
@@ -1278,6 +1427,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 2,
   },
+  checkboxAlignerBadgeRow: {
+    height: 32,
+    marginTop: spacing.lg,
+    justifyContent: "center",
+  },
   timelineLine: {
     position: "absolute",
     top: 36,
@@ -1290,6 +1444,9 @@ const styles = StyleSheet.create({
   },
   timelineLineDashed: {
     opacity: 0.35,
+  },
+  timelineLineExtended: {
+    bottom: -spacing.lg,
   },
   timelineContent: {
     flex: 1,
@@ -1336,6 +1493,14 @@ const styles = StyleSheet.create({
     elevation: 0,
     boxShadow: "0px 10px 40px rgba(149, 235, 122, 0.85)",
   },
+  phaseCardShadowMemories: {
+    shadowColor: colors.seaBlue,
+    shadowOpacity: 0.85,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 0,
+    boxShadow: "0px 10px 40px rgba(120, 196, 232, 0.85)",
+  },
   phaseTopPressable: {
     width: "100%",
   },
@@ -1356,6 +1521,9 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: spacing.md,
     minWidth: 0,
+  },
+  phaseTopLeftBadgeRow: {
+    alignItems: "center",
   },
   phaseBadge: {
     paddingHorizontal: spacing.lg,
@@ -1444,6 +1612,33 @@ const styles = StyleSheet.create({
     color: colors.nightBlack,
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
+  },
+  memoriesPlaceholderBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    flexShrink: 1,
+  },
+  memoriesPlaceholderText: {
+    color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.bodyBold,
+    flexShrink: 1,
+  },
+  memoriesInactiveTextBlock: {
+    justifyContent: "center",
+    flexShrink: 1,
+  },
+  memoriesInactiveLine: {
+    color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.bodyBold,
+  },
+  memoriesInactiveLineMuted: {
+    color: colors.grayedOut,
+    opacity: 0.5,
   },
 
   itineraryLinkRow: {

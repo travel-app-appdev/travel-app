@@ -2,12 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
+  InteractionManager,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
@@ -15,10 +19,12 @@ import { StatusBar } from "expo-status-bar";
 import { Image as ExpoImage } from "expo-image";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { Ionicons } from "@expo/vector-icons";
 import { doc, onSnapshot } from "firebase/firestore";
 
-import { colors, spacing, typography } from "@/src/theme";
+import { colors, spacing, typography, radius } from "@/src/theme";
+import { ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
 import { db, auth } from "@/src/lib/firebase";
 import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
@@ -33,6 +39,7 @@ import type {
 } from "@/src/types/itinerary";
 
 import { AppText } from "@/src/components/common/AppText";
+import { FeedbackModal } from "@/src/components/common/FeedbackModal";
 import { ItineraryHeader } from "@/src/components/itinerary/ItineraryHeader";
 import { ItineraryDaySelector } from "@/src/components/itinerary/ItineraryDaySelector";
 import { PlanningSlotCard } from "@/src/components/itinerary/PlanningSlotCard";
@@ -55,10 +62,13 @@ import {
   type Trip,
   type ActivitySuggestion,
 } from "@/src/api/trips";
-import DeleteIcon from "@/assets/icons/delete.svg";
 import ImageIcon from "@/assets/icons/image.svg";
-import NotSelectImageIcon from "@/assets/icons/not-select-image.svg";
-import SelectImageIcon from "@/assets/icons/select-image.svg";
+import ImageSelectedIcon from "@/assets/icons/select-image.svg";
+import UnselectImageIcon from "@/assets/icons/unselect-image.svg";
+import ImageDownloadIcon from "@/assets/icons/image-download.svg";
+import SelectAllIcon from "@/assets/icons/select-all.svg";
+import ImageDeleteIcon from "@/assets/icons/image-delete.svg";
+import ImageMenuIcon from "@/assets/icons/image-menu.svg";
 import { invalidateTripsCache } from "./home";
 import {
   getActivitiesBySlot,
@@ -71,6 +81,7 @@ import {
 } from "@/src/services/activityService";
 import {
   deleteMemoryPhoto,
+  downloadMemoryPhotos,
   fetchMemories,
   getMemoryPhotoUrl,
   uploadMemoryPhoto,
@@ -79,6 +90,7 @@ import {
 
 const DEV_FORCE_STATE: ItineraryState | null = null;
 const TRANSITION_OVERLAY_MS = 1800;
+const MAX_MEMORY_UPLOAD_BYTES = 900 * 1024;
 
 const activitiesCache = new Map<string, Activity[]>();
 
@@ -252,6 +264,45 @@ function mergeAlternativeLists(
 function buildGoogleMapsUrl(name: string, address?: string): string {
   const query = encodeURIComponent(name + (address ? `, ${address}` : ""));
   return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
+async function prepareMemoryPhotoForUpload(sourceUri: string) {
+  let width = 1400;
+  let compress = 0.6;
+
+  let manipulated = await ImageManipulator.manipulateAsync(
+    sourceUri,
+    [{ resize: { width } }],
+    {
+      compress,
+      format: ImageManipulator.SaveFormat.JPEG,
+    }
+  );
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const info = await FileSystem.getInfoAsync(manipulated.uri);
+
+    if (!info.exists) {
+      throw new Error("Could not read the selected photo.");
+    }
+
+    if (!info.size || info.size <= MAX_MEMORY_UPLOAD_BYTES) {
+      break;
+    }
+
+    width = Math.max(720, Math.round(width * 0.8));
+    compress = Math.max(0.35, compress - 0.1);
+    manipulated = await ImageManipulator.manipulateAsync(
+      manipulated.uri,
+      [{ resize: { width } }],
+      {
+        compress,
+        format: ImageManipulator.SaveFormat.JPEG,
+      }
+    );
+  }
+
+  return manipulated;
 }
 
 type RouteMember = {
@@ -543,6 +594,50 @@ export default function ItineraryScreen() {
   const [isLoadingMemories, setIsLoadingMemories] = useState(false);
   const [isUploadingMemories, setIsUploadingMemories] = useState(false);
   const [isDeletingMemories, setIsDeletingMemories] = useState(false);
+  const [isDownloadingMemories, setIsDownloadingMemories] = useState(false);
+  const [showMemoryPreviewMenu, setShowMemoryPreviewMenu] = useState(false);
+  const [showMemoryFeedbackModal, setShowMemoryFeedbackModal] = useState(false);
+  const [memoryFeedbackTitle, setMemoryFeedbackTitle] = useState("");
+  const [memoryFeedbackMessage, setMemoryFeedbackMessage] = useState("");
+  const memoryPreviewListRef = useRef<FlatList<MemoryPhoto>>(null);
+  const skipPreviewScrollRef = useRef(false);
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const memoryPreviewWidth = Math.min(windowWidth * 0.82, 420);
+  const [memoryAspectRatios, setMemoryAspectRatios] = useState<
+    Record<string, number>
+  >({});
+  const getMemoryPreviewHeight = useCallback(
+    (aspectRatio?: number) => {
+      const maxHeight = Math.min(windowHeight * 0.62, memoryPreviewWidth * 1.45);
+      const minHeight = memoryPreviewWidth * 0.45;
+
+      if (!aspectRatio) {
+        return maxHeight;
+      }
+
+      const naturalHeight = memoryPreviewWidth / aspectRatio;
+      return Math.min(maxHeight, Math.max(minHeight, naturalHeight));
+    },
+    [memoryPreviewWidth, windowHeight]
+  );
+  const memoryPreviewImageHeight = useMemo(
+    () =>
+      getMemoryPreviewHeight(
+        selectedMemory
+          ? memoryAspectRatios[selectedMemory.memory_id]
+          : undefined
+      ),
+    [getMemoryPreviewHeight, memoryAspectRatios, selectedMemory]
+  );
+  const selectedMemoryIndex = useMemo(() => {
+    if (!selectedMemory) return 0;
+
+    const index = memories.findIndex(
+      (memory) => memory.memory_id === selectedMemory.memory_id
+    );
+
+    return index >= 0 ? index : 0;
+  }, [memories, selectedMemory]);
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const [isLoadingActivities, setIsLoadingActivities] = useState(() => {
     const keys = [...activitiesCache.keys()];
@@ -1226,14 +1321,7 @@ export default function ItineraryScreen() {
     try {
       for (let index = 0; index < result.assets.length; index += 1) {
         const asset = result.assets[index];
-        const manipulated = await ImageManipulator.manipulateAsync(
-          asset.uri,
-          [{ resize: { width: 1400 } }],
-          {
-            compress: 0.6,
-            format: ImageManipulator.SaveFormat.JPEG,
-          }
-        );
+        const manipulated = await prepareMemoryPhotoForUpload(asset.uri);
 
         await uploadMemoryPhoto({
           tripId,
@@ -1302,6 +1390,102 @@ export default function ItineraryScreen() {
     [authToken, isDeletingMemories, loadMemories, tripId]
   );
 
+  const handleSelectAllMemories = useCallback(() => {
+    if (memories.length === 0) return;
+
+    const memoryIds = memories.map((memory) => memory.memory_id);
+    const allSelected = memoryIds.every((id) => selectedMemoryIds.includes(id));
+
+    if (allSelected) {
+      setSelectedMemoryIds([]);
+      setIsMemorySelectionMode(false);
+      return;
+    }
+
+    setSelectedMemoryIds(memoryIds);
+    setIsMemorySelectionMode(true);
+  }, [memories, selectedMemoryIds]);
+
+  const openMemoryFeedbackModal = useCallback(
+    (
+      title: string,
+      message: string,
+      options: { closePreview?: boolean } = {}
+    ) => {
+      const shouldClosePreview = options.closePreview ?? true;
+
+      setMemoryFeedbackTitle(title);
+      setMemoryFeedbackMessage(message);
+
+      if (shouldClosePreview) {
+        setShowMemoryPreviewMenu(false);
+        setSelectedMemory(null);
+      }
+
+      InteractionManager.runAfterInteractions(() => {
+        setShowMemoryFeedbackModal(true);
+      });
+    },
+    []
+  );
+
+  const downloadMemoriesByIds = useCallback(
+    async (memoryIds: string[]) => {
+      if (!authToken || isDownloadingMemories || memoryIds.length === 0) {
+        return;
+      }
+
+      const memoriesToDownload = memories.filter((memory) =>
+        memoryIds.includes(memory.memory_id)
+      );
+
+      if (memoriesToDownload.length === 0) {
+        return;
+      }
+
+      setIsDownloadingMemories(true);
+      try {
+        await downloadMemoryPhotos({
+          memories: memoriesToDownload,
+          idToken: authToken,
+        });
+
+        if (Platform.OS !== "web") {
+          openMemoryFeedbackModal(
+            memoriesToDownload.length === 1 ? "Image saved" : "Images saved",
+            memoriesToDownload.length === 1
+              ? "The image was saved to your photo library."
+              : `${memoriesToDownload.length} images were saved to your photo library.`
+          );
+        } else if (memoriesToDownload.length > 1) {
+          openMemoryFeedbackModal(
+            "Downloads started",
+            "If your browser asks, allow multiple downloads."
+          );
+        }
+      } catch (error) {
+        openMemoryFeedbackModal(
+          "Could not download images",
+          error instanceof Error ? error.message : "Please try again.",
+          { closePreview: false }
+        );
+      } finally {
+        setIsDownloadingMemories(false);
+        setShowMemoryPreviewMenu(false);
+      }
+    },
+    [authToken, isDownloadingMemories, memories, openMemoryFeedbackModal]
+  );
+
+  const handleDownloadSelectedMemories = useCallback(() => {
+    void downloadMemoriesByIds(selectedMemoryIds);
+  }, [downloadMemoriesByIds, selectedMemoryIds]);
+
+  const handleDownloadPreviewMemory = useCallback(() => {
+    if (!selectedMemory) return;
+    void downloadMemoriesByIds([selectedMemory.memory_id]);
+  }, [downloadMemoriesByIds, selectedMemory]);
+
   const toggleMemorySelection = useCallback((memoryId: string) => {
     setSelectedMemoryIds((current) => {
       const next = current.includes(memoryId)
@@ -1323,6 +1507,7 @@ export default function ItineraryScreen() {
         return;
       }
 
+      setShowMemoryPreviewMenu(false);
       setSelectedMemory(memory);
     },
     [isMemorySelectionMode, toggleMemorySelection]
@@ -1339,6 +1524,7 @@ export default function ItineraryScreen() {
 
   const handleDeletePreviewMemory = useCallback(() => {
     if (!selectedMemory) return;
+    setShowMemoryPreviewMenu(false);
     void removeMemories([selectedMemory.memory_id]);
   }, [removeMemories, selectedMemory]);
 
@@ -1348,7 +1534,73 @@ export default function ItineraryScreen() {
 
   const handleCloseMemoryPreview = useCallback(() => {
     setSelectedMemory(null);
+    setShowMemoryPreviewMenu(false);
   }, []);
+
+  const handleMemoryImageLoad = useCallback(
+    (memoryId: string, width: number, height: number) => {
+      if (width <= 0 || height <= 0) return;
+
+      setMemoryAspectRatios((current) => {
+        const nextRatio = width / height;
+        if (current[memoryId] === nextRatio) {
+          return current;
+        }
+
+        return {
+          ...current,
+          [memoryId]: nextRatio,
+        };
+      });
+    },
+    []
+  );
+
+  const handleToggleMemoryPreviewMenu = useCallback(() => {
+    setShowMemoryPreviewMenu((current) => !current);
+  }, []);
+
+  const handlePreviewMomentumScrollEnd = useCallback(
+    (offsetX: number) => {
+      if (memories.length === 0 || memoryPreviewWidth <= 0) return;
+
+      const nextIndex = Math.round(offsetX / memoryPreviewWidth);
+      const boundedIndex = Math.min(
+        Math.max(nextIndex, 0),
+        memories.length - 1
+      );
+      const nextMemory = memories[boundedIndex];
+
+      if (!nextMemory) return;
+
+      skipPreviewScrollRef.current = true;
+      setSelectedMemory(nextMemory);
+      setShowMemoryPreviewMenu(false);
+    },
+    [memories, memoryPreviewWidth]
+  );
+
+  useEffect(() => {
+    if (!selectedMemory || memories.length === 0) return;
+
+    if (skipPreviewScrollRef.current) {
+      skipPreviewScrollRef.current = false;
+      return;
+    }
+
+    const index = memories.findIndex(
+      (memory) => memory.memory_id === selectedMemory.memory_id
+    );
+
+    if (index < 0) return;
+
+    requestAnimationFrame(() => {
+      memoryPreviewListRef.current?.scrollToIndex({
+        index,
+        animated: false,
+      });
+    });
+  }, [memories, selectedMemory]);
 
   useEffect(() => {
     if (activeState !== "final") {
@@ -2248,54 +2500,33 @@ export default function ItineraryScreen() {
 
             {activeState === "memories" && (
               <View style={styles.memoriesSection}>
-                {memories.length > 0 && (
-                  <View style={styles.memoriesActions}>
-                    <Pressable
-                      style={[
-                        styles.memoryActionButton,
-                        styles.uploadMemoryButton,
-                        isUploadingMemories && styles.memoryActionDisabled,
-                      ]}
-                      onPress={handleUploadMemories}
-                      disabled={isUploadingMemories}
-                      accessibilityRole="button"
-                      accessibilityLabel="Upload images"
-                      accessibilityState={{ busy: isUploadingMemories }}
-                    >
-                      {isUploadingMemories ? (
-                        <ActivityIndicator color={colors.nightBlack} />
-                      ) : (
-                        <Ionicons
-                          name="cloud-upload-outline"
-                          size={22}
-                          color={colors.nightBlack}
-                        />
-                      )}
-                      <AppText variant="body" style={styles.memoryActionText}>
-                        Upload images
-                      </AppText>
-                    </Pressable>
-
-                    <Pressable
-                      style={[
-                        styles.memoryActionButton,
-                        styles.downloadMemoryButton,
-                      ]}
-                      onPress={handleDownloadAllMemories}
-                      accessibilityRole="button"
-                      accessibilityLabel="Download all memories"
-                    >
+                <View style={styles.memoriesActions}>
+                  <Pressable
+                    style={[
+                      styles.memoryActionButton,
+                      styles.uploadMemoryButton,
+                      isUploadingMemories && styles.memoryActionDisabled,
+                    ]}
+                    onPress={handleUploadMemories}
+                    disabled={isUploadingMemories}
+                    accessibilityRole="button"
+                    accessibilityLabel="Upload images"
+                    accessibilityState={{ busy: isUploadingMemories }}
+                  >
+                    {isUploadingMemories ? (
+                      <ActivityIndicator color={colors.nightBlack} />
+                    ) : (
                       <Ionicons
-                        name="download-outline"
+                        name="cloud-upload-outline"
                         size={22}
                         color={colors.nightBlack}
                       />
-                      <AppText variant="body" style={styles.memoryActionText}>
-                        Download all
-                      </AppText>
-                    </Pressable>
-                  </View>
-                )}
+                    )}
+                    <AppText variant="body" style={styles.memoryActionText}>
+                      Upload images
+                    </AppText>
+                  </Pressable>
+                </View>
 
                 {isLoadingMemories ? (
                   <View style={styles.memoryGrid}>
@@ -2307,93 +2538,67 @@ export default function ItineraryScreen() {
                     ))}
                   </View>
                 ) : memories.length === 0 ? (
-                  <Pressable
-                    style={[
-                      styles.emptyMemoriesPanel,
-                      isUploadingMemories && styles.memoryActionDisabled,
-                    ]}
-                    onPress={handleUploadMemories}
-                    disabled={isUploadingMemories}
-                    accessibilityRole="button"
-                    accessibilityLabel="Upload images"
-                    accessibilityState={{ busy: isUploadingMemories }}
-                  >
+                  <View style={styles.emptyMemoriesPanel}>
                     <View style={styles.emptyMemoriesCenter}>
-                      {isUploadingMemories ? (
-                        <ActivityIndicator color={colors.border} />
-                      ) : (
-                        <ImageIcon width={34} height={34} />
-                      )}
+                      <ImageIcon width={34} height={34} />
                       <AppText variant="body" style={styles.emptyMemoriesText}>
-                        Add images to your trip
+                        No images here yet
                       </AppText>
                     </View>
-                  </Pressable>
+                  </View>
                 ) : (
                   <View style={styles.memoryGrid}>
-                    {[
-                      ...memories.map((memory) => ({
-                        type: "memory" as const,
-                        memory,
-                      })),
-                      ...Array.from({
-                        length: Math.max(0, 6 - memories.length),
-                      }).map((_, index) => ({
-                        type: "placeholder" as const,
-                        index,
-                      })),
-                    ].map((item) => {
-                      if (item.type === "memory") {
-                        const isSelected = selectedMemoryIds.includes(
-                          item.memory.memory_id
-                        );
-
-                        return (
-                          <Pressable
-                            key={item.memory.memory_id}
-                            style={styles.memoryTile}
-                            onPress={() => handleMemoryPress(item.memory)}
-                            onLongPress={() =>
-                              handleMemoryLongPress(item.memory)
-                            }
-                            accessibilityRole="imagebutton"
-                            accessibilityLabel={`Memory photo uploaded by ${
-                              item.memory.uploaded_by_name ?? "a trip member"
-                            }`}
-                            accessibilityHint={
-                              isMemorySelectionMode
-                                ? "Selects or unselects this photo"
-                                : "Opens a larger preview"
-                            }
-                            accessibilityState={{ selected: isSelected }}
-                          >
-                            <ExpoImage
-                              source={{
-                                uri: authToken
-                                  ? getMemoryPhotoUrl(item.memory, authToken)
-                                  : "",
-                              }}
-                              style={styles.memoryImage}
-                              contentFit="cover"
-                            />
-                            {isMemorySelectionMode && (
-                              <View style={styles.memorySelectIcon}>
-                                {isSelected ? (
-                                  <SelectImageIcon width={32} height={32} />
-                                ) : (
-                                  <NotSelectImageIcon width={32} height={32} />
-                                )}
-                              </View>
-                            )}
-                          </Pressable>
-                        );
-                      }
+                    {memories.map((memory) => {
+                      const isSelected = selectedMemoryIds.includes(
+                        memory.memory_id
+                      );
 
                       return (
-                        <View
-                          key={`memory-empty-${item.index}`}
-                          style={styles.memoryPlaceholder}
-                        />
+                        <Pressable
+                          key={memory.memory_id}
+                          style={styles.memoryTile}
+                          onPress={() => handleMemoryPress(memory)}
+                          onLongPress={() => handleMemoryLongPress(memory)}
+                          accessibilityRole="imagebutton"
+                          accessibilityLabel={`Memory photo uploaded by ${
+                            memory.uploaded_by_name ?? "a trip member"
+                          }`}
+                          accessibilityHint={
+                            isMemorySelectionMode
+                              ? "Selects or unselects this photo"
+                              : "Opens a larger preview"
+                          }
+                          accessibilityState={{ selected: isSelected }}
+                        >
+                          <ExpoImage
+                            source={{
+                              uri: authToken
+                                ? getMemoryPhotoUrl(memory, authToken)
+                                : "",
+                            }}
+                            style={styles.memoryImage}
+                            contentFit="cover"
+                          />
+                          {isMemorySelectionMode && (
+                            <Pressable
+                              style={styles.memorySelectIcon}
+                              onPress={() =>
+                                toggleMemorySelection(memory.memory_id)
+                              }
+                              hitSlop={10}
+                              accessibilityRole="button"
+                              accessibilityLabel={
+                                isSelected ? "Unselect image" : "Select image"
+                              }
+                            >
+                              {isSelected ? (
+                                <ImageSelectedIcon width={24} height={24} />
+                              ) : (
+                                <UnselectImageIcon width={24} height={24} />
+                              )}
+                            </Pressable>
+                          )}
+                        </Pressable>
                       );
                     })}
                   </View>
@@ -2555,33 +2760,150 @@ export default function ItineraryScreen() {
               accessibilityLabel="Close memory preview"
             />
 
-            <View style={styles.memoryPreviewContent}>
-              {selectedMemory && authToken && (
-                <ExpoImage
-                  source={{
-                    uri: getMemoryPhotoUrl(selectedMemory, authToken),
-                  }}
-                  style={styles.memoryPreviewImage}
-                  contentFit="contain"
-                />
-              )}
-              <Pressable
+            <View
+              style={[
+                styles.memoryPreviewContent,
+                { width: memoryPreviewWidth },
+              ]}
+            >
+              <View style={styles.memoryPreviewHeader}>
+                <View style={styles.memoryPreviewHeaderRow}>
+                  <View style={styles.memoryPreviewHeaderSpacer} />
+                  <View style={styles.memoryPreviewMenuAnchor}>
+                    <Pressable
+                      style={styles.memoryPreviewMenuButton}
+                      onPress={handleToggleMemoryPreviewMenu}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Open memory actions menu"
+                      accessibilityState={{ expanded: showMemoryPreviewMenu }}
+                    >
+                      <ImageMenuIcon width={24} height={24} />
+                    </Pressable>
+
+                    {showMemoryPreviewMenu ? (
+                      <View style={styles.memoryPreviewMenu}>
+                        <Pressable
+                          style={[
+                            styles.memoryPreviewMenuItem,
+                            isDeletingMemories && styles.memoryActionDisabled,
+                          ]}
+                          onPress={handleDeletePreviewMemory}
+                          disabled={isDeletingMemories}
+                          accessibilityRole="button"
+                          accessibilityLabel="Delete this memory"
+                        >
+                          {isDeletingMemories ? (
+                            <ActivityIndicator color={colors.nightBlack} />
+                          ) : (
+                            <ImageDeleteIcon width={24} height={24} />
+                          )}
+                          <AppText
+                            variant="body"
+                            style={styles.memoryPreviewMenuItemText}
+                          >
+                            Delete
+                          </AppText>
+                        </Pressable>
+
+                        <Pressable
+                          style={[
+                            styles.memoryPreviewMenuItem,
+                            isDownloadingMemories &&
+                              styles.memoryActionDisabled,
+                          ]}
+                          onPress={handleDownloadPreviewMemory}
+                          disabled={isDownloadingMemories}
+                          accessibilityRole="button"
+                          accessibilityLabel="Download this memory"
+                        >
+                          {isDownloadingMemories ? (
+                            <ActivityIndicator color={colors.nightBlack} />
+                          ) : (
+                            <ImageDownloadIcon width={24} height={24} />
+                          )}
+                          <AppText
+                            variant="body"
+                            style={styles.memoryPreviewMenuItemText}
+                          >
+                            Download
+                          </AppText>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+
+              <View
                 style={[
-                  styles.memoryPreviewDeleteButton,
-                  isDeletingMemories && styles.memoryActionDisabled,
+                  styles.memoryPreviewImageWrapper,
+                  {
+                    width: memoryPreviewWidth,
+                    height: memoryPreviewImageHeight,
+                  },
                 ]}
-                onPress={handleDeletePreviewMemory}
-                disabled={isDeletingMemories}
-                accessibilityRole="button"
-                accessibilityLabel="Delete this memory"
-                accessibilityState={{ busy: isDeletingMemories }}
               >
-                {isDeletingMemories ? (
-                  <ActivityIndicator color={colors.nightBlack} />
-                ) : (
-                  <DeleteIcon width={32} height={32} />
-                )}
-              </Pressable>
+                {authToken && memories.length > 0 ? (
+                  <FlatList
+                    ref={memoryPreviewListRef}
+                    data={memories}
+                    horizontal
+                    pagingEnabled
+                    bounces={memories.length > 1}
+                    showsHorizontalScrollIndicator={false}
+                    initialScrollIndex={
+                      memories.length > 0 ? selectedMemoryIndex : undefined
+                    }
+                    keyExtractor={(memory) => memory.memory_id}
+                    getItemLayout={(_, index) => ({
+                      length: memoryPreviewWidth,
+                      offset: memoryPreviewWidth * index,
+                      index,
+                    })}
+                    onScrollToIndexFailed={(info) => {
+                      requestAnimationFrame(() => {
+                        memoryPreviewListRef.current?.scrollToIndex({
+                          index: info.index,
+                          animated: false,
+                        });
+                      });
+                    }}
+                    onScrollBeginDrag={() => setShowMemoryPreviewMenu(false)}
+                    onMomentumScrollEnd={(event) =>
+                      handlePreviewMomentumScrollEnd(
+                        event.nativeEvent.contentOffset.x
+                      )
+                    }
+                    renderItem={({ item: memory }) => (
+                      <View
+                        style={[
+                          styles.memoryPreviewSlide,
+                          {
+                            width: memoryPreviewWidth,
+                            height: memoryPreviewImageHeight,
+                          },
+                        ]}
+                      >
+                        <ExpoImage
+                          source={{
+                            uri: getMemoryPhotoUrl(memory, authToken),
+                          }}
+                          style={styles.memoryPreviewImage}
+                          contentFit="contain"
+                          onLoad={(event) =>
+                            handleMemoryImageLoad(
+                              memory.memory_id,
+                              event.source.width,
+                              event.source.height
+                            )
+                          }
+                        />
+                      </View>
+                    )}
+                  />
+                ) : null}
+              </View>
             </View>
           </View>
         </Modal>
@@ -2619,36 +2941,90 @@ export default function ItineraryScreen() {
         )}
 
         {activeState === "memories" &&
-          isMemorySelectionMode &&
-          memories.length > 0 && (
-            <View style={styles.memoryDeleteTray}>
-              <Pressable
-                style={[
-                  styles.memoryDeleteTrayButton,
-                  (selectedMemoryIds.length === 0 || isDeletingMemories) &&
-                    styles.memoryActionDisabled,
-                ]}
-                onPress={handleDeleteSelectedMemories}
-                disabled={selectedMemoryIds.length === 0 || isDeletingMemories}
-                accessibilityRole="button"
-                accessibilityLabel="Delete selected images"
-                accessibilityState={{
-                  disabled:
-                    selectedMemoryIds.length === 0 || isDeletingMemories,
-                  busy: isDeletingMemories,
-                }}
-              >
-                {isDeletingMemories ? (
-                  <ActivityIndicator color={colors.nightBlack} />
-                ) : (
-                  <DeleteIcon width={22} height={22} />
-                )}
-                <AppText variant="body" style={styles.memoryActionText}>
-                  Delete images
-                </AppText>
-              </Pressable>
+        isMemorySelectionMode &&
+        memories.length > 0 ? (
+          <SafeAreaView
+            edges={["bottom"]}
+            style={styles.memorySelectionSafeArea}
+          >
+            <View style={styles.memorySelectionWrapper}>
+              <View style={styles.memorySelectionTray}>
+                <Pressable
+                  style={[
+                    styles.memorySelectionAction,
+                    (selectedMemoryIds.length === 0 || isDeletingMemories) &&
+                      styles.memoryActionDisabled,
+                  ]}
+                  onPress={handleDeleteSelectedMemories}
+                  disabled={
+                    selectedMemoryIds.length === 0 || isDeletingMemories
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete selected images"
+                >
+                  {isDeletingMemories ? (
+                    <ActivityIndicator color={colors.nightBlack} />
+                  ) : (
+                    <ImageDeleteIcon width={24} height={24} />
+                  )}
+                  <AppText
+                    variant="body"
+                    style={styles.memorySelectionActionText}
+                  >
+                    Delete
+                  </AppText>
+                </Pressable>
+
+                <Pressable
+                  style={styles.memorySelectionAction}
+                  onPress={handleSelectAllMemories}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    selectedMemoryIds.length === memories.length
+                      ? "Deselect all images"
+                      : "Select all images"
+                  }
+                >
+                  <SelectAllIcon width={24} height={24} />
+                  <AppText
+                    variant="body"
+                    style={styles.memorySelectionActionText}
+                  >
+                    {selectedMemoryIds.length === memories.length
+                      ? "Deselect all"
+                      : "Select all"}
+                  </AppText>
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.memorySelectionAction,
+                    (selectedMemoryIds.length === 0 || isDownloadingMemories) &&
+                      styles.memoryActionDisabled,
+                  ]}
+                  onPress={handleDownloadSelectedMemories}
+                  disabled={
+                    selectedMemoryIds.length === 0 || isDownloadingMemories
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Download selected images"
+                >
+                  {isDownloadingMemories ? (
+                    <ActivityIndicator color={colors.nightBlack} />
+                  ) : (
+                    <ImageDownloadIcon width={24} height={24} />
+                  )}
+                  <AppText
+                    variant="body"
+                    style={styles.memorySelectionActionText}
+                  >
+                    Download
+                  </AppText>
+                </Pressable>
+              </View>
             </View>
-          )}
+          </SafeAreaView>
+        ) : null}
 
         <ItineraryInfoModal
           visible={showVotingInfoPopup}
@@ -2727,6 +3103,14 @@ export default function ItineraryScreen() {
             text="We are preparing the activities your group can vote on."
           />
         )}
+
+        <FeedbackModal
+          visible={showMemoryFeedbackModal}
+          title={memoryFeedbackTitle}
+          message={memoryFeedbackMessage}
+          onClose={() => setShowMemoryFeedbackModal(false)}
+          buttonColor={colors.seaBlue}
+        />
       </View>
     </SafeAreaView>
   );
@@ -2791,7 +3175,7 @@ const styles = StyleSheet.create({
   },
   memoriesSection: {
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
+    paddingTop: spacing.sm,
     gap: spacing.md,
   },
   memoriesActions: {
@@ -2800,23 +3184,20 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   memoryActionButton: {
-    flex: 1,
+    alignSelf: "flex-start",
     minHeight: 56,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   uploadMemoryButton: {
     backgroundColor: colors.seaBlue,
   },
   downloadMemoryButton: {
     backgroundColor: colors.sunsetOrange,
-  },
-  memoryActionDisabled: {
-    opacity: 0.65,
   },
   memoryActionText: {
     color: colors.nightBlack,
@@ -2829,15 +3210,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     justifyContent: "center",
-    alignItems: "center",
     paddingHorizontal: spacing.lg,
     marginTop: spacing.sm,
   },
+
   emptyMemoriesCenter: {
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,
   },
+
   emptyMemoriesText: {
     color: colors.border,
     fontFamily: typography.fontFamily.bodyBold,
@@ -2869,7 +3251,46 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: spacing.md,
     top: spacing.md,
+    zIndex: 3,
   },
+  memorySelectionSafeArea: {
+    backgroundColor: colors.lightWhite,
+  },
+  memorySelectionWrapper: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
+  },
+  memorySelectionTray: {
+    backgroundColor: colors.lightWhite,
+    borderRadius: radius.lg,
+    minHeight: ACTION_CARD_HEIGHT,
+    paddingHorizontal: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    boxShadow: `0px 8px ${radius.xl}px rgba(113, 111, 231, 0.25)`,
+    elevation: 6,
+  },
+
+  memoryActionDisabled: {
+    opacity: 0.5,
+  },
+
+  memorySelectionAction: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
+  memorySelectionActionText: {
+    color: colors.textPrimary,
+    textAlign: "center",
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.xs,
+  },
+
   memoryPreviewOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.42)",
@@ -2880,58 +3301,84 @@ const styles = StyleSheet.create({
   },
   memoryPreviewBackdrop: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
   },
   memoryPreviewContent: {
-    width: "82%",
     maxWidth: 420,
-    aspectRatio: 1,
-    borderRadius: 12,
+    borderRadius: radius.md,
     backgroundColor: colors.lightWhite,
-    overflow: "hidden",
+    zIndex: 1,
+    elevation: 4,
+    overflow: "visible",
   },
-  memoryPreviewDeleteButton: {
-    position: "absolute",
-    right: spacing.lg,
-    bottom: spacing.lg,
-    zIndex: 2,
+  memoryPreviewHeader: {
+    backgroundColor: colors.lightWhite,
+    borderTopLeftRadius: radius.md,
+    borderTopRightRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
+    zIndex: 10,
+    overflow: "visible",
+  },
+  memoryPreviewHeaderRow: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  memoryPreviewHeaderSpacer: {
+    flex: 1,
+  },
+  memoryPreviewMenuAnchor: {
+    position: "relative",
+    zIndex: 20,
+  },
+  memoryPreviewMenuButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+  },
+  memoryPreviewMenu: {
+    position: "absolute",
+    top: 40,
+    right: 0,
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    minWidth: 182,
+    boxShadow: "0px 6px 20px rgba(20, 13, 10, 0.14)",
+    elevation: 10,
+    zIndex: 30,
+  },
+  memoryPreviewMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    minHeight: 48,
+  },
+  memoryPreviewMenuItemText: {
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
+  },
+  memoryPreviewImageWrapper: {
+    backgroundColor: colors.border,
+    borderBottomLeftRadius: radius.md,
+    borderBottomRightRadius: radius.md,
+    overflow: "hidden",
+  },
+  memoryPreviewSlide: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.border,
   },
   memoryPreviewImage: {
     width: "100%",
     height: "100%",
-  },
-  memoryDeleteTray: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    minHeight: 136,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: colors.lightWhite,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.md,
-    shadowColor: colors.black,
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 8,
-  },
-  memoryDeleteTrayButton: {
-    minHeight: 60,
-    borderRadius: 999,
-    backgroundColor: colors.seaBlue,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.xs,
-    paddingHorizontal: spacing.xl,
   },
   votingModalOverlay: {
     flex: 1,
