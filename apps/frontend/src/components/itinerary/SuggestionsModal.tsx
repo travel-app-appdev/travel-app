@@ -572,13 +572,13 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
+    maxHeight: "80%",
     backgroundColor: colors.lightWhite,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxxl,
-    maxHeight: "80%",
   },
   header: {
     flexDirection: "row",
@@ -618,7 +618,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     marginBottom: spacing.sm,
     flexShrink: 0,
-    overflow: "visible",
   },
   filterRow: {
     flexDirection: "row",
@@ -652,7 +651,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bodyBold,
   },
   listFrame: {
-    flex: 1,
+    flexShrink: 1,
     minHeight: 0,
     position: "relative",
   },
@@ -673,7 +672,7 @@ const styles = StyleSheet.create({
   scrollbarThumb: {
     width: 5,
     borderRadius: radius.pill,
-    backgroundColor: colors.nightBlack,
+    backgroundColor: "rgba(20, 13, 10, 0.35)",
   },
   centerState: {
     alignItems: "center",
