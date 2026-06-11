@@ -33,7 +33,7 @@ import { toLocalDateString } from "@/src/utils/tripDate";
 import { invalidateTripsCache } from "./home";
 import Plane from "@/assets/icons/plane.svg";
 import LeafUp from "@/assets/visuals/leaf_up.svg";
-import LeafDown from "@/assets/visuals/leaf_down.svg";
+import BackIcon from "@/assets/icons/back.svg";
 import CityScape from "@/assets/visuals/city_scape.svg";
 import CurlyYellow from "@/assets/visuals/curly-yellow.svg";
 import CurlyOrange from "@/assets/visuals/curly-orange.svg";
@@ -1431,18 +1431,12 @@ export default function CreateTripScreen() {
     return (
       <View style={styles.prefsScreen}>
         <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-          {/* Decorative leaves */}
+          {/* Decorative leaf */}
           <View
             style={[styles.prefsLeafTopRight, { pointerEvents: "none" }]}
             {...hiddenFromAccessibility}
           >
-            <LeafUp width={width * 0.38} height={width * 0.38} />
-          </View>
-          <View
-            style={[styles.prefsLeafBottomLeft, { pointerEvents: "none" }]}
-            {...hiddenFromAccessibility}
-          >
-            <LeafDown width={width * 0.42} height={width * 0.42} />
+            <LeafUp width={width * 0.38} height={width * 0.38} color={colors.sunsetPink} />
           </View>
 
           {/* Progress bar only — no full StickyHeader */}
@@ -1467,9 +1461,7 @@ export default function CreateTripScreen() {
               accessibilityRole="button"
               accessibilityLabel="Back to timers"
             >
-              <View {...hiddenFromAccessibility}>
-                <AppText variant="body" style={styles.prefsBackArrow}>‹</AppText>
-              </View>
+              <BackIcon width={24} height={24} {...hiddenFromAccessibility} />
             </Pressable>
 
             {/* Title block */}
