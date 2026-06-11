@@ -17,25 +17,66 @@ export const PREFERENCE_GROUPS: PreferenceGroup[] = [
     group: "Food & Drink",
     items: [
       { key: "coffee", label: "Coffee" },
-      { key: "food",   label: "Food" },
+      { key: "food", label: "Restaurants" },
+      { key: "quickbites", label: "Quick bites" },
+      { key: "desserts", label: "Desserts" },
       { key: "nightlife", label: "Nightlife" },
     ],
   },
   {
     group: "Explore",
     items: [
-      { key: "museums",   label: "Museums" },
-      { key: "nature",    label: "Nature" },
+      { key: "museums", label: "Museums" },
+      { key: "galleries", label: "Galleries" },
+      { key: "sightseeing", label: "Sightseeing" },
+      { key: "viewpoints", label: "Viewpoints" },
+      { key: "heritage", label: "Heritage" },
       { key: "citywalks", label: "City walks" },
-      { key: "shopping",  label: "Shopping" },
     ],
   },
   {
-    group: "Activities",
+    group: "Outdoors",
     items: [
-      { key: "culture",    label: "Culture" },
-      { key: "sports",     label: "Sports" },
-      { key: "sightseeing",label: "Sightseeing" },
+      { key: "nature", label: "Nature" },
+      { key: "parks", label: "Parks" },
+      { key: "gardens", label: "Gardens" },
+      { key: "beaches", label: "Beaches" },
+      { key: "camping", label: "Camping" },
+      { key: "water", label: "Water views" },
+    ],
+  },
+  {
+    group: "Fun",
+    items: [
+      { key: "culture", label: "Culture" },
+      { key: "cinema", label: "Cinema" },
+      { key: "theatre", label: "Theatre" },
+      { key: "amusement", label: "Theme parks" },
+      { key: "zoo_aquarium", label: "Zoo & aquarium" },
+      { key: "bowling", label: "Bowling" },
+      { key: "escape_rooms", label: "Escape rooms" },
+    ],
+  },
+  {
+    group: "Active",
+    items: [
+      { key: "sports", label: "Sports" },
+      { key: "fitness", label: "Fitness" },
+      { key: "swimming", label: "Swimming" },
+      { key: "skiing", label: "Skiing" },
+      { key: "cycling", label: "Cycling" },
+      { key: "water_sports", label: "Water sports" },
+      { key: "spa", label: "Spa" },
+    ],
+  },
+  {
+    group: "Shopping",
+    items: [
+      { key: "shopping", label: "Malls" },
+      { key: "markets", label: "Markets" },
+      { key: "souvenirs", label: "Souvenirs" },
+      { key: "books", label: "Books" },
+      { key: "vintage", label: "Vintage" },
     ],
   },
 ];
@@ -62,6 +103,8 @@ export function PreferenceChips({
       onChange(selected.filter((p) => p !== key));
     } else if (selected.length < maxSelect) {
       onChange([...selected, key]);
+    } else {
+      onChange([...selected.slice(0, maxSelect - 1), key]);
     }
   }
 
@@ -74,13 +117,12 @@ export function PreferenceChips({
       >
         {ALL_PREFERENCES.map(({ key, label }) => {
           const active = selected.includes(key);
-          const disabled = !active && selected.length >= maxSelect;
           return (
             <Chip
               key={key}
               label={label}
               active={active}
-              disabled={disabled}
+              disabled={false}
               onPress={() => toggle(key)}
             />
           );
@@ -99,13 +141,12 @@ export function PreferenceChips({
           <View style={styles.chipRow}>
             {items.map(({ key, label }) => {
               const active = selected.includes(key);
-              const disabled = !active && selected.length >= maxSelect;
               return (
                 <Chip
                   key={key}
                   label={label}
                   active={active}
-                  disabled={disabled}
+                  disabled={false}
                   onPress={() => toggle(key)}
                 />
               );
@@ -193,7 +234,7 @@ const styles = StyleSheet.create({
     fontSize: typography.size.md,
   },
   chipLabelActive: {
-    color: colors.lightWhite,
+    color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
   },
 });

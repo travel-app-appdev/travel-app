@@ -84,7 +84,7 @@ export function PlanningSlotCard({
               <AddIcon width={28} height={28} color={colors.nightBlack} />
             </View>
             <AppText variant="body" style={styles.emptyTitle}>
-              Add activity
+              Add Activity
             </AppText>
           </View>
         </Pressable>
@@ -93,17 +93,13 @@ export function PlanningSlotCard({
           <Pressable
             onPress={handleSuggestPress}
             disabled={disabled}
-            style={({ pressed }) => [
-              styles.suggestFullWidth,
-              pressed && styles.cardPressed,
-              disabled && styles.cardDisabled,
-            ]}
+            style={[styles.suggestPill, disabled && styles.cardDisabled]}
             accessibilityRole="button"
             accessibilityLabel={`Suggest activity at ${slot.label}`}
             accessibilityHint="Shows real place suggestions"
             accessibilityState={{ disabled }}
           >
-            <AppText variant="body" style={styles.suggestFullWidthText} accessible={false}>
+            <AppText variant="body" style={styles.suggestPillText} accessible={false}>
               ✦ Suggest activity
             </AppText>
           </Pressable>
@@ -245,16 +241,16 @@ const styles = StyleSheet.create({
   },
   emptyColumn: {
     flexDirection: "column",
-    gap: spacing.sm,
+    position: "relative",
   },
   emptyCard: {
-    minHeight: 90,
+    minHeight: 126,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.nightBlack,
     backgroundColor: colors.lightWhite,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     overflow: "hidden",
   },
   cardPressed: {
@@ -337,20 +333,25 @@ const styles = StyleSheet.create({
   editCta: {
     backgroundColor: colors.border,
   },
-  suggestFullWidth: {
+  suggestPill: {
+    position: "absolute",
+    top: spacing.sm,
+    right: spacing.sm,
+    zIndex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm,
-    backgroundColor: colors.sunsetOrange,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.beachYellow,
+    borderRadius: radius.pill,
+    minHeight: 32,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
   },
-  suggestFullWidthText: {
+  suggestPillText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
-    fontSize: typography.size.md,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
   },
   ctaPressed: {
     opacity: 0.85,

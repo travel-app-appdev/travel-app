@@ -31,11 +31,15 @@ import { BackLink } from "@/src/components/common/BackLink";
 import {
   deleteTrip,
   fetchTripForUser,
+  getMemberPreferences,
   isTripNotFoundError,
   removeMember,
+  updateMemberPreferences,
   updateTrip,
   type Trip,
 } from "@/src/api/trips";
+import { PreferenceChips } from "@/src/components/common/PreferenceChips";
+import { DestinationAutocomplete } from "@/src/components/common/DestinationAutocomplete";
 import { auth, db } from "@/src/lib/firebase";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
@@ -59,6 +63,7 @@ import CheckMark from "@/assets/icons/check_mark.svg";
 import Unchecked from "@/assets/icons/unchecked.svg";
 import Trash from "@/assets/icons/trash.svg";
 import KeyFrame from "@/assets/icons/key_frame.svg";
+import Settings from "@/assets/icons/settings.svg";
 import Copy from "@/assets/icons/copy.svg";
 import Timer from "@/assets/icons/timer.svg";
 import ArrowItinerary from "@/assets/icons/arrow-itinerary.svg";
@@ -70,7 +75,7 @@ import {
   nativeImportantForAccessibility,
 } from "@/src/utils/accessibility";
 
-type FieldKey = "name" | "date" | "destination" | "members" | "code";
+type FieldKey = "name" | "date" | "destination" | "members" | "code" | "preferences";
 type PhaseKey = "planning" | "voting" | "final";
 
 type PhaseValue = {
@@ -499,6 +504,8 @@ export default function TripOverviewAdminScreen() {
 
   const [members, setMembers] = useState<MemberParam[]>(parsedMembers);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<string[]>([]);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [tripState, setTripState] = useState<Trip["state"]>(initialTripState);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -769,6 +776,13 @@ export default function TripOverviewAdminScreen() {
     tripEnd,
   ]);
 
+  useEffect(() => {
+    getIdToken().then((idToken) => {
+      if (!idToken) return;
+      getMemberPreferences(tripId, idToken).then(setPreferences).catch(() => {});
+    });
+  }, [tripId]);
+
   const disabledTripOrange = "#facbb8";
   const disabledPlanningYellow = "#F6E08F";
 
@@ -824,6 +838,35 @@ export default function TripOverviewAdminScreen() {
   const handleDateRow = useSinglePress(() => toggleField("date"));
   const handleDestRow = useSinglePress(() => toggleField("destination"));
   const handleMembersRow = useSinglePress(() => toggleField("members"));
+  const handlePrefsRow = useSinglePress(async () => {
+    if (openField === "preferences") {
+      toggleField("preferences");
+      return;
+    }
+    const idToken = await getIdToken();
+    if (idToken) {
+      try {
+        const prefs = await getMemberPreferences(tripId, idToken);
+        setPreferences(prefs);
+      } catch {}
+    }
+    toggleField("preferences");
+  });
+
+  const handleSavePreferences = async () => {
+    if (isSavingPrefs) return;
+    const idToken = await getIdToken();
+    if (!idToken) return;
+    try {
+      setIsSavingPrefs(true);
+      await updateMemberPreferences(tripId, preferences, idToken);
+      setOpenField(null);
+    } catch (error) {
+      Alert.alert("Update failed", error instanceof Error ? error.message : "Failed to update preferences");
+    } finally {
+      setIsSavingPrefs(false);
+    }
+  };
   const handlePlanningPhase = useSinglePress(() => togglePhase("planning"));
   const handleVotingPhase = useSinglePress(() => togglePhase("voting"));
 
@@ -868,6 +911,7 @@ export default function TripOverviewAdminScreen() {
         destination: destinationInput.trim(),
       });
       syncTripResponse(updatedTrip);
+      invalidateTripsCache();
       setDestinationUpdated(true);
       safeTimeout(() => {
         setDestinationUpdated(false);
@@ -1619,8 +1663,8 @@ export default function TripOverviewAdminScreen() {
 
             <View style={styles.fieldGroup}>
               {openField === "destination" ? (
-                <View style={[styles.infoRow, styles.infoRowEditing]}>
-                  <View style={styles.infoLeft}>
+                <View style={[styles.infoRow, styles.infoRowEditing, { zIndex: 9999 }]}>
+                  <View style={[styles.infoLeft, { zIndex: 9999 }]}>
                     <View
                       style={styles.infoLabelRow}
                       {...hiddenFromAccessibility}
@@ -1630,16 +1674,15 @@ export default function TripOverviewAdminScreen() {
                         Destination
                       </AppText>
                     </View>
-                    <AppInput
+                    <DestinationAutocomplete
                       value={destinationInput}
-                      onChangeText={(t) => {
+                      onChange={(t) => {
                         setDestinationInput(t);
                         setDestinationUpdated(false);
                       }}
                       placeholder="Enter destination"
-                      autoFocus
+                      inputStyle={[styles.inputBlackStroke, styles.inlineInput]}
                       accessibilityLabel="Destination"
-                      style={[styles.inputBlackStroke, styles.inlineInput]}
                     />
                   </View>
                   <Pressable
@@ -1784,6 +1827,73 @@ export default function TripOverviewAdminScreen() {
                   </View>
                 )}
               </Pressable>
+            </View>
+
+            {/* Preferences */}
+            <View style={styles.fieldGroup}>
+              <Pressable
+                style={[
+                  styles.infoRow,
+                  openField === "preferences" && styles.infoRowEditing,
+                ]}
+                onPress={openField === "preferences" ? undefined : handlePrefsRow}
+                accessibilityRole="button"
+                accessibilityLabel="Edit your activity preferences"
+                accessibilityState={{ expanded: openField === "preferences" }}
+              >
+                <View style={styles.infoLeft}>
+                  <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                    <Settings width={20} height={20} />
+                    <AppText variant="body" style={styles.fieldLabel}>
+                      Preferences
+                    </AppText>
+                  </View>
+                  {openField !== "preferences" && (
+                    <AppText variant="caption" style={styles.infoValue} accessible={false}>
+                      {preferences.length > 0 ? `${preferences.length} selected` : "Not set"}
+                    </AppText>
+                  )}
+                  {openField === "preferences" && (
+                    <View style={{ marginTop: spacing.sm }}>
+                      <PreferenceChips
+                        selected={preferences}
+                        onChange={setPreferences}
+                        showGroups
+                      />
+                    </View>
+                  )}
+                </View>
+                {openField === "preferences" ? (
+                  <Pressable
+                    style={styles.rowChevronButton}
+                    onPress={handlePrefsRow}
+                    accessibilityRole="button"
+                    accessibilityLabel="Collapse preferences"
+                    accessibilityState={{ expanded: true }}
+                  >
+                    <View {...hiddenFromAccessibility}>
+                      <ArrowUp width={20} height={20} />
+                    </View>
+                  </Pressable>
+                ) : (
+                  <View {...hiddenFromAccessibility}>
+                    <ArrowDown width={20} height={20} />
+                  </View>
+                )}
+              </Pressable>
+              {openField === "preferences" && (
+                <Pressable
+                  style={[styles.saveBtn, isSavingPrefs && { opacity: 0.6 }]}
+                  onPress={handleSavePreferences}
+                  disabled={isSavingPrefs}
+                  accessibilityRole="button"
+                  accessibilityLabel="Save preferences"
+                >
+                  <AppText variant="body" style={styles.saveBtnText}>
+                    {isSavingPrefs ? "Saving..." : "Save preferences"}
+                  </AppText>
+                </Pressable>
+              )}
             </View>
 
             <View style={styles.fieldGroup}>
@@ -2776,6 +2886,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  saveBtn: {
+    backgroundColor: colors.beachYellow,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.sm,
+  },
+  saveBtnText: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    color: colors.nightBlack,
+  },
   dateTimeRow: {
     flexDirection: "row",
     gap: spacing.md,

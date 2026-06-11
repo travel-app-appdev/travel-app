@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
   hint: {
     fontFamily: typography.fontFamily.body,
     fontSize: typography.size.md,
-    color: colors.grayedOut,
+    color: colors.nightBlack,
     lineHeight: typography.lineHeight.md,
   },
   spacer: {
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   continueBtnText: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.lg,
-    color: colors.lightWhite,
+    color: colors.nightBlack,
   },
   skipBtn: {
     height: 44,
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   skipText: {
     fontFamily: typography.fontFamily.body,
     fontSize: typography.size.md,
-    color: colors.grayedOut,
+    color: colors.nightBlack,
     textDecorationLine: "underline",
   },
 });

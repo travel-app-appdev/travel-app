@@ -1,5 +1,44 @@
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+export async function fetchDestinationSuggestions(
+  query: string
+): Promise<string[]> {
+  const trimmed = query.trim();
+
+  if (trimmed.length < 1) {
+    return [];
+  }
+
+  if (!API_URL) {
+    console.warn("[autocomplete] EXPO_PUBLIC_API_URL is not configured");
+    return [];
+  }
+
+  try {
+    const response = await fetch(
+      `${API_URL}/autocomplete/destinations?q=${encodeURIComponent(trimmed)}`
+    );
+
+    if (!response.ok) {
+      console.warn("[autocomplete] response not ok:", response.status);
+      return [];
+    }
+
+    const data = (await response.json()) as { results?: unknown };
+
+    if (!Array.isArray(data.results)) {
+      return [];
+    }
+
+    return data.results.filter(
+      (item): item is string => typeof item === "string"
+    );
+  } catch (error) {
+    console.warn("[autocomplete] fetch error:", error);
+    return [];
+  }
+}
+
 export type TripMember = {
   id: string;
   name: string;
@@ -596,6 +635,7 @@ export type ActivitySuggestion = {
   source: "geoapify";
   sourcePlaceId: string;
   matchedPreferences: string[];
+  categories?: string[];
 };
 
 export async function fetchActivitySuggestions(
@@ -616,6 +656,22 @@ export async function fetchActivitySuggestions(
   }
 
   return (data as { suggestions: ActivitySuggestion[] }).suggestions;
+}
+
+export async function getMemberPreferences(
+  tripId: string,
+  idToken: string
+): Promise<string[]> {
+  const response = await fetch(
+    `${API_URL}/trips/${encodeURIComponent(tripId)}/members/me/preferences`,
+    { headers: { Authorization: `Bearer ${idToken}` } }
+  );
+  if (!response.ok) {
+    const data: ApiErrorResponse = await response.json();
+    throw new Error(data.error || "Failed to fetch preferences");
+  }
+  const data = await response.json() as { preferences: string[] };
+  return data.preferences;
 }
 
 export async function updateMemberPreferences(
