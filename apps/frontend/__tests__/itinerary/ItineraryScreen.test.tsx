@@ -27,6 +27,11 @@ jest.mock("@/assets/icons/delete.svg", () => () => null);
 jest.mock("@/assets/icons/image.svg", () => () => null);
 jest.mock("@/assets/icons/not-select-image.svg", () => () => null);
 jest.mock("@/assets/icons/select-image.svg", () => () => null);
+jest.mock("@/assets/icons/image-menu.svg", () => () => null);
+jest.mock("@/assets/icons/image-download.svg", () => () => null);
+jest.mock("@/assets/icons/image-delete.svg", () => () => null);
+jest.mock("@/assets/icons/select-all.svg", () => () => null);
+jest.mock("@/assets/icons/unselect-image.svg", () => () => null);
 
 jest.mock("expo-router", () => ({
   router: {
@@ -76,6 +81,7 @@ jest.mock("@/src/services/activityService", () => ({
 
 jest.mock("@/src/services/memoriesService", () => ({
   deleteMemoryPhoto: (payload: unknown) => mockDeleteMemoryPhoto(payload),
+  downloadMemoryPhotos: jest.fn(),
   fetchMemories: (payload: unknown) => mockFetchMemories(payload),
   uploadMemoryPhoto: (payload: unknown) => mockUploadMemoryPhoto(payload),
   getMemoryPhotoUrl: () => "https://example.com/memory.jpg",

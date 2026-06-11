@@ -50,18 +50,40 @@ async function verifyAcceptedMember(tripId: string, idToken: string) {
   return decoded.uid;
 }
 
-async function ensureMemoriesTrip(tripId: string) {
+async function ensureMemoriesAccess(tripId: string) {
   const trip = await findTripById(tripId);
 
   if (!trip) {
     throw { status: 404, message: "Trip not found" };
   }
 
-  if (trip.state !== "Memories") {
-    throw { status: 400, message: "Trip is not in Memories state" };
+  if (trip.state !== "Final" && trip.state !== "Memories") {
+    throw { status: 400, message: "Trip is not ready for memories yet" };
+  }
+
+  if (!hasTripStartDatePassed(trip.start_date)) {
+    throw {
+      status: 400,
+      message: "Memories are available once the trip starts",
+    };
   }
 
   return trip;
+}
+
+function hasTripStartDatePassed(startDateString?: string): boolean {
+  if (!startDateString) return false;
+
+  const [year, month, day] = startDateString.split("-").map(Number);
+  if (!year || !month || !day) return false;
+
+  const tripStart = new Date(year, month - 1, day);
+  tripStart.setHours(0, 0, 0, 0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return tripStart <= today;
 }
 
 export async function listMemoryPhotos(input: {
@@ -69,7 +91,7 @@ export async function listMemoryPhotos(input: {
   idToken: string;
 }): Promise<MemoryPhoto[]> {
   await verifyAcceptedMember(input.tripId, input.idToken);
-  await ensureMemoriesTrip(input.tripId);
+  await ensureMemoriesAccess(input.tripId);
 
   return findMemoryPhotosByTripId(input.tripId);
 }
@@ -80,7 +102,7 @@ export async function uploadMemoryPhoto(input: {
   file?: Express.Multer.File;
 }): Promise<MemoryPhoto> {
   const userId = await verifyAcceptedMember(input.tripId, input.idToken);
-  await ensureMemoriesTrip(input.tripId);
+  await ensureMemoriesAccess(input.tripId);
 
   const file = input.file;
   if (!file) {
@@ -132,7 +154,7 @@ export async function getMemoryPhotoFile(input: {
   idToken: string;
 }): Promise<{ filePath: string; mimeType: string; originalName: string }> {
   await verifyAcceptedMember(input.tripId, input.idToken);
-  await ensureMemoriesTrip(input.tripId);
+  await ensureMemoriesAccess(input.tripId);
 
   const memory = await findMemoryPhotoById(input.memoryId);
   if (!memory || memory.trip_id !== input.tripId) {
@@ -160,7 +182,7 @@ export async function deleteMemoryPhoto(input: {
   idToken: string;
 }): Promise<void> {
   await verifyAcceptedMember(input.tripId, input.idToken);
-  await ensureMemoriesTrip(input.tripId);
+  await ensureMemoriesAccess(input.tripId);
 
   const memory = await findMemoryPhotoById(input.memoryId);
   if (!memory || memory.trip_id !== input.tripId) {

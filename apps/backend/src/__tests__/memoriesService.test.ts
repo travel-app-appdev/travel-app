@@ -92,7 +92,7 @@ describe("memoriesService", () => {
       trip_id: TRIP_ID,
       title: "Greek Islands",
       destination: "Greece",
-      start_date: "2026-08-14",
+      start_date: "2026-01-01",
       end_date: "2026-08-22",
       state: "Memories",
     });
@@ -172,6 +172,47 @@ describe("memoriesService", () => {
 
     expect(fs.writeFile).not.toHaveBeenCalled();
     expect(createMemoryPhoto).not.toHaveBeenCalled();
+  });
+
+  it("allows uploads during Final state once the trip has started", async () => {
+    (findTripById as jest.Mock).mockResolvedValueOnce({
+      trip_id: TRIP_ID,
+      title: "Greek Islands",
+      destination: "Greece",
+      start_date: "2026-01-01",
+      end_date: "2026-08-22",
+      state: "Final",
+    });
+
+    await uploadMemoryPhoto({
+      tripId: TRIP_ID,
+      idToken: TOKEN,
+      file: mockFile(),
+    });
+
+    expect(createMemoryPhoto).toHaveBeenCalled();
+  });
+
+  it("rejects uploads before the trip starts", async () => {
+    (findTripById as jest.Mock).mockResolvedValueOnce({
+      trip_id: TRIP_ID,
+      title: "Greek Islands",
+      destination: "Greece",
+      start_date: "2099-01-01",
+      end_date: "2099-01-10",
+      state: "Final",
+    });
+
+    await expect(
+      uploadMemoryPhoto({
+        tripId: TRIP_ID,
+        idToken: TOKEN,
+        file: mockFile(),
+      }),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: "Memories are available once the trip starts",
+    });
   });
 
   it("writes the file and saves metadata for a valid member upload", async () => {
