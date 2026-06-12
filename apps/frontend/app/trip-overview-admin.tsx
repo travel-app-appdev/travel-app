@@ -86,6 +86,13 @@ import type { TripState } from "@/src/types/trip";
 type FieldKey = "name" | "date" | "destination" | "members" | "code" | "preferences";
 type PhaseKey = "planning" | "voting" | "final" | "memories";
 
+const PAST_TRIP_LOCKED_FIELDS: FieldKey[] = [
+  "name",
+  "date",
+  "destination",
+  "preferences",
+];
+
 type PhaseValue = {
   start: Date;
   end: Date;
@@ -515,6 +522,7 @@ export default function TripOverviewAdminScreen() {
   const checklistTripState = tripState;
   const isTripStarted = isTripStartedByStartDate(toLocalDateString(tripStart));
   const isTripEnded = isPastTripByEndDate(toLocalDateString(tripEnd));
+  const isTripDetailsEditable = !isTripEnded;
   const checklistDisplayState = getChecklistDisplayState(
     checklistTripState,
     isTripStarted
@@ -835,11 +843,22 @@ export default function TripOverviewAdminScreen() {
   };
 
   const toggleField = (key: FieldKey) => {
+    if (isTripEnded && PAST_TRIP_LOCKED_FIELDS.includes(key)) return;
     setOpenField((prev) => (prev === key ? null : key));
     setTripNameUpdated(false);
     setTripDateUpdated(false);
     setDestinationUpdated(false);
   };
+
+  useEffect(() => {
+    if (
+      isTripEnded &&
+      openField &&
+      PAST_TRIP_LOCKED_FIELDS.includes(openField)
+    ) {
+      setOpenField(null);
+    }
+  }, [isTripEnded, openField]);
 
   const closePhaseCalendar = () => {
     setShowPhaseDateCalendar(null);
@@ -1524,7 +1543,31 @@ export default function TripOverviewAdminScreen() {
             }
           >
             <View style={styles.fieldGroup}>
-              {openField === "name" ? (
+              {!isTripDetailsEditable ? (
+                <View
+                  style={styles.infoRow}
+                  accessibilityLabel={`Trip name: ${tripName}`}
+                >
+                  <View style={styles.infoLeft}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
+                      <TripTitle width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Trip name
+                      </AppText>
+                    </View>
+                    <AppText
+                      variant="caption"
+                      style={styles.infoValue}
+                      accessible={false}
+                    >
+                      {tripName}
+                    </AppText>
+                  </View>
+                </View>
+              ) : openField === "name" ? (
                 <View style={[styles.infoRow, styles.infoRowEditing]}>
                   <View style={styles.infoLeft}>
                     <View
@@ -1592,7 +1635,7 @@ export default function TripOverviewAdminScreen() {
                 </Pressable>
               )}
 
-              {openField === "name" && (
+              {isTripDetailsEditable && openField === "name" && (
                 <View style={styles.expandedField}>
                   <AppButton
                     title={isUpdatingName ? "Updating..." : "Update"}
@@ -1623,46 +1666,23 @@ export default function TripOverviewAdminScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <Pressable
-                style={[
-                  styles.infoRow,
-                  openField === "date" && styles.infoRowEditing,
-                ]}
-                onPress={openField === "date" ? undefined : handleDateRow}
-                accessibilityRole="button"
-                accessibilityLabel={`Edit trip dates, current value: ${formatDateDisplay(
-                  tripStart
-                )} to ${formatDateDisplay(tripEnd)}`}
-                accessibilityState={{ expanded: openField === "date" }}
-              >
-                <View style={styles.infoLeft}>
-                  <View
-                    style={styles.infoLabelRow}
-                    {...hiddenFromAccessibility}
-                  >
-                    <Calendar width={20} height={20} />
-                    <AppText variant="body" style={styles.fieldLabel}>
-                      Trip date
-                    </AppText>
-                  </View>
-                  {openField === "date" ? (
-                    <Pressable
-                      style={[styles.dateInput, styles.inlineInput]}
-                      onPress={handleOpenTripCalendar}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Trip start date, currently ${formatDateDisplay(
-                        tripStart
-                      )}. Tap to change`}
+              {!isTripDetailsEditable ? (
+                <View
+                  style={styles.infoRow}
+                  accessibilityLabel={`Trip dates: ${formatDateDisplay(
+                    tripStart
+                  )} to ${formatDateDisplay(tripEnd)}`}
+                >
+                  <View style={styles.infoLeft}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
                     >
-                      <AppText variant="body" style={styles.dateText}>
-                        {formatDateDisplay(tripStart)} -{" "}
-                        {formatDateDisplay(tripEnd)}
+                      <Calendar width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Trip date
                       </AppText>
-                      <View {...hiddenFromAccessibility}>
-                        <Calendar width={20} height={20} />
-                      </View>
-                    </Pressable>
-                  ) : (
+                    </View>
                     <AppText
                       variant="caption"
                       style={styles.infoValue}
@@ -1671,28 +1691,80 @@ export default function TripOverviewAdminScreen() {
                       {formatDateDisplay(tripStart)} –{" "}
                       {formatDateDisplay(tripEnd)}
                     </AppText>
-                  )}
-                </View>
-                {openField === "date" ? (
-                  <Pressable
-                    style={styles.rowChevronButton}
-                    onPress={handleDateRow}
-                    accessibilityRole="button"
-                    accessibilityLabel="Collapse trip date editor"
-                    accessibilityState={{ expanded: true }}
-                  >
-                    <View {...hiddenFromAccessibility}>
-                      <ArrowUp width={20} height={20} />
-                    </View>
-                  </Pressable>
-                ) : (
-                  <View {...hiddenFromAccessibility}>
-                    <ArrowDown width={20} height={20} />
                   </View>
-                )}
-              </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  style={[
+                    styles.infoRow,
+                    openField === "date" && styles.infoRowEditing,
+                  ]}
+                  onPress={openField === "date" ? undefined : handleDateRow}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit trip dates, current value: ${formatDateDisplay(
+                    tripStart
+                  )} to ${formatDateDisplay(tripEnd)}`}
+                  accessibilityState={{ expanded: openField === "date" }}
+                >
+                  <View style={styles.infoLeft}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
+                      <Calendar width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Trip date
+                      </AppText>
+                    </View>
+                    {openField === "date" ? (
+                      <Pressable
+                        style={[styles.dateInput, styles.inlineInput]}
+                        onPress={handleOpenTripCalendar}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Trip start date, currently ${formatDateDisplay(
+                          tripStart
+                        )}. Tap to change`}
+                      >
+                        <AppText variant="body" style={styles.dateText}>
+                          {formatDateDisplay(tripStart)} -{" "}
+                          {formatDateDisplay(tripEnd)}
+                        </AppText>
+                        <View {...hiddenFromAccessibility}>
+                          <Calendar width={20} height={20} />
+                        </View>
+                      </Pressable>
+                    ) : (
+                      <AppText
+                        variant="caption"
+                        style={styles.infoValue}
+                        accessible={false}
+                      >
+                        {formatDateDisplay(tripStart)} –{" "}
+                        {formatDateDisplay(tripEnd)}
+                      </AppText>
+                    )}
+                  </View>
+                  {openField === "date" ? (
+                    <Pressable
+                      style={styles.rowChevronButton}
+                      onPress={handleDateRow}
+                      accessibilityRole="button"
+                      accessibilityLabel="Collapse trip date editor"
+                      accessibilityState={{ expanded: true }}
+                    >
+                      <View {...hiddenFromAccessibility}>
+                        <ArrowUp width={20} height={20} />
+                      </View>
+                    </Pressable>
+                  ) : (
+                    <View {...hiddenFromAccessibility}>
+                      <ArrowDown width={20} height={20} />
+                    </View>
+                  )}
+                </Pressable>
+              )}
 
-              {openField === "date" && (
+              {isTripDetailsEditable && openField === "date" && (
                 <View style={styles.expandedField}>
                   <AppButton
                     title={isUpdatingDate ? "Updating..." : "Update"}
@@ -1723,7 +1795,31 @@ export default function TripOverviewAdminScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              {openField === "destination" ? (
+              {!isTripDetailsEditable ? (
+                <View
+                  style={styles.infoRow}
+                  accessibilityLabel={`Destination: ${destination}`}
+                >
+                  <View style={styles.infoLeft}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
+                      <Location width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Destination
+                      </AppText>
+                    </View>
+                    <AppText
+                      variant="caption"
+                      style={styles.infoValue}
+                      accessible={false}
+                    >
+                      {destination}
+                    </AppText>
+                  </View>
+                </View>
+              ) : openField === "destination" ? (
                 <View style={[styles.infoRow, styles.infoRowEditing, { zIndex: 9999 }]}>
                   <View style={[styles.infoLeft, { zIndex: 9999 }]}>
                     <View
@@ -1790,7 +1886,7 @@ export default function TripOverviewAdminScreen() {
                 </Pressable>
               )}
 
-              {openField === "destination" && (
+              {isTripDetailsEditable && openField === "destination" && (
                 <View style={styles.expandedField}>
                   <AppButton
                     title={isUpdatingDestination ? "Updating..." : "Update"}
@@ -1892,57 +1988,82 @@ export default function TripOverviewAdminScreen() {
 
             {/* Preferences */}
             <View style={styles.fieldGroup}>
-              <Pressable
-                style={[
-                  styles.infoRow,
-                  openField === "preferences" && styles.infoRowEditing,
-                ]}
-                onPress={openField === "preferences" ? undefined : handlePrefsRow}
-                accessibilityRole="button"
-                accessibilityLabel="Edit your activity preferences"
-                accessibilityState={{ expanded: openField === "preferences" }}
-              >
-                <View style={styles.infoLeft}>
-                  <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
-                    <Settings width={20} height={20} />
-                    <AppText variant="body" style={styles.fieldLabel}>
-                      Preferences
-                    </AppText>
-                  </View>
-                  {openField !== "preferences" && (
+              {!isTripDetailsEditable ? (
+                <View
+                  style={styles.infoRow}
+                  accessibilityLabel={`Preferences: ${
+                    preferences.length > 0
+                      ? `${preferences.length} selected`
+                      : "Not set"
+                  }`}
+                >
+                  <View style={styles.infoLeft}>
+                    <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                      <Settings width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Preferences
+                      </AppText>
+                    </View>
                     <AppText variant="caption" style={styles.infoValue} accessible={false}>
-                      {preferences.length > 0 ? `${preferences.length} selected` : "Not set"}
+                      {preferences.length > 0
+                        ? `${preferences.length} selected`
+                        : "Not set"}
                     </AppText>
-                  )}
-                  {openField === "preferences" && (
-                    <View style={{ marginTop: spacing.sm }}>
-                      <PreferenceChips
-                        selected={preferences}
-                        onChange={setPreferences}
-                        showGroups
-                      />
-                    </View>
-                  )}
-                </View>
-                {openField === "preferences" ? (
-                  <Pressable
-                    style={styles.rowChevronButton}
-                    onPress={handlePrefsRow}
-                    accessibilityRole="button"
-                    accessibilityLabel="Collapse preferences"
-                    accessibilityState={{ expanded: true }}
-                  >
-                    <View {...hiddenFromAccessibility}>
-                      <ArrowUp width={20} height={20} />
-                    </View>
-                  </Pressable>
-                ) : (
-                  <View {...hiddenFromAccessibility}>
-                    <ArrowDown width={20} height={20} />
                   </View>
-                )}
-              </Pressable>
-              {openField === "preferences" && (
+                </View>
+              ) : (
+                <Pressable
+                  style={[
+                    styles.infoRow,
+                    openField === "preferences" && styles.infoRowEditing,
+                  ]}
+                  onPress={openField === "preferences" ? undefined : handlePrefsRow}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit your activity preferences"
+                  accessibilityState={{ expanded: openField === "preferences" }}
+                >
+                  <View style={styles.infoLeft}>
+                    <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                      <Settings width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Preferences
+                      </AppText>
+                    </View>
+                    {openField !== "preferences" && (
+                      <AppText variant="caption" style={styles.infoValue} accessible={false}>
+                        {preferences.length > 0 ? `${preferences.length} selected` : "Not set"}
+                      </AppText>
+                    )}
+                    {openField === "preferences" && (
+                      <View style={{ marginTop: spacing.sm }}>
+                        <PreferenceChips
+                          selected={preferences}
+                          onChange={setPreferences}
+                          showGroups
+                        />
+                      </View>
+                    )}
+                  </View>
+                  {openField === "preferences" ? (
+                    <Pressable
+                      style={styles.rowChevronButton}
+                      onPress={handlePrefsRow}
+                      accessibilityRole="button"
+                      accessibilityLabel="Collapse preferences"
+                      accessibilityState={{ expanded: true }}
+                    >
+                      <View {...hiddenFromAccessibility}>
+                        <ArrowUp width={20} height={20} />
+                      </View>
+                    </Pressable>
+                  ) : (
+                    <View {...hiddenFromAccessibility}>
+                      <ArrowDown width={20} height={20} />
+                    </View>
+                  )}
+                </Pressable>
+              )}
+              {isTripDetailsEditable && openField === "preferences" && (
                 <Pressable
                   style={[styles.saveBtn, isSavingPrefs && { opacity: 0.6 }]}
                   onPress={handleSavePreferences}

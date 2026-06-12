@@ -383,6 +383,19 @@ export async function updateTripForAdmin(input: {
         throw { status: 404, message: "Trip not found" };
     }
 
+    if (
+        hasTripEndDatePassed(current.end_date) &&
+        (input.title !== undefined ||
+            input.destination !== undefined ||
+            input.start_date !== undefined ||
+            input.end_date !== undefined)
+    ) {
+        throw {
+            status: 400,
+            message: "Trip details cannot be updated after the trip has ended",
+        };
+    }
+
     const effectiveTimeline = {
         start_date: input.start_date ?? current.start_date,
         end_date: input.end_date ?? current.end_date,
@@ -792,7 +805,7 @@ function isPast(date: Date): boolean {
     return date.getTime() <= Date.now();
 }
 
-function hasTripEndDatePassed(endDateString?: string): boolean {
+export function hasTripEndDatePassed(endDateString?: string): boolean {
     if (!endDateString) return false;
 
     const endDate = parseLocalDate(endDateString);

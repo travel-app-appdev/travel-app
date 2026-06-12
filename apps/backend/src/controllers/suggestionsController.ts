@@ -1,7 +1,12 @@
 import { Request, Response } from "express";
 import admin from "../config/firebase";
 import { getActivitySuggestions, saveMemberPreferences } from "../services/suggestionsService";
-import { findMembership, getMemberPreferences } from "../repositories/tripsRepository";
+import { hasTripEndDatePassed } from "../services/tripsService";
+import {
+    findMembership,
+    findTripById,
+    getMemberPreferences,
+} from "../repositories/tripsRepository";
 
 export async function getSuggestionsController(req: Request, res: Response) {
     try {
@@ -53,6 +58,14 @@ export async function updatePreferencesController(req: Request, res: Response) {
         const decoded = await admin.auth().verifyIdToken(idToken as string);
         const membership = await findMembership(tripId as string, decoded.uid);
         if (!membership) return res.status(403).json({ error: "Not a member of this trip" });
+
+        const trip = await findTripById(tripId as string);
+        if (!trip) return res.status(404).json({ error: "Trip not found" });
+        if (hasTripEndDatePassed(trip.end_date)) {
+            return res.status(400).json({
+                error: "Preferences cannot be updated after the trip has ended",
+            });
+        }
 
         const cleaned = preferences
             .filter((p) => typeof p === "string")
