@@ -14,7 +14,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Image as ExpoImage } from "expo-image";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -61,6 +61,7 @@ import {
   finishVoting,
   isTripNotFoundError,
   fetchActivitySuggestions,
+  getMemberPreferences,
   type Trip,
   type ActivitySuggestion,
 } from "@/src/api/trips";
@@ -251,17 +252,61 @@ function mapBackendFinalSlot(slot: any): FinalSlotUi {
 
 function mergeAlternativeLists(
   alternativeActivities: Activity[],
-  addedAlternativeActivities: Activity[]
+  addedAlternativeActivities: Activity[],
+  stableOrder?: readonly Activity[]
 ): Activity[] {
   const byId = new Map<string, Activity>();
 
-  [...alternativeActivities, ...addedAlternativeActivities].forEach(
-    (activity) => {
-      byId.set(activity.id, activity);
-    }
-  );
+  for (const activity of alternativeActivities) {
+    byId.set(activity.id, activity);
+  }
+  for (const activity of addedAlternativeActivities) {
+    byId.set(activity.id, activity);
+  }
 
-  return Array.from(byId.values());
+  if (stableOrder?.length) {
+    const ordered: Activity[] = [];
+    const seen = new Set<string>();
+
+    for (const activity of stableOrder) {
+      const next = byId.get(activity.id);
+      if (next) {
+        ordered.push(next);
+        seen.add(activity.id);
+      }
+    }
+
+    for (const activity of alternativeActivities) {
+      if (!seen.has(activity.id)) {
+        ordered.push(activity);
+        seen.add(activity.id);
+      }
+    }
+
+    for (const activity of addedAlternativeActivities) {
+      if (!seen.has(activity.id)) {
+        ordered.push(activity);
+      }
+    }
+
+    return ordered;
+  }
+
+  const ordered: Activity[] = [];
+  const seen = new Set<string>();
+
+  for (const activity of alternativeActivities) {
+    ordered.push(activity);
+    seen.add(activity.id);
+  }
+
+  for (const activity of addedAlternativeActivities) {
+    if (!seen.has(activity.id)) {
+      ordered.push(activity);
+    }
+  }
+
+  return ordered;
 }
 
 function buildGoogleMapsUrl(name: string, address?: string): string {
@@ -712,6 +757,36 @@ export default function ItineraryScreen() {
   const [isSuggestionsLoadingMore, setIsSuggestionsLoadingMore] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
   const suggestionsSlotActivityIdRef = useRef<string | null>(null);
+  const [memberPreferences, setMemberPreferences] = useState<string[]>([]);
+
+  const hasMemberPreferences = memberPreferences.length > 0;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!authToken || !tripId) {
+        setMemberPreferences([]);
+        return;
+      }
+
+      let cancelled = false;
+
+      getMemberPreferences(tripId, authToken)
+        .then((preferences) => {
+          if (!cancelled) {
+            setMemberPreferences(preferences);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setMemberPreferences([]);
+          }
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }, [authToken, tripId])
+  );
 
   const finalizingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
@@ -2242,88 +2317,124 @@ export default function ItineraryScreen() {
         return;
       }
 
-      try {
-        const fullSlotId = `${activityToToggle.dayId}_${activityToToggle.slotId}`;
+      const fullSlotId = `${activityToToggle.dayId}_${activityToToggle.slotId}`;
+      let previousAddedIds: string[] = [];
 
-        await toggleAddedAlternativeToItinerary({
+      setSelectedAddedAlternativeActivityIds((current) => {
+        previousAddedIds = current;
+        const wasAdded = current.includes(activityToToggle.id);
+        return wasAdded
+          ? current.filter((id) => id !== activityToToggle.id)
+          : [...current, activityToToggle.id];
+      });
+
+      try {
+        const result = await toggleAddedAlternativeToItinerary({
           idToken: authToken,
           tripId,
           slotId: fullSlotId,
           activityId: activityToToggle.id,
         });
 
-        const refreshed = await getFinalItineraryActivities(
-          tripId,
-          currentUserId ?? undefined
+        setSelectedAddedAlternativeActivityIds(
+          result.addedAlternativeActivityIds
         );
 
-        const mappedSlots = (refreshed.slots ?? []).map(mapBackendFinalSlot);
-        setFinalSlots(mappedSlots);
+        setFinalSlots((current) =>
+          current.map((slot) => {
+            if (
+              slot.dayId !== activityToToggle.dayId ||
+              slot.slotId !== activityToToggle.slotId
+            ) {
+              return slot;
+            }
 
-        const flatMappedActivities = mappedSlots.flatMap((slot) => [
-          slot.selectedActivity,
-          ...slot.alternativeActivities,
-          ...slot.addedAlternativeActivities,
-        ]);
-
-        activitiesCache.set(`${tripId}_final`, flatMappedActivities);
-        setApiActivities(flatMappedActivities);
-
-        const matchingFinalSlot = mappedSlots.find((slot) => {
-          if (slot.selectedActivity.id === activityToToggle.id) return true;
-
-          if (
-            slot.alternativeActivities.some(
+            const alreadyInAdded = slot.addedAlternativeActivities.some(
               (item) => item.id === activityToToggle.id
-            )
-          ) {
-            return true;
-          }
-
-          if (
-            slot.addedAlternativeActivities.some(
+            );
+            const alreadyInAlternatives = slot.alternativeActivities.some(
               (item) => item.id === activityToToggle.id
-            )
-          ) {
-            return true;
-          }
+            );
 
-          return false;
-        });
+            if (result.added && alreadyInAlternatives) {
+              return {
+                ...slot,
+                alternativeActivities: slot.alternativeActivities.filter(
+                  (item) => item.id !== activityToToggle.id
+                ),
+                addedAlternativeActivities: [
+                  ...slot.addedAlternativeActivities,
+                  activityToToggle,
+                ],
+                alternativeCount: Math.max(0, slot.alternativeCount - 1),
+              };
+            }
 
-        const alternativeActivities =
-          matchingFinalSlot?.alternativeActivities ?? [];
-        const addedAlternativeActivities =
-          matchingFinalSlot?.addedAlternativeActivities ?? [];
-        const nextAddedIds = addedAlternativeActivities.map((item) => item.id);
+            if (!result.added && alreadyInAdded) {
+              return {
+                ...slot,
+                alternativeActivities: [
+                  ...slot.alternativeActivities,
+                  activityToToggle,
+                ],
+                addedAlternativeActivities:
+                  slot.addedAlternativeActivities.filter(
+                    (item) => item.id !== activityToToggle.id
+                  ),
+                alternativeCount: slot.alternativeCount + 1,
+              };
+            }
 
-        setSelectedAlternativeActivities(alternativeActivities);
-        setSelectedDisplayedAlternativeActivities(
-          mergeAlternativeLists(
-            alternativeActivities,
-            addedAlternativeActivities
+            return slot;
+          })
+        );
+
+        const isAddedToItinerary =
+          result.addedAlternativeActivityIds.includes(activityToToggle.id);
+
+        setApiActivities((current) =>
+          current.map((item) =>
+            item.id === activityToToggle.id
+              ? {
+                  ...item,
+                  isAddedToFinalItinerary: isAddedToItinerary,
+                }
+              : item
           )
         );
-        setSelectedAddedAlternativeActivityIds(nextAddedIds);
+
+        const cachedActivities = activitiesCache.get(`${tripId}_final`);
+        if (cachedActivities) {
+          activitiesCache.set(
+            `${tripId}_final`,
+            cachedActivities.map((item) =>
+              item.id === activityToToggle.id
+                ? {
+                    ...item,
+                    isAddedToFinalItinerary: isAddedToItinerary,
+                  }
+                : item
+            )
+          );
+        }
 
         setSelectedActivity((current) =>
           current?.id === activityToToggle.id
             ? {
                 ...current,
-                isAddedToFinalItinerary: nextAddedIds.includes(
-                  activityToToggle.id
-                ),
+                isAddedToFinalItinerary: isAddedToItinerary,
               }
             : current
         );
       } catch (error) {
+        setSelectedAddedAlternativeActivityIds(previousAddedIds);
         Alert.alert(
           "Could not update itinerary",
           error instanceof Error ? error.message : "Please try again."
         );
       }
     },
-    [authToken, tripId, currentUserId]
+    [authToken, tripId]
   );
 
   async function handleAddVote(activityId: string) {
@@ -2759,7 +2870,9 @@ export default function ItineraryScreen() {
                           activity={activity}
                           onAddActivity={handleAddActivity}
                           onEditActivity={handleEditActivity}
-                          onSuggest={handleSuggest}
+                          onSuggest={
+                            hasMemberPreferences ? handleSuggest : undefined
+                          }
                           disabled={hasCurrentUserFinished}
                         />
                       ))}
@@ -2875,6 +2988,7 @@ export default function ItineraryScreen() {
           onAdd={handleAddSuggestion}
           onLoadMore={handleLoadMoreSuggestions}
           addedElsewherePlaceIds={suggestionsAddedElsewherePlaceIds}
+          selectedPreferences={memberPreferences}
         />
 
         <ActivityDetailModal
