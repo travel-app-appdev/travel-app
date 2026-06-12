@@ -67,6 +67,26 @@ export function FinalSlotCard({
   const hasGoogleMapsUrl = !!activity.googleMapsUrl?.trim();
   const joinedCount = activity.joinedCount ?? 0;
   const joinedLabel = `${joinedCount} joined`;
+  const lastMetaPlacement = hasGoogleMapsUrl
+    ? "google"
+    : hasAddress
+      ? "address"
+      : activityTimeRange
+        ? "time"
+        : "name";
+
+  const renderJoinedMeta = () => (
+    <View style={styles.inlineMeta} accessible={false}>
+      <MembersIcon width={14} height={14} />
+      <AppText
+        variant="caption"
+        style={styles.joinedCount}
+        numberOfLines={1}
+      >
+        {joinedLabel}
+      </AppText>
+    </View>
+  );
 
   const detailParts = [
     activityTimeRange ? `time ${activityTimeRange}` : null,
@@ -111,9 +131,27 @@ export function FinalSlotCard({
           ) : null}
         </View>
 
-        <AppText variant="subtitle" style={styles.name} numberOfLines={2}>
-          {activity.name}
-        </AppText>
+        {lastMetaPlacement === "name" ? (
+          <View
+            style={styles.nameWithMetaRow}
+            accessible={true}
+            accessibilityLabel={`${activity.name}, ${joinedLabel}`}
+          >
+            <AppText
+              variant="subtitle"
+              style={styles.nameInRow}
+              numberOfLines={2}
+              accessible={false}
+            >
+              {activity.name}
+            </AppText>
+            {renderJoinedMeta()}
+          </View>
+        ) : (
+          <AppText variant="subtitle" style={styles.name} numberOfLines={2}>
+            {activity.name}
+          </AppText>
+        )}
 
         {hasAddress ? (
           <>
@@ -138,7 +176,11 @@ export function FinalSlotCard({
             <View
               style={styles.detailRow}
               accessible={true}
-              accessibilityLabel={`Address: ${activity.address.trim()}, ${joinedLabel}`}
+              accessibilityLabel={
+                lastMetaPlacement === "address"
+                  ? `Address: ${activity.address.trim()}, ${joinedLabel}`
+                  : `Address: ${activity.address.trim()}`
+              }
             >
               <LocationPin
                 width={16}
@@ -155,23 +197,18 @@ export function FinalSlotCard({
                 {activity.address.trim()}
               </AppText>
 
-              <View style={styles.inlineMeta} accessible={false}>
-                <MembersIcon width={14} height={14} />
-                <AppText
-                  variant="caption"
-                  style={styles.joinedCount}
-                  numberOfLines={1}
-                >
-                  {joinedLabel}
-                </AppText>
-              </View>
+              {lastMetaPlacement === "address" ? renderJoinedMeta() : null}
             </View>
           </>
         ) : !!activityTimeRange ? (
           <View
             style={styles.detailRow}
             accessible={true}
-            accessibilityLabel={`Activity time: ${activityTimeRange}, ${joinedLabel}`}
+            accessibilityLabel={
+              lastMetaPlacement === "time"
+                ? `Activity time: ${activityTimeRange}, ${joinedLabel}`
+                : `Activity time: ${activityTimeRange}`
+            }
           >
             <Timer width={16} height={16} {...hiddenFromAccessibility} />
 
@@ -184,42 +221,19 @@ export function FinalSlotCard({
               {activityTimeRange}
             </AppText>
 
-            <View style={styles.inlineMeta} accessible={false}>
-              <MembersIcon width={14} height={14} />
-              <AppText
-                variant="caption"
-                style={styles.joinedCount}
-                numberOfLines={1}
-              >
-                {joinedLabel}
-              </AppText>
-            </View>
+            {lastMetaPlacement === "time" ? renderJoinedMeta() : null}
           </View>
-        ) : (
-          <View
-            style={styles.nameMetaRow}
-            accessible={true}
-            accessibilityLabel={joinedLabel}
-          >
-            <View style={styles.nameMetaSpacer} />
-            <View style={styles.inlineMeta} accessible={false}>
-              <MembersIcon width={14} height={14} />
-              <AppText
-                variant="caption"
-                style={styles.joinedCount}
-                numberOfLines={1}
-              >
-                {joinedLabel}
-              </AppText>
-            </View>
-          </View>
-        )}
+        ) : null}
 
         {hasGoogleMapsUrl && (
           <View
-            style={styles.googleRow}
+            style={styles.detailRow}
             accessible={true}
-            accessibilityLabel="Google Maps link available"
+            accessibilityLabel={
+              lastMetaPlacement === "google"
+                ? `Google Maps link available, ${joinedLabel}`
+                : "Google Maps link available"
+            }
           >
             <GoogleIcon width={14} height={14} {...hiddenFromAccessibility} />
             <AppText
@@ -230,6 +244,7 @@ export function FinalSlotCard({
             >
               Google Maps link
             </AppText>
+            {lastMetaPlacement === "google" ? renderJoinedMeta() : null}
           </View>
         )}
       </Pressable>
@@ -360,11 +375,25 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.lg,
     marginBottom: 2,
   },
+  nameWithMetaRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.sm,
+    marginBottom: 2,
+  },
+  nameInRow: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
+  },
   detailRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
     marginTop: 1,
+    minWidth: 0,
   },
   detailText: {
     flex: 1,
@@ -378,24 +407,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.xs,
     flexShrink: 0,
-    marginLeft: spacing.sm,
-  },
-  nameMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 1,
-  },
-  nameMetaSpacer: {
-    flex: 1,
-  },
-  googleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-    minWidth: 0,
+    marginLeft: "auto",
   },
   googleLink: {
+    flex: 1,
     flexShrink: 1,
     color: colors.seaBlue,
     fontFamily: typography.fontFamily.bodySemiBold,
@@ -409,6 +424,7 @@ const styles = StyleSheet.create({
   },
   cta: {
     width: 92,
+    alignSelf: "stretch",
     minHeight: CARD_HEIGHT,
     borderRadius: radius.md,
     backgroundColor: colors.neonGreen,

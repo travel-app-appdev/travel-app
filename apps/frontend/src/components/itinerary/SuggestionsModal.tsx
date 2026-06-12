@@ -1,22 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Linking,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
-import type { NativeScrollEvent, NativeSyntheticEvent } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 import type { ActivitySuggestion } from "@/src/api/trips";
+import type { Activity } from "@/src/types/itinerary";
 
 import CloseIcon from "@/assets/icons/close.svg";
 import LocationPin from "@/assets/icons/location-pin.svg";
 import AddIcon from "@/assets/icons/add.svg";
+import GoogleIcon from "@/assets/icons/google.svg";
+import CheckIcon from "@/assets/icons/check_mark.svg";
 
 type Props = {
   visible: boolean;
@@ -27,11 +32,98 @@ type Props = {
   loadingMore?: boolean;
   error?: string | null;
   onClose: () => void;
-  onAdd: (suggestion: ActivitySuggestion) => void;
+  onAdd: (suggestion: ActivitySuggestion) => void | Promise<void>;
   onLoadMore?: () => void;
+  addedElsewherePlaceIds?: string[];
 };
 
+function normalizeMatchText(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function normalizeMapsUrl(url: string) {
+  return url.trim().toLowerCase();
+}
+
+export function activityMatchesSuggestion(
+  activity: Activity,
+  suggestion: ActivitySuggestion
+): boolean {
+  const activityMapsUrl = activity.googleMapsUrl?.trim();
+  const suggestionMapsUrl = suggestion.googleMapsUrl?.trim();
+
+  if (activityMapsUrl && suggestionMapsUrl) {
+    return normalizeMapsUrl(activityMapsUrl) === normalizeMapsUrl(suggestionMapsUrl);
+  }
+
+  return (
+    normalizeMatchText(activity.name) === normalizeMatchText(suggestion.name) &&
+    normalizeMatchText(activity.address ?? "") ===
+      normalizeMatchText(suggestion.address ?? "")
+  );
+}
+
+export function getAddedElsewherePlaceIds(
+  activities: Activity[],
+  suggestions: ActivitySuggestion[],
+  currentDayId: string,
+  currentSlotId: string
+): Set<string> {
+  const otherActivities = activities.filter(
+    (activity) =>
+      !(activity.dayId === currentDayId && activity.slotId === currentSlotId)
+  );
+  const placeIds = new Set<string>();
+
+  for (const suggestion of suggestions) {
+    if (
+      suggestion.sourcePlaceId &&
+      otherActivities.some((activity) =>
+        activityMatchesSuggestion(activity, suggestion)
+      )
+    ) {
+      placeIds.add(suggestion.sourcePlaceId);
+    }
+  }
+
+  return placeIds;
+}
+
 const ALL_FILTER = "All";
+const SHEET_ANIMATION_MS = 280;
+const SHEET_BODY_RESERVE = 168;
+
+function getSheetLayout(
+  windowWidth: number,
+  windowHeight: number,
+  insets: { top: number; bottom: number; left: number; right: number }
+) {
+  const isLandscape = windowWidth > windowHeight;
+  const availableHeight = Math.max(
+    windowHeight - insets.top - insets.bottom,
+    220
+  );
+
+  if (isLandscape) {
+    return {
+      isLandscape: true,
+      sheetMaxHeight: availableHeight,
+      listMaxHeight: Math.max(availableHeight - SHEET_BODY_RESERVE, 100),
+      sheetInsetLeft: insets.left,
+      sheetInsetRight: insets.right,
+    };
+  }
+
+  const sheetMaxHeight = Math.round(availableHeight * 0.92);
+
+  return {
+    isLandscape: false,
+    sheetMaxHeight,
+    listMaxHeight: Math.max(sheetMaxHeight - SHEET_BODY_RESERVE, 140),
+    sheetInsetLeft: 0,
+    sheetInsetRight: 0,
+  };
+}
 
 const CATEGORY_LABEL_RULES: { label: string; categories: string[] }[] = [
   {
@@ -64,7 +156,7 @@ const CATEGORY_LABEL_RULES: { label: string; categories: string[] }[] = [
     label: "Gallery",
     categories: ["entertainment.culture.gallery", "commercial.art"],
   },
-  { label: "Sight", categories: ["tourism.sights", "tourism.attraction"] },
+  { label: "Sightseeing", categories: ["tourism.sights", "tourism.attraction"] },
   { label: "Viewpoint", categories: ["tourism.attraction.viewpoint"] },
   {
     label: "Culture",
@@ -124,7 +216,7 @@ const PREFERENCE_LABELS: Record<string, string> = {
   nightlife: "Nightlife",
   museums: "Museum",
   galleries: "Gallery",
-  sightseeing: "Sight",
+  sightseeing: "Sightseeing",
   viewpoints: "Viewpoint",
   heritage: "Heritage",
   citywalks: "City walks",
@@ -194,22 +286,107 @@ export function SuggestionsModal({
   onClose,
   onAdd,
   onLoadMore,
+  addedElsewherePlaceIds = [],
 }: Props) {
-  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const {
+    isLandscape,
+    sheetMaxHeight,
+    listMaxHeight,
+    sheetInsetLeft,
+    sheetInsetRight,
+  } = useMemo(
+    () => getSheetLayout(windowWidth, windowHeight, insets),
+    [
+      insets.bottom,
+      insets.left,
+      insets.right,
+      insets.top,
+      windowHeight,
+      windowWidth,
+    ]
+  );
+
+  const [addedPlaceId, setAddedPlaceId] = useState<string | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
   const [activeFilter, setActiveFilter] = useState(ALL_FILTER);
-  const [scrollMetrics, setScrollMetrics] = useState({
-    contentHeight: 0,
-    viewportHeight: 0,
-    offsetY: 0,
-  });
+  const [mounted, setMounted] = useState(visible);
+  const slideAnim = useRef(new Animated.Value(sheetMaxHeight)).current;
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const listScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    if (visible) setActiveFilter(ALL_FILTER);
+    if (visible) {
+      setMounted(true);
+      slideAnim.setValue(sheetMaxHeight);
+      backdropAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: SHEET_ANIMATION_MS,
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropAnim, {
+          toValue: 1,
+          duration: SHEET_ANIMATION_MS,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+
+    if (!mounted) return;
+
+    slideAnim.setValue(0);
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: sheetMaxHeight,
+        duration: SHEET_ANIMATION_MS,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 0,
+        duration: SHEET_ANIMATION_MS,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) {
+        setMounted(false);
+      }
+    });
+  }, [backdropAnim, mounted, sheetMaxHeight, slideAnim, visible]);
+
+  useEffect(() => {
+    if (visible) {
+      setActiveFilter(ALL_FILTER);
+      setAddedPlaceId(null);
+      setIsAdding(false);
+    }
   }, [visible, slotLabel]);
 
-  function handleAdd(s: ActivitySuggestion) {
-    setAddedIds((prev) => new Set([...prev, s.sourcePlaceId]));
-    onAdd(s);
+  function handleClose() {
+    onClose();
+  }
+
+  const elsewherePlaceIds = useMemo(
+    () => new Set(addedElsewherePlaceIds),
+    [addedElsewherePlaceIds]
+  );
+
+  async function handleAdd(s: ActivitySuggestion) {
+    if (isAdding || elsewherePlaceIds.has(s.sourcePlaceId)) return;
+
+    const previousPlaceId = addedPlaceId;
+    setAddedPlaceId(s.sourcePlaceId);
+    setIsAdding(true);
+    try {
+      await onAdd(s);
+    } catch {
+      setAddedPlaceId(previousPlaceId);
+    } finally {
+      setIsAdding(false);
+    }
   }
 
   // Build subtitle: "Based on your preferences · Museums, Shopping · Prague"
@@ -264,6 +441,10 @@ export function SuggestionsModal({
     [effectiveFilter, suggestionItems]
   );
 
+  useEffect(() => {
+    listScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [effectiveFilter, loading, suggestions.length]);
+
   const allMatchedPrefs = suggestions.flatMap((s) => s.matchedPreferences);
   const uniquePrefs = [...new Set(allMatchedPrefs)];
   const prefsText =
@@ -284,49 +465,162 @@ export function SuggestionsModal({
     Linking.openURL(url).catch(() => {});
   }
 
-  function handleSuggestionScroll(
-    event: NativeSyntheticEvent<NativeScrollEvent>
-  ) {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    setScrollMetrics((prev) => ({ ...prev, offsetY }));
-  }
+  const showFilterChips =
+    !loading && !error && suggestions.length > 0;
 
-  const scrollbarVisible =
-    scrollMetrics.contentHeight > scrollMetrics.viewportHeight + 8;
-  const scrollbarThumbHeight = scrollbarVisible
-    ? Math.max(
-        40,
-        (scrollMetrics.viewportHeight / scrollMetrics.contentHeight) *
-          scrollMetrics.viewportHeight
-      )
-    : 0;
-  const scrollbarMaxOffset = Math.max(
-    scrollMetrics.contentHeight - scrollMetrics.viewportHeight,
-    1
-  );
-  const scrollbarMaxThumbOffset = Math.max(
-    scrollMetrics.viewportHeight - scrollbarThumbHeight,
-    0
-  );
-  const scrollbarThumbTop = scrollbarVisible
-    ? Math.min(
-        scrollbarMaxThumbOffset,
-        (Math.max(scrollMetrics.offsetY, 0) / scrollbarMaxOffset) *
-          scrollbarMaxThumbOffset
-      )
-    : 0;
+  const listContent = visibleSuggestionItems.map(({ suggestion: s, labels, key }) => {
+    const isAddedInSlot = addedPlaceId === s.sourcePlaceId;
+    const isAddedElsewhere = elsewherePlaceIds.has(s.sourcePlaceId);
+    const isAdded = isAddedInSlot || isAddedElsewhere;
+    return (
+      <View key={key} style={styles.card}>
+        <View style={styles.cardBody}>
+          <View style={styles.titleRow}>
+            <AppText
+              variant="body"
+              style={styles.placeName}
+              numberOfLines={2}
+            >
+              {s.name}
+            </AppText>
+            {labels.length > 0 && (
+              <View style={styles.titleLabels}>
+                {labels.slice(0, 3).map((label) => (
+                  <View key={label} style={styles.placeLabel}>
+                    <AppText variant="body" style={styles.placeLabelText}>
+                      {label}
+                    </AppText>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {!!s.address && (
+            <View style={styles.infoRow}>
+              <LocationPin
+                width={18}
+                height={18}
+                {...hiddenFromAccessibility}
+              />
+              <AppText
+                variant="body"
+                style={styles.addressText}
+                numberOfLines={2}
+              >
+                {s.address}
+              </AppText>
+            </View>
+          )}
+
+          <Pressable
+            onPress={() => openMapsForPlace(s)}
+            style={styles.mapsLink}
+            accessibilityRole="link"
+            accessibilityLabel={`Open ${s.name} in Google Maps`}
+          >
+            <GoogleIcon width={18} height={18} {...hiddenFromAccessibility} />
+            <AppText variant="body" style={styles.mapsLinkText}>
+              Open in Google Maps
+            </AppText>
+          </Pressable>
+        </View>
+
+        <Pressable
+          onPress={() => handleAdd(s)}
+          disabled={isAdding || isAdded}
+          style={[styles.addBtn, isAdded && styles.addBtnDone]}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isAddedElsewhere
+              ? `${s.name} already added in another time slot`
+              : isAdded
+                ? `${s.name} added`
+                : addedPlaceId
+                  ? `Replace with ${s.name}`
+                  : `Add ${s.name} to itinerary`
+          }
+          accessibilityState={{ disabled: isAdding || isAdded }}
+        >
+          {isAdded ? (
+            <View {...hiddenFromAccessibility}>
+              <CheckIcon width={20} height={20} color={colors.nightBlack} />
+            </View>
+          ) : (
+            <View {...hiddenFromAccessibility}>
+              <AddIcon width={20} height={20} color={colors.nightBlack} />
+            </View>
+          )}
+          <AppText
+            variant="body"
+            style={[styles.addBtnText, isAdded && styles.addBtnTextDone]}
+          >
+            {isAdded ? "Added" : "Add Activity"}
+          </AppText>
+        </Pressable>
+      </View>
+    );
+  });
 
   return (
     <Modal
-      visible={visible}
+      visible={mounted}
       transparent
       animationType="none"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
       statusBarTranslucent
     >
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
-          {/* Header */}
+      <View style={styles.modalRoot}>
+        <Animated.View
+          style={[
+            styles.backdrop,
+            {
+              opacity: backdropAnim,
+            },
+          ]}
+        />
+        <Pressable
+          style={styles.backdropPress}
+          onPress={handleClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close suggestions"
+        />
+        {insets.bottom > 0 && (
+          <View
+            style={[styles.bottomSafeAreaFill, { height: insets.bottom }]}
+            pointerEvents="none"
+          />
+        )}
+        <View
+          style={[
+            styles.sheetHost,
+            isLandscape
+              ? {
+                  left: sheetInsetLeft,
+                  right: sheetInsetRight,
+                  top: insets.top,
+                  bottom: 0,
+                  justifyContent: "flex-start",
+                }
+              : {
+                  paddingTop: insets.top + spacing.xs,
+                },
+          ]}
+          pointerEvents="box-none"
+        >
+        <Animated.View
+          style={[
+            styles.sheet,
+            isLandscape && styles.sheetLandscape,
+            {
+              width: "100%",
+              maxHeight: sheetMaxHeight,
+              ...(isLandscape ? { height: sheetMaxHeight } : null),
+              paddingBottom: spacing.lg + insets.bottom,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
           <View style={styles.header}>
             <View style={styles.headerText}>
               <AppText variant="body" style={styles.title}>
@@ -335,14 +629,16 @@ export function SuggestionsModal({
                   {slotLabel.toLowerCase()}
                 </AppText>
               </AppText>
-              {!loading && !error && suggestions.length > 0 && (
-                <AppText variant="body" style={styles.subtitleText} numberOfLines={2}>
-                  {subtitle}
-                </AppText>
-              )}
+              <View style={styles.subtitleSlot}>
+                {showFilterChips && (
+                  <AppText variant="body" style={styles.subtitleText} numberOfLines={2}>
+                    {subtitle}
+                  </AppText>
+                )}
+              </View>
             </View>
             <Pressable
-              onPress={onClose}
+              onPress={handleClose}
               style={styles.closeBtn}
               accessibilityRole="button"
               accessibilityLabel="Close suggestions"
@@ -351,214 +647,124 @@ export function SuggestionsModal({
             </Pressable>
           </View>
 
-          {!loading && !error && suggestions.length > 0 && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterRow}
-              style={styles.filterScroller}
-            >
-              <Pressable
-                onPress={() => setActiveFilter(ALL_FILTER)}
-                style={[
-                  styles.filterChip,
-                  effectiveFilter === ALL_FILTER && styles.filterChipActive,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`Show all ${suggestions.length} suggestions`}
+          <View style={styles.filterScroller}>
+            {showFilterChips && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterRow}
+                style={styles.filterScrollFill}
               >
-                <AppText
-                  variant="body"
+                <Pressable
+                  onPress={() => setActiveFilter(ALL_FILTER)}
                   style={[
-                    styles.filterChipText,
-                    effectiveFilter === ALL_FILTER && styles.filterChipTextActive,
+                    styles.filterChip,
+                    effectiveFilter === ALL_FILTER && styles.filterChipActive,
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show all ${suggestions.length} suggestions`}
                 >
-                  All ({suggestions.length})
-                </AppText>
-              </Pressable>
-
-              {filterOptions.map(({ label, count }) => {
-                const active = effectiveFilter === label;
-                return (
-                  <Pressable
-                    key={label}
-                    onPress={() => setActiveFilter(label)}
-                    style={[styles.filterChip, active && styles.filterChipActive]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Show ${label} suggestions`}
-                    accessibilityState={{ selected: active }}
+                  <AppText
+                    variant="body"
+                    style={[
+                      styles.filterChipText,
+                      effectiveFilter === ALL_FILTER && styles.filterChipTextActive,
+                    ]}
                   >
-                    <AppText
-                      variant="body"
-                      style={[
-                        styles.filterChipText,
-                        active && styles.filterChipTextActive,
-                      ]}
-                    >
-                      {label} ({count})
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          )}
+                    All ({suggestions.length})
+                  </AppText>
+                </Pressable>
 
-          {/* Content */}
-          <View style={styles.listFrame}>
-            <ScrollView
-              contentContainerStyle={styles.list}
-              showsVerticalScrollIndicator={false}
-              onScroll={handleSuggestionScroll}
-              scrollEventThrottle={16}
-              onLayout={(event) => {
-                const viewportHeight = event.nativeEvent.layout.height;
-                setScrollMetrics((prev) => ({ ...prev, viewportHeight }));
-              }}
-              onContentSizeChange={(_, contentHeight) => {
-                setScrollMetrics((prev) => ({ ...prev, contentHeight }));
-              }}
-            >
-            {loading && (
-              <View style={styles.centerState}>
+                {filterOptions.map(({ label, count }) => {
+                  const active = effectiveFilter === label;
+                  return (
+                    <Pressable
+                      key={label}
+                      onPress={() => setActiveFilter(label)}
+                      style={[styles.filterChip, active && styles.filterChipActive]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Show ${label} suggestions`}
+                      accessibilityState={{ selected: active }}
+                    >
+                      <AppText
+                        variant="body"
+                        style={[
+                          styles.filterChipText,
+                          active && styles.filterChipTextActive,
+                        ]}
+                      >
+                        {label} ({count})
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+
+          <View style={[styles.listContainer, { height: listMaxHeight }]}>
+            {loading ? (
+              <View style={styles.listStatusCenter}>
                 <ActivityIndicator color={colors.nightBlack} size="large" />
                 <AppText variant="body" style={styles.stateText}>
                   Finding places nearby...
                 </AppText>
               </View>
-            )}
-
-            {!loading && error && (
-              <View style={styles.centerState}>
+            ) : error ? (
+              <View style={styles.listStatusCenter}>
                 <AppText variant="body" style={styles.stateText}>
                   {error}
                 </AppText>
               </View>
-            )}
-
-            {!loading && !error && suggestions.length === 0 && (
-              <View style={styles.centerState}>
+            ) : suggestions.length === 0 ? (
+              <View style={styles.listStatusCenter}>
                 <AppText variant="body" style={styles.stateText}>
-                  No suggestions found for this destination.{"\n"}Try setting preferences to get better results.
+                  No suggestions found for this destination.{"\n"}Try setting
+                  preferences to get better results.
                 </AppText>
               </View>
-            )}
-
-            {!loading &&
-              !error &&
-              visibleSuggestionItems.map(({ suggestion: s, labels, key }) => {
-                const added = addedIds.has(s.sourcePlaceId);
-                return (
-                  <View key={key} style={styles.card}>
-                    {/* Place info */}
-                    <View style={styles.cardBody}>
-                      <AppText variant="body" style={styles.placeName} numberOfLines={2}>
-                        {s.name}
-                      </AppText>
-
-                      {labels.length > 0 && (
-                        <View style={styles.labelRow}>
-                          {labels.slice(0, 3).map((label) => (
-                            <View key={label} style={styles.placeLabel}>
-                              <AppText variant="body" style={styles.placeLabelText}>
-                                {label}
-                              </AppText>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-
-                      {!!s.address && (
-                        <View style={styles.infoRow}>
-                          <LocationPin
-                            width={18}
-                            height={18}
-                            {...hiddenFromAccessibility}
-                          />
-                          <AppText
-                            variant="body"
-                            style={styles.addressText}
-                            numberOfLines={2}
-                          >
-                            {s.address}
-                          </AppText>
-                        </View>
-                      )}
-
-                      {/* Google Maps link */}
-                      <Pressable
-                        onPress={() => openMapsForPlace(s)}
-                        style={styles.mapsLink}
-                        accessibilityRole="link"
-                        accessibilityLabel={`Open ${s.name} in Google Maps`}
-                      >
-                        <AppText variant="body" style={styles.mapsLinkText}>
-                          Open in Google Maps →
-                        </AppText>
-                      </Pressable>
-                    </View>
-
-                    {/* Add Activity button */}
-                    <Pressable
-                      onPress={() => handleAdd(s)}
-                      disabled={added}
-                      style={[styles.addBtn, added && styles.addBtnDone]}
-                      accessibilityRole="button"
-                      accessibilityLabel={added ? `${s.name} added` : `Add ${s.name} to itinerary`}
-                    >
-                      {!added && (
-                        <View {...hiddenFromAccessibility}>
-                          <AddIcon width={20} height={20} color={colors.nightBlack} />
-                        </View>
-                      )}
-                      <AppText
-                        variant="body"
-                        style={[styles.addBtnText, added && styles.addBtnTextDone]}
-                      >
-                        {added ? "Added ✓" : "Add Activity"}
-                      </AppText>
-                    </Pressable>
-                  </View>
-                );
-              })}
-
-            {/* Load more button */}
-            {!loading && !error && suggestions.length > 0 && !!onLoadMore && (
-              <Pressable
-                style={[styles.loadMoreBtn, loadingMore && styles.loadMoreBtnDisabled]}
-                onPress={onLoadMore}
-                disabled={loadingMore}
-                accessibilityRole="button"
-                accessibilityLabel="Load more suggestions"
+            ) : (
+              <ScrollView
+                ref={listScrollRef}
+                style={styles.listScroll}
+                contentContainerStyle={styles.list}
+                showsVerticalScrollIndicator
+                nestedScrollEnabled
               >
-                {loadingMore ? (
-                  <ActivityIndicator color={colors.nightBlack} size="small" />
+                {listContent.length > 0 ? (
+                  listContent
                 ) : (
-                  <AppText variant="body" style={styles.loadMoreText}>
-                    Load more suggestions
-                  </AppText>
+                  <View style={styles.emptyFilterState}>
+                    <AppText variant="body" style={styles.stateText}>
+                      No activities match this filter.
+                    </AppText>
+                  </View>
                 )}
-              </Pressable>
-            )}
-            </ScrollView>
-            {scrollbarVisible && (
-              <View
-                pointerEvents="none"
-                style={styles.scrollbarTrack}
-                {...hiddenFromAccessibility}
-              >
-                <View
-                  style={[
-                    styles.scrollbarThumb,
-                    {
-                      height: scrollbarThumbHeight,
-                      transform: [{ translateY: scrollbarThumbTop }],
-                    },
-                  ]}
-                />
-              </View>
+
+                {!!onLoadMore && (
+                  <Pressable
+                    style={[
+                      styles.loadMoreBtn,
+                      loadingMore && styles.loadMoreBtnDisabled,
+                    ]}
+                    onPress={onLoadMore}
+                    disabled={loadingMore}
+                    accessibilityRole="button"
+                    accessibilityLabel="Load more suggestions"
+                  >
+                    {loadingMore ? (
+                      <ActivityIndicator color={colors.nightBlack} size="small" />
+                    ) : (
+                      <AppText variant="body" style={styles.loadMoreText}>
+                        Load more suggestions
+                      </AppText>
+                    )}
+                  </Pressable>
+                )}
+              </ScrollView>
             )}
           </View>
+        </Animated.View>
         </View>
       </View>
     </Modal>
@@ -566,26 +772,43 @@ export function SuggestionsModal({
 }
 
 const styles = StyleSheet.create({
-  overlay: {
+  modalRoot: {
     flex: 1,
-    backgroundColor: "transparent",
+  },
+  sheetHost: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: "flex-end",
   },
+  bottomSafeAreaFill: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.lightWhite,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  backdropPress: {
+    ...StyleSheet.absoluteFillObject,
+  },
   sheet: {
-    maxHeight: "80%",
+    width: "100%",
     backgroundColor: colors.lightWhite,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.xxxl,
+  },
+  sheetLandscape: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   header: {
     flexDirection: "row",
     alignItems: "flex-start",
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingBottom: spacing.sm,
     gap: spacing.sm,
   },
   headerText: {
@@ -610,6 +833,9 @@ const styles = StyleSheet.create({
     color: colors.nightBlack,
     lineHeight: typography.lineHeight.sm,
   },
+  subtitleSlot: {
+    minHeight: typography.lineHeight.sm * 2,
+  },
   closeBtn: {
     padding: spacing.xs,
     marginTop: 2,
@@ -617,23 +843,30 @@ const styles = StyleSheet.create({
   filterScroller: {
     marginTop: spacing.xs,
     marginBottom: spacing.sm,
+    marginHorizontal: -spacing.lg,
     flexShrink: 0,
+    height: 48,
+  },
+  filterScrollFill: {
+    flex: 1,
+    backgroundColor: "transparent",
   },
   filterRow: {
     flexDirection: "row",
     gap: spacing.sm,
     alignItems: "center",
     paddingVertical: spacing.xs,
-    paddingRight: spacing.lg,
+    paddingLeft: spacing.lg + spacing.sm,
+    paddingRight: spacing.xl,
   },
   filterChip: {
-    minHeight: 34,
-    paddingHorizontal: spacing.md,
+    minHeight: 40,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.nightBlack,
-    backgroundColor: colors.lightWhite,
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -644,40 +877,37 @@ const styles = StyleSheet.create({
   filterChipText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodySemiBold,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
   },
   filterChipTextActive: {
-    fontFamily: typography.fontFamily.bodyBold,
+    // Keep the same font metrics so chips do not resize when selected.
+    fontFamily: typography.fontFamily.bodySemiBold,
   },
-  listFrame: {
-    flexShrink: 1,
-    minHeight: 0,
-    position: "relative",
+  listContainer: {
+    flexShrink: 0,
+    marginHorizontal: -spacing.lg,
+  },
+  listScroll: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
+  listStatusCenter: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   list: {
     gap: spacing.md,
-    paddingBottom: spacing.md,
-    paddingRight: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+    flexGrow: 0,
   },
-  scrollbarTrack: {
-    position: "absolute",
-    top: spacing.xs,
-    right: 0,
-    bottom: spacing.xs,
-    width: 5,
-    borderRadius: radius.pill,
-    backgroundColor: "#E7E0D2",
-  },
-  scrollbarThumb: {
-    width: 5,
-    borderRadius: radius.pill,
-    backgroundColor: "rgba(20, 13, 10, 0.35)",
-  },
-  centerState: {
+  emptyFilterState: {
+    paddingVertical: spacing.lg,
     alignItems: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.xxxl,
   },
   stateText: {
     color: colors.nightBlack,
@@ -696,30 +926,40 @@ const styles = StyleSheet.create({
   cardBody: {
     gap: spacing.sm,
   },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
   placeName: {
+    flex: 1,
+    flexShrink: 1,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.lg,
     color: colors.nightBlack,
     lineHeight: typography.lineHeight.lg,
   },
-  labelRow: {
+  titleLabels: {
     flexDirection: "row",
     flexWrap: "wrap",
+    justifyContent: "flex-end",
     gap: spacing.xs,
+    maxWidth: "42%",
+    flexShrink: 0,
   },
   placeLabel: {
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.beachYellow,
     backgroundColor: "#FFF4C2",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
   placeLabelText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodySemiBold,
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
   },
   infoRow: {
     flexDirection: "row",
@@ -733,11 +973,14 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
   },
   mapsLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
     marginTop: spacing.xs,
   },
   mapsLinkText: {
     fontSize: typography.size.sm,
-    color: colors.nightBlack,
+    color: colors.seaBlue,
     fontFamily: typography.fontFamily.bodySemiBold,
     textDecorationLine: "underline",
   },
