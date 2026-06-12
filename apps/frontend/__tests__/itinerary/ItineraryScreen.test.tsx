@@ -1,5 +1,5 @@
 import React from "react";
-import { act, render, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import ItineraryScreen from "@/app/itinerary";
 
@@ -250,7 +250,7 @@ describe("ItineraryScreen transition overlays", () => {
           id: "user-123",
           name: "Helen",
           role: "member",
-          planning_done: true,
+          planning_done: false,
         },
         {
           id: "user-456",
@@ -261,20 +261,28 @@ describe("ItineraryScreen transition overlays", () => {
       ],
     });
 
-    const { queryByText, unmount } = render(<ItineraryScreen />);
+    const { queryByText, getByLabelText, unmount } = render(<ItineraryScreen />);
 
     await waitFor(() => {
       expect(mockPlanningDoneBarProps).toHaveBeenCalled();
     });
 
-    const uncheckedPlanningProps = mockPlanningDoneBarProps.mock.calls.find(
-      ([props]) => (props as { checked: boolean }).checked === false
-    )?.[0] as { onPress: () => Promise<void> } | undefined;
+    const latestPlanningProps = mockPlanningDoneBarProps.mock.calls.at(-1)?.[0] as
+      | { checked: boolean; onPress: () => void }
+      | undefined;
 
-    expect(uncheckedPlanningProps).toBeTruthy();
+    expect(latestPlanningProps?.checked).toBe(false);
 
     await act(async () => {
-      await uncheckedPlanningProps?.onPress();
+      latestPlanningProps?.onPress();
+    });
+
+    await waitFor(() => {
+      expect(getByLabelText("Submit planning confirmation")).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(getByLabelText("Submit your activities"));
     });
 
     await waitFor(() => {
