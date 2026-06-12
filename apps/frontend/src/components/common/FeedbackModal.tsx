@@ -20,7 +20,7 @@ export function FeedbackModal({
   message,
   onClose,
   buttonLabel = "Okay",
-  buttonColor = colors.neonGreen,
+  buttonColor = colors.beachYellow,
 }: FeedbackModalProps) {
   return (
     <Modal

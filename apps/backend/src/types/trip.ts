@@ -21,6 +21,7 @@ export type Trip = {
     planning_started_at?: string;
     planning_end_at?: string;
     voting_end_at?: string;
+    preferences?: string[];
 };
 
 export type TripDocument = {
@@ -34,6 +35,7 @@ export type TripDocument = {
     planning_started_at?: any;
     planning_end_at?: any;
     voting_end_at?: any;
+    preferences?: string[];
 };
 
 export type MemoryPhoto = {

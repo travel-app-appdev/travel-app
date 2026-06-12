@@ -113,7 +113,8 @@ export function ActivityDetailModal({
 
               <Pressable
                 onPress={onClose}
-                hitSlop={10}
+                style={styles.closeBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
                 accessibilityLabel="Close activity details"
               >
@@ -379,6 +380,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  closeBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -10,
+    marginRight: -8,
   },
   smallTitle: {
     color: colors.textPrimary,

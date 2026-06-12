@@ -11,7 +11,6 @@ import {
   View,
   Platform,
   KeyboardAvoidingView,
-  Alert,
   Modal,
   TextInput,
   Animated,
@@ -26,6 +25,7 @@ import { AppInput } from "@/src/components/common/AppInput";
 import { DestinationAutocomplete } from "@/src/components/common/DestinationAutocomplete";
 import { AppButton } from "@/src/components/common/AppButton";
 import { BackLink } from "@/src/components/common/BackLink";
+import { FeedbackModal } from "@/src/components/common/FeedbackModal";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { PressLock } from "@/src/utils/PressLock";
@@ -346,6 +346,15 @@ export default function CreateTripScreen() {
   const [isCreating, setIsCreating] = useState(false);
   const [showOnboardingHint, setShowOnboardingHint] = useState(false);
   const [showNotLoggedInModal, setShowNotLoggedInModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackTitle, setFeedbackTitle] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+
+  const openFeedbackModal = (title: string, message: string) => {
+    setFeedbackTitle(title);
+    setFeedbackMessage(message);
+    setShowFeedbackModal(true);
+  };
 
   const blinkingDotAnim = useRef(new Animated.Value(2)).current;
 
@@ -686,7 +695,10 @@ export default function CreateTripScreen() {
 
   const handleContinueFromDestination = () => {
     if (!destination.trim()) {
-      Alert.alert("Missing destination", "Please enter a destination first.");
+      openFeedbackModal(
+        "Missing destination",
+        "Please enter a destination first."
+      );
       return;
     }
     setStep(2);
@@ -694,11 +706,14 @@ export default function CreateTripScreen() {
 
   const handleContinueToTimers = () => {
     if (!tripName.trim()) {
-      Alert.alert("Missing trip name", "Please enter a trip name.");
+      openFeedbackModal("Missing trip name", "Please enter a trip name.");
       return;
     }
     if (tripEnd < tripStart) {
-      Alert.alert("Invalid dates", "End date cannot be before start date.");
+      openFeedbackModal(
+        "Invalid dates",
+        "End date cannot be before start date."
+      );
       return;
     }
     syncPhasesFromTripDates(tripStart, tripEnd);
@@ -716,23 +731,23 @@ export default function CreateTripScreen() {
           combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
         );
         if (nextEnd <= new Date()) {
-          Alert.alert(
+          openFeedbackModal(
             "Invalid planning end",
-            "Planning end must be in the future."
+            "Planning end date must be in the future."
           );
           return;
         }
         if (nextEnd > tripEndBoundary) {
-          Alert.alert(
+          openFeedbackModal(
             "Invalid planning end",
-            "Planning end cannot be after the trip end date."
+            "Planning end date cannot be after the trip end date."
           );
           return;
         }
         if (nextEnd >= currentVotingEnd) {
-          Alert.alert(
-            "Invalid planning end",
-            "Planning end must be before voting end."
+          openFeedbackModal(
+            "Invalid phase order",
+            "Planning end date must be before voting end."
           );
           return;
         }
@@ -766,14 +781,14 @@ export default function CreateTripScreen() {
           combineDateAndTime(phaseDates.planning.end, phaseDates.planning.time)
         );
         if (nextEnd <= currentPlanningEnd) {
-          Alert.alert(
+          openFeedbackModal(
             "Invalid voting end",
             "Voting end must be after planning end."
           );
           return;
         }
         if (nextEnd > tripEndBoundary) {
-          Alert.alert(
+          openFeedbackModal(
             "Invalid voting end",
             "Voting end cannot be after the trip end date."
           );
@@ -804,14 +819,17 @@ export default function CreateTripScreen() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to update phase";
-      Alert.alert("Update failed", message);
+      openFeedbackModal("Update failed", message);
     }
   };
 
   const handleApplyPhaseTime = () => {
     if (!showPhaseTimePicker) return;
     if (!isValidTimeString(tempPhaseTime)) {
-      Alert.alert("Invalid time", "Please enter a valid time as HH:MM.");
+      openFeedbackModal(
+        "Invalid time",
+        "Please enter a valid time as HH:MM."
+      );
       return;
     }
     setPhaseDates((prev) => ({
@@ -831,15 +849,18 @@ export default function CreateTripScreen() {
       return;
     }
     if (!destination.trim()) {
-      Alert.alert("Missing destination", "Please enter a destination.");
+      openFeedbackModal("Missing destination", "Please enter a destination.");
       return;
     }
     if (!tripName.trim()) {
-      Alert.alert("Missing trip name", "Please enter a trip name.");
+      openFeedbackModal("Missing trip name", "Please enter a trip name.");
       return;
     }
     if (tripEnd < tripStart) {
-      Alert.alert("Invalid dates", "End date cannot be before start date.");
+      openFeedbackModal(
+        "Invalid dates",
+        "End date cannot be before start date."
+      );
       return;
     }
 
@@ -853,7 +874,7 @@ export default function CreateTripScreen() {
       const tripEndBoundary = endOfDay(tripEnd);
 
       if (planningEnd <= new Date()) {
-        Alert.alert(
+        openFeedbackModal(
           "Invalid planning end",
           "Planning end must be in the future."
         );
@@ -861,21 +882,21 @@ export default function CreateTripScreen() {
       }
 
       if (planningEnd > tripEndBoundary) {
-        Alert.alert(
+        openFeedbackModal(
           "Invalid planning end",
           "Planning end cannot be after the trip end date."
         );
         return;
       }
       if (planningEnd >= votingEnd) {
-        Alert.alert(
-          "Invalid voting end",
-          "Voting end must be after planning end."
+        openFeedbackModal(
+          "Invalid phase order",
+          "Planning end must be before voting end."
         );
         return;
       }
       if (votingEnd > tripEndBoundary) {
-        Alert.alert(
+        openFeedbackModal(
           "Invalid voting end",
           "Voting end cannot be after the trip end date."
         );
@@ -885,7 +906,7 @@ export default function CreateTripScreen() {
       setIsCreating(true);
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert(
+        openFeedbackModal(
           "Authentication error",
           "No Firebase user found. Please log in again."
         );
@@ -916,11 +937,20 @@ export default function CreateTripScreen() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to create trip";
-      Alert.alert("Create trip failed", message);
+      openFeedbackModal("Create trip failed", message);
     } finally {
       setIsCreating(false);
     }
   };
+
+  const feedbackModal = (
+    <FeedbackModal
+      visible={showFeedbackModal}
+      title={feedbackTitle}
+      message={feedbackMessage}
+      onClose={() => setShowFeedbackModal(false)}
+    />
+  );
 
   const TOTAL_STEPS = 5;
   const progress = useRef(new Animated.Value(1)).current;
@@ -1402,6 +1432,8 @@ export default function CreateTripScreen() {
                 </View>
               </SafeAreaView>
             </Modal>
+
+            {feedbackModal}
           </View>
         </SafeAreaView>
       </View>
@@ -1436,7 +1468,11 @@ export default function CreateTripScreen() {
             style={[styles.prefsLeafTopRight, { pointerEvents: "none" }]}
             {...hiddenFromAccessibility}
           >
-            <LeafUp width={width * 0.38} height={width * 0.38} color={colors.sunsetPink} />
+            <LeafUp
+              width={width * 0.38}
+              height={width * 0.38}
+              color={colors.plantGreen}
+            />
           </View>
 
           {/* Progress bar only — no full StickyHeader */}
@@ -1467,7 +1503,7 @@ export default function CreateTripScreen() {
             {/* Title block */}
             <View style={styles.prefsTitleBlock}>
               <AppText variant="title" style={styles.prefsTitle}>
-                Your preferences
+                Your Travel Preference
               </AppText>
               <AppText variant="body" style={styles.prefsSubtitle}>
                 What do you enjoy{" "}
@@ -1476,7 +1512,7 @@ export default function CreateTripScreen() {
                 </AppText>
               </AppText>
               <AppText variant="caption" style={styles.prefsHintText}>
-                {"Pick up to 5 categories. We'll use them to suggest activities for your trip."}
+                {"Pick up to 5 categories. We'll use your picks to suggest activities during planning."}
               </AppText>
             </View>
 
@@ -1914,6 +1950,8 @@ export default function CreateTripScreen() {
               </View>
             </SafeAreaView>
           </Modal>
+
+          {feedbackModal}
         </View>
       </SafeAreaView>
     </View>
@@ -2484,14 +2522,12 @@ const styles = StyleSheet.create({
     top: 0,
     right: 0,
     zIndex: 0,
-    opacity: 0.55,
   },
   prefsLeafBottomLeft: {
     position: "absolute",
     bottom: "8%",
     left: 0,
     zIndex: 0,
-    opacity: 0.55,
     transform: [{ rotate: "5deg" }],
   },
   prefsProgressBlock: {
@@ -2547,6 +2583,7 @@ const styles = StyleSheet.create({
     fontSize: typography.size.md,
     color: colors.nightBlack,
     lineHeight: typography.lineHeight.md,
+    marginTop: spacing.lg,
   },
   prefsSpacer: {
     height: spacing.xl,
@@ -2580,7 +2617,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   prefsSkipText: {
-    fontFamily: typography.fontFamily.body,
+    fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.md,
     color: colors.nightBlack,
     textDecorationLine: "underline",

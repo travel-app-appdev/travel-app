@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import admin from "../config/firebase";
-import { getActivitySuggestions, saveMemberPreferences } from "../services/suggestionsService";
+import {
+    getActivitySuggestions,
+    saveMemberPreferences,
+} from "../services/suggestionsService";
 import { hasTripEndDatePassed } from "../services/tripsService";
 import {
     findMembership,
@@ -21,7 +24,12 @@ export async function getSuggestionsController(req: Request, res: Response) {
         const membership = await findMembership(tripId as string, decoded.uid);
         if (!membership) return res.status(403).json({ error: "Not a member of this trip" });
 
-        const suggestions = await getActivitySuggestions(tripId as string, slotType, offset);
+        const suggestions = await getActivitySuggestions(
+            tripId as string,
+            slotType,
+            decoded.uid,
+            offset
+        );
         return res.json({ suggestions });
     } catch (err: any) {
         return res.status(err.status ?? 500).json({ error: err.message ?? "Internal server error" });

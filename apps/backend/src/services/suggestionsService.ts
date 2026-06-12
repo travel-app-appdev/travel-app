@@ -1,5 +1,5 @@
 import admin from "../config/firebase";
-import { findTripById, findAcceptedMembersByTripId, setMemberPreferences } from "../repositories/tripsRepository";
+import { findTripById, getMemberPreferences, setMemberPreferences } from "../repositories/tripsRepository";
 import { ActivitySuggestion } from "../types/trip";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -57,6 +57,7 @@ const PREFERENCE_TO_CATEGORIES: Record<string, string[]> = {
 export async function getActivitySuggestions(
     tripId: string,
     slotType: string,
+    userId: string,
     offset: number = 0
 ): Promise<ActivitySuggestion[]> {
     const apiKey = process.env.GEOAPIFY_API_KEY;
@@ -66,14 +67,17 @@ export async function getActivitySuggestions(
     const trip = await findTripById(tripId);
     if (!trip) throw { status: 404, message: "Trip not found" };
 
-    // 2. Aggregate preferences from all accepted members
-    const members = await findAcceptedMembersByTripId(tripId);
-    const allPrefs = members.flatMap((m) => (m as any).preferences ?? []);
-    const uniquePrefs = [...new Set<string>(allPrefs)];
+    // 2. Use only the current member's preferences for this trip
+    const memberPrefs = await getMemberPreferences(tripId, userId);
+    const uniquePrefs = [...new Set(memberPrefs)];
+
+    if (uniquePrefs.length === 0) {
+        return [];
+    }
 
     // 3. Check cache (only for first page)
     if (offset === 0) {
-        const cacheKey = buildCacheKey(tripId, slotType, uniquePrefs);
+        const cacheKey = buildCacheKey(tripId, slotType, userId, uniquePrefs);
         const cached = await readCache(cacheKey);
         if (cached) return cached;
     }
@@ -87,24 +91,25 @@ export async function getActivitySuggestions(
 
     const defaultCategories = ["tourism.sights", "catering.restaurant", "entertainment", "leisure.park"];
 
-    // 5. Build category list from preferences, fall back to defaults
-    let categories = uniquePrefs.length > 0
-        ? [...new Set(uniquePrefs.flatMap((p) => PREFERENCE_TO_CATEGORIES[p] ?? []))]
-        : defaultCategories;
+    // 5. Build category list from this member's preferences
+    let categories = [
+        ...new Set(uniquePrefs.flatMap((p) => PREFERENCE_TO_CATEGORIES[p] ?? [])),
+    ];
 
     if (categories.length === 0) categories = defaultCategories;
 
     // 6. Fetch places from Geoapify
     let suggestions = await fetchPlaces(coords, categories, uniquePrefs, apiKey, offset);
 
-    // If specific preferences returned nothing, fall back to defaults
-    if (suggestions.length === 0 && uniquePrefs.length > 0) {
-        suggestions = await fetchPlaces(coords, defaultCategories, [], apiKey, offset);
+    if (uniquePrefs.length > 0) {
+        suggestions = suggestions.filter(
+            (suggestion) => suggestion.matchedPreferences.length > 0
+        );
     }
 
     // 7. Cache first-page results only (only if we got results)
     if (offset === 0 && suggestions.length > 0) {
-        const cacheKey = buildCacheKey(tripId, slotType, uniquePrefs);
+        const cacheKey = buildCacheKey(tripId, slotType, userId, uniquePrefs);
         await writeCache(cacheKey, tripId, suggestions);
     }
 
@@ -124,9 +129,14 @@ export async function saveMemberPreferences(
 
 // Helpers
 
-function buildCacheKey(tripId: string, slotType: string, prefs: string[]): string {
+function buildCacheKey(
+    tripId: string,
+    slotType: string,
+    userId: string,
+    prefs: string[]
+): string {
     const sorted = [...prefs].sort().join(",");
-    return tripId + "__" + slotType + "__" + sorted;
+    return tripId + "__" + userId + "__" + slotType + "__" + sorted;
 }
 
 async function readCache(cacheKey: string): Promise<ActivitySuggestion[] | null> {
@@ -233,10 +243,10 @@ async function fetchPlaces(
 function categoryMatchesPreference(placeCategories: string[], preference: string): boolean {
     const preferenceCategories = PREFERENCE_TO_CATEGORIES[preference] ?? [];
     return preferenceCategories.some((preferenceCategory) =>
-        placeCategories.some((placeCategory) =>
-            placeCategory === preferenceCategory ||
-            placeCategory.startsWith(preferenceCategory + ".") ||
-            preferenceCategory.startsWith(placeCategory + ".")
+        placeCategories.some(
+            (placeCategory) =>
+                placeCategory === preferenceCategory ||
+                placeCategory.startsWith(preferenceCategory + ".")
         )
     );
 }
