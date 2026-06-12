@@ -42,6 +42,12 @@ export async function findTripById(tripId: string): Promise<Trip | null> {
         planning_started_at: normalizeDateTime(data.planning_started_at),
         planning_end_at: normalizeDateTime(data.planning_end_at),
         voting_end_at: normalizeDateTime(data.voting_end_at),
+        preferences: Array.isArray(data.preferences)
+            ? data.preferences.filter(
+                  (preference): preference is string =>
+                      typeof preference === "string"
+              )
+            : [],
     };
 }
 
@@ -356,6 +362,27 @@ export async function setMemberPreferences(
     if (snapshot.empty) return;
 
     await snapshot.docs[0].ref.update({ preferences });
+}
+
+export async function getTripPreferences(tripId: string): Promise<string[]> {
+    const trip = await findTripById(tripId);
+    if (!trip) return [];
+
+    if (Array.isArray(trip.preferences) && trip.preferences.length > 0) {
+        return trip.preferences;
+    }
+
+    const adminUserId = await findTripAdminUserId(tripId);
+    if (!adminUserId) return [];
+
+    return getMemberPreferences(tripId, adminUserId);
+}
+
+export async function setTripPreferences(
+    tripId: string,
+    preferences: string[]
+): Promise<void> {
+    await updateTripById(tripId, { preferences });
 }
 
 export async function setMemberPlanningDone(
