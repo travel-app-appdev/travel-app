@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
+import { getPreferenceLabel } from "@/src/components/common/PreferenceChips";
 import type { ActivitySuggestion } from "@/src/api/trips";
 import type { Activity } from "@/src/types/itinerary";
 
@@ -35,6 +36,7 @@ type Props = {
   onAdd: (suggestion: ActivitySuggestion) => void | Promise<void>;
   onLoadMore?: () => void;
   addedElsewherePlaceIds?: string[];
+  selectedPreferences?: string[];
 };
 
 function normalizeMatchText(value: string) {
@@ -140,7 +142,7 @@ const CATEGORY_LABEL_RULES: { label: string; categories: string[] }[] = [
   },
   { label: "Cafe", categories: ["catering.cafe"] },
   {
-    label: "Food",
+    label: "Restaurants",
     categories: [
       "catering.restaurant",
       "catering.fast_food",
@@ -208,9 +210,48 @@ const CATEGORY_LABEL_RULES: { label: string; categories: string[] }[] = [
   },
 ];
 
+const PREFERENCE_FILTER_LABELS: Record<string, string[]> = {
+  coffee: ["Coffee", "Cafe"],
+  food: ["Restaurants"],
+  quickbites: ["Restaurants"],
+  desserts: ["Dessert", "Cafe"],
+  nightlife: ["Nightlife"],
+  museums: ["Museum", "Gallery"],
+  galleries: ["Gallery", "Museum"],
+  sightseeing: ["Sightseeing", "Viewpoint", "Culture"],
+  viewpoints: ["Viewpoint", "Sightseeing"],
+  heritage: ["Culture", "Sightseeing"],
+  citywalks: ["Sightseeing", "Culture"],
+  nature: ["Nature", "Park"],
+  parks: ["Park", "Nature"],
+  gardens: ["Park", "Nature"],
+  beaches: ["Beach"],
+  camping: ["Camping"],
+  water: ["Viewpoint", "Nature"],
+  culture: ["Culture", "Museum", "Gallery"],
+  cinema: ["Cinema"],
+  theatre: ["Theatre"],
+  amusement: ["Fun"],
+  zoo_aquarium: ["Fun"],
+  bowling: ["Fun"],
+  escape_rooms: ["Fun"],
+  sports: ["Active"],
+  fitness: ["Active"],
+  swimming: ["Active"],
+  skiing: ["Active"],
+  cycling: ["Active"],
+  water_sports: ["Active"],
+  spa: ["Spa"],
+  shopping: ["Shopping"],
+  markets: ["Shopping"],
+  souvenirs: ["Shopping"],
+  books: ["Shopping"],
+  vintage: ["Shopping"],
+};
+
 const PREFERENCE_LABELS: Record<string, string> = {
   coffee: "Coffee",
-  food: "Food",
+  food: "Restaurants",
   quickbites: "Quick bites",
   desserts: "Dessert",
   nightlife: "Nightlife",
@@ -251,7 +292,10 @@ function categoryMatches(category: string, target: string) {
   return category === target || category.startsWith(target + ".");
 }
 
-function getSuggestionLabels(suggestion: ActivitySuggestion) {
+function getSuggestionLabels(
+  suggestion: ActivitySuggestion,
+  allowedFilterLabels: Set<string> | null
+) {
   const labels = new Set<string>();
   const categories = suggestion.categories ?? [];
 
@@ -272,6 +316,10 @@ function getSuggestionLabels(suggestion: ActivitySuggestion) {
     });
   }
 
+  if (allowedFilterLabels) {
+    return Array.from(labels).filter((label) => allowedFilterLabels.has(label));
+  }
+
   return Array.from(labels);
 }
 
@@ -287,6 +335,7 @@ export function SuggestionsModal({
   onAdd,
   onLoadMore,
   addedElsewherePlaceIds = [],
+  selectedPreferences = [],
 }: Props) {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -390,24 +439,56 @@ export function SuggestionsModal({
   }
 
   // Build subtitle: "Based on your preferences · Museums, Shopping · Prague"
+  const allowedFilterLabels = useMemo(() => {
+    if (selectedPreferences.length === 0) return null;
+
+    const labels = new Set<string>();
+    selectedPreferences.forEach((preference) => {
+      (PREFERENCE_FILTER_LABELS[preference] ?? []).forEach((label) => {
+        labels.add(label);
+      });
+    });
+    return labels;
+  }, [selectedPreferences]);
+
   const suggestionItems = useMemo(
     () =>
-      suggestions.map((suggestion, index) => ({
-        suggestion,
-        labels: getSuggestionLabels(suggestion),
-        key: suggestion.sourcePlaceId || `${suggestion.name}-${index}`,
-      })),
-    [suggestions]
+      suggestions
+        .filter((suggestion) => {
+          if (selectedPreferences.length === 0) return true;
+          return suggestion.matchedPreferences.some((preference) =>
+            selectedPreferences.includes(preference)
+          );
+        })
+        .map((suggestion, index) => ({
+          suggestion,
+          labels: getSuggestionLabels(suggestion, allowedFilterLabels),
+          key: suggestion.sourcePlaceId || `${suggestion.name}-${index}`,
+        })),
+    [allowedFilterLabels, selectedPreferences, suggestions]
   );
 
   const filterOptions = useMemo(() => {
+    if (selectedPreferences.length > 0) {
+      return selectedPreferences.map((preference) => ({
+        key: preference,
+        label: getPreferenceLabel(preference),
+        count: suggestionItems.filter(({ suggestion }) =>
+          suggestion.matchedPreferences.includes(preference)
+        ).length,
+      }));
+    }
+
     const counts = new Map<string, number>();
     suggestionItems.forEach(({ labels }) => {
       labels.forEach((label) => counts.set(label, (counts.get(label) ?? 0) + 1));
     });
 
     return Array.from(counts.entries())
-      .map(([label, count]) => ({ label, count }))
+      .map(([label, count]) => ({ key: label, label, count }))
+      .filter(
+        ({ label }) => !allowedFilterLabels || allowedFilterLabels.has(label)
+      )
       .sort((a, b) => {
         const aIndex = CATEGORY_LABEL_RULES.findIndex(
           (rule) => rule.label === a.label
@@ -423,11 +504,11 @@ export function SuggestionsModal({
           a.label.localeCompare(b.label)
         );
       });
-  }, [suggestionItems]);
+  }, [allowedFilterLabels, selectedPreferences, suggestionItems]);
 
   const effectiveFilter =
     activeFilter === ALL_FILTER ||
-    filterOptions.some((option) => option.label === activeFilter)
+    filterOptions.some((option) => option.key === activeFilter)
       ? activeFilter
       : ALL_FILTER;
 
@@ -435,8 +516,8 @@ export function SuggestionsModal({
     () =>
       effectiveFilter === ALL_FILTER
         ? suggestionItems
-        : suggestionItems.filter(({ labels }) =>
-            labels.includes(effectiveFilter)
+        : suggestionItems.filter(({ suggestion }) =>
+            suggestion.matchedPreferences.includes(effectiveFilter)
           ),
     [effectiveFilter, suggestionItems]
   );
@@ -445,14 +526,12 @@ export function SuggestionsModal({
     listScrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [effectiveFilter, loading, suggestions.length]);
 
-  const allMatchedPrefs = suggestions.flatMap((s) => s.matchedPreferences);
-  const uniquePrefs = [...new Set(allMatchedPrefs)];
   const prefsText =
-    uniquePrefs.length > 0
-      ? uniquePrefs.map((pref) => PREFERENCE_LABELS[pref] ?? pref).join(", ")
+    selectedPreferences.length > 0
+      ? selectedPreferences.map((pref) => getPreferenceLabel(pref)).join(", ")
       : null;
 
-  const subtitleParts: string[] = ["Based on your preferences"];
+  const subtitleParts: string[] = ["Based on your travel preferences"];
   if (prefsText) subtitleParts.push(prefsText);
   if (destination) subtitleParts.push(destination);
   const subtitle = subtitleParts.join(" · ");
@@ -466,7 +545,12 @@ export function SuggestionsModal({
   }
 
   const showFilterChips =
-    !loading && !error && suggestions.length > 0;
+    !loading &&
+    !error &&
+    (selectedPreferences.length > 0 || suggestionItems.length > 0);
+
+  const showSuggestionList =
+    suggestions.length > 0 || selectedPreferences.length > 0;
 
   const listContent = visibleSuggestionItems.map(({ suggestion: s, labels, key }) => {
     const isAddedInSlot = addedPlaceId === s.sourcePlaceId;
@@ -640,10 +724,13 @@ export function SuggestionsModal({
             <Pressable
               onPress={handleClose}
               style={styles.closeBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel="Close suggestions"
             >
-              <CloseIcon width={22} height={22} {...hiddenFromAccessibility} />
+              <View {...hiddenFromAccessibility}>
+                <CloseIcon width={22} height={22} />
+              </View>
             </Pressable>
           </View>
 
@@ -662,25 +749,25 @@ export function SuggestionsModal({
                     effectiveFilter === ALL_FILTER && styles.filterChipActive,
                   ]}
                   accessibilityRole="button"
-                  accessibilityLabel={`Show all ${suggestions.length} suggestions`}
-                >
-                  <AppText
-                    variant="body"
-                    style={[
-                      styles.filterChipText,
-                      effectiveFilter === ALL_FILTER && styles.filterChipTextActive,
-                    ]}
+                    accessibilityLabel={`Show all ${suggestionItems.length} suggestions`}
                   >
-                    All ({suggestions.length})
-                  </AppText>
-                </Pressable>
+                    <AppText
+                      variant="body"
+                      style={[
+                        styles.filterChipText,
+                        effectiveFilter === ALL_FILTER && styles.filterChipTextActive,
+                      ]}
+                    >
+                      All ({suggestionItems.length})
+                    </AppText>
+                  </Pressable>
 
-                {filterOptions.map(({ label, count }) => {
-                  const active = effectiveFilter === label;
+                {filterOptions.map(({ key, label, count }) => {
+                  const active = effectiveFilter === key;
                   return (
                     <Pressable
-                      key={label}
-                      onPress={() => setActiveFilter(label)}
+                      key={key}
+                      onPress={() => setActiveFilter(key)}
                       style={[styles.filterChip, active && styles.filterChipActive]}
                       accessibilityRole="button"
                       accessibilityLabel={`Show ${label} suggestions`}
@@ -716,7 +803,7 @@ export function SuggestionsModal({
                   {error}
                 </AppText>
               </View>
-            ) : suggestions.length === 0 ? (
+            ) : !showSuggestionList ? (
               <View style={styles.listStatusCenter}>
                 <AppText variant="body" style={styles.stateText}>
                   No suggestions found for this destination.{"\n"}Try setting
@@ -736,12 +823,12 @@ export function SuggestionsModal({
                 ) : (
                   <View style={styles.emptyFilterState}>
                     <AppText variant="body" style={styles.stateText}>
-                      No activities match this filter.
+                      No matching activities for this preference.
                     </AppText>
                   </View>
                 )}
 
-                {!!onLoadMore && (
+                {!!onLoadMore && listContent.length > 0 && (
                   <Pressable
                     style={[
                       styles.loadMoreBtn,
@@ -837,8 +924,12 @@ const styles = StyleSheet.create({
     minHeight: typography.lineHeight.sm * 2,
   },
   closeBtn: {
-    padding: spacing.xs,
-    marginTop: 2,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -6,
+    marginRight: -8,
   },
   filterScroller: {
     marginTop: spacing.xs,
