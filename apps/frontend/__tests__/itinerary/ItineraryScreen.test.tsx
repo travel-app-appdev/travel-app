@@ -40,6 +40,13 @@ jest.mock("expo-router", () => ({
     replace: (route: unknown) => mockReplace(route),
     setParams: (params: unknown) => mockSetParams(params),
   },
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    const React = require("react");
+    React.useEffect(() => {
+      const cleanup = callback();
+      return typeof cleanup === "function" ? cleanup : undefined;
+    }, []);
+  },
   useLocalSearchParams: () => mockParams,
 }));
 
@@ -64,6 +71,7 @@ jest.mock("@/src/api/trips", () => ({
   fetchTripForUser: (userId: unknown, tripId: unknown, options: unknown) =>
     mockFetchTripForUser(userId, tripId, options),
   finishPlanning: (payload: unknown) => mockFinishPlanning(payload),
+  getMemberPreferences: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock("@/src/services/activityService", () => ({
@@ -174,6 +182,31 @@ jest.mock("@/src/components/itinerary/VotingTimeFilter", () => ({
 
 jest.mock("@/src/components/itinerary/FinalSlotCard", () => ({
   FinalSlotCard: () => null,
+}));
+
+jest.mock("@/src/components/itinerary/SuggestionsModal", () => ({
+  SuggestionsModal: () => null,
+  getAddedElsewherePlaceIds: () => new Set<string>(),
+}));
+
+jest.mock("@/src/components/itinerary/FinalSuggestedActivitiesSection", () => ({
+  FinalSuggestedActivitiesSection: () => null,
+}));
+
+jest.mock("@/src/components/itinerary/ActivityDetailModal", () => ({
+  ActivityDetailModal: () => null,
+}));
+
+jest.mock("@/src/components/common/FeedbackModal", () => ({
+  FeedbackModal: () => null,
+}));
+
+jest.mock("@/src/components/itinerary/VotingDoneBar", () => ({
+  VotingDoneBar: () => null,
+}));
+
+jest.mock("@/src/components/itinerary/ItineraryInfoModal", () => ({
+  ItineraryInfoModal: () => null,
 }));
 
 function setBaseParams(state: "planning" | "voting" | "final" | "memories") {
