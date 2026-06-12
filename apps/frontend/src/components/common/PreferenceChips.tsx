@@ -81,8 +81,31 @@ export const PREFERENCE_GROUPS: PreferenceGroup[] = [
   },
 ];
 
+export const PREFERENCE_GROUP_COLORS: Record<string, string> = {
+  "Food & Drink": colors.beachYellow,
+  Explore: colors.sunsetPink,
+  Outdoors: colors.plantGreen,
+  Fun: colors.sunsetOrange,
+  Active: colors.neonGreen,
+  Shopping: colors.seaBlue,
+};
+
+export function getPreferenceGroupColor(key: string): string {
+  const group = PREFERENCE_GROUPS.find((entry) =>
+    entry.items.some((item) => item.key === key)
+  );
+  return group
+    ? (PREFERENCE_GROUP_COLORS[group.group] ?? colors.sunsetOrange)
+    : colors.sunsetOrange;
+}
+
 export const ALL_PREFERENCES = PREFERENCE_GROUPS.flatMap((g) => g.items);
 export type PreferenceKey = (typeof ALL_PREFERENCES)[number]["key"];
+
+export function getPreferenceLabel(key: string): string {
+  const match = ALL_PREFERENCES.find((item) => item.key === key);
+  return match?.label ?? key;
+}
 
 type Props = {
   selected: string[];
@@ -122,6 +145,7 @@ export function PreferenceChips({
               key={key}
               label={label}
               active={active}
+              activeColor={getPreferenceGroupColor(key)}
               disabled={false}
               onPress={() => toggle(key)}
             />
@@ -133,7 +157,9 @@ export function PreferenceChips({
 
   return (
     <View style={styles.groups}>
-      {PREFERENCE_GROUPS.map(({ group, items }) => (
+      {PREFERENCE_GROUPS.map(({ group, items }) => {
+        const groupColor = PREFERENCE_GROUP_COLORS[group] ?? colors.sunsetOrange;
+        return (
         <View key={group} style={styles.groupSection}>
           <AppText variant="body" style={styles.groupLabel}>
             {group}
@@ -146,6 +172,7 @@ export function PreferenceChips({
                   key={key}
                   label={label}
                   active={active}
+                  activeColor={groupColor}
                   disabled={false}
                   onPress={() => toggle(key)}
                 />
@@ -153,7 +180,8 @@ export function PreferenceChips({
             })}
           </View>
         </View>
-      ))}
+      );
+      })}
     </View>
   );
 }
@@ -161,11 +189,13 @@ export function PreferenceChips({
 function Chip({
   label,
   active,
+  activeColor,
   disabled,
   onPress,
 }: {
   label: string;
   active: boolean;
+  activeColor: string;
   disabled: boolean;
   onPress: () => void;
 }) {
@@ -175,7 +205,10 @@ function Chip({
       disabled={disabled}
       style={[
         styles.chip,
-        active && styles.chipActive,
+        active && {
+          backgroundColor: activeColor,
+          borderColor: activeColor,
+        },
         disabled && styles.chipDisabled,
       ]}
       accessibilityRole="checkbox"
@@ -220,10 +253,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.nightBlack,
     backgroundColor: "transparent",
-  },
-  chipActive: {
-    backgroundColor: colors.sunsetOrange,
-    borderColor: colors.sunsetOrange,
   },
   chipDisabled: {
     opacity: 0.35,
