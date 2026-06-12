@@ -36,6 +36,25 @@ export function VotingSlotCard({
   const hasGoogleMapsUrl = !!activity.googleMapsUrl?.trim();
   const voteCount = activity.voteCount ?? 0;
   const voteLabel = `${voteCount} ${voteCount === 1 ? "vote" : "votes"}`;
+  const lastMetaPlacement = hasGoogleMapsUrl
+    ? "google"
+    : hasAddress
+      ? "address"
+      : activityTimeRange
+        ? "time"
+        : "name";
+
+  const renderVoteMeta = () => (
+    <View
+      style={styles.inlineVote}
+      accessibilityLiveRegion="polite"
+      accessible={false}
+    >
+      <AppText variant="caption" style={styles.voteCount} numberOfLines={1}>
+        {voteLabel}
+      </AppText>
+    </View>
+  );
 
   const detailParts = [
     activityTimeRange ? `time ${activityTimeRange}` : null,
@@ -63,9 +82,27 @@ export function VotingSlotCard({
           </AppText>
         </View>
 
-        <AppText variant="subtitle" style={styles.name} numberOfLines={2}>
-          {activity.name}
-        </AppText>
+        {lastMetaPlacement === "name" ? (
+          <View
+            style={styles.nameWithMetaRow}
+            accessible={true}
+            accessibilityLabel={`${activity.name}, ${voteLabel}`}
+          >
+            <AppText
+              variant="subtitle"
+              style={styles.nameInRow}
+              numberOfLines={2}
+              accessible={false}
+            >
+              {activity.name}
+            </AppText>
+            {renderVoteMeta()}
+          </View>
+        ) : (
+          <AppText variant="subtitle" style={styles.name} numberOfLines={2}>
+            {activity.name}
+          </AppText>
+        )}
 
         {hasAddress ? (
           <>
@@ -90,7 +127,11 @@ export function VotingSlotCard({
             <View
               style={styles.detailRow}
               accessible={true}
-              accessibilityLabel={`Address: ${activity.address.trim()}, ${voteLabel}`}
+              accessibilityLabel={
+                lastMetaPlacement === "address"
+                  ? `Address: ${activity.address.trim()}, ${voteLabel}`
+                  : `Address: ${activity.address.trim()}`
+              }
             >
               <LocationPin
                 width={16}
@@ -107,26 +148,18 @@ export function VotingSlotCard({
                 {activity.address.trim()}
               </AppText>
 
-              <View
-                style={styles.inlineVote}
-                accessibilityLiveRegion="polite"
-                accessible={false}
-              >
-                <AppText
-                  variant="caption"
-                  style={styles.voteCount}
-                  numberOfLines={1}
-                >
-                  {voteLabel}
-                </AppText>
-              </View>
+              {lastMetaPlacement === "address" ? renderVoteMeta() : null}
             </View>
           </>
         ) : !!activityTimeRange ? (
           <View
             style={styles.detailRow}
             accessible={true}
-            accessibilityLabel={`Activity time: ${activityTimeRange}, ${voteLabel}`}
+            accessibilityLabel={
+              lastMetaPlacement === "time"
+                ? `Activity time: ${activityTimeRange}, ${voteLabel}`
+                : `Activity time: ${activityTimeRange}`
+            }
           >
             <Timer width={16} height={16} {...hiddenFromAccessibility} />
 
@@ -139,42 +172,19 @@ export function VotingSlotCard({
               {activityTimeRange}
             </AppText>
 
-            <View
-              style={styles.inlineVote}
-              accessibilityLiveRegion="polite"
-              accessible={false}
-            >
-              <AppText
-                variant="caption"
-                style={styles.voteCount}
-                numberOfLines={1}
-              >
-                {voteLabel}
-              </AppText>
-            </View>
+            {lastMetaPlacement === "time" ? renderVoteMeta() : null}
           </View>
-        ) : (
-          <View
-            style={styles.nameVoteRow}
-            accessible={true}
-            accessibilityLabel={voteLabel}
-          >
-            <View style={styles.nameVoteSpacer} />
-            <AppText
-              variant="caption"
-              style={styles.voteCount}
-              numberOfLines={1}
-            >
-              {voteLabel}
-            </AppText>
-          </View>
-        )}
+        ) : null}
 
         {hasGoogleMapsUrl && (
           <View
-            style={styles.googleRow}
+            style={styles.detailRow}
             accessible={true}
-            accessibilityLabel="Google Maps link available"
+            accessibilityLabel={
+              lastMetaPlacement === "google"
+                ? `Google Maps link available, ${voteLabel}`
+                : "Google Maps link available"
+            }
           >
             <GoogleIcon width={14} height={14} {...hiddenFromAccessibility} />
             <AppText
@@ -185,6 +195,7 @@ export function VotingSlotCard({
             >
               Google Maps link
             </AppText>
+            {lastMetaPlacement === "google" ? renderVoteMeta() : null}
           </View>
         )}
       </Pressable>
@@ -265,11 +276,25 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.lg,
     marginBottom: 2,
   },
+  nameWithMetaRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.sm,
+    marginBottom: 2,
+  },
+  nameInRow: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.lg,
+  },
   detailRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
     marginTop: 1,
+    minWidth: 0,
   },
   detailText: {
     flex: 1,
@@ -280,24 +305,10 @@ const styles = StyleSheet.create({
   },
   inlineVote: {
     flexShrink: 0,
-    marginLeft: spacing.sm,
-  },
-  nameVoteRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 1,
-  },
-  nameVoteSpacer: {
-    flex: 1,
-  },
-  googleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-    minWidth: 0,
+    marginLeft: "auto",
   },
   googleLink: {
+    flex: 1,
     flexShrink: 1,
     color: colors.seaBlue,
     fontFamily: typography.fontFamily.bodySemiBold,
@@ -306,6 +317,7 @@ const styles = StyleSheet.create({
   },
   cta: {
     width: 92,
+    alignSelf: "stretch",
     minHeight: CARD_HEIGHT,
     borderRadius: radius.md,
     backgroundColor: colors.sunsetPink,

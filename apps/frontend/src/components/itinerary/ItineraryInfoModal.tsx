@@ -1,4 +1,5 @@
 import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, spacing } from "@/src/theme";
 
@@ -26,53 +27,60 @@ export function ItineraryInfoModal({
       visible={visible}
       transparent
       animationType="fade"
+      statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <Pressable
-          style={styles.backdrop}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel={closeAccessibilityLabel}
-        />
-        <View
-          style={styles.card}
-          accessibilityViewIsModal={true}
-          accessible={true}
-          accessibilityLabel={accessibilityLabel}
-        >
-          <AppText variant="subtitle" style={styles.title}>
-            {title}
-          </AppText>
-          <AppText variant="body" style={styles.text}>
-            {text}
-          </AppText>
+      <SafeAreaView style={styles.safeArea} edges={["top", "right", "bottom", "left"]}>
+        <View style={styles.overlay}>
           <Pressable
-            style={[
-              styles.primaryButton,
-              { backgroundColor: primaryButtonColor },
-            ]}
+            style={styles.backdrop}
             onPress={onClose}
             accessibilityRole="button"
             accessibilityLabel={closeAccessibilityLabel}
+          />
+          <View
+            style={styles.card}
+            accessibilityViewIsModal={true}
+            accessible={true}
+            accessibilityLabel={accessibilityLabel}
           >
-            <AppText variant="body" style={styles.buttonText}>
-              Got it
+            <AppText variant="subtitle" style={styles.title}>
+              {title}
             </AppText>
-          </Pressable>
+            <AppText variant="body" style={styles.text}>
+              {text}
+            </AppText>
+            <Pressable
+              style={[
+                styles.primaryButton,
+                { backgroundColor: primaryButtonColor },
+              ]}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel={closeAccessibilityLabel}
+            >
+              <AppText variant="body" style={styles.buttonText}>
+                Got it
+              </AppText>
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.32)",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,

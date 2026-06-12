@@ -40,6 +40,7 @@ import type {
 import type { TripState } from "@/src/types/trip";
 
 import { AppText } from "@/src/components/common/AppText";
+import { ConfirmModal } from "@/src/components/common/ConfirmModal";
 import { FeedbackModal } from "@/src/components/common/FeedbackModal";
 import { ItineraryHeader } from "@/src/components/itinerary/ItineraryHeader";
 import { ItineraryDaySelector } from "@/src/components/itinerary/ItineraryDaySelector";
@@ -53,7 +54,7 @@ import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
 import { FinalSuggestedActivitiesSection } from "@/src/components/itinerary/FinalSuggestedActivitiesSection";
 import { ActivityDetailModal } from "@/src/components/itinerary/ActivityDetailModal";
-import { SuggestionsModal } from "@/src/components/itinerary/SuggestionsModal";
+import { SuggestionsModal, getAddedElsewherePlaceIds } from "@/src/components/itinerary/SuggestionsModal";
 import {
   fetchTripForUser,
   finishPlanning,
@@ -78,6 +79,7 @@ import {
   toggleAddedAlternativeToItinerary,
   voteForActivity,
   createActivity,
+  updateActivity,
   type FinalItineraryResponseDto,
 } from "@/src/services/activityService";
 import {
@@ -452,37 +454,51 @@ function getIntroText(state: ItineraryState): string {
 }
 
 type TransitionOverlayProps = {
+  visible: boolean;
   title: string;
   text: string;
 };
 
-function TransitionOverlay({ title, text }: TransitionOverlayProps) {
+function TransitionOverlay({ visible, title, text }: TransitionOverlayProps) {
   return (
-    <View
-      style={styles.finalizingOverlay}
-      accessibilityViewIsModal={true}
-      accessible={true}
-      accessibilityLiveRegion="assertive"
-      accessibilityLabel={`${title}. ${text}`}
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={() => {}}
     >
-      <View style={styles.finalizingCard}>
-        <ActivityIndicator color={colors.nightBlack} />
-        <AppText
-          variant="subtitle"
-          style={styles.finalizingTitle}
-          accessible={false}
+      <SafeAreaView
+        style={styles.transitionOverlaySafeArea}
+        edges={["top", "right", "bottom", "left"]}
+      >
+        <View
+          style={styles.transitionOverlayContent}
+          accessibilityViewIsModal={true}
+          accessible={true}
+          accessibilityLiveRegion="assertive"
+          accessibilityLabel={`${title}. ${text}`}
         >
-          {title}
-        </AppText>
-        <AppText
-          variant="caption"
-          style={styles.finalizingText}
-          accessible={false}
-        >
-          {text}
-        </AppText>
-      </View>
-    </View>
+          <View style={styles.finalizingCard}>
+            <ActivityIndicator color={colors.nightBlack} />
+            <AppText
+              variant="subtitle"
+              style={styles.finalizingTitle}
+              accessible={false}
+            >
+              {title}
+            </AppText>
+            <AppText
+              variant="caption"
+              style={styles.finalizingText}
+              accessible={false}
+            >
+              {text}
+            </AppText>
+          </View>
+        </View>
+      </SafeAreaView>
+    </Modal>
   );
 }
 
@@ -662,6 +678,8 @@ export default function ItineraryScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [showPlanningInfoPopup, setShowPlanningInfoPopup] = useState(false);
+  const [showPlanningConfirmModal, setShowPlanningConfirmModal] =
+    useState(false);
   const [showVotingInfoPopup, setShowVotingInfoPopup] = useState(false);
   const [showVotingConfirmModal, setShowVotingConfirmModal] = useState(false);
   const [isSubmittingPlanning, setIsSubmittingPlanning] = useState(false);
@@ -693,6 +711,7 @@ export default function ItineraryScreen() {
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
   const [isSuggestionsLoadingMore, setIsSuggestionsLoadingMore] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+  const suggestionsSlotActivityIdRef = useRef<string | null>(null);
 
   const finalizingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
@@ -782,8 +801,22 @@ export default function ItineraryScreen() {
   }, [planningEndAt, votingEndAt]);
 
   useEffect(() => {
+    if (transitionTargetStateRef.current) {
+      activeStateRef.current = transitionTargetStateRef.current;
+      return;
+    }
+
     activeStateRef.current = activeState;
   }, [activeState]);
+
+  useEffect(() => {
+    if (
+      transitionTargetStateRef.current &&
+      routeState === transitionTargetStateRef.current
+    ) {
+      transitionTargetStateRef.current = null;
+    }
+  }, [routeState]);
 
   useEffect(() => {
     if (activeState === "planning") return;
@@ -857,11 +890,11 @@ export default function ItineraryScreen() {
           if (transitionTargetStateRef.current === nextState) return;
 
           transitionTargetStateRef.current = nextState;
+          activeStateRef.current = nextState;
 
           const finishTransition = () => {
             applyRefreshedTrip(nextState);
             setActivityRefreshKey((value) => value + 1);
-            transitionTargetStateRef.current = null;
           };
 
           if (nextState === "voting") {
@@ -1640,6 +1673,20 @@ export default function ItineraryScreen() {
     setShowPlanningInfoPopup(true);
   }
 
+  function handlePlanningDonePress() {
+    if (hasCurrentUserFinished) {
+      void handleFinishPlanning();
+      return;
+    }
+
+    setShowPlanningConfirmModal(true);
+  }
+
+  function handleConfirmSubmitPlanning() {
+    setShowPlanningConfirmModal(false);
+    void handleFinishPlanning();
+  }
+
   const lastAppliedActivitySignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -1681,6 +1728,29 @@ export default function ItineraryScreen() {
   const slotItems = useMemo(() => {
     return mapActivitiesToSlots(slots, apiActivities, selectedDayId);
   }, [slots, apiActivities, selectedDayId]);
+
+  const planningActivities = useMemo(
+    () => (apiActivities.length > 0 ? apiActivities : itinerary.activities),
+    [apiActivities, itinerary.activities]
+  );
+
+  const suggestionsAddedElsewherePlaceIds = useMemo(
+    () =>
+      Array.from(
+        getAddedElsewherePlaceIds(
+          planningActivities,
+          suggestions,
+          selectedDayId,
+          suggestionsSlotId
+        )
+      ),
+    [
+      planningActivities,
+      suggestions,
+      selectedDayId,
+      suggestionsSlotId,
+    ]
+  );
 
   const planningStatusParam = useMemo(
     () =>
@@ -1762,6 +1832,12 @@ export default function ItineraryScreen() {
   async function handleSuggest(slotId: string, slotLabel: string) {
     if (!authToken || !tripId) return;
 
+    const existingForSlot = apiActivities.find(
+      (activity) =>
+        activity.dayId === selectedDayId && activity.slotId === slotId
+    );
+    suggestionsSlotActivityIdRef.current = existingForSlot?.id ?? null;
+
     setSuggestionsSlotId(slotId);
     setSuggestionsSlotLabel(slotLabel);
     setSuggestions([]);
@@ -1798,9 +1874,46 @@ export default function ItineraryScreen() {
   }
 
   async function handleAddSuggestion(suggestion: ActivitySuggestion) {
-    if (!authToken || !tripId || !selectedDayId || !suggestionsSlotId) return;
+    if (!authToken || !tripId || !selectedDayId || !suggestionsSlotId) {
+      throw new Error("Missing trip context");
+    }
+
+    const existingActivityId =
+      suggestionsSlotActivityIdRef.current ??
+      apiActivities.find(
+        (activity) =>
+          activity.dayId === selectedDayId &&
+          activity.slotId === suggestionsSlotId
+      )?.id;
+
+    const googleMapsUrl =
+      suggestion.googleMapsUrl ??
+      buildGoogleMapsUrl(suggestion.name, suggestion.address);
 
     try {
+      if (existingActivityId) {
+        const result = await updateActivity(existingActivityId, {
+          idToken: authToken,
+          name: suggestion.name,
+          address: suggestion.address,
+          googleMapsUrl,
+        });
+
+        suggestionsSlotActivityIdRef.current = existingActivityId;
+
+        const updatedActivity = mapBackendActivity(result, {
+          dayId: selectedDayId,
+          slotId: suggestionsSlotId,
+        });
+
+        const applyUpdate = (activities: Activity[]) =>
+          upsertActivity(activities, updatedActivity);
+
+        setApiActivities((current) => applyUpdate(current));
+        if (tripId) updateCachedActivities(tripId, applyUpdate);
+        return;
+      }
+
       const fullSlotId = `${selectedDayId}_${suggestionsSlotId}`;
       const result = await createActivity({
         idToken: authToken,
@@ -1809,15 +1922,15 @@ export default function ItineraryScreen() {
         slotId: fullSlotId,
         name: suggestion.name,
         address: suggestion.address,
-        googleMapsUrl:
-          suggestion.googleMapsUrl ??
-          buildGoogleMapsUrl(suggestion.name, suggestion.address),
+        googleMapsUrl,
       });
 
       const newActivity: Activity = mapBackendActivity(result, {
         dayId: selectedDayId,
         slotId: suggestionsSlotId,
       });
+
+      suggestionsSlotActivityIdRef.current = newActivity.id;
 
       const applyNew = (activities: Activity[]) =>
         upsertActivity(activities, newActivity);
@@ -1829,6 +1942,7 @@ export default function ItineraryScreen() {
         "Could not add activity",
         err instanceof Error ? err.message : "Please try again."
       );
+      throw err;
     }
   }
 
@@ -2760,6 +2874,7 @@ export default function ItineraryScreen() {
           onClose={() => setShowSuggestionsModal(false)}
           onAdd={handleAddSuggestion}
           onLoadMore={handleLoadMoreSuggestions}
+          addedElsewherePlaceIds={suggestionsAddedElsewherePlaceIds}
         />
 
         <ActivityDetailModal
@@ -2938,11 +3053,24 @@ export default function ItineraryScreen() {
         <ItineraryInfoModal
           visible={activeState === "planning" && showPlanningInfoPopup}
           title="Planning done"
-          text="Uncheck Planning done to edit or add activities again."
+          text="You can uncheck Planning done to edit your activities again until every member has submitted."
           primaryButtonColor={colors.beachYellow}
           accessibilityLabel="Planning done information"
           closeAccessibilityLabel="Close planning information"
           onClose={() => setShowPlanningInfoPopup(false)}
+        />
+
+        <ConfirmModal
+          visible={activeState === "planning" && showPlanningConfirmModal}
+          title="Submit your activities?"
+          message="You can still edit your activities until every member has finished planning. Once everyone submits, planning closes and your group moves on to voting."
+          confirmLabel="Submit"
+          confirmButtonColor={colors.beachYellow}
+          accessibilityLabel="Submit planning confirmation"
+          confirmAccessibilityLabel="Submit your activities"
+          cancelAccessibilityLabel="Cancel submitting activities"
+          onConfirm={handleConfirmSubmitPlanning}
+          onCancel={() => setShowPlanningConfirmModal(false)}
         />
 
         {activeState === "planning" && (
@@ -2953,7 +3081,7 @@ export default function ItineraryScreen() {
               isPreparingFinalItinerary ||
               isPreparingVoting
             }
-            onPress={handleFinishPlanning}
+            onPress={handlePlanningDonePress}
             onInfoPress={handlePlanningInfoPress}
           />
         )}
@@ -3063,73 +3191,30 @@ export default function ItineraryScreen() {
           onClose={() => setShowVotingInfoPopup(false)}
         />
 
-        <Modal
+        <ConfirmModal
           visible={showVotingConfirmModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowVotingConfirmModal(false)}
-        >
-          <View style={styles.votingModalOverlay}>
-            <Pressable
-              style={styles.votingModalBackdrop}
-              onPress={() => setShowVotingConfirmModal(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Cancel ending voting"
-            />
-            <View
-              style={styles.votingModalCard}
-              accessibilityViewIsModal={true}
-              accessible={true}
-              accessibilityLabel="End voting confirmation"
-            >
-              <AppText variant="subtitle" style={styles.votingModalTitle}>
-                End voting?
-              </AppText>
-              <AppText variant="body" style={styles.votingModalText}>
-                Are you sure you want to end voting for all members?
-              </AppText>
-              <View style={styles.votingModalActions}>
-                <Pressable
-                  style={styles.votingModalSecondaryButton}
-                  onPress={() => setShowVotingConfirmModal(false)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel ending voting"
-                >
-                  <AppText
-                    variant="body"
-                    style={styles.votingModalSecondaryButtonText}
-                  >
-                    Cancel
-                  </AppText>
-                </Pressable>
-                <Pressable
-                  style={styles.votingModalPrimaryButton}
-                  onPress={handleConfirmFinishVoting}
-                  accessibilityRole="button"
-                  accessibilityLabel="End voting for everyone"
-                >
-                  <AppText variant="body" style={styles.votingModalButtonText}>
-                    End voting
-                  </AppText>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </Modal>
+          title="Submit voting?"
+          message="This ends voting for everyone immediately. No one can add or change votes after that, and your group moves on to the final itinerary."
+          confirmLabel="Submit"
+          confirmButtonColor={colors.sunsetPink}
+          accessibilityLabel="Submit voting confirmation"
+          confirmAccessibilityLabel="Submit voting for everyone"
+          cancelAccessibilityLabel="Cancel submitting voting"
+          onConfirm={handleConfirmFinishVoting}
+          onCancel={() => setShowVotingConfirmModal(false)}
+        />
 
-        {isPreparingFinalItinerary && (
-          <TransitionOverlay
-            title="Making your itinerary ready"
-            text="We are choosing the group favorites for each time slot."
-          />
-        )}
+        <TransitionOverlay
+          visible={isPreparingFinalItinerary}
+          title="Making your itinerary ready"
+          text="We are choosing the group favorites for each time slot."
+        />
 
-        {isPreparingVoting && (
-          <TransitionOverlay
-            title="Getting voting ready"
-            text="We are preparing the activities your group can vote on."
-          />
-        )}
+        <TransitionOverlay
+          visible={isPreparingVoting}
+          title="Getting voting ready"
+          text="We are preparing the activities your group can vote on."
+        />
 
         <FeedbackModal
           visible={showMemoryFeedbackModal}
@@ -3407,72 +3492,16 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  votingModalOverlay: {
+  transitionOverlaySafeArea: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.32)",
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  transitionOverlayContent: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: spacing.xl,
-  },
-  votingModalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  votingModalCard: {
-    width: "100%",
-    maxWidth: 340,
-    borderRadius: 18,
-    backgroundColor: colors.lightWhite,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xl,
-    gap: spacing.md,
-  },
-  votingModalTitle: {
-    color: colors.nightBlack,
-    textAlign: "center",
-  },
-  votingModalText: {
-    color: colors.nightBlack,
-    textAlign: "center",
-  },
-  votingModalActions: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: spacing.sm,
-  },
-  votingModalPrimaryButton: {
-    minHeight: 48,
-    borderRadius: 999,
-    backgroundColor: colors.sunsetPink,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  votingModalSecondaryButton: {
-    minHeight: 48,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.sunsetPink,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  votingModalButtonText: {
-    color: colors.nightBlack,
-    textAlign: "center",
-  },
-  votingModalSecondaryButtonText: {
-    color: colors.nightBlack,
-    textAlign: "center",
-  },
-  finalizingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.32)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.xl,
-    zIndex: 40,
   },
   finalizingCard: {
     width: "100%",
