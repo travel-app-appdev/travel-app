@@ -3,7 +3,6 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { doc, onSnapshot } from "firebase/firestore";
 import {
   AccessibilityInfo,
-  Alert,
   findNodeHandle,
   Pressable,
   RefreshControl,
@@ -28,6 +27,7 @@ import {
   ACTION_CARD_HEIGHT,
 } from "@/src/components/common/ActionCard";
 import { BackLink } from "@/src/components/common/BackLink";
+import { FeedbackModal } from "@/src/components/common/FeedbackModal";
 import {
   deleteTrip,
   fetchTripForUser,
@@ -417,6 +417,9 @@ export default function TripOverviewAdminScreen() {
   const [showRemoveMemberErrorModal, setShowRemoveMemberErrorModal] =
     useState(false);
   const [removeMemberErrorMessage, setRemoveMemberErrorMessage] = useState("");
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackTitle, setFeedbackTitle] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
   const [memberToRemove, setMemberToRemove] = useState<{
     id: string;
     name: string;
@@ -429,6 +432,12 @@ export default function TripOverviewAdminScreen() {
     const id = setTimeout(fn, delay);
     timeoutRefs.current.push(id);
     return id;
+  };
+
+  const openFeedbackModal = (title: string, message: string) => {
+    setFeedbackTitle(title);
+    setFeedbackMessage(message);
+    setShowFeedbackModal(true);
   };
 
   useEffect(() => {
@@ -836,7 +845,7 @@ export default function TripOverviewAdminScreen() {
   const getIdToken = async (): Promise<string | null> => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
-      Alert.alert("Not logged in", "Please log in again.");
+      openFeedbackModal("Not logged in", "Please log in again.");
       return null;
     }
     return currentUser.getIdToken();
@@ -906,7 +915,7 @@ export default function TripOverviewAdminScreen() {
       await updateMemberPreferences(tripId, preferences, idToken);
       setOpenField(null);
     } catch (error) {
-      Alert.alert(
+      openFeedbackModal(
         "Update failed",
         error instanceof Error ? error.message : "Failed to update preferences"
       );
@@ -936,7 +945,7 @@ export default function TripOverviewAdminScreen() {
         setOpenField(null);
       }, 1500);
     } catch (error) {
-      Alert.alert(
+      openFeedbackModal(
         "Update failed",
         error instanceof Error ? error.message : "Failed to update name"
       );
@@ -965,7 +974,7 @@ export default function TripOverviewAdminScreen() {
         setOpenField(null);
       }, 1500);
     } catch (error) {
-      Alert.alert(
+      openFeedbackModal(
         "Update failed",
         error instanceof Error ? error.message : "Failed to update destination"
       );
@@ -989,7 +998,7 @@ export default function TripOverviewAdminScreen() {
       const tripEndBoundary = endOfDay(tripEnd);
 
       if (planningEnd > tripEndBoundary) {
-        Alert.alert(
+        openFeedbackModal(
           "Invalid trip end",
           "Trip end cannot be before the planning end date."
         );
@@ -997,15 +1006,15 @@ export default function TripOverviewAdminScreen() {
       }
 
       if (planningEnd >= votingEnd) {
-        Alert.alert(
+        openFeedbackModal(
           "Invalid phase order",
-          "Voting end must be after planning end."
+          "Planning end must be before voting end."
         );
         return;
       }
 
       if (votingEnd > tripEndBoundary) {
-        Alert.alert(
+        openFeedbackModal(
           "Invalid trip end",
           "Trip end cannot be before the voting end date."
         );
@@ -1035,7 +1044,7 @@ export default function TripOverviewAdminScreen() {
         setOpenField(null);
       }, 1500);
     } catch (error) {
-      Alert.alert(
+      openFeedbackModal(
         "Update failed",
         error instanceof Error ? error.message : "Failed to update dates"
       );
@@ -1275,7 +1284,10 @@ export default function TripOverviewAdminScreen() {
     if (!showPhaseTimePicker) return;
 
     if (!isValidTimeString(tempPhaseTime)) {
-      Alert.alert("Invalid time", "Please enter a valid time as HH:MM.");
+      openFeedbackModal(
+        "Invalid time",
+        "Please enter a valid time as HH:MM."
+      );
       return;
     }
 
@@ -1313,7 +1325,7 @@ export default function TripOverviewAdminScreen() {
         );
 
         if (nextPlanningEnd > tripEndBoundary) {
-          Alert.alert(
+          openFeedbackModal(
             "Invalid planning end",
             "Planning end cannot be after the trip end date."
           );
@@ -1325,9 +1337,9 @@ export default function TripOverviewAdminScreen() {
         );
 
         if (currentVotingEnd <= nextPlanningEnd) {
-          Alert.alert(
+          openFeedbackModal(
             "Invalid phase order",
-            "Voting end must be after planning end."
+            "Planning end must be before voting end."
           );
           return;
         }
@@ -1347,15 +1359,15 @@ export default function TripOverviewAdminScreen() {
         );
 
         if (nextEnd < currentPlanningEnd) {
-          Alert.alert(
+          openFeedbackModal(
             "Invalid voting end",
-            "Voting end cannot be before planning end."
+            "Voting end must be after planning end."
           );
           return;
         }
 
         if (nextEnd > tripEndBoundary) {
-          Alert.alert(
+          openFeedbackModal(
             "Invalid voting end",
             "Voting end cannot be after the trip end date."
           );
@@ -1388,7 +1400,7 @@ export default function TripOverviewAdminScreen() {
         setOpenPhase(null);
       }, 1500);
     } catch (error) {
-      Alert.alert(
+      openFeedbackModal(
         "Update failed",
         error instanceof Error ? error.message : "Failed to update phase"
       );
@@ -1490,7 +1502,7 @@ export default function TripOverviewAdminScreen() {
       invalidateTripsCache();
       router.replace("/home");
     } catch (error) {
-      Alert.alert(
+      openFeedbackModal(
         "Delete failed",
         error instanceof Error ? error.message : "Failed to delete trip"
       );
@@ -1986,12 +1998,12 @@ export default function TripOverviewAdminScreen() {
               </Pressable>
             </View>
 
-            {/* Preferences */}
+            {/* Your Travel Preference */}
             <View style={styles.fieldGroup}>
               {!isTripDetailsEditable ? (
                 <View
                   style={styles.infoRow}
-                  accessibilityLabel={`Preferences: ${
+                  accessibilityLabel={`Your Travel Preference: ${
                     preferences.length > 0
                       ? `${preferences.length} selected`
                       : "Not set"
@@ -2001,7 +2013,7 @@ export default function TripOverviewAdminScreen() {
                     <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
                       <Settings width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
-                        Preferences
+                        Your Travel Preference
                       </AppText>
                     </View>
                     <AppText variant="caption" style={styles.infoValue} accessible={false}>
@@ -2019,14 +2031,14 @@ export default function TripOverviewAdminScreen() {
                   ]}
                   onPress={openField === "preferences" ? undefined : handlePrefsRow}
                   accessibilityRole="button"
-                  accessibilityLabel="Edit your activity preferences"
+                  accessibilityLabel="Edit your travel preference"
                   accessibilityState={{ expanded: openField === "preferences" }}
                 >
                   <View style={styles.infoLeft}>
                     <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
                       <Settings width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
-                        Preferences
+                        Your Travel Preference
                       </AppText>
                     </View>
                     {openField !== "preferences" && (
@@ -2049,7 +2061,7 @@ export default function TripOverviewAdminScreen() {
                       style={styles.rowChevronButton}
                       onPress={handlePrefsRow}
                       accessibilityRole="button"
-                      accessibilityLabel="Collapse preferences"
+                      accessibilityLabel="Collapse travel preference"
                       accessibilityState={{ expanded: true }}
                     >
                       <View {...hiddenFromAccessibility}>
@@ -2069,10 +2081,10 @@ export default function TripOverviewAdminScreen() {
                   onPress={handleSavePreferences}
                   disabled={isSavingPrefs}
                   accessibilityRole="button"
-                  accessibilityLabel="Save preferences"
+                  accessibilityLabel="Save travel preference"
                 >
                   <AppText variant="body" style={styles.saveBtnText}>
-                    {isSavingPrefs ? "Saving..." : "Save preferences"}
+                    {isSavingPrefs ? "Saving..." : "Save travel preference"}
                   </AppText>
                 </Pressable>
               )}
@@ -3027,6 +3039,13 @@ export default function TripOverviewAdminScreen() {
               </View>
             </ModalShell>
           </Modal>
+
+          <FeedbackModal
+            visible={showFeedbackModal}
+            title={feedbackTitle}
+            message={feedbackMessage}
+            onClose={() => setShowFeedbackModal(false)}
+          />
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
