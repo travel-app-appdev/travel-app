@@ -1581,13 +1581,18 @@ export default function CreateTripScreen() {
                   accessibilityLabel="Share trip invite code"
                   accessibilityHint="Opens the share sheet to invite members"
                 >
-                  <AppText
-                    variant="body"
-                    style={styles.codeText}
-                    accessible={false}
-                  >
-                    {tripCode}
-                  </AppText>
+                  <View style={styles.codeTextWrapper}>
+                    <AppText
+                      variant="body"
+                      style={styles.codeText}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.85}
+                      accessible={false}
+                    >
+                      {tripCode}
+                    </AppText>
+                  </View>
                   <View
                     style={styles.shareIconArea}
                     {...hiddenFromAccessibility}
@@ -2103,22 +2108,27 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: spacing.sm,
     borderWidth: 2,
     borderColor: colors.nightBlack,
     minHeight: 48,
+  },
+  codeTextWrapper: {
+    flex: 1,
+    minWidth: 0,
   },
   codeText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.xl,
     lineHeight: typography.lineHeight.xl,
-    letterSpacing: 3,
+    letterSpacing: 2,
   },
   shareIconArea: {
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
     minWidth: 32,
     minHeight: 32,
   },
