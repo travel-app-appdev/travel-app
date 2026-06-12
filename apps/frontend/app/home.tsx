@@ -87,6 +87,27 @@ let tripsCache: TripsCache | null = null;
 
 let tripsCacheForceNext = false;
 
+let persistedHomeTab: Tab = "your";
+let persistedHomeTabUserId: string | null = null;
+
+function getPersistedHomeTab(userId: string | null): Tab {
+  if (userId && persistedHomeTabUserId === userId) {
+    return persistedHomeTab;
+  }
+  return "your";
+}
+
+function persistHomeTab(userId: string | null, tab: Tab) {
+  if (!userId) {
+    persistedHomeTab = "your";
+    persistedHomeTabUserId = null;
+    return;
+  }
+
+  persistedHomeTab = tab;
+  persistedHomeTabUserId = userId;
+}
+
 export function invalidateTripsCache() {
   tripsCache = null;
   tripsCacheForceNext = true;
@@ -282,7 +303,9 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<Tab>("your");
+  const [activeTab, setActiveTabState] = useState<Tab>(() =>
+    getPersistedHomeTab(user?.uid ?? null)
+  );
   const [yourTrips, setYourTrips] = useState<TripCardItem[]>(
     tripsCache?.yourTrips ?? []
   );
@@ -294,6 +317,11 @@ export default function HomeScreen() {
 
   const lastFetchRef = useRef<number>(tripsCache?.fetchedAt ?? 0);
   const latestUserIdRef = useRef<string | null>(user?.uid ?? null);
+
+  const setActiveTab = useCallback((tab: Tab) => {
+    persistHomeTab(latestUserIdRef.current, tab);
+    setActiveTabState(tab);
+  }, []);
 
   // NEW: keep latest lists in a ref to avoid stale closures in snapshot listeners
   const listsRef = useRef<{
@@ -361,8 +389,12 @@ export default function HomeScreen() {
       setIsLoading(false);
       tripsCache = null;
       lastFetchRef.current = 0;
+      persistHomeTab(null, "your");
+      setActiveTabState("your");
       return;
     }
+
+    setActiveTabState(getPersistedHomeTab(newUserId));
 
     if (!tripsCache || tripsCache.userId !== newUserId) {
       setYourTrips([]);
@@ -587,8 +619,12 @@ export default function HomeScreen() {
   const trips = activeTab === "your" ? yourTrips : pastTrips;
 
   const handleProfile = useSinglePress(() => router.push("/profile"));
-  const handleYourTab = useSinglePress(() => setActiveTab("your"));
-  const handlePastTab = useSinglePress(() => setActiveTab("past"));
+  const handleYourTab = useSinglePress(() => {
+    setActiveTab("your");
+  });
+  const handlePastTab = useSinglePress(() => {
+    setActiveTab("past");
+  });
   const handleRefresh = useCallback(async () => {
     if (isRefreshing || isLoading) return;
 
