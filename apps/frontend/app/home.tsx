@@ -130,7 +130,7 @@ function getInitials(name: string): string {
 }
 
 function getCardColor(tripId: string): string {
-  const palette = [colors.plantGreen, colors.sunsetOrange, colors.sunsetPink];
+  const palette = [colors.plantGreen, colors.sunsetOrange];
   let hash = 0;
 
   for (let i = 0; i < tripId.length; i++) {
