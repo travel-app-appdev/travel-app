@@ -27,10 +27,13 @@ import {
 import { BackLink } from "@/src/components/common/BackLink";
 import {
   fetchTripForUser,
+  getMemberPreferences,
   isTripNotFoundError,
   leaveTrip,
+  updateMemberPreferences,
   type Trip,
 } from "@/src/api/trips";
+import { PreferenceChips } from "@/src/components/common/PreferenceChips";
 import { auth, db } from "@/src/lib/firebase";
 import { invalidateTripsCache } from "./home";
 import { colors, spacing, radius, typography } from "@/src/theme";
@@ -61,6 +64,9 @@ import Timepoint from "@/assets/icons/timepoint.svg";
 import CheckMark from "@/assets/icons/check_mark.svg";
 import Unchecked from "@/assets/icons/unchecked.svg";
 import KeyFrame from "@/assets/icons/key_frame.svg";
+import Settings from "@/assets/icons/settings.svg";
+import ArrowUp from "@/assets/icons/arrow_up.svg";
+import ArrowDown from "@/assets/icons/arrow_down.svg";
 import Copy from "@/assets/icons/copy.svg";
 import Exit from "@/assets/icons/exit.svg";
 import ArrowItinerary from "@/assets/icons/arrow-itinerary.svg";
@@ -286,6 +292,9 @@ export default function TripOverviewMemberScreen() {
   const [codeCopied, setCodeCopied] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [preferences, setPreferences] = useState<string[]>([]);
+  const [isPrefsExpanded, setIsPrefsExpanded] = useState(false);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
   const blinkingDotAnim = useRef(new Animated.Value(1)).current;
 
   const [tripSnapshot, setTripSnapshot] = useState({
@@ -644,6 +653,56 @@ export default function TripOverviewMemberScreen() {
     }
   }, [isLeaving, isRefreshing, refreshTripSnapshot]);
 
+  const loadPreferences = useCallback(async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !tripId) return;
+
+    try {
+      const idToken = await currentUser.getIdToken();
+      const prefs = await getMemberPreferences(tripId, idToken);
+      setPreferences(prefs);
+    } catch {
+      // keep existing values
+    }
+  }, [tripId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadPreferences();
+    }, [loadPreferences])
+  );
+
+  const handlePrefsRow = useSinglePress(async () => {
+    if (isPrefsExpanded) {
+      setIsPrefsExpanded(false);
+      return;
+    }
+
+    await loadPreferences();
+    setIsPrefsExpanded(true);
+  });
+
+  const handleSavePreferences = async () => {
+    if (isSavingPrefs || isTripEnded) return;
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    try {
+      setIsSavingPrefs(true);
+      const idToken = await currentUser.getIdToken();
+      await updateMemberPreferences(tripId, preferences, idToken);
+      setIsPrefsExpanded(false);
+    } catch (error) {
+      Alert.alert(
+        "Update failed",
+        error instanceof Error ? error.message : "Failed to update travel preference"
+      );
+    } finally {
+      setIsSavingPrefs(false);
+    }
+  };
+
   async function handleConfirmLeaveTrip() {
     try {
       setIsLeaving(true);
@@ -783,6 +842,101 @@ export default function TripOverviewMemberScreen() {
                   ? members.map((m) => m.name).join(", ")
                   : "—"}
               </AppText>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              {isTripEnded ? (
+                <View
+                  style={styles.infoRow}
+                  accessibilityLabel={`Your Travel Preference: ${
+                    preferences.length > 0
+                      ? `${preferences.length} selected`
+                      : "Not set"
+                  }`}
+                >
+                  <View style={styles.infoLeft}>
+                    <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                      <Settings width={20} height={20} />
+                      <AppText variant="body" style={styles.fieldLabel}>
+                        Your Travel Preference
+                      </AppText>
+                    </View>
+                    <AppText variant="caption" style={styles.infoValue} accessible={false}>
+                      {preferences.length > 0
+                        ? `${preferences.length} selected`
+                        : "Not set"}
+                    </AppText>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <Pressable
+                    style={[
+                      styles.infoRow,
+                      isPrefsExpanded && styles.infoRowEditing,
+                    ]}
+                    onPress={isPrefsExpanded ? undefined : handlePrefsRow}
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit your travel preference"
+                    accessibilityState={{ expanded: isPrefsExpanded }}
+                  >
+                    <View style={styles.infoLeft}>
+                      <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                        <Settings width={20} height={20} />
+                        <AppText variant="body" style={styles.fieldLabel}>
+                          Your Travel Preference
+                        </AppText>
+                      </View>
+                      {!isPrefsExpanded && (
+                        <AppText variant="caption" style={styles.infoValue} accessible={false}>
+                          {preferences.length > 0
+                            ? `${preferences.length} selected`
+                            : "Not set"}
+                        </AppText>
+                      )}
+                      {isPrefsExpanded && (
+                        <View style={{ marginTop: spacing.sm }}>
+                          <PreferenceChips
+                            selected={preferences}
+                            onChange={setPreferences}
+                            showGroups
+                          />
+                        </View>
+                      )}
+                    </View>
+                    {isPrefsExpanded ? (
+                      <Pressable
+                        style={styles.rowChevronButton}
+                        onPress={handlePrefsRow}
+                        accessibilityRole="button"
+                        accessibilityLabel="Collapse travel preference"
+                        accessibilityState={{ expanded: true }}
+                      >
+                        <View {...hiddenFromAccessibility}>
+                          <ArrowUp width={20} height={20} />
+                        </View>
+                      </Pressable>
+                    ) : (
+                      <View {...hiddenFromAccessibility}>
+                        <ArrowDown width={20} height={20} />
+                      </View>
+                    )}
+                  </Pressable>
+                  {isPrefsExpanded && (
+                    <Pressable
+                      style={[styles.saveBtn, isSavingPrefs && { opacity: 0.6 }]}
+                      onPress={handleSavePreferences}
+                      disabled={isSavingPrefs}
+                      accessibilityRole="button"
+                      accessibilityLabel="Save travel preference"
+                    >
+                      <AppText variant="body" style={styles.saveBtnText}>
+                        {isSavingPrefs ? "Saving..." : "Save travel preference"}
+                      </AppText>
+                    </Pressable>
+                  )}
+                </>
+              )}
             </View>
 
             <View style={styles.fieldGroup}>
@@ -1373,7 +1527,33 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: spacing.xs,
   },
-  infoLeft: { gap: spacing.xs, flex: 1 },
+  infoLeft: { gap: spacing.xs, flex: 1, paddingRight: spacing.xl },
+  infoRowEditing: {
+    minHeight: 64,
+    position: "relative",
+  },
+  rowChevronButton: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    minWidth: 28,
+    minHeight: typography.lineHeight.xl,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveBtn: {
+    backgroundColor: colors.beachYellow,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.sm,
+  },
+  saveBtnText: {
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    color: colors.nightBlack,
+  },
   codeValue: {
     fontFamily: typography.fontFamily.bodyBold,
     letterSpacing: 2,
