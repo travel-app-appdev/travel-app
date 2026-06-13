@@ -1,6 +1,10 @@
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
-import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  getAdditionalUserInfo,
+  signInWithCredential,
+} from "firebase/auth";
 import { auth } from "./firebase";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -17,10 +21,12 @@ export function useGoogleLogin() {
     const credential = GoogleAuthProvider.credential(googleIdToken);
     const result = await signInWithCredential(auth, credential);
     const firebaseIdToken = await result.user.getIdToken();
+    const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
 
     return {
       firebaseIdToken,
       firebaseUser: result.user,
+      isNewUser,
     };
   }
 
