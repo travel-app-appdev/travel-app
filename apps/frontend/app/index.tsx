@@ -87,7 +87,7 @@ export default function StartPage() {
 
         if (!googleIdToken) return;
 
-        const { firebaseIdToken, firebaseUser } =
+        const { firebaseIdToken, firebaseUser, isNewUser } =
           await signInWithGoogleToken(googleIdToken);
 
         setUser({
@@ -97,7 +97,7 @@ export default function StartPage() {
         });
         setIdToken(firebaseIdToken);
 
-        router.replace("/onboarding");
+        router.replace(isNewUser ? "/onboarding" : "/home");
       }
     }
 
