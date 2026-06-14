@@ -383,6 +383,16 @@ export async function updateTripForAdmin(input: {
         throw { status: 404, message: "Trip not found" };
     }
 
+    // Past trips are read-only. Once the end date has elapsed the trip moves to
+    // the "Past Trips" bucket and can no longer be edited by anyone, including
+    // the admin. Uses the same end-date logic that determines that bucket.
+    if (hasTripEndDatePassed(current.end_date)) {
+        throw {
+            status: 400,
+            message: "This trip has ended and can no longer be edited",
+        };
+    }
+
     const effectiveTimeline = {
         start_date: input.start_date ?? current.start_date,
         end_date: input.end_date ?? current.end_date,
