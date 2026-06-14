@@ -14,6 +14,7 @@ import {
     updateTripForAdmin,
     getTripByInviteCodePublic,
 } from "../services/tripsService";
+import { invalidateTripSuggestionsCache } from "../services/suggestionsService";
 
 export const getMyTrips = async (req: Request, res: Response): Promise<void> => {
     const userId = req.query.userId as string;
@@ -391,6 +392,9 @@ export const updateTrip = async (req: Request, res: Response): Promise<void> => 
     try {
         const trip = await updateTripForAdmin({ idToken, tripId, title, destination, start_date, end_date,
         planning_end_at, voting_end_at });
+        if (destination) {
+            await invalidateTripSuggestionsCache(tripId);
+        }
         res.status(200).json(trip);
     } catch (error: any) {
         if (error.status === 403) {

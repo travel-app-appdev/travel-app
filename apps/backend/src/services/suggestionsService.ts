@@ -1,5 +1,5 @@
 import admin from "../config/firebase";
-import { findTripById, findAcceptedMembersByTripId, setMemberPreferences } from "../repositories/tripsRepository";
+import { findTripById, getMemberPreferences, setMemberPreferences } from "../repositories/tripsRepository";
 import { ActivitySuggestion } from "../types/trip";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -7,18 +7,47 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 // Maps preference chip -> Geoapify categories
 const PREFERENCE_TO_CATEGORIES: Record<string, string[]> = {
     // Food & Drink
-    coffee:     ["catering.cafe", "catering.cafe.coffee_shop"],
-    food:       ["catering.restaurant", "catering.fast_food", "catering.food_court"],
+    coffee:     ["catering.cafe", "catering.cafe.coffee_shop", "catering.cafe.coffee"],
+    food:       ["catering.restaurant", "catering.food_court"],
+    quickbites: ["catering.fast_food", "catering.food_court"],
+    desserts:   ["catering.cafe.dessert", "catering.cafe.ice_cream", "catering.cafe.cake"],
     nightlife:  ["catering.bar", "catering.pub", "catering.biergarten"],
     // Explore
     museums:    ["entertainment.museum", "entertainment.culture.gallery"],
-    nature:     ["leisure.park", "natural", "national_park"],
+    galleries:  ["entertainment.culture.gallery", "commercial.art"],
+    viewpoints: ["tourism.attraction.viewpoint", "tourism.attraction"],
+    heritage:   ["heritage", "building.historic", "tourism.sights"],
     citywalks:  ["tourism.sights", "tourism.attraction"],
-    shopping:   ["commercial.shopping_mall", "commercial.marketplace", "commercial.gift_and_souvenir"],
-    // Activities
-    culture:    ["entertainment.culture", "tourism.attraction", "heritage"],
-    sports:     ["sport", "activity.sport_club"],
     sightseeing:["tourism.sights", "tourism.attraction"],
+    // Outdoors
+    nature:     ["leisure.park", "natural", "national_park"],
+    parks:      ["leisure.park", "leisure.park.nature_reserve"],
+    gardens:    ["leisure.park.garden", "leisure.park"],
+    beaches:    ["beach", "beach.beach_resort"],
+    camping:    ["camping", "camping.camp_site", "camping.camp_pitch"],
+    water:      ["natural.water", "natural.water.hot_spring", "tourism.attraction.viewpoint"],
+    // Fun
+    culture:    ["entertainment.culture", "tourism.attraction", "heritage"],
+    cinema:     ["entertainment.cinema"],
+    theatre:    ["entertainment.culture.theatre"],
+    amusement:  ["entertainment.theme_park", "entertainment.activity_park", "entertainment.water_park"],
+    zoo_aquarium: ["entertainment.zoo", "entertainment.aquarium"],
+    bowling:    ["entertainment.bowling_alley"],
+    escape_rooms: ["entertainment.escape_game"],
+    // Active
+    sports:     ["sport", "activity.sport_club"],
+    fitness:    ["sport.fitness", "sport.fitness.gym", "sport.fitness.fitness_centre"],
+    swimming:   ["sport.swimming_pool"],
+    skiing:     ["ski", "rental.ski", "commercial.outdoor_and_sport.ski"],
+    cycling:    ["rental.bicycle", "commercial.outdoor_and_sport.bicycle"],
+    water_sports: ["commercial.outdoor_and_sport.water_sports", "rental.boat", "sport.dive_centre"],
+    spa:        ["leisure.spa", "service.beauty.spa", "service.beauty.massage"],
+    // Shopping
+    shopping:   ["commercial.shopping_mall", "commercial.department_store"],
+    markets:    ["commercial.marketplace"],
+    souvenirs:  ["commercial.gift_and_souvenir"],
+    books:      ["commercial.books"],
+    vintage:    ["commercial.second_hand", "commercial.antiques"],
     // Legacy keys (backwards compat)
     relaxing:   ["leisure.spa", "beach.beach_resort", "leisure.park"],
     adventure:  ["sport", "activity", "natural", "camping"],
@@ -28,6 +57,7 @@ const PREFERENCE_TO_CATEGORIES: Record<string, string[]> = {
 export async function getActivitySuggestions(
     tripId: string,
     slotType: string,
+    userId: string,
     offset: number = 0
 ): Promise<ActivitySuggestion[]> {
     const apiKey = process.env.GEOAPIFY_API_KEY;
@@ -37,14 +67,17 @@ export async function getActivitySuggestions(
     const trip = await findTripById(tripId);
     if (!trip) throw { status: 404, message: "Trip not found" };
 
-    // 2. Aggregate preferences from all accepted members
-    const members = await findAcceptedMembersByTripId(tripId);
-    const allPrefs = members.flatMap((m) => (m as any).preferences ?? []);
-    const uniquePrefs = [...new Set<string>(allPrefs)];
+    // 2. Use only the current member's preferences for this trip
+    const memberPrefs = await getMemberPreferences(tripId, userId);
+    const uniquePrefs = [...new Set(memberPrefs)];
+
+    if (uniquePrefs.length === 0) {
+        return [];
+    }
 
     // 3. Check cache (only for first page)
     if (offset === 0) {
-        const cacheKey = buildCacheKey(tripId, slotType, uniquePrefs);
+        const cacheKey = buildCacheKey(tripId, slotType, userId, uniquePrefs);
         const cached = await readCache(cacheKey);
         if (cached) return cached;
     }
@@ -56,21 +89,27 @@ export async function getActivitySuggestions(
         return [];
     }
 
-    // 5. Build category list
-    const categories = uniquePrefs.length > 0
-        ? [...new Set(uniquePrefs.flatMap((p) => PREFERENCE_TO_CATEGORIES[p] ?? []))]
-        : ["entertainment", "catering.restaurant", "leisure.park"];
+    const defaultCategories = ["tourism.sights", "catering.restaurant", "entertainment", "leisure.park"];
 
-    if (categories.length === 0) {
-        categories.push("entertainment", "catering.restaurant");
-    }
+    // 5. Build category list from this member's preferences
+    let categories = [
+        ...new Set(uniquePrefs.flatMap((p) => PREFERENCE_TO_CATEGORIES[p] ?? [])),
+    ];
+
+    if (categories.length === 0) categories = defaultCategories;
 
     // 6. Fetch places from Geoapify
-    const suggestions = await fetchPlaces(coords, categories, uniquePrefs, apiKey, offset);
+    let suggestions = await fetchPlaces(coords, categories, uniquePrefs, apiKey, offset);
 
-    // 7. Cache first-page results only
-    if (offset === 0) {
-        const cacheKey = buildCacheKey(tripId, slotType, uniquePrefs);
+    if (uniquePrefs.length > 0) {
+        suggestions = suggestions.filter(
+            (suggestion) => suggestion.matchedPreferences.length > 0
+        );
+    }
+
+    // 7. Cache first-page results only (only if we got results)
+    if (offset === 0 && suggestions.length > 0) {
+        const cacheKey = buildCacheKey(tripId, slotType, userId, uniquePrefs);
         await writeCache(cacheKey, tripId, suggestions);
     }
 
@@ -90,9 +129,14 @@ export async function saveMemberPreferences(
 
 // Helpers
 
-function buildCacheKey(tripId: string, slotType: string, prefs: string[]): string {
+function buildCacheKey(
+    tripId: string,
+    slotType: string,
+    userId: string,
+    prefs: string[]
+): string {
     const sorted = [...prefs].sort().join(",");
-    return tripId + "__" + slotType + "__" + sorted;
+    return tripId + "__" + userId + "__" + slotType + "__" + sorted;
 }
 
 async function readCache(cacheKey: string): Promise<ActivitySuggestion[] | null> {
@@ -118,7 +162,7 @@ async function writeCache(cacheKey: string, tripId: string, suggestions: Activit
     });
 }
 
-async function invalidateTripSuggestionsCache(tripId: string): Promise<void> {
+export async function invalidateTripSuggestionsCache(tripId: string): Promise<void> {
     const db = admin.firestore();
     const snapshot = await db
         .collection("suggestion_cache")
@@ -155,8 +199,8 @@ async function fetchPlaces(
     apiKey: string,
     offset: number = 0
 ): Promise<ActivitySuggestion[]> {
-    const categoryParam = categories.slice(0, 8).join(",");
-    const radius = 5000; // 5km radius
+    const categoryParam = categories.slice(0, 15).join(",");
+    const radius = 10000; // 10km radius
     const limit = 10;
     const url = "https://api.geoapify.com/v2/places?categories=" + encodeURIComponent(categoryParam) + "&filter=circle:" + coords.lon + "," + coords.lat + "," + radius + "&limit=" + limit + "&offset=" + offset + "&apiKey=" + apiKey;
 
@@ -175,6 +219,12 @@ async function fetchPlaces(
         const [lon, lat] = f.geometry?.coordinates ?? [0, 0];
         const name = props.name ?? props.address_line1 ?? "Unknown place";
         const address = props.formatted ?? props.address_line2;
+        const placeCategories = Array.isArray(props.categories)
+            ? props.categories.filter((category: unknown): category is string => typeof category === "string")
+            : [];
+        const placeMatchedPrefs = matchedPrefs.filter((pref) =>
+            categoryMatchesPreference(placeCategories, pref)
+        );
 
         return {
             name,
@@ -184,9 +234,21 @@ async function fetchPlaces(
             longitude: lon,
             source: "geoapify",
             sourcePlaceId: props.place_id ?? "",
-            matchedPreferences: matchedPrefs,
+            matchedPreferences: placeMatchedPrefs,
+            categories: placeCategories,
         };
     });
+}
+
+function categoryMatchesPreference(placeCategories: string[], preference: string): boolean {
+    const preferenceCategories = PREFERENCE_TO_CATEGORIES[preference] ?? [];
+    return preferenceCategories.some((preferenceCategory) =>
+        placeCategories.some(
+            (placeCategory) =>
+                placeCategory === preferenceCategory ||
+                placeCategory.startsWith(preferenceCategory + ".")
+        )
+    );
 }
 
 function buildGoogleMapsUrl(name: string, address?: string): string {

@@ -46,8 +46,8 @@ describe("PlanningSlotCard", () => {
     );
 
     expect(getByText("Breakfast", { includeHiddenElements: true })).toBeTruthy();
-    expect(getByText("Empty Activity")).toBeTruthy();
-    expect(queryByText(/Add\s*activity/i)).toBeNull();
+    expect(getByText("Add Activity")).toBeTruthy();
+    expect(queryByText("Empty Activity")).toBeNull();
 
     fireEvent.press(getByLabelText("Add activity at Breakfast"));
 
@@ -71,7 +71,8 @@ describe("PlanningSlotCard", () => {
     expect(getByText("Breakfast", { includeHiddenElements: true })).toBeTruthy();
     expect(getByText("Museum visit")).toBeTruthy();
     expect(getByText("Museumplatz 1")).toBeTruthy();
-    expect(getByText("https://maps.google.com/museum")).toBeTruthy();
+    expect(getByText("Open in Google Maps")).toBeTruthy();
+    expect(getByLabelText("Google Maps link available")).toBeTruthy();
     expect(getByText(/Edit\s*activity/i)).toBeTruthy();
     expect(queryByText("Empty Activity")).toBeNull();
 

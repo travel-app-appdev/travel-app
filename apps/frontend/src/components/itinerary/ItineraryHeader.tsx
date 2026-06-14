@@ -1,12 +1,11 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
+import { BackLink } from "@/src/components/common/BackLink";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { formatTripDateRange } from "@/src/utils/itinerary/formatTripToDateRange";
-import { useSinglePress } from "@/src/hooks/useSinglePress";
 import type { ItineraryState } from "@/src/types/itinerary";
 import Hourglass1 from "@/assets/icons/hourglass_1.svg";
 
-import Back from "@/assets/icons/back.svg";
 import MascotPlanning from "@/assets/mascots/mascot-planning.svg";
 import MascotVoting from "@/assets/mascots/mascot-voting.svg";
 import MascotFinal from "@/assets/mascots/mascot-final.svg";
@@ -33,6 +32,8 @@ function getHeroColor(state: ItineraryState): string {
   switch (state) {
     case "voting":
       return colors.sunsetPink;
+    case "memories":
+      return colors.seaBlue;
     case "final":
       return colors.neonGreen;
     case "planning":
@@ -46,6 +47,7 @@ function getMascotByState(state: ItineraryState) {
     case "voting":
       return MascotVoting;
     case "final":
+    case "memories":
       return MascotFinal;
     case "planning":
     default:
@@ -65,10 +67,9 @@ export function ItineraryHeader({
 }: Props) {
   const heroColor = getHeroColor(state);
   const Mascot = getMascotByState(state);
-  const handleBack = useSinglePress(onBackPress);  
   const blinkingDotAnim = useRef(new Animated.Value(1)).current;
   
-const isActive = state !== "final";  
+const isActive = state !== "final" && state !== "memories";
 const isMuted = state === "planning"; 
 
 
@@ -97,16 +98,11 @@ useEffect(() => {
     <View style={styles.wrapper}>
       <View style={[styles.hero, { backgroundColor: heroColor }]}>
         <View style={styles.topRow}>
-          <Pressable
-            onPress={handleBack}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            style={styles.backButton}
-          >
-            <Back width={20} height={20} />
-          </Pressable>
+          <View style={styles.backButtonSlot}>
+            <BackLink onPress={onBackPress} />
+          </View>
 
-      {state !== "final" ? (
+      {state !== "final" && state !== "memories" ? (
   <View
     style={styles.timerBox}
     accessible={true}
@@ -220,23 +216,27 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 0,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxxxl2,
   },
   topRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginTop: spacing.xl,
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  backButton: {
-    minWidth: 44,
+    position: "relative",
     minHeight: 44,
-    justifyContent: "center",
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
+    marginTop: spacing.xl,
+    marginBottom: spacing.xs,
+    paddingRight: spacing.xl,
+  },
+  backButtonSlot: {
+    position: "absolute",
+    left: spacing.md,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-start",
+    zIndex: 2,
   },
   timerBox: {
     flexDirection: "row",
@@ -263,6 +263,7 @@ const styles = StyleSheet.create({
   },
   heroContent: {
     gap: spacing.xs,
+    paddingHorizontal: spacing.xl,
   },
   title: {
     fontFamily: typography.fontFamily.bodyBold,

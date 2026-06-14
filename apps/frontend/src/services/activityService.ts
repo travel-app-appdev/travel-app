@@ -1,4 +1,5 @@
 import { invalidateMyTripsCache } from "@/src/api/trips";
+import type { TripState } from "@/src/api/trips";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -70,7 +71,7 @@ export type UpdateActivityPayload = {
 export type VoteForActivityResponse = {
   activityId: string;
   slotId: string;
-  tripState: "Planning" | "Voting" | "Final";
+  tripState: TripState;
   voteAccepted?: boolean;
 };
 

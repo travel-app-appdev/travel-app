@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
   },
   calendarApplyButton: {
     flex: 1,
-    backgroundColor: colors.neonGreen,
+    backgroundColor: colors.beachYellow,
   },
   calendarApplyButtonText: {
     color: colors.nightBlack,

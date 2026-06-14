@@ -1,5 +1,5 @@
 import React from "react";
-import { act, render, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import ItineraryScreen from "@/app/itinerary";
 
@@ -13,6 +13,9 @@ const mockGetActivitiesBySlot = jest.fn();
 const mockGetFinalItineraryActivities = jest.fn();
 const mockToggleActivityAttendance = jest.fn();
 const mockVoteForActivity = jest.fn();
+const mockFetchMemories = jest.fn();
+const mockUploadMemoryPhoto = jest.fn();
+const mockDeleteMemoryPhoto = jest.fn();
 const mockDaySelectorProps = jest.fn();
 const mockPlanningDoneBarProps = jest.fn();
 const mockPlanningSlotCardProps = jest.fn();
@@ -20,12 +23,29 @@ const mockPlanningSlotCardProps = jest.fn();
 let mockParams: Record<string, string | undefined> = {};
 let mockTripDays = [{ id: "2026-06-01", label: "1 Jun" }];
 
+jest.mock("@/assets/icons/delete.svg", () => () => null);
+jest.mock("@/assets/icons/image.svg", () => () => null);
+jest.mock("@/assets/icons/not-select-image.svg", () => () => null);
+jest.mock("@/assets/icons/select-image.svg", () => () => null);
+jest.mock("@/assets/icons/image-menu.svg", () => () => null);
+jest.mock("@/assets/icons/image-download.svg", () => () => null);
+jest.mock("@/assets/icons/image-delete.svg", () => () => null);
+jest.mock("@/assets/icons/select-all.svg", () => () => null);
+jest.mock("@/assets/icons/unselect-image.svg", () => () => null);
+
 jest.mock("expo-router", () => ({
   router: {
     back: () => mockBack(),
     canGoBack: () => mockCanGoBack(),
     replace: (route: unknown) => mockReplace(route),
     setParams: (params: unknown) => mockSetParams(params),
+  },
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    const React = require("react");
+    React.useEffect(() => {
+      const cleanup = callback();
+      return typeof cleanup === "function" ? cleanup : undefined;
+    }, []);
   },
   useLocalSearchParams: () => mockParams,
 }));
@@ -37,6 +57,7 @@ jest.mock("firebase/firestore", () => ({
 
 jest.mock("@/src/lib/firebase", () => ({
   db: {},
+  auth: {},
 }));
 
 jest.mock("@/src/context/AuthContext", () => ({
@@ -50,6 +71,7 @@ jest.mock("@/src/api/trips", () => ({
   fetchTripForUser: (userId: unknown, tripId: unknown, options: unknown) =>
     mockFetchTripForUser(userId, tripId, options),
   finishPlanning: (payload: unknown) => mockFinishPlanning(payload),
+  getMemberPreferences: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock("@/src/services/activityService", () => ({
@@ -63,6 +85,29 @@ jest.mock("@/src/services/activityService", () => ({
   toggleActivityAttendance: (payload: unknown) =>
     mockToggleActivityAttendance(payload),
   voteForActivity: (payload: unknown) => mockVoteForActivity(payload),
+}));
+
+jest.mock("@/src/services/memoriesService", () => ({
+  deleteMemoryPhoto: (payload: unknown) => mockDeleteMemoryPhoto(payload),
+  downloadMemoryPhotos: jest.fn(),
+  fetchMemories: (payload: unknown) => mockFetchMemories(payload),
+  uploadMemoryPhoto: (payload: unknown) => mockUploadMemoryPhoto(payload),
+  getMemoryPhotoUrl: () => "https://example.com/memory.jpg",
+}));
+
+jest.mock("expo-image", () => ({
+  Image: () => null,
+}));
+
+jest.mock("expo-image-picker", () => ({
+  MediaTypeOptions: { Images: "Images" },
+  requestMediaLibraryPermissionsAsync: jest.fn(),
+  launchImageLibraryAsync: jest.fn(),
+}));
+
+jest.mock("expo-image-manipulator", () => ({
+  SaveFormat: { JPEG: "jpeg" },
+  manipulateAsync: jest.fn(),
 }));
 
 jest.mock("@/src/utils/itinerary/generateTimeSlots", () => ({
@@ -139,7 +184,32 @@ jest.mock("@/src/components/itinerary/FinalSlotCard", () => ({
   FinalSlotCard: () => null,
 }));
 
-function setBaseParams(state: "planning" | "voting" | "final") {
+jest.mock("@/src/components/itinerary/SuggestionsModal", () => ({
+  SuggestionsModal: () => null,
+  getAddedElsewherePlaceIds: () => new Set<string>(),
+}));
+
+jest.mock("@/src/components/itinerary/FinalSuggestedActivitiesSection", () => ({
+  FinalSuggestedActivitiesSection: () => null,
+}));
+
+jest.mock("@/src/components/itinerary/ActivityDetailModal", () => ({
+  ActivityDetailModal: () => null,
+}));
+
+jest.mock("@/src/components/common/FeedbackModal", () => ({
+  FeedbackModal: () => null,
+}));
+
+jest.mock("@/src/components/itinerary/VotingDoneBar", () => ({
+  VotingDoneBar: () => null,
+}));
+
+jest.mock("@/src/components/itinerary/ItineraryInfoModal", () => ({
+  ItineraryInfoModal: () => null,
+}));
+
+function setBaseParams(state: "planning" | "voting" | "final" | "memories") {
   mockParams = {
     tripId: "trip-123",
     state,
@@ -156,7 +226,7 @@ function setBaseParams(state: "planning" | "voting" | "final") {
   };
 }
 
-function backendTrip(state: "Planning" | "Voting" | "Final") {
+function backendTrip(state: "Planning" | "Voting" | "Final" | "Memories") {
   return {
     trip_id: "trip-123",
     title: "Vienna Trip",
@@ -190,6 +260,7 @@ describe("ItineraryScreen transition overlays", () => {
     mockTripDays = [{ id: "2026-06-01", label: "1 Jun" }];
     mockGetActivitiesBySlot.mockResolvedValue([]);
     mockGetFinalItineraryActivities.mockResolvedValue([]);
+    mockFetchMemories.mockResolvedValue([]);
   });
 
   it("does not show the voting loading overlay when planning submit is not complete for all members", async () => {
@@ -212,7 +283,7 @@ describe("ItineraryScreen transition overlays", () => {
           id: "user-123",
           name: "Helen",
           role: "member",
-          planning_done: true,
+          planning_done: false,
         },
         {
           id: "user-456",
@@ -223,20 +294,28 @@ describe("ItineraryScreen transition overlays", () => {
       ],
     });
 
-    const { queryByText, unmount } = render(<ItineraryScreen />);
+    const { queryByText, getByLabelText, unmount } = render(<ItineraryScreen />);
 
     await waitFor(() => {
       expect(mockPlanningDoneBarProps).toHaveBeenCalled();
     });
 
-    const uncheckedPlanningProps = mockPlanningDoneBarProps.mock.calls.find(
-      ([props]) => (props as { checked: boolean }).checked === false
-    )?.[0] as { onPress: () => Promise<void> } | undefined;
+    const latestPlanningProps = mockPlanningDoneBarProps.mock.calls.at(-1)?.[0] as
+      | { checked: boolean; onPress: () => void }
+      | undefined;
 
-    expect(uncheckedPlanningProps).toBeTruthy();
+    expect(latestPlanningProps?.checked).toBe(false);
 
     await act(async () => {
-      await uncheckedPlanningProps?.onPress();
+      latestPlanningProps?.onPress();
+    });
+
+    await waitFor(() => {
+      expect(getByLabelText("Submit planning confirmation")).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(getByLabelText("Submit your activities"));
     });
 
     await waitFor(() => {
@@ -401,6 +480,29 @@ describe("ItineraryScreen transition overlays", () => {
           return activity?.endTime === "23:00";
         })
       ).toBe(true);
+    });
+
+    unmount();
+  });
+
+  it("renders the memories screen with the empty upload state", async () => {
+    setBaseParams("memories");
+    mockFetchTripForUser.mockResolvedValue(backendTrip("Memories"));
+    mockFetchMemories.mockResolvedValue([]);
+
+    const { getByText, queryByText, unmount } = render(<ItineraryScreen />);
+
+    await waitFor(() => {
+      expect(getByText("Memories")).toBeTruthy();
+      expect(getByText("Upload images")).toBeTruthy();
+      expect(getByText("No images here yet")).toBeTruthy();
+    });
+
+    expect(queryByText("Download all")).toBeNull();
+
+    expect(mockFetchMemories).toHaveBeenCalledWith({
+      tripId: "trip-123",
+      idToken: "token-123",
     });
 
     unmount();

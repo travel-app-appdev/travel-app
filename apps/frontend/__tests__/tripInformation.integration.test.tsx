@@ -49,9 +49,20 @@ jest.mock("expo-router", () => ({
 }));
 
 // src/api/trips
+jest.mock("react-native-safe-area-context", () => ({
+  SafeAreaView: ({ children, ...props }: any) => {
+    const { View } = require("react-native");
+    return <View {...props}>{children}</View>;
+  },
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 jest.mock("@/src/api/trips", () => ({
   fetchMyTrips: jest.fn().mockResolvedValue([]),
   getCachedMyTrips: jest.fn().mockReturnValue(null),
+  fetchTripForUser: jest.fn().mockResolvedValue(null),
+  getMemberPreferences: jest.fn().mockResolvedValue([]),
+  updateMemberPreferences: jest.fn().mockResolvedValue(undefined),
   leaveTrip: (...args: any[]) => mockLeaveTrip(...args),
 }));
 
@@ -109,6 +120,10 @@ jest.mock("@/assets/icons/arrow-itinerary.svg", () => svgMock);
 jest.mock("@/assets/mascots/Votey_Yellow.svg", () => svgMock);
 jest.mock("@/assets/mascots/Votey_Pink.svg", () => svgMock);
 jest.mock("@/assets/mascots/Votey_Green.svg", () => svgMock);
+jest.mock("@/assets/icons/settings.svg", () => svgMock);
+jest.mock("@/assets/icons/arrow_up.svg", () => svgMock);
+jest.mock("@/assets/icons/arrow_down.svg", () => svgMock);
+jest.mock("@/assets/mascots/Votey-Blue-Memory.svg", () => svgMock);
 
 // ─── Helper to get the mocked firebase module at runtime ─────────────────────
 

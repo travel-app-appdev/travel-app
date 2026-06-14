@@ -1,4 +1,47 @@
+import type { TripState } from "@/src/types/trip";
+
+export type { TripState };
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+export async function fetchDestinationSuggestions(
+  query: string
+): Promise<string[]> {
+  const trimmed = query.trim();
+
+  if (trimmed.length < 1) {
+    return [];
+  }
+
+  if (!API_URL) {
+    console.warn("[autocomplete] EXPO_PUBLIC_API_URL is not configured");
+    return [];
+  }
+
+  try {
+    const response = await fetch(
+      `${API_URL}/autocomplete/destinations?q=${encodeURIComponent(trimmed)}`
+    );
+
+    if (!response.ok) {
+      console.warn("[autocomplete] response not ok:", response.status);
+      return [];
+    }
+
+    const data = (await response.json()) as { results?: unknown };
+
+    if (!Array.isArray(data.results)) {
+      return [];
+    }
+
+    return data.results.filter(
+      (item): item is string => typeof item === "string"
+    );
+  } catch (error) {
+    console.warn("[autocomplete] fetch error:", error);
+    return [];
+  }
+}
 
 export type TripMember = {
   id: string;
@@ -14,7 +57,7 @@ export type Trip = {
   destination: string;
   start_date: string;
   end_date: string;
-  state: "Planning" | "Voting" | "Final";
+  state: TripState;
   role: "admin" | "member";
   members?: TripMember[];
   invite_code?: string;
@@ -30,7 +73,7 @@ export type TripPreview = {
   destination: string;
   start_date: string;
   end_date: string;
-  state: "Planning" | "Voting" | "Final";
+  state: TripState;
 };
 
 type ApiErrorResponse = {
@@ -472,7 +515,7 @@ type UpdateTripPayload = {
   end_date?: string;
   planning_end_at?: string;
   voting_end_at?: string;
-  state?: "Planning" | "Voting" | "Final";
+  state?: TripState;
 };
 
 export async function updateTrip(payload: UpdateTripPayload): Promise<Trip> {
@@ -511,7 +554,7 @@ export async function updateTrip(payload: UpdateTripPayload): Promise<Trip> {
 
 export type FinishPlanningResponse = {
   allDone: boolean;
-  tripState: "Planning" | "Voting" | "Final";
+  tripState: TripState;
   completedMembers: number;
   totalMembers: number;
   planningDone: boolean;
@@ -553,7 +596,7 @@ export async function finishPlanning(
 }
 
 export type FinishVotingResponse = {
-  tripState: "Planning" | "Voting" | "Final";
+  tripState: TripState;
 };
 
 type FinishVotingPayload = {
@@ -596,6 +639,7 @@ export type ActivitySuggestion = {
   source: "geoapify";
   sourcePlaceId: string;
   matchedPreferences: string[];
+  categories?: string[];
 };
 
 export async function fetchActivitySuggestions(
@@ -616,6 +660,22 @@ export async function fetchActivitySuggestions(
   }
 
   return (data as { suggestions: ActivitySuggestion[] }).suggestions;
+}
+
+export async function getMemberPreferences(
+  tripId: string,
+  idToken: string
+): Promise<string[]> {
+  const response = await fetch(
+    `${API_URL}/trips/${encodeURIComponent(tripId)}/members/me/preferences`,
+    { headers: { Authorization: `Bearer ${idToken}` } }
+  );
+  if (!response.ok) {
+    const data: ApiErrorResponse = await response.json();
+    throw new Error(data.error || "Failed to fetch preferences");
+  }
+  const data = await response.json() as { preferences: string[] };
+  return data.preferences;
 }
 
 export async function updateMemberPreferences(

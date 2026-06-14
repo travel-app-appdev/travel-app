@@ -56,7 +56,7 @@ type TripCardItem = {
   endDate: string;
   rawStartDate: string;
   rawEndDate: string;
-  status: "planning" | "voting" | "final";
+  status: "planning" | "voting" | "final" | "memories";
   cardColor: string;
   role: "admin" | "member";
   inviteCode: string;
@@ -87,11 +87,26 @@ let tripsCache: TripsCache | null = null;
 
 let tripsCacheForceNext = false;
 
-// Remembers which tab the user was last viewing so that remounting Home (e.g.
-// after deleting or leaving a trip, which does router.replace("/home"), or
-// after backing out of a trip overview) restores that tab instead of always
-// snapping back to "Your Trips". Reset to "your" when the user changes.
-let lastActiveTab: Tab = "your";
+let persistedHomeTab: Tab = "your";
+let persistedHomeTabUserId: string | null = null;
+
+function getPersistedHomeTab(userId: string | null): Tab {
+  if (userId && persistedHomeTabUserId === userId) {
+    return persistedHomeTab;
+  }
+  return "your";
+}
+
+function persistHomeTab(userId: string | null, tab: Tab) {
+  if (!userId) {
+    persistedHomeTab = "your";
+    persistedHomeTabUserId = null;
+    return;
+  }
+
+  persistedHomeTab = tab;
+  persistedHomeTabUserId = userId;
+}
 
 export function invalidateTripsCache() {
   tripsCache = null;
@@ -115,7 +130,7 @@ function getInitials(name: string): string {
 }
 
 function getCardColor(tripId: string): string {
-  const palette = [colors.plantGreen, colors.sunsetOrange, colors.seaBlue];
+  const palette = [colors.plantGreen, colors.sunsetOrange];
   let hash = 0;
 
   for (let i = 0; i < tripId.length; i++) {
@@ -127,8 +142,11 @@ function getCardColor(tripId: string): string {
 
 function getUiStatus(
   state: Trip["state"],
-  memberCount: number
-): "planning" | "voting" | "final" {
+  memberCount: number,
+  isPast: boolean
+): "planning" | "voting" | "final" | "memories" {
+  if (isPast) return "memories";
+  if (state === "Memories") return "final";
   if (state === "Voting" && memberCount <= 1) return "final";
   if (state === "Voting") return "voting";
   if (state === "Final") return "final";
@@ -160,6 +178,7 @@ function mapTripToCardTrip(
     })
   );
   const effectiveState = getEffectiveTripState(trip, today);
+  const isPast = isPastTripByEndDate(trip.end_date, today);
 
   return {
     id: trip.trip_id,
@@ -169,7 +188,7 @@ function mapTripToCardTrip(
     endDate: formatDate(trip.end_date),
     rawStartDate: trip.start_date,
     rawEndDate: trip.end_date,
-    status: getUiStatus(effectiveState, members.length),
+    status: getUiStatus(effectiveState, members.length, isPast),
     cardColor: getCardColor(trip.trip_id),
     role: trip.role === "admin" ? "admin" : "member",
     inviteCode: trip.invite_code ?? "",
@@ -284,7 +303,9 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<Tab>(lastActiveTab);
+  const [activeTab, setActiveTabState] = useState<Tab>(() =>
+    getPersistedHomeTab(user?.uid ?? null)
+  );
   const [yourTrips, setYourTrips] = useState<TripCardItem[]>(
     tripsCache?.yourTrips ?? []
   );
@@ -307,6 +328,11 @@ export default function HomeScreen() {
   const selectTab = useCallback((tab: Tab) => {
     lastActiveTab = tab;
     setActiveTab(tab);
+  }, []);
+
+  const setActiveTab = useCallback((tab: Tab) => {
+    persistHomeTab(latestUserIdRef.current, tab);
+    setActiveTabState(tab);
   }, []);
 
   // NEW: keep latest lists in a ref to avoid stale closures in snapshot listeners
@@ -384,8 +410,12 @@ export default function HomeScreen() {
       setIsLoading(false);
       tripsCache = null;
       lastFetchRef.current = 0;
+      persistHomeTab(null, "your");
+      setActiveTabState("your");
       return;
     }
+
+    setActiveTabState(getPersistedHomeTab(newUserId));
 
     if (!tripsCache || tripsCache.userId !== newUserId) {
       setYourTrips([]);
@@ -559,9 +589,20 @@ export default function HomeScreen() {
 
               const memberCount = existingTrip?.members.length ?? 0;
 
+              const rawEndDate = existingTrip?.rawEndDate ?? "";
+              const effectiveState = rawEndDate
+                ? getEffectiveTripState({
+                    state: nextState,
+                    end_date: rawEndDate,
+                  })
+                : nextState;
+              const isPast = rawEndDate
+                ? isPastTripByEndDate(rawEndDate)
+                : false;
+
               patchTripInLocalLists(tripId, {
-                rawState: nextState,
-                status: getUiStatus(nextState, memberCount),
+                rawState: effectiveState,
+                status: getUiStatus(effectiveState, memberCount, isPast),
                 planningStartedAt: tripData.planning_started_at,
                 planningEndAt: tripData.planning_end_at,
                 votingEndAt: tripData.voting_end_at,
@@ -599,8 +640,12 @@ export default function HomeScreen() {
   const trips = activeTab === "your" ? yourTrips : pastTrips;
 
   const handleProfile = useSinglePress(() => router.push("/profile"));
-  const handleYourTab = useSinglePress(() => selectTab("your"));
-  const handlePastTab = useSinglePress(() => selectTab("past"));
+  const handleYourTab = useSinglePress(() => {
+    setActiveTab("your");
+  });
+  const handlePastTab = useSinglePress(() => {
+    setActiveTab("past");
+  });
   const handleRefresh = useCallback(async () => {
     if (isRefreshing || isLoading) return;
 
@@ -801,7 +846,7 @@ export default function HomeScreen() {
                     pathname: "/itinerary",
                     params: {
                       tripId: trip.id,
-                      state: status,
+                      state: status === "memories" ? "memories" : status,
                       title: trip.title,
                       destination: trip.destination,
                       startDate: trip.rawStartDate,

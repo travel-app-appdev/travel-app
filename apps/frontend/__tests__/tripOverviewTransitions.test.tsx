@@ -52,6 +52,8 @@ jest.mock("@/src/api/trips", () => ({
   fetchTripForUser: (userId: unknown, tripId: unknown, options: unknown) =>
     mockFetchTripForUser(userId, tripId, options),
   getCachedMyTrips: (userId: unknown) => mockGetCachedMyTrips(userId),
+  getMemberPreferences: jest.fn().mockResolvedValue([]),
+  updateMemberPreferences: jest.fn().mockResolvedValue(undefined),
   updateTrip: (payload: unknown) => mockUpdateTrip(payload),
   deleteTrip: jest.fn(),
   leaveTrip: jest.fn(),
@@ -137,10 +139,14 @@ jest.mock("@/assets/icons/key_frame.svg", () => () => null);
 jest.mock("@/assets/icons/copy.svg", () => () => null);
 jest.mock("@/assets/icons/timer.svg", () => () => null);
 jest.mock("@/assets/icons/arrow-itinerary.svg", () => () => null);
+jest.mock("@/assets/icons/image.svg", () => () => null);
+jest.mock("@/assets/icons/image-active.svg", () => () => null);
 jest.mock("@/assets/icons/exit.svg", () => () => null);
 jest.mock("@/assets/mascots/Votey_Yellow.svg", () => () => null);
 jest.mock("@/assets/mascots/Votey_Pink.svg", () => () => null);
 jest.mock("@/assets/mascots/Votey_Green.svg", () => () => null);
+jest.mock("@/assets/icons/settings.svg", () => () => null);
+jest.mock("@/assets/mascots/Votey-Blue-Memory.svg", () => () => null);
 
 const NOW = "2026-06-02T10:00:00.000Z";
 const PLANNING_END = "2026-06-02T10:00:01.000Z";
@@ -280,11 +286,22 @@ describe("trip overview checklist timer transitions", () => {
 
   it("updates admin overview from Voting to Final when the voting timer expires", async () => {
     setOverviewParams("Voting", {
+      startDate: "2026-06-03",
       votingEndAt: PLANNING_END,
     });
-    mockFetchTripForUser
-      .mockResolvedValueOnce(backendTrip("Voting"))
-      .mockResolvedValueOnce(backendTrip("Final"));
+    mockFetchTripForUser.mockImplementation(
+      async (_userId, _tripId, options?: { forceRefresh?: boolean }) => {
+        const trip = options?.forceRefresh
+          ? backendTrip("Final")
+          : backendTrip("Voting");
+
+        return {
+          ...trip,
+          start_date: "2026-06-03",
+          voting_end_at: PLANNING_END,
+        };
+      }
+    );
 
     const screen = render(<TripOverviewAdminScreen />);
 

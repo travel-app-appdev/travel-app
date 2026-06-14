@@ -1,4 +1,4 @@
-export type TripState = "Planning" | "Voting" | "Final";
+export type TripState = "Planning" | "Voting" | "Final" | "Memories";
 
 export type TripMember = {
     id: string;
@@ -21,6 +21,7 @@ export type Trip = {
     planning_started_at?: string;
     planning_end_at?: string;
     voting_end_at?: string;
+    preferences?: string[];
 };
 
 export type TripDocument = {
@@ -34,6 +35,31 @@ export type TripDocument = {
     planning_started_at?: any;
     planning_end_at?: any;
     voting_end_at?: any;
+    preferences?: string[];
+};
+
+export type MemoryPhoto = {
+    memory_id: string;
+    trip_id: string;
+    uploaded_by: string;
+    uploaded_by_name?: string;
+    original_name: string;
+    file_name: string;
+    mime_type: string;
+    file_size: number;
+    created_at: string;
+    file_url: string;
+};
+
+export type MemoryPhotoDocument = {
+    trip_id: string;
+    uploaded_by: string;
+    uploaded_by_name?: string;
+    original_name: string;
+    file_name: string;
+    mime_type: string;
+    file_size: number;
+    created_at: any;
 };
 
 export type TripMembershipDocument = {
@@ -54,6 +80,7 @@ export type ActivitySuggestion = {
     source: "geoapify";
     sourcePlaceId: string;
     matchedPreferences: string[];
+    categories?: string[];
 };
 
 export type UserDocument = {

@@ -61,13 +61,21 @@ export default function PreferencesScreen() {
           style={[styles.leafTopRight, { pointerEvents: "none" }]}
           {...hiddenFromAccessibility}
         >
-          <LeafUp width={W * 0.38} height={W * 0.38} />
+          <LeafUp
+            width={W * 0.38}
+            height={W * 0.38}
+            color={colors.plantGreen}
+          />
         </View>
         <View
           style={[styles.leafBottomLeft, { pointerEvents: "none" }]}
           {...hiddenFromAccessibility}
         >
-          <LeafDown width={W * 0.42} height={W * 0.42} />
+          <LeafDown
+            width={W * 0.42}
+            height={W * 0.42}
+            color={colors.plantGreen}
+          />
         </View>
 
         <ScrollView
@@ -89,7 +97,7 @@ export default function PreferencesScreen() {
           {/* Title */}
           <View style={styles.titleBlock}>
             <AppText variant="title" style={styles.title}>
-              Your preferences
+              Your Travel Preference
             </AppText>
             <AppText variant="body" style={styles.subtitle}>
               What do you enjoy{" "}
@@ -98,7 +106,7 @@ export default function PreferencesScreen() {
               </AppText>
             </AppText>
             <AppText variant="caption" style={styles.hint}>
-              {"Pick up to 5 categories. We'll use them to suggest activities for your trip."}
+              {"Pick up to 5 categories. We'll use your picks to suggest activities during planning."}
             </AppText>
           </View>
 
@@ -159,14 +167,12 @@ const styles = StyleSheet.create({
     top: H * -0.01,
     right: W * -0.05,
     zIndex: 0,
-    opacity: 0.55,
   },
   leafBottomLeft: {
     position: "absolute",
     bottom: H * 0.08,
     left: W * -0.08,
     zIndex: 0,
-    opacity: 0.55,
     transform: [{ rotate: "5deg" }],
   },
   scroll: {
@@ -208,8 +214,9 @@ const styles = StyleSheet.create({
   hint: {
     fontFamily: typography.fontFamily.body,
     fontSize: typography.size.md,
-    color: colors.grayedOut,
+    color: colors.nightBlack,
     lineHeight: typography.lineHeight.md,
+    marginTop: spacing.lg,
   },
   spacer: {
     height: spacing.xl,
@@ -235,7 +242,7 @@ const styles = StyleSheet.create({
   continueBtnText: {
     fontFamily: typography.fontFamily.bodyBold,
     fontSize: typography.size.lg,
-    color: colors.lightWhite,
+    color: colors.nightBlack,
   },
   skipBtn: {
     height: 44,
@@ -243,9 +250,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   skipText: {
-    fontFamily: typography.fontFamily.body,
+    fontFamily: typography.fontFamily.bodySemiBold,
     fontSize: typography.size.md,
-    color: colors.grayedOut,
+    color: colors.nightBlack,
     textDecorationLine: "underline",
   },
 });
