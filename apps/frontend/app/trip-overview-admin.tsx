@@ -1,3 +1,4 @@
+//apps/frontend/app/trip-overview-admin.tsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -48,7 +49,6 @@ import {
   formatTripDurationText,
   formatTripTimerText,
 } from "@/src/utils/tripTimer";
-import { isPastTripByEndDate } from "@/src/utils/tripState";
 import Plane from "@/assets/icons/plane.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
 import Calendar from "@/assets/icons/calendar.svg";
@@ -2231,7 +2231,10 @@ export default function TripOverviewAdminScreen() {
                     : phase.color;
                   const isLast = index === phases.length - 1;
                   const canExpand =
-                    isActive && phaseId !== "final" && phaseId !== "memories";
+                    isActive &&
+                    phaseId !== "final" &&
+                    phaseId !== "memories" &&
+                    !isPast;
                   const showItineraryLink = isActive;
 
                   const activeShadowStyle =
@@ -2352,7 +2355,7 @@ export default function TripOverviewAdminScreen() {
                                     : `${phase.label} phase, ${timerText} ${
                                         isActive
                                           ? "remaining"
-                                          : isPast
+                                          : isPastPhase
                                             ? "completed"
                                             : "upcoming"
                                       }`
