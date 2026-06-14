@@ -44,6 +44,7 @@ import {
   formatTripDurationText,
   formatTripTimerText,
 } from "@/src/utils/tripTimer";
+import { isPastTripByEndDate } from "@/src/utils/tripState";
 import Plane from "@/assets/icons/plane.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
 import Calendar from "@/assets/icons/calendar.svg";
@@ -278,9 +279,10 @@ type MemberRowProps = {
   member: MemberParam;
   onRemove: (id: string, name: string) => void;
   isRemoving: boolean;
+  readOnly: boolean;
 };
 
-function MemberRow({ member, onRemove, isRemoving }: MemberRowProps) {
+function MemberRow({ member, onRemove, isRemoving, readOnly }: MemberRowProps) {
   const handleRemove = useSinglePress(() => onRemove(member.id, member.name));
 
   return (
@@ -288,23 +290,25 @@ function MemberRow({ member, onRemove, isRemoving }: MemberRowProps) {
       <AppText variant="body" style={styles.memberName}>
         {member.name}
       </AppText>
-      <Pressable
-        onPress={handleRemove}
-        disabled={isRemoving}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityRole="button"
-        accessibilityLabel={
-          isRemoving ? `Removing ${member.name}` : `Remove ${member.name}`
-        }
-        style={isRemoving ? styles.removingIcon : undefined}
-      >
-        <View
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
+      {!readOnly && (
+        <Pressable
+          onPress={handleRemove}
+          disabled={isRemoving}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isRemoving ? `Removing ${member.name}` : `Remove ${member.name}`
+          }
+          style={isRemoving ? styles.removingIcon : undefined}
         >
-          <RemovePerson width={22} height={22} />
-        </View>
-      </Pressable>
+          <View
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+          >
+            <RemovePerson width={22} height={22} />
+          </View>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -509,6 +513,15 @@ export default function TripOverviewAdminScreen() {
   });
 
   const checklistTripState = tripState;
+
+  // A trip whose end date has elapsed is read-only: the admin can view it,
+  // copy the invite code, and delete it, but cannot edit any of its fields.
+  // Mirrors the "Past Trips" bucket logic on the home screen and the backend
+  // guard in updateTripForAdmin.
+  const isPast = useMemo(
+    () => isPastTripByEndDate(toLocalDateString(tripEnd)),
+    [tripEnd]
+  );
 
   const planningStartDate = parseIsoToDate(tripTiming.planningStartedAt);
   const planningEndDate = parseIsoToDate(tripTiming.planningEndAt);
@@ -796,6 +809,8 @@ export default function TripOverviewAdminScreen() {
   };
 
   const toggleField = (key: FieldKey) => {
+    // Read-only past trips never open an editor.
+    if (isPast) return;
     setOpenField((prev) => (prev === key ? null : key));
     setTripNameUpdated(false);
     setTripDateUpdated(false);
@@ -808,6 +823,8 @@ export default function TripOverviewAdminScreen() {
   };
 
   const togglePhase = (key: PhaseKey) => {
+    // Read-only past trips never open a phase editor.
+    if (isPast) return;
     closePhaseCalendar();
     setShowPhaseTimePicker(null);
     setOpenPhase((prev) => (prev === key ? null : key));
@@ -1418,8 +1435,20 @@ export default function TripOverviewAdminScreen() {
               />
             }
           >
+            {isPast && (
+              <View style={styles.readOnlyBanner}>
+                <AppText
+                  variant="caption"
+                  style={styles.readOnlyBannerText}
+                  accessibilityRole="text"
+                >
+                  This trip has ended and can no longer be edited.
+                </AppText>
+              </View>
+            )}
+
             <View style={styles.fieldGroup}>
-              {openField === "name" ? (
+              {openField === "name" && !isPast ? (
                 <View style={[styles.infoRow, styles.infoRowEditing]}>
                   <View style={styles.infoLeft}>
                     <View
@@ -1458,10 +1487,15 @@ export default function TripOverviewAdminScreen() {
               ) : (
                 <Pressable
                   style={styles.infoRow}
-                  onPress={handleNameRow}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Edit trip name, current value: ${tripName}`}
-                  accessibilityState={{ expanded: false }}
+                  onPress={isPast ? undefined : handleNameRow}
+                  disabled={isPast}
+                  accessibilityRole={isPast ? "text" : "button"}
+                  accessibilityLabel={
+                    isPast
+                      ? `Trip name: ${tripName}`
+                      : `Edit trip name, current value: ${tripName}`
+                  }
+                  accessibilityState={isPast ? undefined : { expanded: false }}
                 >
                   <View style={styles.infoLeft}>
                     <View
@@ -1481,13 +1515,15 @@ export default function TripOverviewAdminScreen() {
                       {tripName}
                     </AppText>
                   </View>
-                  <View {...hiddenFromAccessibility}>
-                    <ArrowDown width={20} height={20} />
-                  </View>
+                  {!isPast && (
+                    <View {...hiddenFromAccessibility}>
+                      <ArrowDown width={20} height={20} />
+                    </View>
+                  )}
                 </Pressable>
               )}
 
-              {openField === "name" && (
+              {openField === "name" && !isPast && (
                 <View style={styles.expandedField}>
                   <AppButton
                     title={isUpdatingName ? "Updating..." : "Update"}
@@ -1521,14 +1557,25 @@ export default function TripOverviewAdminScreen() {
               <Pressable
                 style={[
                   styles.infoRow,
-                  openField === "date" && styles.infoRowEditing,
+                  openField === "date" && !isPast && styles.infoRowEditing,
                 ]}
-                onPress={openField === "date" ? undefined : handleDateRow}
-                accessibilityRole="button"
-                accessibilityLabel={`Edit trip dates, current value: ${formatDateDisplay(
-                  tripStart
-                )} to ${formatDateDisplay(tripEnd)}`}
-                accessibilityState={{ expanded: openField === "date" }}
+                onPress={
+                  isPast || openField === "date" ? undefined : handleDateRow
+                }
+                disabled={isPast}
+                accessibilityRole={isPast ? "text" : "button"}
+                accessibilityLabel={
+                  isPast
+                    ? `Trip dates: ${formatDateDisplay(
+                        tripStart
+                      )} to ${formatDateDisplay(tripEnd)}`
+                    : `Edit trip dates, current value: ${formatDateDisplay(
+                        tripStart
+                      )} to ${formatDateDisplay(tripEnd)}`
+                }
+                accessibilityState={
+                  isPast ? undefined : { expanded: openField === "date" }
+                }
               >
                 <View style={styles.infoLeft}>
                   <View
@@ -1540,7 +1587,7 @@ export default function TripOverviewAdminScreen() {
                       Trip date
                     </AppText>
                   </View>
-                  {openField === "date" ? (
+                  {openField === "date" && !isPast ? (
                     <Pressable
                       style={[styles.dateInput, styles.inlineInput]}
                       onPress={handleOpenTripCalendar}
@@ -1568,7 +1615,7 @@ export default function TripOverviewAdminScreen() {
                     </AppText>
                   )}
                 </View>
-                {openField === "date" ? (
+                {openField === "date" && !isPast ? (
                   <Pressable
                     style={styles.rowChevronButton}
                     onPress={handleDateRow}
@@ -1580,14 +1627,14 @@ export default function TripOverviewAdminScreen() {
                       <ArrowUp width={20} height={20} />
                     </View>
                   </Pressable>
-                ) : (
+                ) : !isPast ? (
                   <View {...hiddenFromAccessibility}>
                     <ArrowDown width={20} height={20} />
                   </View>
-                )}
+                ) : null}
               </Pressable>
 
-              {openField === "date" && (
+              {openField === "date" && !isPast && (
                 <View style={styles.expandedField}>
                   <AppButton
                     title={isUpdatingDate ? "Updating..." : "Update"}
@@ -1618,7 +1665,7 @@ export default function TripOverviewAdminScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              {openField === "destination" ? (
+              {openField === "destination" && !isPast ? (
                 <View style={[styles.infoRow, styles.infoRowEditing]}>
                   <View style={styles.infoLeft}>
                     <View
@@ -1657,10 +1704,15 @@ export default function TripOverviewAdminScreen() {
               ) : (
                 <Pressable
                   style={styles.infoRow}
-                  onPress={handleDestRow}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Edit destination, current value: ${destination}`}
-                  accessibilityState={{ expanded: false }}
+                  onPress={isPast ? undefined : handleDestRow}
+                  disabled={isPast}
+                  accessibilityRole={isPast ? "text" : "button"}
+                  accessibilityLabel={
+                    isPast
+                      ? `Destination: ${destination}`
+                      : `Edit destination, current value: ${destination}`
+                  }
+                  accessibilityState={isPast ? undefined : { expanded: false }}
                 >
                   <View style={styles.infoLeft}>
                     <View
@@ -1680,13 +1732,15 @@ export default function TripOverviewAdminScreen() {
                       {destination}
                     </AppText>
                   </View>
-                  <View {...hiddenFromAccessibility}>
-                    <ArrowDown width={20} height={20} />
-                  </View>
+                  {!isPast && (
+                    <View {...hiddenFromAccessibility}>
+                      <ArrowDown width={20} height={20} />
+                    </View>
+                  )}
                 </Pressable>
               )}
 
-              {openField === "destination" && (
+              {openField === "destination" && !isPast && (
                 <View style={styles.expandedField}>
                   <AppButton
                     title={isUpdatingDestination ? "Updating..." : "Update"}
@@ -1748,6 +1802,7 @@ export default function TripOverviewAdminScreen() {
                             member={member}
                             onRemove={handleRemoveMember}
                             isRemoving={removingMemberId === member.id}
+                            readOnly={isPast}
                           />
                         ))
                       ) : (
@@ -1871,7 +1926,7 @@ export default function TripOverviewAdminScreen() {
                 {phases.map((phase, index) => {
                   const phaseId = phase.id;
                   const isActive = phase.status === "active";
-                  const isPast = phase.status === "past";
+                  const isPastPhase = phase.status === "past";
                   const isMuted = !isActive;
                   const isOpen = openPhase === phaseId;
                   const dates = phaseDates[phaseId];
@@ -1884,7 +1939,8 @@ export default function TripOverviewAdminScreen() {
                     ? phase.disabledColor
                     : phase.color;
                   const isLast = index === phases.length - 1;
-                  const canExpand = isActive && phaseId !== "final";
+                  // Past trips never expose phase editing.
+                  const canExpand = isActive && phaseId !== "final" && !isPast;
 
                   const activeShadowStyle =
                     phaseId === "planning"
@@ -1918,7 +1974,7 @@ export default function TripOverviewAdminScreen() {
                           <View
                             style={[
                               styles.timelineLine,
-                              isPast
+                              isPastPhase
                                 ? styles.timelineLineSolid
                                 : styles.timelineLineDashed,
                             ]}
@@ -1957,7 +2013,7 @@ export default function TripOverviewAdminScreen() {
                                   : `${phase.label} phase, ${timerText} ${
                                       isActive
                                         ? "remaining"
-                                        : isPast
+                                        : isPastPhase
                                           ? "completed"
                                           : "upcoming"
                                     }`
@@ -2660,6 +2716,19 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     color: colors.textPrimary,
+  },
+
+  readOnlyBanner: {
+    backgroundColor: colors.beachYellow,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  readOnlyBannerText: {
+    color: colors.nightBlack,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontFamily: typography.fontFamily.bodyBold,
   },
 
   stickyHeaderBlock: {
