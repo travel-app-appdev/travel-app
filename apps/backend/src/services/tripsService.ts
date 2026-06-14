@@ -390,7 +390,18 @@ export async function updateTripForAdmin(input: {
         voting_end_at: input.voting_end_at ?? current.voting_end_at,
     };
 
-    ensureValidTripTimeline(effectiveTimeline);
+    // Only validate the timeline when the request actually touches a timeline
+    // field. A title- or destination-only edit must not be rejected because of
+    // pre-existing (possibly inverted) stored timestamps.
+    const touchesTimeline =
+        input.start_date !== undefined ||
+        input.end_date !== undefined ||
+        input.planning_end_at !== undefined ||
+        input.voting_end_at !== undefined;
+
+    if (touchesTimeline) {
+        ensureValidTripTimeline(effectiveTimeline);
+    }
 
     const nextPlanningEnd = input.planning_end_at
         ? parseIsoDate(input.planning_end_at)
