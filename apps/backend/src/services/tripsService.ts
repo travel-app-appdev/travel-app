@@ -1,4 +1,5 @@
-﻿import admin from "../config/firebase";
+// apps/backend/src/services/tripsService.ts
+import admin from "../config/firebase";
 import {
     createTripWithAdminMembership,
     findAcceptedMembershipsByUserId,
@@ -383,16 +384,13 @@ export async function updateTripForAdmin(input: {
         throw { status: 404, message: "Trip not found" };
     }
 
-    if (
-        hasTripEndDatePassed(current.end_date) &&
-        (input.title !== undefined ||
-            input.destination !== undefined ||
-            input.start_date !== undefined ||
-            input.end_date !== undefined)
-    ) {
+    // Past trips are read-only. Once the end date has elapsed the trip moves to
+    // the "Past Trips" bucket and can no longer be edited by anyone, including
+    // the admin. Uses the same end-date logic that determines that bucket.
+    if (hasTripEndDatePassed(current.end_date)) {
         throw {
             status: 400,
-            message: "Trip details cannot be updated after the trip has ended",
+            message: "This trip has ended and can no longer be edited",
         };
     }
 
@@ -403,7 +401,18 @@ export async function updateTripForAdmin(input: {
         voting_end_at: input.voting_end_at ?? current.voting_end_at,
     };
 
-    ensureValidTripTimeline(effectiveTimeline);
+    // Only validate the timeline when the request actually touches a timeline
+    // field. A title- or destination-only edit must not be rejected because of
+    // pre-existing (possibly inverted) stored timestamps.
+    const touchesTimeline =
+        input.start_date !== undefined ||
+        input.end_date !== undefined ||
+        input.planning_end_at !== undefined ||
+        input.voting_end_at !== undefined;
+
+    if (touchesTimeline) {
+        ensureValidTripTimeline(effectiveTimeline);
+    }
 
     const nextPlanningEnd = input.planning_end_at
         ? parseIsoDate(input.planning_end_at)

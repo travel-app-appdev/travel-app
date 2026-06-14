@@ -87,6 +87,11 @@ let tripsCache: TripsCache | null = null;
 
 let tripsCacheForceNext = false;
 
+// Remembers which tab the user was last viewing so that remounting Home (e.g.
+// after deleting or leaving a trip, which does router.replace("/home"), or
+// after backing out of a trip overview) restores that tab instead of always
+// snapping back to "Your Trips". Keyed to the user id so it resets to "your"
+// when the user changes.
 let persistedHomeTab: Tab = "your";
 let persistedHomeTabUserId: string | null = null;
 
@@ -318,6 +323,8 @@ export default function HomeScreen() {
   const lastFetchRef = useRef<number>(tripsCache?.fetchedAt ?? 0);
   const latestUserIdRef = useRef<string | null>(user?.uid ?? null);
 
+  // Wraps the raw setter so the module-level persisted tab stays in sync and
+  // survives remounts of this screen.
   const setActiveTab = useCallback((tab: Tab) => {
     persistHomeTab(latestUserIdRef.current, tab);
     setActiveTabState(tab);
@@ -394,6 +401,7 @@ export default function HomeScreen() {
       return;
     }
 
+    // Restore this user's persisted tab (resets to "your" if the user changed).
     setActiveTabState(getPersistedHomeTab(newUserId));
 
     if (!tripsCache || tripsCache.userId !== newUserId) {
