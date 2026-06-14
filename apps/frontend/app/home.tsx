@@ -87,6 +87,12 @@ let tripsCache: TripsCache | null = null;
 
 let tripsCacheForceNext = false;
 
+// Remembers which tab the user was last viewing so that remounting Home (e.g.
+// after deleting or leaving a trip, which does router.replace("/home"), or
+// after backing out of a trip overview) restores that tab instead of always
+// snapping back to "Your Trips". Reset to "your" when the user changes.
+let lastActiveTab: Tab = "your";
+
 export function invalidateTripsCache() {
   tripsCache = null;
   tripsCacheForceNext = true;
@@ -278,7 +284,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<Tab>("your");
+  const [activeTab, setActiveTab] = useState<Tab>(lastActiveTab);
   const [yourTrips, setYourTrips] = useState<TripCardItem[]>(
     tripsCache?.yourTrips ?? []
   );
@@ -290,6 +296,18 @@ export default function HomeScreen() {
 
   const lastFetchRef = useRef<number>(tripsCache?.fetchedAt ?? 0);
   const latestUserIdRef = useRef<string | null>(user?.uid ?? null);
+  // Tracks the user id the tab state currently belongs to, so we can reset the
+  // tab ONLY when the user actually changes — not merely when the trips cache
+  // was invalidated (e.g. after deleting or leaving a trip), which also leaves
+  // tripsCache null but must keep the user on their current tab.
+  const tabUserIdRef = useRef<string | null>(user?.uid ?? null);
+
+  // Wraps setActiveTab so the module-level lastActiveTab stays in sync and
+  // survives remounts of this screen.
+  const selectTab = useCallback((tab: Tab) => {
+    lastActiveTab = tab;
+    setActiveTab(tab);
+  }, []);
 
   // NEW: keep latest lists in a ref to avoid stale closures in snapshot listeners
   const listsRef = useRef<{
@@ -350,6 +368,15 @@ export default function HomeScreen() {
   useEffect(() => {
     const newUserId = user?.uid ?? null;
     latestUserIdRef.current = newUserId;
+
+    // Reset the tab to "your" only when the user actually changes (login,
+    // logout, or account switch). Cache invalidation alone (delete/leave) must
+    // not reset it.
+    if (tabUserIdRef.current !== newUserId) {
+      tabUserIdRef.current = newUserId;
+      lastActiveTab = "your";
+      setActiveTab("your");
+    }
 
     if (!newUserId) {
       setYourTrips([]);
@@ -572,8 +599,8 @@ export default function HomeScreen() {
   const trips = activeTab === "your" ? yourTrips : pastTrips;
 
   const handleProfile = useSinglePress(() => router.push("/profile"));
-  const handleYourTab = useSinglePress(() => setActiveTab("your"));
-  const handlePastTab = useSinglePress(() => setActiveTab("past"));
+  const handleYourTab = useSinglePress(() => selectTab("your"));
+  const handlePastTab = useSinglePress(() => selectTab("past"));
   const handleRefresh = useCallback(async () => {
     if (isRefreshing || isLoading) return;
 
