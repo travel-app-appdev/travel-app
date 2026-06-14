@@ -1,3 +1,4 @@
+// apps/backend/src/services/tripsService.ts
 import admin from "../config/firebase";
 import {
     createTripWithAdminMembership,
