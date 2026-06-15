@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   InteractionManager,
+  type ListRenderItem,
   Modal,
   Platform,
   Pressable,
@@ -21,16 +22,16 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { Ionicons } from "@expo/vector-icons";
-import { doc, onSnapshot } from "firebase/firestore";
 
 import { colors, spacing, typography, radius } from "@/src/theme";
 import { ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
-import { db, auth } from "@/src/lib/firebase";
+import { auth } from "@/src/lib/firebase";
 import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
 import { mapActivitiesToSlots } from "@/src/utils/itinerary/mapActivitiesToSlots";
 import { getActiveTripTimerText } from "@/src/utils/tripTimer";
 import { useAuth } from "@/src/context/AuthContext";
+import { useItineraryTrip } from "@/src/hooks/useItineraryTrip";
 
 import type {
   TripItinerary,
@@ -55,7 +56,10 @@ import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
 import { FinalSuggestedActivitiesSection } from "@/src/components/itinerary/FinalSuggestedActivitiesSection";
 import { ActivityDetailModal } from "@/src/components/itinerary/ActivityDetailModal";
-import { SuggestionsModal, getAddedElsewherePlaceIds } from "@/src/components/itinerary/SuggestionsModal";
+import {
+  SuggestionsModal,
+  getAddedElsewherePlaceIds,
+} from "@/src/components/itinerary/SuggestionsModal";
 import {
   fetchTripForUser,
   finishPlanning,
@@ -82,7 +86,9 @@ import {
   voteForActivity,
   createActivity,
   updateActivity,
+  type BackendActivity,
   type FinalItineraryResponseDto,
+  type FinalItinerarySlotDto,
 } from "@/src/services/activityService";
 import {
   deleteMemoryPhoto,
@@ -176,7 +182,7 @@ function updateCachedActivities(
 }
 
 function mapBackendActivity(
-  activity: any,
+  activity: BackendActivity,
   fallback: { dayId: string; slotId: string }
 ): Activity {
   const backendSlot = activity.slot_id
@@ -212,7 +218,7 @@ type FinalSlotUi = {
   alternativeCount: number;
 };
 
-function mapBackendFinalSlot(slot: any): FinalSlotUi {
+function mapBackendFinalSlot(slot: FinalItinerarySlotDto): FinalSlotUi {
   const split = splitBackendSlotId(slot.slot_id);
 
   const selectedActivity = mapBackendActivity(slot.selectedActivity, {
@@ -221,7 +227,7 @@ function mapBackendFinalSlot(slot: any): FinalSlotUi {
   });
 
   const alternativeActivities = Array.isArray(slot.alternativeActivities)
-    ? slot.alternativeActivities.map((activity: any) =>
+    ? slot.alternativeActivities.map((activity) =>
         mapBackendActivity(activity, {
           dayId: split.dayId,
           slotId: split.slotId,
@@ -232,7 +238,7 @@ function mapBackendFinalSlot(slot: any): FinalSlotUi {
   const addedAlternativeActivities = Array.isArray(
     slot.addedAlternativeActivities
   )
-    ? slot.addedAlternativeActivities.map((activity: any) =>
+    ? slot.addedAlternativeActivities.map((activity) =>
         mapBackendActivity(activity, {
           dayId: split.dayId,
           slotId: split.slotId,
@@ -686,7 +692,10 @@ export default function ItineraryScreen() {
   >({});
   const getMemoryPreviewHeight = useCallback(
     (aspectRatio?: number) => {
-      const maxHeight = Math.min(windowHeight * 0.62, memoryPreviewWidth * 1.45);
+      const maxHeight = Math.min(
+        windowHeight * 0.62,
+        memoryPreviewWidth * 1.45
+      );
       const minHeight = memoryPreviewWidth * 0.45;
 
       if (!aspectRatio) {
@@ -755,7 +764,8 @@ export default function ItineraryScreen() {
   const [suggestionsSlotLabel, setSuggestionsSlotLabel] = useState("");
   const [suggestions, setSuggestions] = useState<ActivitySuggestion[]>([]);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
-  const [isSuggestionsLoadingMore, setIsSuggestionsLoadingMore] = useState(false);
+  const [isSuggestionsLoadingMore, setIsSuggestionsLoadingMore] =
+    useState(false);
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
   const suggestionsSlotActivityIdRef = useRef<string | null>(null);
   const [memberPreferences, setMemberPreferences] = useState<string[]>([]);
@@ -796,7 +806,6 @@ export default function ItineraryScreen() {
     typeof setTimeout
   > | null>(null);
   const initialTripRefreshKeyRef = useRef<string | null>(null);
-  const lastFinalUpdateRef = useRef<string | null | undefined>(undefined);
 
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
@@ -1124,52 +1133,18 @@ export default function ItineraryScreen() {
     }
   }, [tripId, currentUserId]);
 
-  useEffect(() => {
-    if (!tripId) {
-      return;
-    }
+  const handleItineraryTripMissing = useCallback(() => {
+    invalidateTripsCache();
+    router.replace("/home");
+  }, []);
 
-    let isInitialSnapshot = true;
-    const unsubscribe = onSnapshot(
-      doc(db, "trips", tripId),
-      async (snapshot) => {
-        if (!snapshot.exists()) {
-          invalidateTripsCache();
-          router.replace("/home");
-          return;
-        }
-
-        const data = snapshot.data();
-
-        if (activeState === "final") {
-          const nextValue =
-            data?.final_itinerary_updated_at?.toMillis?.()?.toString?.() ??
-            null;
-
-          if (lastFinalUpdateRef.current === undefined) {
-            lastFinalUpdateRef.current = nextValue;
-          } else if (nextValue !== lastFinalUpdateRef.current) {
-            lastFinalUpdateRef.current = nextValue;
-            await refreshFinalItinerary();
-          }
-        }
-
-        if (isInitialSnapshot) {
-          isInitialSnapshot = false;
-          return;
-        }
-
-        if (activeState === "planning" || activeState === "voting") {
-          void refreshTripTimerFields({ forceRefresh: true });
-        }
-      },
-      (error) => {
-        console.log("Trip listener error:", error);
-      }
-    );
-
-    return unsubscribe;
-  }, [activeState, refreshFinalItinerary, refreshTripTimerFields, tripId]);
+  const { resetFinalUpdateTracking } = useItineraryTrip({
+    tripId,
+    activeState,
+    onMissing: handleItineraryTripMissing,
+    refreshFinalItinerary,
+    refreshTripTimerFields,
+  });
 
   const loadActivities = useCallback(
     async (options: { showLoading?: boolean } = {}) => {
@@ -1257,7 +1232,7 @@ export default function ItineraryScreen() {
                     currentUserId ?? undefined
                   );
 
-                  return slotActivities.map((activity: any) =>
+                  return slotActivities.map((activity) =>
                     mapBackendActivity(activity, {
                       dayId: day.id,
                       slotId: slot.id,
@@ -1296,7 +1271,7 @@ export default function ItineraryScreen() {
                 currentUserId ?? undefined
               );
 
-              return slotActivities.map((activity: any) =>
+              return slotActivities.map((activity) =>
                 mapBackendActivity(activity, {
                   dayId: resolvedDayId,
                   slotId: slot.id,
@@ -1437,7 +1412,8 @@ export default function ItineraryScreen() {
       // Web browsers only allow the file picker during the original click gesture.
       result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
     } else {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         Alert.alert(
           "Photo access needed",
@@ -1658,6 +1634,63 @@ export default function ItineraryScreen() {
     );
   }, []);
 
+  const renderMemoryTile = useCallback<ListRenderItem<MemoryPhoto>>(
+    ({ item: memory }) => {
+      const isSelected = selectedMemoryIds.includes(memory.memory_id);
+
+      return (
+        <Pressable
+          style={styles.memoryTile}
+          onPress={() => handleMemoryPress(memory)}
+          onLongPress={() => handleMemoryLongPress(memory)}
+          accessibilityRole="imagebutton"
+          accessibilityLabel={`Memory photo uploaded by ${
+            memory.uploaded_by_name ?? "a trip member"
+          }`}
+          accessibilityHint={
+            isMemorySelectionMode
+              ? "Selects or unselects this photo"
+              : "Opens a larger preview"
+          }
+          accessibilityState={{ selected: isSelected }}
+        >
+          <ExpoImage
+            source={{
+              uri: authToken ? getMemoryPhotoUrl(memory, authToken) : "",
+            }}
+            style={styles.memoryImage}
+            contentFit="cover"
+          />
+          {isMemorySelectionMode && (
+            <Pressable
+              style={styles.memorySelectIcon}
+              onPress={() => toggleMemorySelection(memory.memory_id)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isSelected ? "Unselect image" : "Select image"
+              }
+            >
+              {isSelected ? (
+                <ImageSelectedIcon width={24} height={24} />
+              ) : (
+                <UnselectImageIcon width={24} height={24} />
+              )}
+            </Pressable>
+          )}
+        </Pressable>
+      );
+    },
+    [
+      authToken,
+      handleMemoryLongPress,
+      handleMemoryPress,
+      isMemorySelectionMode,
+      selectedMemoryIds,
+      toggleMemorySelection,
+    ]
+  );
+
   const handleDeletePreviewMemory = useCallback(() => {
     if (!selectedMemory) return;
     setShowMemoryPreviewMenu(false);
@@ -1741,9 +1774,9 @@ export default function ItineraryScreen() {
   useEffect(() => {
     if (activeState !== "final") {
       setFinalSlots([]);
-      lastFinalUpdateRef.current = undefined;
+      resetFinalUpdateTracking();
     }
-  }, [activeState]);
+  }, [activeState, resetFinalUpdateTracking]);
 
   function handlePlanningInfoPress() {
     setShowPlanningInfoPopup(true);
@@ -1820,12 +1853,7 @@ export default function ItineraryScreen() {
           suggestionsSlotId
         )
       ),
-    [
-      planningActivities,
-      suggestions,
-      selectedDayId,
-      suggestionsSlotId,
-    ]
+    [planningActivities, suggestions, selectedDayId, suggestionsSlotId]
   );
 
   const planningStatusParam = useMemo(
@@ -1865,7 +1893,6 @@ export default function ItineraryScreen() {
         dayId: selectedDayId,
         slotId: `${selectedDayId}_${slotId}`,
         selectedDay: selectedDayId,
-        activitiesJson: JSON.stringify(itinerary.activities),
         planningEndAt: timerDeadlines.planningEndAt ?? "",
         votingEndAt: timerDeadlines.votingEndAt ?? "",
       },
@@ -1898,7 +1925,6 @@ export default function ItineraryScreen() {
         initialGoogleMapsUrl: activity.googleMapsUrl ?? "",
         initialStartTime: activity.startTime ?? "",
         initialEndTime: activity.endTime ?? "",
-        activitiesJson: JSON.stringify(itinerary.activities),
         planningEndAt: timerDeadlines.planningEndAt ?? "",
         votingEndAt: timerDeadlines.votingEndAt ?? "",
       },
@@ -1935,7 +1961,12 @@ export default function ItineraryScreen() {
     if (!authToken || !tripId || !suggestionsSlotId) return;
     setIsSuggestionsLoadingMore(true);
     try {
-      const results = await fetchActivitySuggestions(tripId, suggestionsSlotId, authToken, suggestions.length);
+      const results = await fetchActivitySuggestions(
+        tripId,
+        suggestionsSlotId,
+        authToken,
+        suggestions.length
+      );
       // Merge, deduplicating by sourcePlaceId
       setSuggestions((prev) => {
         const existingIds = new Set(prev.map((s) => s.sourcePlaceId));
@@ -2390,8 +2421,9 @@ export default function ItineraryScreen() {
           })
         );
 
-        const isAddedToItinerary =
-          result.addedAlternativeActivityIds.includes(activityToToggle.id);
+        const isAddedToItinerary = result.addedAlternativeActivityIds.includes(
+          activityToToggle.id
+        );
 
         setApiActivities((current) =>
           current.map((item) =>
@@ -2806,61 +2838,15 @@ export default function ItineraryScreen() {
                     </View>
                   </View>
                 ) : (
-                  <View style={styles.memoryGrid}>
-                    {memories.map((memory) => {
-                      const isSelected = selectedMemoryIds.includes(
-                        memory.memory_id
-                      );
-
-                      return (
-                        <Pressable
-                          key={memory.memory_id}
-                          style={styles.memoryTile}
-                          onPress={() => handleMemoryPress(memory)}
-                          onLongPress={() => handleMemoryLongPress(memory)}
-                          accessibilityRole="imagebutton"
-                          accessibilityLabel={`Memory photo uploaded by ${
-                            memory.uploaded_by_name ?? "a trip member"
-                          }`}
-                          accessibilityHint={
-                            isMemorySelectionMode
-                              ? "Selects or unselects this photo"
-                              : "Opens a larger preview"
-                          }
-                          accessibilityState={{ selected: isSelected }}
-                        >
-                          <ExpoImage
-                            source={{
-                              uri: authToken
-                                ? getMemoryPhotoUrl(memory, authToken)
-                                : "",
-                            }}
-                            style={styles.memoryImage}
-                            contentFit="cover"
-                          />
-                          {isMemorySelectionMode && (
-                            <Pressable
-                              style={styles.memorySelectIcon}
-                              onPress={() =>
-                                toggleMemorySelection(memory.memory_id)
-                              }
-                              hitSlop={10}
-                              accessibilityRole="button"
-                              accessibilityLabel={
-                                isSelected ? "Unselect image" : "Select image"
-                              }
-                            >
-                              {isSelected ? (
-                                <ImageSelectedIcon width={24} height={24} />
-                              ) : (
-                                <UnselectImageIcon width={24} height={24} />
-                              )}
-                            </Pressable>
-                          )}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                  <FlatList
+                    data={memories}
+                    keyExtractor={(memory) => memory.memory_id}
+                    renderItem={renderMemoryTile}
+                    numColumns={2}
+                    scrollEnabled={false}
+                    contentContainerStyle={styles.memoryListContent}
+                    columnWrapperStyle={styles.memoryListRow}
+                  />
                 )}
               </View>
             )}
@@ -3472,6 +3458,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
+  },
+  memoryListContent: {
+    gap: spacing.sm,
+  },
+  memoryListRow: {
+    justifyContent: "space-between",
   },
   memoryTile: {
     width: "48.5%",

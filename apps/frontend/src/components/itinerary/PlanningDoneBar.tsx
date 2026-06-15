@@ -26,6 +26,7 @@ export function PlanningDoneBar({
       accessibilityLabel="Mark planning as done"
       accessibilityCheckedLabel="Mark planning as not done"
       infoAccessibilityLabel="Show planning done info"
+      accessibilityRole="checkbox"
       onPress={onPress}
       onInfoPress={onInfoPress}
     />

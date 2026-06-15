@@ -1,5 +1,10 @@
 import { useCallback } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  View,
+  type AccessibilityRole,
+} from "react-native";
 import { AppText } from "@/src/components/common/AppText";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { PressLock } from "@/src/utils/PressLock";
@@ -18,6 +23,7 @@ type Props = {
   accessibilityLabel: string;
   accessibilityCheckedLabel: string;
   infoAccessibilityLabel: string;
+  accessibilityRole?: AccessibilityRole;
   onPress: () => void;
   onInfoPress: () => void;
 };
@@ -33,6 +39,7 @@ export function ItineraryDoneBar({
   accessibilityLabel,
   accessibilityCheckedLabel,
   infoAccessibilityLabel,
+  accessibilityRole = "checkbox",
   onPress,
   onInfoPress,
 }: Props) {
@@ -72,7 +79,7 @@ export function ItineraryDoneBar({
           disabled={isDisabled}
           hitSlop={8}
           testID="done-bar-submit-button"
-          accessibilityRole="checkbox"
+          accessibilityRole={accessibilityRole}
           accessibilityLabel={
             checked ? accessibilityCheckedLabel : accessibilityLabel
           }
