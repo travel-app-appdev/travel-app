@@ -1,5 +1,6 @@
 import React from "react";
 import { fireEvent, render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 
 import { ItineraryDoneBar } from "@/src/components/itinerary/ItineraryDoneBar";
 
@@ -59,6 +60,39 @@ describe("ItineraryDoneBar", () => {
 
     expect(getByTestId("done-bar-checked-icon")).toBeTruthy();
     expect(queryByTestId("done-bar-unchecked-icon")).toBeNull();
+  });
+
+  it("can dock to the bottom edge with only the top corners rounded", () => {
+    const { getByTestId } = render(
+      <ItineraryDoneBar
+        label="Planning done"
+        checked={true}
+        docked
+        accentColor="#F7CE46"
+        shadowColor="#F77646"
+        shadow="0px -10px 16px rgba(255, 107, 53, 0.15)"
+        accessibilityLabel="Mark planning as done"
+        accessibilityCheckedLabel="Mark planning as not done"
+        infoAccessibilityLabel="Show planning done info"
+        onPress={jest.fn()}
+        onInfoPress={jest.fn()}
+      />
+    );
+
+    const wrapperStyle = StyleSheet.flatten(
+      getByTestId("done-bar-wrapper").props.style
+    );
+    const footerStyle = StyleSheet.flatten(
+      getByTestId("done-bar-footer").props.style
+    );
+
+    expect(wrapperStyle.left).toBe(0);
+    expect(wrapperStyle.right).toBe(0);
+    expect(wrapperStyle.bottom).toBe(0);
+    expect(footerStyle.borderTopLeftRadius).toBe(23);
+    expect(footerStyle.borderTopRightRadius).toBe(23);
+    expect(footerStyle.borderBottomLeftRadius).toBe(0);
+    expect(footerStyle.borderBottomRightRadius).toBe(0);
   });
 
   it("fires the submit action", async () => {

@@ -40,6 +40,7 @@ import type {
 import type { TripState } from "@/src/types/trip";
 
 import { AppText } from "@/src/components/common/AppText";
+import { BackLink } from "@/src/components/common/BackLink";
 import { ConfirmModal } from "@/src/components/common/ConfirmModal";
 import { FeedbackModal } from "@/src/components/common/FeedbackModal";
 import { ItineraryHeader } from "@/src/components/itinerary/ItineraryHeader";
@@ -2697,6 +2698,17 @@ export default function ItineraryScreen() {
           ? colors.neonGreen
           : colors.beachYellow;
 
+  const shouldShowPlanningLockOverlay =
+    activeState === "planning" && hasCurrentUserFinished;
+
+  function handleBackPress() {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/home");
+    }
+  }
+
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: safeAreaBg }]}
@@ -2725,14 +2737,9 @@ export default function ItineraryScreen() {
             endDate={itinerary.endDate}
             introText={getIntroText(activeState)}
             daysLeftText={timerText}
-            onBackPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace("/home");
-              }
-            }}
+            onBackPress={handleBackPress}
             state={activeState}
+            showBackButton={!shouldShowPlanningLockOverlay}
           />
 
           <View style={styles.contentPanel}>
@@ -2859,33 +2866,22 @@ export default function ItineraryScreen() {
             )}
 
             {activeState === "planning" && (
-              <View style={styles.planningContent}>
-                <View style={styles.slotList}>
-                  {isLoadingActivities
-                    ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
-                    : slotItems.map(({ slot, activity }) => (
-                        <PlanningSlotCard
-                          key={slot.id}
-                          slot={slot}
-                          activity={activity}
-                          onAddActivity={handleAddActivity}
-                          onEditActivity={handleEditActivity}
-                          onSuggest={
-                            hasMemberPreferences ? handleSuggest : undefined
-                          }
-                          disabled={hasCurrentUserFinished}
-                        />
-                      ))}
-                </View>
-
-                {hasCurrentUserFinished && (
-                  <View
-                    style={[
-                      styles.planningLockOverlay,
-                      { pointerEvents: "auto" },
-                    ]}
-                  />
-                )}
+              <View style={styles.slotList}>
+                {isLoadingActivities
+                  ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
+                  : slotItems.map(({ slot, activity }) => (
+                      <PlanningSlotCard
+                        key={slot.id}
+                        slot={slot}
+                        activity={activity}
+                        onAddActivity={handleAddActivity}
+                        onEditActivity={handleEditActivity}
+                        onSuggest={
+                          hasMemberPreferences ? handleSuggest : undefined
+                        }
+                        disabled={hasCurrentUserFinished}
+                      />
+                    ))}
               </View>
             )}
 
@@ -3187,6 +3183,20 @@ export default function ItineraryScreen() {
           onCancel={() => setShowPlanningConfirmModal(false)}
         />
 
+        {shouldShowPlanningLockOverlay && (
+          <View
+            pointerEvents="none"
+            style={styles.screenLockOverlay}
+            testID="planning-screen-lock-overlay"
+          />
+        )}
+
+        {shouldShowPlanningLockOverlay && (
+          <View style={styles.screenLockBackButton} testID="screen-lock-back">
+            <BackLink onPress={handleBackPress} />
+          </View>
+        )}
+
         {activeState === "planning" && (
           <PlanningDoneBar
             checked={hasCurrentUserFinished}
@@ -3373,13 +3383,20 @@ const styles = StyleSheet.create({
   finalSlotSection: {
     gap: spacing.sm,
   },
-  planningContent: {
-    position: "relative",
-  },
-  planningLockOverlay: {
+  screenLockOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.25)",
-    zIndex: 5,
+    zIndex: 9,
+    elevation: 9,
+  },
+  screenLockBackButton: {
+    position: "absolute",
+    left: spacing.md,
+    top: spacing.sm + spacing.xl,
+    width: 44,
+    height: 44,
+    zIndex: 11,
+    elevation: 11,
   },
   footerBackground: {
     position: "absolute",
