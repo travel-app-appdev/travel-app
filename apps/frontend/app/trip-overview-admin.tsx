@@ -82,6 +82,10 @@ import {
   isPastTripByEndDate,
   isTripStartedByStartDate,
 } from "@/src/utils/tripState";
+import {
+  mapTripMembersToMemberParams,
+  type MemberDisplay,
+} from "@/src/utils/tripMembers";
 import type { TripState } from "@/src/types/trip";
 
 type FieldKey =
@@ -108,37 +112,7 @@ type PhaseValue = {
 
 type PhaseDates = Record<PhaseKey, PhaseValue>;
 
-type MemberParam = {
-  id: string;
-  name: string;
-  initials: string;
-  color: string;
-};
-
-const MEMBER_COLORS = [
-  colors.beachYellow,
-  colors.sunsetPink,
-  colors.neonGreen,
-  colors.seaBlue,
-];
-
-function getMemberInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-}
-
-function mapTripMembersToMemberParams(
-  members?: Trip["members"]
-): MemberParam[] {
-  return (members ?? []).map((member, index) => ({
-    id: member.id,
-    name: member.name,
-    initials: getMemberInitials(member.name),
-    color: MEMBER_COLORS[index % MEMBER_COLORS.length],
-  }));
-}
+type MemberParam = MemberDisplay;
 
 type CalendarDay = {
   dateString: string;
@@ -598,7 +572,7 @@ export default function TripOverviewAdminScreen() {
       id: "planning",
       label: "Planning",
       color: colors.beachYellow,
-      disabledColor: "#F6E08F",
+      disabledColor: colors.disabledBeachYellow,
       status: getPhaseStatus(
         "planning",
         checklistTripState,
@@ -610,7 +584,7 @@ export default function TripOverviewAdminScreen() {
       id: "voting",
       label: "Voting",
       color: colors.sunsetPink,
-      disabledColor: "#F0B8FB",
+      disabledColor: colors.disabledSunsetPink,
       status: getPhaseStatus(
         "voting",
         checklistTripState,
@@ -622,7 +596,7 @@ export default function TripOverviewAdminScreen() {
       id: "final",
       label: "Final",
       color: colors.neonGreen,
-      disabledColor: "#C8F5BE",
+      disabledColor: colors.disabledNeonGreen,
       status: getPhaseStatus(
         "final",
         checklistTripState,
@@ -634,7 +608,7 @@ export default function TripOverviewAdminScreen() {
       id: "memories",
       label: "Memory",
       color: colors.seaBlue,
-      disabledColor: "#A8D4F0",
+      disabledColor: colors.disabledSeaBlue,
       status: getPhaseStatus(
         "memories",
         checklistTripState,
@@ -885,8 +859,8 @@ export default function TripOverviewAdminScreen() {
     });
   }, [tripId]);
 
-  const disabledTripOrange = "#facbb8";
-  const disabledPlanningYellow = "#F6E08F";
+  const disabledTripOrange = colors.disabledSunsetOrange;
+  const disabledPlanningYellow = colors.disabledBeachYellow;
 
   const [showPhaseDateCalendar, setShowPhaseDateCalendar] =
     useState<PhaseKey | null>(null);
@@ -3512,7 +3486,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
   },
   phaseCardShadowPlanning: {
-    shadowColor: "#ebb822",
+    shadowColor: colors.shadowYellow,
     shadowOpacity: 0.16,
     shadowRadius: 1,
     shadowOffset: { width: 0, height: 1 },

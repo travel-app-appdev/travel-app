@@ -1,5 +1,6 @@
 import { colors } from "@/src/theme";
 import type { ItineraryState } from "@/src/types/itinerary";
+import { getMemberColor } from "@/src/utils/tripMembers";
 
 export type Member = {
   id: string;
@@ -28,8 +29,8 @@ export const MOCK_TRIPS: MockTrip[] = [
     status: "planning",
     cardColor: colors.beachYellow,
     members: [
-      { id: "1", initials: "HV", color: "#FF8A65" },
-      { id: "2", initials: "MB", color: "#4FC3F7" },
+      { id: "1", initials: "HV", color: getMemberColor(0) },
+      { id: "2", initials: "MB", color: getMemberColor(1) },
     ],
   },
   {
@@ -41,8 +42,8 @@ export const MOCK_TRIPS: MockTrip[] = [
     status: "voting",
     cardColor: colors.sunsetPink,
     members: [
-      { id: "1", initials: "HV", color: "#FF8A65" },
-      { id: "2", initials: "MB", color: "#4FC3F7" },
+      { id: "1", initials: "HV", color: getMemberColor(0) },
+      { id: "2", initials: "MB", color: getMemberColor(1) },
     ],
   },
   {
@@ -54,8 +55,8 @@ export const MOCK_TRIPS: MockTrip[] = [
     status: "final",
     cardColor: colors.neonGreen,
     members: [
-      { id: "1", initials: "HV", color: "#FF8A65" },
-      { id: "2", initials: "MB", color: "#4FC3F7" },
+      { id: "1", initials: "HV", color: getMemberColor(0) },
+      { id: "2", initials: "MB", color: getMemberColor(1) },
     ],
   },
 ];

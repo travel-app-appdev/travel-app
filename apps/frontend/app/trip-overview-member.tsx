@@ -52,6 +52,10 @@ import {
   isPastTripByEndDate,
   isTripStartedByStartDate,
 } from "@/src/utils/tripState";
+import {
+  mapTripMembersToMemberParams,
+  type MemberDisplay,
+} from "@/src/utils/tripMembers";
 import type { TripState } from "@/src/types/trip";
 import Plane from "@/assets/icons/plane.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
@@ -86,37 +90,7 @@ type PhaseValue = {
 
 type PhaseDates = Record<PhaseKey, PhaseValue>;
 
-type MemberParam = {
-  id: string;
-  name: string;
-  initials: string;
-  color: string;
-};
-
-const MEMBER_COLORS = [
-  colors.beachYellow,
-  colors.sunsetPink,
-  colors.neonGreen,
-  colors.seaBlue,
-];
-
-function getMemberInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-}
-
-function mapTripMembersToMemberParams(
-  members?: Trip["members"]
-): MemberParam[] {
-  return (members ?? []).map((member, index) => ({
-    id: member.id,
-    name: member.name,
-    initials: getMemberInitials(member.name),
-    color: MEMBER_COLORS[index % MEMBER_COLORS.length],
-  }));
-}
+type MemberParam = MemberDisplay;
 
 function getChecklistSubtitle(tripState: TripState): string {
   switch (tripState) {
@@ -549,28 +523,28 @@ export default function TripOverviewMemberScreen() {
       id: "planning",
       label: "Planning",
       color: colors.beachYellow,
-      disabledColor: "#F6E08F",
+      disabledColor: colors.disabledBeachYellow,
       status: getPhaseStatus("planning", tripState, isTripEnded, isTripStarted),
     },
     {
       id: "voting",
       label: "Voting",
       color: colors.sunsetPink,
-      disabledColor: "#F0B8FB",
+      disabledColor: colors.disabledSunsetPink,
       status: getPhaseStatus("voting", tripState, isTripEnded, isTripStarted),
     },
     {
       id: "final",
       label: "Final",
       color: colors.neonGreen,
-      disabledColor: "#C8F5BE",
+      disabledColor: colors.disabledNeonGreen,
       status: getPhaseStatus("final", tripState, isTripEnded, isTripStarted),
     },
     {
       id: "memories",
       label: "Memory",
       color: colors.seaBlue,
-      disabledColor: "#A8D4F0",
+      disabledColor: colors.disabledSeaBlue,
       status: getPhaseStatus("memories", tripState, isTripEnded, isTripStarted),
     },
   ];
@@ -1701,7 +1675,7 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   phaseCardShadowPlanning: {
-    shadowColor: "#ebb822",
+    shadowColor: colors.shadowYellow,
     shadowOpacity: 0.16,
     shadowRadius: 1,
     shadowOffset: { width: 0, height: 1 },

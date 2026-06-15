@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.error,
     fontSize: typography.size.sm,
-    lineHeight: 18,
+    lineHeight: typography.lineHeight.sm,
   },
   buttonWrapper: {
     width: "100%",

@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   itemPressed: {
-    backgroundColor: "#FFF4C2",
+    backgroundColor: colors.highlightYellow,
   },
   itemText: {
     fontSize: typography.size.md,
