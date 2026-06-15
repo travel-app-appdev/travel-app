@@ -1,5 +1,6 @@
 import React from "react";
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 
 import ItineraryScreen from "@/app/itinerary";
 
@@ -16,6 +17,7 @@ const mockVoteForActivity = jest.fn();
 const mockFetchMemories = jest.fn();
 const mockUploadMemoryPhoto = jest.fn();
 const mockDeleteMemoryPhoto = jest.fn();
+const mockHeaderProps = jest.fn();
 const mockDaySelectorProps = jest.fn();
 const mockPlanningDoneBarProps = jest.fn();
 const mockPlanningSlotCardProps = jest.fn();
@@ -32,6 +34,7 @@ jest.mock("@/assets/icons/image-download.svg", () => () => null);
 jest.mock("@/assets/icons/image-delete.svg", () => () => null);
 jest.mock("@/assets/icons/select-all.svg", () => () => null);
 jest.mock("@/assets/icons/unselect-image.svg", () => () => null);
+jest.mock("@/assets/icons/back.svg", () => () => null);
 
 jest.mock("expo-router", () => ({
   router: {
@@ -141,9 +144,10 @@ jest.mock("@/src/components/common/AppText", () => ({
 }));
 
 jest.mock("@/src/components/itinerary/ItineraryHeader", () => ({
-  ItineraryHeader: ({ title }: { title: string }) => {
+  ItineraryHeader: (props: { title: string; showBackButton?: boolean }) => {
+    mockHeaderProps(props);
     const { Text } = require("react-native");
-    return <Text>{title}</Text>;
+    return <Text>{props.title}</Text>;
   },
 }));
 
@@ -261,6 +265,97 @@ describe("ItineraryScreen transition overlays", () => {
     mockGetActivitiesBySlot.mockResolvedValue([]);
     mockGetFinalItineraryActivities.mockResolvedValue([]);
     mockFetchMemories.mockResolvedValue([]);
+  });
+
+  it("dims the planning screen after planning is marked done while keeping the done bar visible and reversible", async () => {
+    setBaseParams("planning");
+    mockFetchTripForUser.mockResolvedValue(backendTrip("Planning"));
+    mockFinishPlanning.mockResolvedValueOnce({
+      allDone: false,
+      tripState: "Planning",
+      completedMembers: 1,
+      totalMembers: 2,
+      planningDone: false,
+    });
+
+    const { getByTestId, unmount } = render(<ItineraryScreen />);
+
+    await waitFor(() => {
+      expect(getByTestId("planning-screen-lock-overlay")).toBeTruthy();
+    });
+
+    expect(
+      getByTestId("planning-screen-lock-overlay").props.pointerEvents
+    ).toBe("none");
+    expect(
+      StyleSheet.flatten(getByTestId("planning-screen-lock-overlay").props.style)
+        .zIndex
+    ).toBeLessThan(10);
+    expect(mockHeaderProps.mock.calls.at(-1)?.[0].showBackButton).toBe(false);
+    expect(
+      StyleSheet.flatten(getByTestId("screen-lock-back").props.style).zIndex
+    ).toBeGreaterThan(10);
+
+    await waitFor(() => {
+      expect(mockPlanningDoneBarProps).toHaveBeenCalled();
+    });
+
+    const latestPlanningProps = mockPlanningDoneBarProps.mock.calls.at(
+      -1
+    )?.[0] as { checked: boolean; disabled?: boolean; onPress: () => void };
+
+    expect(latestPlanningProps.checked).toBe(true);
+    expect(latestPlanningProps.disabled).toBe(false);
+
+    await act(async () => {
+      latestPlanningProps.onPress();
+    });
+
+    await waitFor(() => {
+      expect(mockFinishPlanning).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tripId: "trip-123",
+          planningDone: false,
+        })
+      );
+    });
+
+    unmount();
+  });
+
+  it("does not dim the planning screen before planning is marked done", async () => {
+    setBaseParams("planning");
+    mockParams.members = JSON.stringify([
+      { userId: "user-123", hasFinishedPlanning: false },
+      { userId: "user-456", hasFinishedPlanning: false },
+    ]);
+    mockFetchTripForUser.mockResolvedValue({
+      ...backendTrip("Planning"),
+      members: [
+        {
+          id: "user-123",
+          name: "Helen",
+          role: "member",
+          planning_done: false,
+        },
+        {
+          id: "user-456",
+          name: "Sam",
+          role: "admin",
+          planning_done: false,
+        },
+      ],
+    });
+
+    const { queryByTestId, unmount } = render(<ItineraryScreen />);
+
+    await waitFor(() => {
+      expect(mockPlanningDoneBarProps).toHaveBeenCalled();
+    });
+
+    expect(queryByTestId("planning-screen-lock-overlay")).toBeNull();
+
+    unmount();
   });
 
   it("does not show the voting loading overlay when planning submit is not complete for all members", async () => {

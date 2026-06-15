@@ -11,6 +11,7 @@ type Props = {
   label: string;
   checked: boolean;
   disabled?: boolean;
+  docked?: boolean;
   accentColor: string;
   shadowColor: string;
   shadow: string;
@@ -25,6 +26,7 @@ export function ItineraryDoneBar({
   label,
   checked,
   disabled = false,
+  docked = false,
   accentColor,
   shadowColor,
   shadow,
@@ -52,8 +54,18 @@ export function ItineraryDoneBar({
   }, [onInfoPress]);
 
   return (
-    <View style={styles.wrapper}>
-      <View style={[styles.footer, { shadowColor, boxShadow: shadow }]}>
+    <View
+      style={[styles.wrapper, docked && styles.dockedWrapper]}
+      testID="done-bar-wrapper"
+    >
+      <View
+        style={[
+          styles.footer,
+          docked && styles.dockedFooter,
+          { shadowColor, boxShadow: shadow },
+        ]}
+        testID="done-bar-footer"
+      >
         <Pressable
           style={[styles.doneButton, { backgroundColor: accentColor }]}
           onPress={handlePress}
@@ -106,6 +118,11 @@ const styles = StyleSheet.create({
     zIndex: 10,
     elevation: 10,
   },
+  dockedWrapper: {
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   footer: {
     width: "100%",
     minHeight: 96,
@@ -119,6 +136,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: spacing.md,
     elevation: 6,
+  },
+  dockedFooter: {
+    borderTopLeftRadius: 23,
+    borderTopRightRadius: 23,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   doneButton: {
     minHeight: 56,

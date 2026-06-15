@@ -26,6 +26,7 @@ type Props = {
   daysLeftText?: string;
   onBackPress: () => void;
   state?: ItineraryState;
+  showBackButton?: boolean;
 };
 
 function getHeroColor(state: ItineraryState): string {
@@ -64,6 +65,7 @@ export function ItineraryHeader({
   daysLeftText = "0 days",
   onBackPress,
   state = "planning",
+  showBackButton = true,
 }: Props) {
   const heroColor = getHeroColor(state);
   const Mascot = getMascotByState(state);
@@ -98,9 +100,11 @@ useEffect(() => {
     <View style={styles.wrapper}>
       <View style={[styles.hero, { backgroundColor: heroColor }]}>
         <View style={styles.topRow}>
-          <View style={styles.backButtonSlot}>
-            <BackLink onPress={onBackPress} />
-          </View>
+          {showBackButton && (
+            <View style={styles.backButtonSlot}>
+              <BackLink onPress={onBackPress} />
+            </View>
+          )}
 
       {state !== "final" && state !== "memories" ? (
   <View
