@@ -1,6 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
-import { doc, onSnapshot } from "firebase/firestore";
 import {
   AccessibilityInfo,
   findNodeHandle,
@@ -30,10 +29,9 @@ import {
   isTripNotFoundError,
   leaveTrip,
   updateMemberPreferences,
-  type Trip,
 } from "@/src/api/trips";
 import { PreferenceChips } from "@/src/components/common/PreferenceChips";
-import { auth, db } from "@/src/lib/firebase";
+import { auth } from "@/src/lib/firebase";
 import { invalidateTripsCache } from "./home";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import {
@@ -46,6 +44,7 @@ import {
 } from "@/src/utils/accessibility";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { useApiFeedbackModal } from "@/src/hooks/useApiFeedbackModal";
+import { useTripDocumentListener } from "@/src/hooks/useTripDocumentListener";
 import {
   getChecklistDisplayState,
   getPhaseStatus,
@@ -375,7 +374,6 @@ export default function TripOverviewMemberScreen() {
           planningEndAt: currentTrip.planning_end_at ?? "",
           votingEndAt: currentTrip.voting_end_at ?? "",
         });
-
         if (currentTrip.members) {
           setMembers(mapTripMembersForDisplay(currentTrip.members));
         }
@@ -409,35 +407,25 @@ export default function TripOverviewMemberScreen() {
     }, [refreshTripSnapshot])
   );
 
-  useEffect(() => {
-    if (!tripId) {
-      return;
-    }
+  const handleTripMissing = useCallback(() => {
+    invalidateTripsCache();
+    router.replace("/home");
+  }, [router]);
 
-    let isInitialSnapshot = true;
-    const unsubscribe = onSnapshot(
-      doc(db, "trips", tripId),
-      (snapshot) => {
-        if (!snapshot.exists()) {
-          invalidateTripsCache();
-          router.replace("/home");
-          return;
-        }
+  const handleTripSnapshotChanged = useCallback(() => {
+    void refreshTripSnapshot({ forceRefresh: true });
+  }, [refreshTripSnapshot]);
 
-        if (isInitialSnapshot) {
-          isInitialSnapshot = false;
-          return;
-        }
+  const handleTripListenerError = useCallback((error: Error) => {
+    console.log("Trip deletion listener error:", error);
+  }, []);
 
-        void refreshTripSnapshot({ forceRefresh: true });
-      },
-      (error) => {
-        console.log("Trip deletion listener error:", error);
-      }
-    );
-
-    return unsubscribe;
-  }, [refreshTripSnapshot, router, tripId]);
+  useTripDocumentListener({
+    tripId,
+    onMissing: handleTripMissing,
+    onChange: handleTripSnapshotChanged,
+    onError: handleTripListenerError,
+  });
 
   useEffect(() => {
     if (!tripId || (tripState !== "Planning" && tripState !== "Voting")) {
@@ -497,15 +485,14 @@ export default function TripOverviewMemberScreen() {
     if (node) AccessibilityInfo.setAccessibilityFocus(node);
   }
 
-  const parsedMembers: MemberParam[] = (() => {
+  const routeMembers: MemberParam[] = useMemo(() => {
     try {
       return membersParam ? JSON.parse(membersParam) : [];
     } catch {
       return [];
     }
-  })();
-
-  const [members, setMembers] = useState<MemberParam[]>(parsedMembers);
+  }, [membersParam]);
+  const [members, setMembers] = useState<MemberParam[]>(routeMembers);
 
   const tripStart = useMemo(
     () =>
@@ -862,13 +849,20 @@ export default function TripOverviewMemberScreen() {
                   }`}
                 >
                   <View style={styles.infoLeft}>
-                    <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
                       <Settings width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Your Travel Preference
                       </AppText>
                     </View>
-                    <AppText variant="caption" style={styles.infoValue} accessible={false}>
+                    <AppText
+                      variant="caption"
+                      style={styles.infoValue}
+                      accessible={false}
+                    >
                       {preferences.length > 0
                         ? `${preferences.length} selected`
                         : "Not set"}
@@ -888,14 +882,21 @@ export default function TripOverviewMemberScreen() {
                     accessibilityState={{ expanded: isPrefsExpanded }}
                   >
                     <View style={styles.infoLeft}>
-                      <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                      <View
+                        style={styles.infoLabelRow}
+                        {...hiddenFromAccessibility}
+                      >
                         <Settings width={20} height={20} />
                         <AppText variant="body" style={styles.fieldLabel}>
                           Your Travel Preference
                         </AppText>
                       </View>
                       {!isPrefsExpanded && (
-                        <AppText variant="caption" style={styles.infoValue} accessible={false}>
+                        <AppText
+                          variant="caption"
+                          style={styles.infoValue}
+                          accessible={false}
+                        >
                           {preferences.length > 0
                             ? `${preferences.length} selected`
                             : "Not set"}
@@ -931,7 +932,10 @@ export default function TripOverviewMemberScreen() {
                   </Pressable>
                   {isPrefsExpanded && (
                     <Pressable
-                      style={[styles.saveBtn, isSavingPrefs && { opacity: 0.6 }]}
+                      style={[
+                        styles.saveBtn,
+                        isSavingPrefs && { opacity: 0.6 },
+                      ]}
                       onPress={handleSavePreferences}
                       disabled={isSavingPrefs}
                       accessibilityRole="button"
@@ -1145,10 +1149,7 @@ export default function TripOverviewMemberScreen() {
                         <View
                           style={
                             isActive
-                              ? [
-                                  styles.phaseCardShadowWrap,
-                                  activeShadowStyle,
-                                ]
+                              ? [styles.phaseCardShadowWrap, activeShadowStyle]
                               : undefined
                           }
                         >
@@ -1186,7 +1187,8 @@ export default function TripOverviewMemberScreen() {
                                       </AppText>
                                     </View>
 
-                                    {phaseId === "planning" || phaseId === "voting" ? (
+                                    {phaseId === "planning" ||
+                                    phaseId === "voting" ? (
                                       <View style={styles.phaseTimerBlock}>
                                         <View
                                           style={styles.hourglassCol}
@@ -1322,7 +1324,8 @@ export default function TripOverviewMemberScreen() {
                                   </View>
                                 </View>
 
-                                {phaseId === "planning" || phaseId === "voting" ? (
+                                {phaseId === "planning" ||
+                                phaseId === "voting" ? (
                                   <AppText
                                     variant="caption"
                                     style={[

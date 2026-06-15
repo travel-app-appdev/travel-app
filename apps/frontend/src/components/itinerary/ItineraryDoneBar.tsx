@@ -1,5 +1,11 @@
 import { useCallback, type ReactNode } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type AccessibilityRole,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/common/AppText";
 import { ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
@@ -21,6 +27,7 @@ type Props = {
   accessibilityLabel: string;
   accessibilityCheckedLabel: string;
   infoAccessibilityLabel: string;
+  accessibilityRole?: AccessibilityRole;
   onPress: () => void;
   onInfoPress: () => void;
 };
@@ -96,6 +103,7 @@ export function ItineraryDoneBar({
   accessibilityLabel,
   accessibilityCheckedLabel,
   infoAccessibilityLabel,
+  accessibilityRole = "checkbox",
   onPress,
   onInfoPress,
 }: Props) {
@@ -124,7 +132,7 @@ export function ItineraryDoneBar({
         disabled={isDisabled}
         hitSlop={8}
         testID="done-bar-submit-button"
-        accessibilityRole="checkbox"
+        accessibilityRole={accessibilityRole}
         accessibilityLabel={
           checked ? accessibilityCheckedLabel : accessibilityLabel
         }

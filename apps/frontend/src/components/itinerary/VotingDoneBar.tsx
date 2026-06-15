@@ -25,6 +25,7 @@ export function VotingDoneBar({
       accessibilityLabel="End voting for everyone"
       accessibilityCheckedLabel="Voting is being submitted"
       infoAccessibilityLabel="Show voting done info"
+      accessibilityRole="button"
       onPress={onPress}
       onInfoPress={onInfoPress}
     />

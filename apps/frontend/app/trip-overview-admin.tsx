@@ -1,7 +1,6 @@
 //apps/frontend/app/trip-overview-admin.tsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { doc, onSnapshot } from "firebase/firestore";
 import {
   AccessibilityInfo,
   findNodeHandle,
@@ -42,11 +41,12 @@ import {
 import { PreferenceChips } from "@/src/components/common/PreferenceChips";
 import { DestinationAutocomplete } from "@/src/components/common/DestinationAutocomplete";
 import { useAuth } from "@/src/context/AuthContext";
-import { auth, db } from "@/src/lib/firebase";
+import { auth } from "@/src/lib/firebase";
 import { getUserFacingApiError } from "@/src/lib/apiErrors";
 import { redirectToLogin } from "@/src/lib/sessionExpired";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
+import { useTripDocumentListener } from "@/src/hooks/useTripDocumentListener";
 import { invalidateTripsCache } from "./home";
 import {
   formatTripDurationText,
@@ -88,7 +88,13 @@ import {
 } from "@/src/utils/tripState";
 import type { TripState } from "@/src/types/trip";
 
-type FieldKey = "name" | "date" | "destination" | "members" | "code" | "preferences";
+type FieldKey =
+  | "name"
+  | "date"
+  | "destination"
+  | "members"
+  | "code"
+  | "preferences";
 type PhaseKey = "planning" | "voting" | "final" | "memories";
 
 const PAST_TRIP_LOCKED_FIELDS: FieldKey[] = [
@@ -112,6 +118,31 @@ type MemberParam = {
   initials: string;
   color: string;
 };
+
+const MEMBER_COLORS = [
+  colors.beachYellow,
+  colors.sunsetPink,
+  colors.neonGreen,
+  colors.seaBlue,
+];
+
+function getMemberInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function mapTripMembersToMemberParams(
+  members?: Trip["members"]
+): MemberParam[] {
+  return (members ?? []).map((member, index) => ({
+    id: member.id,
+    name: member.name,
+    initials: getMemberInitials(member.name),
+    color: MEMBER_COLORS[index % MEMBER_COLORS.length],
+  }));
+}
 
 type CalendarDay = {
   dateString: string;
@@ -605,28 +636,48 @@ export default function TripOverviewAdminScreen() {
       label: "Planning",
       color: colors.beachYellow,
       disabledColor: "#F6E08F",
-      status: getPhaseStatus("planning", checklistTripState, isTripEnded, isTripStarted),
+      status: getPhaseStatus(
+        "planning",
+        checklistTripState,
+        isTripEnded,
+        isTripStarted
+      ),
     },
     {
       id: "voting",
       label: "Voting",
       color: colors.sunsetPink,
       disabledColor: "#F0B8FB",
-      status: getPhaseStatus("voting", checklistTripState, isTripEnded, isTripStarted),
+      status: getPhaseStatus(
+        "voting",
+        checklistTripState,
+        isTripEnded,
+        isTripStarted
+      ),
     },
     {
       id: "final",
       label: "Final",
       color: colors.neonGreen,
       disabledColor: "#C8F5BE",
-      status: getPhaseStatus("final", checklistTripState, isTripEnded, isTripStarted),
+      status: getPhaseStatus(
+        "final",
+        checklistTripState,
+        isTripEnded,
+        isTripStarted
+      ),
     },
     {
       id: "memories",
       label: "Memory",
       color: colors.seaBlue,
       disabledColor: "#A8D4F0",
-      status: getPhaseStatus("memories", checklistTripState, isTripEnded, isTripStarted),
+      status: getPhaseStatus(
+        "memories",
+        checklistTripState,
+        isTripEnded,
+        isTripStarted
+      ),
     },
   ];
 
@@ -669,6 +720,10 @@ export default function TripOverviewAdminScreen() {
     setDestinationInput(trip.destination);
     setTripStart(nextTripStart);
     setTripEnd(nextTripEnd);
+    const nextMembers = mapTripMembersToMemberParams(trip.members);
+    if (nextMembers.length > 0) {
+      setMembers(nextMembers);
+    }
     setTripTiming({
       planningStartedAt: trip.planning_started_at ?? "",
       planningEndAt: trip.planning_end_at ?? "",
@@ -749,35 +804,25 @@ export default function TripOverviewAdminScreen() {
     }, [refreshTripSnapshot])
   );
 
-  useEffect(() => {
-    if (!tripId) {
-      return;
-    }
+  const handleTripMissing = useCallback(() => {
+    invalidateTripsCache();
+    router.replace("/home");
+  }, [router]);
 
-    let isInitialSnapshot = true;
-    const unsubscribe = onSnapshot(
-      doc(db, "trips", tripId),
-      (snapshot) => {
-        if (!snapshot.exists()) {
-          invalidateTripsCache();
-          router.replace("/home");
-          return;
-        }
+  const handleTripSnapshotChanged = useCallback(() => {
+    void refreshTripSnapshot({ forceRefresh: true });
+  }, [refreshTripSnapshot]);
 
-        if (isInitialSnapshot) {
-          isInitialSnapshot = false;
-          return;
-        }
+  const handleTripListenerError = useCallback((error: Error) => {
+    console.log("Trip deletion listener error:", error);
+  }, []);
 
-        void refreshTripSnapshot({ forceRefresh: true });
-      },
-      (error) => {
-        console.log("Trip deletion listener error:", error);
-      }
-    );
-
-    return unsubscribe;
-  }, [refreshTripSnapshot, router, tripId]);
+  useTripDocumentListener({
+    tripId,
+    onMissing: handleTripMissing,
+    onChange: handleTripSnapshotChanged,
+    onError: handleTripListenerError,
+  });
 
   useEffect(() => {
     if (!tripId || (tripState !== "Planning" && tripState !== "Voting")) {
@@ -875,7 +920,9 @@ export default function TripOverviewAdminScreen() {
   useEffect(() => {
     getIdToken().then((idToken) => {
       if (!idToken) return;
-      getMemberPreferences(tripId, idToken).then(setPreferences).catch(() => {});
+      getMemberPreferences(tripId, idToken)
+        .then(setPreferences)
+        .catch(() => {});
     });
   }, [tripId]);
 
@@ -1345,10 +1392,7 @@ export default function TripOverviewAdminScreen() {
     if (!showPhaseTimePicker) return;
 
     if (!isValidTimeString(tempPhaseTime)) {
-      openFeedbackModal(
-        "Invalid time",
-        "Please enter a valid time as HH:MM."
-      );
+      openFeedbackModal("Invalid time", "Please enter a valid time as HH:MM.");
       return;
     }
 
@@ -1906,7 +1950,13 @@ export default function TripOverviewAdminScreen() {
                   </View>
                 </View>
               ) : openField === "destination" ? (
-                <View style={[styles.infoRow, styles.infoRowEditing, { zIndex: 9999 }]}>
+                <View
+                  style={[
+                    styles.infoRow,
+                    styles.infoRowEditing,
+                    { zIndex: 9999 },
+                  ]}
+                >
                   <View style={[styles.infoLeft, { zIndex: 9999 }]}>
                     <View
                       style={styles.infoLabelRow}
@@ -2092,13 +2142,20 @@ export default function TripOverviewAdminScreen() {
                   }`}
                 >
                   <View style={styles.infoLeft}>
-                    <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
                       <Settings width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Your Travel Preference
                       </AppText>
                     </View>
-                    <AppText variant="caption" style={styles.infoValue} accessible={false}>
+                    <AppText
+                      variant="caption"
+                      style={styles.infoValue}
+                      accessible={false}
+                    >
                       {preferences.length > 0
                         ? `${preferences.length} selected`
                         : "Not set"}
@@ -2111,21 +2168,32 @@ export default function TripOverviewAdminScreen() {
                     styles.infoRow,
                     openField === "preferences" && styles.infoRowEditing,
                   ]}
-                  onPress={openField === "preferences" ? undefined : handlePrefsRow}
+                  onPress={
+                    openField === "preferences" ? undefined : handlePrefsRow
+                  }
                   accessibilityRole="button"
                   accessibilityLabel="Edit your travel preference"
                   accessibilityState={{ expanded: openField === "preferences" }}
                 >
                   <View style={styles.infoLeft}>
-                    <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
                       <Settings width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Your Travel Preference
                       </AppText>
                     </View>
                     {openField !== "preferences" && (
-                      <AppText variant="caption" style={styles.infoValue} accessible={false}>
-                        {preferences.length > 0 ? `${preferences.length} selected` : "Not set"}
+                      <AppText
+                        variant="caption"
+                        style={styles.infoValue}
+                        accessible={false}
+                      >
+                        {preferences.length > 0
+                          ? `${preferences.length} selected`
+                          : "Not set"}
                       </AppText>
                     )}
                     {openField === "preferences" && (
@@ -2436,7 +2504,8 @@ export default function TripOverviewAdminScreen() {
                                       </AppText>
                                     </View>
 
-                                    {phaseId === "planning" || phaseId === "voting" ? (
+                                    {phaseId === "planning" ||
+                                    phaseId === "voting" ? (
                                       <View style={styles.phaseTimerBlock}>
                                         <View
                                           style={styles.hourglassCol}
@@ -2581,7 +2650,8 @@ export default function TripOverviewAdminScreen() {
                                   ) : null}
                                 </View>
 
-                                {phaseId === "planning" || phaseId === "voting" ? (
+                                {phaseId === "planning" ||
+                                phaseId === "voting" ? (
                                   <AppText
                                     variant="caption"
                                     style={[
