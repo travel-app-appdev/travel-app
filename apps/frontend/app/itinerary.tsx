@@ -3394,7 +3394,7 @@ const styles = StyleSheet.create({
   memoryActionButton: {
     alignSelf: "flex-start",
     minHeight: 56,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -3447,14 +3447,14 @@ const styles = StyleSheet.create({
   memoryTile: {
     width: "48.5%",
     aspectRatio: 1,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     overflow: "hidden",
     backgroundColor: colors.border,
   },
   memoryPlaceholder: {
     width: "48.5%",
     aspectRatio: 1,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     backgroundColor: colors.border,
   },
   memoryImage: {

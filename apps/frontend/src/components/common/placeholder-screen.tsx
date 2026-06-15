@@ -2,7 +2,7 @@
 import { Link, type Href } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/common/AppText";
-import { colors, spacing } from "@/src/theme";
+import { colors, spacing, typography } from "@/src/theme";
 
 type PlaceholderScreenProps = {
   title: string;
@@ -56,6 +56,6 @@ const styles = StyleSheet.create({
   link: {
     marginTop: spacing.md,
     color: colors.primary,
-    fontSize: 16,
+    fontSize: typography.size.md,
   },
 });

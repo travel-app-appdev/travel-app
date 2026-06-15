@@ -1,7 +1,7 @@
 import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/common/AppText";
-import { colors, spacing } from "@/src/theme";
+import { colors, radius, spacing } from "@/src/theme";
 
 type Props = {
   visible: boolean;
@@ -30,7 +30,10 @@ export function ItineraryInfoModal({
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.safeArea} edges={["top", "right", "bottom", "left"]}>
+      <SafeAreaView
+        style={styles.safeArea}
+        edges={["top", "right", "bottom", "left"]}
+      >
         <View style={styles.overlay}>
           <Pressable
             style={styles.backdrop}
@@ -104,7 +107,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     minHeight: 48,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     backgroundColor: colors.sunsetPink,
     alignItems: "center",
     justifyContent: "center",

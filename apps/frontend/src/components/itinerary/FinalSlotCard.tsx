@@ -78,11 +78,7 @@ export function FinalSlotCard({
   const renderJoinedMeta = () => (
     <View style={styles.inlineMeta} accessible={false}>
       <MembersIcon width={14} height={14} />
-      <AppText
-        variant="caption"
-        style={styles.joinedCount}
-        numberOfLines={1}
-      >
+      <AppText variant="caption" style={styles.joinedCount} numberOfLines={1}>
         {joinedLabel}
       </AppText>
     </View>
@@ -357,8 +353,8 @@ const styles = StyleSheet.create({
   badge: {
     minWidth: 24,
     height: 24,
-    borderRadius: 12,
-    paddingHorizontal: 8,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.neonGreen,

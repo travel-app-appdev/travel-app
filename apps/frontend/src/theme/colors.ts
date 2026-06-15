@@ -7,6 +7,15 @@ export const colors = {
   plantGreen: "#54B864",
   continueOrange: "#F77646",
 
+  disabledSunsetOrange: "#facbb8",
+  disabledBeachYellow: "#F6E08F",
+  disabledSunsetPink: "#F0B8FB",
+  disabledNeonGreen: "#C8F5BE",
+  disabledSeaBlue: "#A8D4F0",
+
+  highlightYellow: "#FFF4C2",
+  shadowYellow: "#ebb822",
+
   lightWhite: "#FFFEF5",
   nightBlack: "#140D0A",
   grayedOut: "#767676",

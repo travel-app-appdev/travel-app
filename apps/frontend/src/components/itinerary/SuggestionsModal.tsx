@@ -1207,7 +1207,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.beachYellow,
-    backgroundColor: "#FFF4C2",
+    backgroundColor: colors.highlightYellow,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },

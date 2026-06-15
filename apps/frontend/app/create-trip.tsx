@@ -211,9 +211,9 @@ function normalizeTimeInput(value: string): string {
 }
 
 const CalendarModalWrapper = ({
-                                children,
-                                isLandscape,
-                              }: {
+  children,
+  isLandscape,
+}: {
   children: React.ReactNode;
   isLandscape: boolean;
 }) => (
@@ -245,17 +245,17 @@ type ProgressBarProps = {
 };
 
 const ProgressBar: React.FC<ProgressBarProps> = ({
-                                                   progressWidth,
-                                                   currentStep,
-                                                   totalSteps,
-                                                 }) => {
+  progressWidth,
+  currentStep,
+  totalSteps,
+}) => {
   return (
     <View style={styles.progressBarContainer}>
       <View
         style={{
           width: "100%",
           height: 8,
-          borderRadius: 8,
+          borderRadius: radius.sm,
           backgroundColor:
             currentStep === 3 ? colors.grayedOut : colors.lightWhite,
           overflow: "hidden",
@@ -264,7 +264,7 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
         <Animated.View
           style={{
             height: "100%",
-            borderRadius: 8,
+            borderRadius: radius.sm,
             backgroundColor: colors.seaBlue,
             width: progressWidth,
           }}
@@ -275,8 +275,8 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
           marginTop: 6,
           alignSelf: "center",
           color: colors.nightBlack,
-          fontSize: 14,
-          fontWeight: "600",
+          fontSize: typography.size.sm,
+          fontFamily: typography.fontFamily.bodySemiBold,
         }}
       >
         {currentStep}/{totalSteps}
@@ -398,8 +398,8 @@ export default function CreateTripScreen() {
     };
   }, [blinkingDotAnim]);
 
-  const disabledTripOrange = "#facbb8";
-  const disabledPlanningYellow = "#F6E08F";
+  const disabledTripOrange = colors.disabledSunsetOrange;
+  const disabledPlanningYellow = colors.disabledBeachYellow;
 
   const [activePhaseCalendar, setActivePhaseCalendar] =
     useState<PhaseKey | null>(null);
@@ -715,7 +715,8 @@ export default function CreateTripScreen() {
     );
 
     if (isPlanningEditor) return { ...tripRange, ...planningRange };
-    if (isVotingEditor) return { ...tripRange, ...planningRange, ...votingRange };
+    if (isVotingEditor)
+      return { ...tripRange, ...planningRange, ...votingRange };
     return tripRange;
   }, [
     showPhaseDateCalendar,
@@ -857,10 +858,7 @@ export default function CreateTripScreen() {
   const handleApplyPhaseTime = () => {
     if (!showPhaseTimePicker) return;
     if (!isValidTimeString(tempPhaseTime)) {
-      openFeedbackModal(
-        "Invalid time",
-        "Please enter a valid time as HH:MM."
-      );
+      openFeedbackModal("Invalid time", "Please enter a valid time as HH:MM.");
       return;
     }
     setPhaseDates((prev) => ({
@@ -1027,7 +1025,10 @@ export default function CreateTripScreen() {
               <View style={styles.setupSection}>
                 {showOnboardingHint && (
                   <View style={styles.onboardingTooltip}>
-                    <AppText variant="body" style={styles.onboardingTooltipText}>
+                    <AppText
+                      variant="body"
+                      style={styles.onboardingTooltipText}
+                    >
                       Need a refresher? Open{" "}
                       <AppText
                         variant="body"
@@ -1249,9 +1250,7 @@ export default function CreateTripScreen() {
                 disabled={isCreating}
                 style={styles.nextButton}
                 textStyle={styles.nextButtonText}
-                accessibilityLabel={
-                  isCreating ? "Continuing" : "Continue"
-                }
+                accessibilityLabel={isCreating ? "Continuing" : "Continue"}
               />
             </View>
 
@@ -1542,7 +1541,9 @@ export default function CreateTripScreen() {
                 </AppText>
               </AppText>
               <AppText variant="caption" style={styles.prefsHintText}>
-                {"Pick up to 5 categories. We'll use your picks to suggest activities during planning."}
+                {
+                  "Pick up to 5 categories. We'll use your picks to suggest activities during planning."
+                }
               </AppText>
             </View>
 
@@ -1561,7 +1562,10 @@ export default function CreateTripScreen() {
             <Pressable
               onPress={handlePreferencesContinue}
               disabled={isSavingPrefs}
-              style={[styles.prefsContinueBtn, isSavingPrefs && styles.prefsContinueBtnDisabled]}
+              style={[
+                styles.prefsContinueBtn,
+                isSavingPrefs && styles.prefsContinueBtnDisabled,
+              ]}
               accessibilityRole="button"
               accessibilityLabel="Continue"
             >
@@ -1723,7 +1727,9 @@ export default function CreateTripScreen() {
                     Where is your trip taking place?
                   </AppText>
 
-                  <View style={[styles.fieldGroup, { marginTop: 20, zIndex: 9999 }]}>
+                  <View
+                    style={[styles.fieldGroup, { marginTop: 20, zIndex: 9999 }]}
+                  >
                     <View
                       style={styles.fieldLabelRow}
                       {...hiddenFromAccessibility}
@@ -2247,7 +2253,7 @@ const styles = StyleSheet.create({
   },
   setupText: {
     flex: 1,
-    fontSize: 18,
+    fontSize: typography.size.lg,
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
     lineHeight: typography.lineHeight.md,
@@ -2583,8 +2589,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   prefsBackArrow: {
-    fontSize: 32,
-    lineHeight: 36,
+    fontSize: typography.size.displaySm,
+    lineHeight: typography.lineHeight.displaySm,
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
   },

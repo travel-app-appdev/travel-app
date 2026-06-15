@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   },
   doneButton: {
     minHeight: 56,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
   doneText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
-    fontSize: 18,
+    fontSize: typography.size.lg,
   },
   infoButton: {
     width: 42,
