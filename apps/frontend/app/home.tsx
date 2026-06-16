@@ -205,6 +205,32 @@ function mapTripToCardTrip(
   };
 }
 
+function compareUpcomingTrips(a: TripCardItem, b: TripCardItem): number {
+  const startDiff =
+    parseLocalTripDate(a.rawStartDate).getTime() -
+    parseLocalTripDate(b.rawStartDate).getTime();
+
+  if (startDiff !== 0) return startDiff;
+
+  return (
+    parseLocalTripDate(a.rawEndDate).getTime() -
+    parseLocalTripDate(b.rawEndDate).getTime()
+  );
+}
+
+function comparePastTrips(a: TripCardItem, b: TripCardItem): number {
+  const endDiff =
+    parseLocalTripDate(b.rawEndDate).getTime() -
+    parseLocalTripDate(a.rawEndDate).getTime();
+
+  if (endDiff !== 0) return endDiff;
+
+  return (
+    parseLocalTripDate(b.rawStartDate).getTime() -
+    parseLocalTripDate(a.rawStartDate).getTime()
+  );
+}
+
 function mapTripsToLists(backendTrips: TripWithMembers[]) {
   const today = new Date();
 
@@ -220,6 +246,9 @@ function mapTripsToLists(backendTrips: TripWithMembers[]) {
       upcoming.push(mappedTrip);
     }
   });
+
+  upcoming.sort(compareUpcomingTrips);
+  past.sort(comparePastTrips);
 
   return { upcoming, past };
 }
