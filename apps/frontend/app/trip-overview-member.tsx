@@ -1273,7 +1273,7 @@ export default function TripOverviewMemberScreen() {
                                           {`${formatDateDisplay(dates.start)} at ${dates.time}`}
                                         </AppText>
                                       </View>
-                                    ) : !isTripStarted ? (
+                                    ) : !isActive ? (
                                       <View
                                         style={styles.memoriesInactiveTextBlock}
                                       >

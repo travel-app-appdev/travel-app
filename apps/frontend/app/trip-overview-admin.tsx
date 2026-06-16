@@ -2486,7 +2486,7 @@ export default function TripOverviewAdminScreen() {
                                           {`${formatDateDisplay(dates.start)} at ${dates.time}`}
                                         </AppText>
                                       </View>
-                                    ) : !isTripStarted ? (
+                                    ) : !isActive ? (
                                       <View
                                         style={styles.memoriesInactiveTextBlock}
                                       >
