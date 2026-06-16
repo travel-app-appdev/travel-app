@@ -21,7 +21,7 @@ export function VotingDoneBar({
       disabled={disabled}
       accentColor={colors.sunsetPink}
       shadowColor={colors.sunsetPink}
-      shadow={`0px -10px ${radius.lg}px rgba(229, 130, 251, 0.18)`}
+      shadow={`0px 8px ${radius.xl}px rgba(229, 130, 251, 0.25)`}
       accessibilityLabel="End voting for everyone"
       accessibilityCheckedLabel="Voting is being submitted"
       infoAccessibilityLabel="Show voting done info"

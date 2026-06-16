@@ -40,7 +40,6 @@ import type {
 import type { TripState } from "@/src/types/trip";
 
 import { AppText } from "@/src/components/common/AppText";
-import { BackLink } from "@/src/components/common/BackLink";
 import { ConfirmModal } from "@/src/components/common/ConfirmModal";
 import { FeedbackModal } from "@/src/components/common/FeedbackModal";
 import { ItineraryHeader } from "@/src/components/itinerary/ItineraryHeader";
@@ -2710,26 +2709,25 @@ export default function ItineraryScreen() {
   }
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: safeAreaBg }]}
-      edges={["top", "left", "right"]}
-    >
+    <View style={[styles.root, { backgroundColor: safeAreaBg }]}>
       <StatusBar style="dark" />
 
-      <View style={styles.screen}>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              tintColor={colors.nightBlack}
-              colors={[colors.nightBlack]}
-            />
-          }
-        >
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+        <View style={styles.screen}>
+          <View style={styles.mainContent}>
+            <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={colors.nightBlack}
+                colors={[colors.nightBlack]}
+              />
+            }
+          >
           <ItineraryHeader
             title={activeState === "memories" ? "Memories" : "Itinerary"}
             tripName={itinerary.title}
@@ -2739,7 +2737,6 @@ export default function ItineraryScreen() {
             daysLeftText={timerText}
             onBackPress={handleBackPress}
             state={activeState}
-            showBackButton={!shouldShowPlanningLockOverlay}
           />
 
           <View style={styles.contentPanel}>
@@ -2967,9 +2964,15 @@ export default function ItineraryScreen() {
             )}
           </View>
         </ScrollView>
+        </View>
 
-        {activeState === "planning" && (
-          <View style={[styles.footerBackground, { pointerEvents: "none" }]} />
+        {activeState === "voting" && isAdmin && (
+          <VotingDoneBar
+            checked={isSubmittingVoting || isPreparingFinalItinerary}
+            disabled={isSubmittingVoting || isPreparingFinalItinerary}
+            onPress={handleFinishVoting}
+            onInfoPress={handleVotingInfoPress}
+          />
         )}
 
         <SuggestionsModal
@@ -3183,42 +3186,6 @@ export default function ItineraryScreen() {
           onCancel={() => setShowPlanningConfirmModal(false)}
         />
 
-        {shouldShowPlanningLockOverlay && (
-          <View
-            pointerEvents="none"
-            style={styles.screenLockOverlay}
-            testID="planning-screen-lock-overlay"
-          />
-        )}
-
-        {shouldShowPlanningLockOverlay && (
-          <View style={styles.screenLockBackButton} testID="screen-lock-back">
-            <BackLink onPress={handleBackPress} />
-          </View>
-        )}
-
-        {activeState === "planning" && (
-          <PlanningDoneBar
-            checked={hasCurrentUserFinished}
-            disabled={
-              isSubmittingPlanning ||
-              isPreparingFinalItinerary ||
-              isPreparingVoting
-            }
-            onPress={handlePlanningDonePress}
-            onInfoPress={handlePlanningInfoPress}
-          />
-        )}
-
-        {activeState === "voting" && isAdmin && (
-          <VotingDoneBar
-            checked={isSubmittingVoting || isPreparingFinalItinerary}
-            disabled={isSubmittingVoting || isPreparingFinalItinerary}
-            onPress={handleFinishVoting}
-            onInfoPress={handleVotingInfoPress}
-          />
-        )}
-
         {activeState === "memories" &&
         isMemorySelectionMode &&
         memories.length > 0 ? (
@@ -3347,17 +3314,47 @@ export default function ItineraryScreen() {
           onClose={() => setShowMemoryFeedbackModal(false)}
           buttonColor={colors.seaBlue}
         />
-      </View>
-    </SafeAreaView>
+        </View>
+      </SafeAreaView>
+
+      {shouldShowPlanningLockOverlay ? (
+        <View
+          pointerEvents="none"
+          style={styles.screenLockOverlayFullScreen}
+          testID="planning-screen-lock-overlay"
+        />
+      ) : null}
+
+      {activeState === "planning" ? (
+        <PlanningDoneBar
+          checked={hasCurrentUserFinished}
+          dimSurroundings={shouldShowPlanningLockOverlay}
+          disabled={
+            isSubmittingPlanning ||
+            isPreparingFinalItinerary ||
+            isPreparingVoting
+          }
+          onPress={handlePlanningDonePress}
+          onInfoPress={handlePlanningInfoPress}
+        />
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: colors.beachYellow,
+    backgroundColor: "transparent",
   },
   screen: {
+    flex: 1,
+    backgroundColor: colors.lightWhite,
+  },
+  mainContent: {
     flex: 1,
     position: "relative",
     backgroundColor: colors.lightWhite,
@@ -3368,7 +3365,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingTop: 0,
-    paddingBottom: 140,
+    paddingBottom: spacing.xl,
   },
   contentPanel: {
     marginHorizontal: 0,
@@ -3383,31 +3380,10 @@ const styles = StyleSheet.create({
   finalSlotSection: {
     gap: spacing.sm,
   },
-  screenLockOverlay: {
+  screenLockOverlayFullScreen: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.25)",
     zIndex: 9,
-    elevation: 9,
-  },
-  screenLockBackButton: {
-    position: "absolute",
-    left: spacing.md,
-    top: spacing.sm + spacing.xl,
-    width: 44,
-    height: 44,
-    zIndex: 11,
-    elevation: 11,
-  },
-  footerBackground: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.lightWhite,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    height: 110,
-    elevation: 4,
   },
   votingSection: {
     paddingTop: spacing.md,

@@ -36,6 +36,18 @@ jest.mock("@/assets/icons/select-all.svg", () => () => null);
 jest.mock("@/assets/icons/unselect-image.svg", () => () => null);
 jest.mock("@/assets/icons/back.svg", () => () => null);
 
+jest.mock("react-native-safe-area-context", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+
+  return {
+    SafeAreaView: ({ children, ...props }: any) => (
+      <View {...props}>{children}</View>
+    ),
+    useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }),
+  };
+});
+
 jest.mock("expo-router", () => ({
   router: {
     back: () => mockBack(),
@@ -267,7 +279,7 @@ describe("ItineraryScreen transition overlays", () => {
     mockFetchMemories.mockResolvedValue([]);
   });
 
-  it("dims the planning screen after planning is marked done while keeping the done bar visible and reversible", async () => {
+  it("dims the itinerary content after planning is marked done while keeping the done bar bright", async () => {
     setBaseParams("planning");
     mockFetchTripForUser.mockResolvedValue(backendTrip("Planning"));
     mockFinishPlanning.mockResolvedValueOnce({
@@ -287,14 +299,6 @@ describe("ItineraryScreen transition overlays", () => {
     expect(
       getByTestId("planning-screen-lock-overlay").props.pointerEvents
     ).toBe("none");
-    expect(
-      StyleSheet.flatten(getByTestId("planning-screen-lock-overlay").props.style)
-        .zIndex
-    ).toBeLessThan(10);
-    expect(mockHeaderProps.mock.calls.at(-1)?.[0].showBackButton).toBe(false);
-    expect(
-      StyleSheet.flatten(getByTestId("screen-lock-back").props.style).zIndex
-    ).toBeGreaterThan(10);
 
     await waitFor(() => {
       expect(mockPlanningDoneBarProps).toHaveBeenCalled();
@@ -323,7 +327,7 @@ describe("ItineraryScreen transition overlays", () => {
     unmount();
   });
 
-  it("does not dim the planning screen before planning is marked done", async () => {
+  it("does not dim the itinerary before planning is marked done", async () => {
     setBaseParams("planning");
     mockParams.members = JSON.stringify([
       { userId: "user-123", hasFinishedPlanning: false },
@@ -354,6 +358,12 @@ describe("ItineraryScreen transition overlays", () => {
     });
 
     expect(queryByTestId("planning-screen-lock-overlay")).toBeNull();
+
+    const latestPlanningProps = mockPlanningDoneBarProps.mock.calls.at(-1)?.[0] as
+      | { checked: boolean }
+      | undefined;
+
+    expect(latestPlanningProps?.checked).toBe(false);
 
     unmount();
   });

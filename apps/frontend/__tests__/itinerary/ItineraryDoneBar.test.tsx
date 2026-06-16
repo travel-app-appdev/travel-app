@@ -93,6 +93,8 @@ describe("ItineraryDoneBar", () => {
     expect(footerStyle.borderTopRightRadius).toBe(23);
     expect(footerStyle.borderBottomLeftRadius).toBe(0);
     expect(footerStyle.borderBottomRightRadius).toBe(0);
+    expect(footerStyle.shadowColor).toBe("#F77646");
+    expect(footerStyle.shadowOpacity).toBe(0.45);
   });
 
   it("fires the submit action", async () => {
