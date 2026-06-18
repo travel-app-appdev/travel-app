@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Modal,
   Platform,
@@ -8,9 +8,10 @@ import {
   TextInput,
   useWindowDimensions,
   View,
+  KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 
 import { AppText } from "@/src/components/common/AppText";
@@ -27,6 +28,17 @@ import TextStyle from "@/assets/icons/text-style.svg";
 import Back from "@/assets/icons/back.svg";
 import Timer from "@/assets/icons/timer.svg";
 
+import {
+  fetchActivitySuggestions,
+  getMemberPreferences,
+  type ActivitySuggestion,
+} from "@/src/api/trips";
+import {
+  getAddedElsewherePlaceIds,
+  SuggestionsModal,
+} from "@/src/components/itinerary/SuggestionsModal";
+import type { Activity } from "@/src/types/itinerary";
+
 import { createActivity, updateActivity } from "@/src/services/activityService";
 import { useAuth } from "@/src/context/AuthContext";
 import { getUserFacingApiError } from "@/src/lib/apiErrors";
@@ -40,6 +52,9 @@ const MAX_DESCRIPTION_LENGTH = 1000;
 const MAX_ADDRESS_LENGTH = 300;
 const MAX_GOOGLE_LINK_LENGTH = 2048;
 const FALLBACK_TIME_PLACEHOLDER = "HH:MM";
+const SAVE_BUTTON_MIN_HEIGHT = 52;
+const SAVE_BAR_RESERVED_HEIGHT =
+  SAVE_BUTTON_MIN_HEIGHT + spacing.lg + spacing.xxxl;
 
 const SLOT_TIME_PLACEHOLDERS: Record<
   string,
@@ -103,6 +118,22 @@ function getUnsetTimeAccessibilityText(placeholder: string) {
   return placeholder === FALLBACK_TIME_PLACEHOLDER
     ? "not set"
     : `not set, suggested ${placeholder}`;
+}
+
+function buildGoogleMapsUrl(name: string, address?: string): string {
+  const query = encodeURIComponent(name + (address ? `, ${address}` : ""));
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
+function parseActivitiesJson(value?: string): Activity[] {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 type ActivityTimeField = "start" | "end";
@@ -233,6 +264,21 @@ export default function AddActivityScreen() {
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackButtonLabel, setFeedbackButtonLabel] = useState("Okay");
   const feedbackOnCloseRef = useRef<(() => void) | null>(null);
+  const [showSuggestionsModal, setShowSuggestionsModal] = useState(false);
+  const [suggestions, setSuggestions] = useState<ActivitySuggestion[]>([]);
+  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
+  const [isSuggestionsLoadingMore, setIsSuggestionsLoadingMore] = useState(false);
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+  const [memberPreferences, setMemberPreferences] = useState<string[]>([]);
+
+  const normalizedSlot = useMemo(() => splitSlotId(slotId), [slotId]);
+  const resolvedDayId = dayId ?? normalizedSlot.dayId ?? "";
+  const resolvedSlotType = normalizedSlot.slotId ?? slotId ?? "";
+  const slotLabel = resolvedSlotType || "this time slot";
+  const hasMemberPreferences = memberPreferences.length > 0;
+  const canSuggestActivity = Boolean(
+    tripId && resolvedSlotType && hasMemberPreferences
+  );
   const { startTime: startTimePlaceholder, endTime: endTimePlaceholder } =
     useMemo(() => getSlotTimePlaceholders(slotId), [slotId]);
   const activityTimePickerPlaceholder =
@@ -302,15 +348,141 @@ export default function AddActivityScreen() {
   }
 
   function parseExistingActivities() {
-    if (!activitiesJson) return [];
+    return parseActivitiesJson(activitiesJson);
+  }
+
+  const suggestionsAddedElsewherePlaceIds = useMemo(() => {
+    if (!resolvedDayId || !resolvedSlotType) return [];
+
+    return [
+      ...getAddedElsewherePlaceIds(
+        parseActivitiesJson(activitiesJson),
+        suggestions,
+        resolvedDayId,
+        resolvedSlotType
+      ),
+    ];
+  }, [activitiesJson, resolvedDayId, resolvedSlotType, suggestions]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!tripId || !idToken) {
+        setMemberPreferences([]);
+        return;
+      }
+
+      let cancelled = false;
+
+      getMemberPreferences(tripId, idToken)
+        .then((preferences) => {
+          if (!cancelled) {
+            setMemberPreferences(preferences);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setMemberPreferences([]);
+          }
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }, [idToken, tripId])
+  );
+
+  const getAuthToken = useCallback(async () => {
+    let token = idToken;
+    const currentUser = auth.currentUser;
+
+    if (currentUser) {
+      try {
+        token = await currentUser.getIdToken(true);
+      } catch {
+        // Fall back to the cached token if refresh fails.
+      }
+    }
+
+    return token;
+  }, [idToken]);
+
+  const handleSuggestActivity = useCallback(async () => {
+    if (!tripId || !resolvedSlotType) {
+      openFeedbackModal("Missing data", "Trip or time slot is missing.");
+      return;
+    }
+
+    const token = await getAuthToken();
+    if (!token) {
+      openFeedbackModal("Not logged in", "Please log in again.");
+      return;
+    }
+
+    setSuggestions([]);
+    setSuggestionsError(null);
+    setIsSuggestionsLoading(true);
+    setShowSuggestionsModal(true);
 
     try {
-      const parsed = JSON.parse(activitiesJson);
-      return Array.isArray(parsed) ? parsed : [];
+      const [results, preferences] = await Promise.all([
+        fetchActivitySuggestions(tripId, resolvedSlotType, token),
+        getMemberPreferences(tripId, token).catch(() => [] as string[]),
+      ]);
+
+      setSuggestions(results);
+      setMemberPreferences(preferences);
     } catch {
-      return [];
+      setSuggestionsError("Could not load suggestions. Please try again.");
+    } finally {
+      setIsSuggestionsLoading(false);
     }
-  }
+  }, [getAuthToken, resolvedSlotType, tripId]);
+
+  const handleLoadMoreSuggestions = useCallback(async () => {
+    if (!tripId || !resolvedSlotType) return;
+
+    const token = await getAuthToken();
+    if (!token) return;
+
+    setIsSuggestionsLoadingMore(true);
+
+    try {
+      const results = await fetchActivitySuggestions(
+        tripId,
+        resolvedSlotType,
+        token,
+        suggestions.length
+      );
+
+      setSuggestions((current) => {
+        const existingIds = new Set(current.map((item) => item.sourcePlaceId));
+        const fresh = results.filter(
+          (item) => !existingIds.has(item.sourcePlaceId)
+        );
+        return [...current, ...fresh];
+      });
+    } catch {
+      // Keep existing suggestions visible if loading more fails.
+    } finally {
+      setIsSuggestionsLoadingMore(false);
+    }
+  }, [getAuthToken, resolvedSlotType, suggestions.length, tripId]);
+
+  const handleApplySuggestion = useCallback(
+    async (suggestion: ActivitySuggestion) => {
+      const googleMapsUrl =
+        suggestion.googleMapsUrl ??
+        buildGoogleMapsUrl(suggestion.name, suggestion.address);
+
+      setActivityName(suggestion.name);
+      setAddress(suggestion.address ?? "");
+      setGoogleLink(googleMapsUrl);
+      setShowSuggestionsModal(false);
+    },
+    []
+  );
+
+  const handleSuggestPress = useSinglePress(handleSuggestActivity);
 
   function navigateBackWithActivity(savedActivityId: string) {
     const normalizedSlot = splitSlotId(slotId);
@@ -508,42 +680,80 @@ export default function AddActivityScreen() {
   const handleSave = useSinglePress(handleSaveActivity);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-      <StatusBar style="dark" />
+    <View style={styles.fullScreen}>
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+        <StatusBar style="dark" />
 
-      <ScrollView
-        style={styles.scroll}
-        stickyHeaderIndices={[0]}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <StickyHeader isEditMode={isEditMode} onBack={handleBack} />
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <ScrollView
+            style={styles.flex}
+            stickyHeaderIndices={[0]}
+            contentContainerStyle={[
+              styles.content,
+              { paddingBottom: SAVE_BAR_RESERVED_HEIGHT },
+            ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.stickyTopBlock}>
+              <StickyHeader isEditMode={isEditMode} onBack={handleBack} />
 
-        <View style={styles.form}>
-          <View style={styles.fields}>
-            <View style={styles.fieldGroup}>
-              <View
-                style={styles.labelRow}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
-              >
-                <TextStyle width={24} height={24} />
-                <AppText variant="body" style={styles.label}>
-                  Activity Name
-                </AppText>
-              </View>
+              {canSuggestActivity ? (
+                <View style={styles.suggestSection}>
+                  <AppText variant="body" style={styles.suggestTitle}>
+                    Not sure what to add?
+                  </AppText>
 
-              <TextInput
-                value={activityName}
-                onChangeText={setActivityName}
-                placeholder="Name"
-                placeholderTextColor={colors.textMuted}
-                style={styles.input}
-                maxLength={MAX_NAME_LENGTH}
-                accessibilityLabel="Activity name"
-                accessibilityHint="Enter the name of the activity"
-              />
+                  <Pressable
+                    onPress={handleSuggestPress}
+                    style={({ pressed }) => [
+                      styles.suggestPill,
+                      pressed && styles.suggestPillPressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Suggest activity for ${slotLabel}`}
+                    accessibilityHint="Shows real place suggestions based on your chosen travel preferences"
+                  >
+                    <AppText
+                      variant="body"
+                      style={styles.suggestPillText}
+                      accessible={false}
+                    >
+                      ✦ Suggest activity
+                    </AppText>
+                  </Pressable>
+                </View>
+              ) : null}
             </View>
+
+            <View style={styles.form}>
+              <View style={styles.fields}>
+                <View style={styles.fieldGroup}>
+                  <View
+                    style={styles.labelRow}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                  >
+                    <TextStyle width={24} height={24} />
+                    <AppText variant="body" style={styles.label}>
+                      Activity Name
+                    </AppText>
+                  </View>
+
+                  <TextInput
+                    value={activityName}
+                    onChangeText={setActivityName}
+                    placeholder="Name"
+                    placeholderTextColor={colors.textMuted}
+                    style={styles.input}
+                    maxLength={MAX_NAME_LENGTH}
+                    accessibilityLabel="Activity name"
+                    accessibilityHint="Enter the name of the activity"
+                  />
+                </View>
 
             <View style={styles.fieldGroup}>
               <View
@@ -699,25 +909,31 @@ export default function AddActivityScreen() {
                 accessibilityHint="Paste a Google Maps URL for this activity"
               />
             </View>
-          </View>
+              </View>
+            </View>
+          </ScrollView>
 
-          <Pressable
-            onPress={handleSave}
-            style={({ pressed }) => [
-              styles.saveButton,
-              pressed && styles.saveButtonPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={
-              isEditMode ? "Save activity changes" : "Save activity"
-            }
-          >
-            <AppText variant="body" style={styles.saveButtonText}>
-              {isEditMode ? "Save changes" : "Add activity"}
-            </AppText>
-          </Pressable>
-        </View>
-      </ScrollView>
+          <SafeAreaView edges={["bottom"]} style={styles.saveSafeArea}>
+            <View style={styles.saveWrapper}>
+              <Pressable
+                onPress={handleSave}
+                style={({ pressed }) => [
+                  styles.saveButton,
+                  pressed && styles.saveButtonPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  isEditMode ? "Save activity changes" : "Save activity"
+                }
+              >
+                <AppText variant="body" style={styles.saveButtonText}>
+                  {isEditMode ? "Save changes" : "Add activity"}
+                </AppText>
+              </Pressable>
+            </View>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
 
       <Modal
         visible={showActivityTimePicker !== null}
@@ -783,29 +999,44 @@ export default function AddActivityScreen() {
         buttonLabel={feedbackButtonLabel}
         onClose={closeFeedbackModal}
       />
-    </SafeAreaView>
+
+      <SuggestionsModal
+        visible={showSuggestionsModal}
+        slotLabel={slotLabel}
+        destination={destination}
+        suggestions={suggestions}
+        loading={isSuggestionsLoading}
+        loadingMore={isSuggestionsLoadingMore}
+        error={suggestionsError}
+        onClose={() => setShowSuggestionsModal(false)}
+        onAdd={handleApplySuggestion}
+        onLoadMore={handleLoadMoreSuggestions}
+        addedElsewherePlaceIds={suggestionsAddedElsewherePlaceIds}
+        selectedPreferences={memberPreferences}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  fullScreen: {
+    flex: 1,
+    backgroundColor: colors.beachYellow,
+  },
   safeArea: {
     flex: 1,
     backgroundColor: colors.beachYellow,
   },
-  scroll: {
+  flex: {
     flex: 1,
-    backgroundColor: colors.beachYellow,
   },
   content: {
     flexGrow: 1,
     backgroundColor: colors.beachYellow,
     paddingHorizontal: 0,
     paddingTop: 0,
-    paddingBottom: spacing.xl,
   },
-  stickyHeaderBlock: {
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xl,
+  stickyTopBlock: {
     backgroundColor: colors.beachYellow,
     zIndex: 20,
     elevation: 0,
@@ -813,6 +1044,44 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     shadowRadius: 0,
     shadowOffset: { width: 0, height: 0 },
+  },
+  stickyHeaderBlock: {
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.beachYellow,
+  },
+  suggestSection: {
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.beachYellow,
+  },
+  suggestTitle: {
+    color: colors.nightBlack,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.lg,
+    lineHeight: typography.lineHeight.md,
+    textAlign: "center",
+  },
+  suggestPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.nightBlack,
+    borderRadius: radius.pill,
+    minHeight: 44,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  suggestPillPressed: {
+    opacity: 0.85,
+  },
+  suggestPillText: {
+    color: colors.lightWhite,
+    fontFamily: typography.fontFamily.bodyBold,
+    fontSize: typography.size.md,
+    lineHeight: typography.lineHeight.md,
   },
   header: {
     width: "100%",
@@ -852,11 +1121,9 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.xxl,
   },
   form: {
-    flex: 1,
     width: "100%",
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
-    justifyContent: "space-between",
   },
   fields: {
     gap: spacing.xl,
@@ -1011,17 +1278,22 @@ const styles = StyleSheet.create({
     textAlignVertical: "center",
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
   },
+  saveSafeArea: {
+    backgroundColor: colors.beachYellow,
+  },
+  saveWrapper: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
+  },
   saveButton: {
-    alignSelf: "center",
-    width: "85%",
-    minHeight: 52,
+    width: "100%",
+    minHeight: SAVE_BUTTON_MIN_HEIGHT,
     borderRadius: radius.pill,
     backgroundColor: colors.sunsetOrange,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.xl,
-    marginTop: spacing.xxxl,
-    marginBottom: spacing.xl,
   },
   saveButtonPressed: {
     opacity: 0.85,
