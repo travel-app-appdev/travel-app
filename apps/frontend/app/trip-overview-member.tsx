@@ -1833,13 +1833,20 @@ const styles = StyleSheet.create({
   },
 
   itineraryLinkRow: {
-    alignSelf: "flex-start",
+    alignSelf: "stretch",
     marginTop: spacing.lg,
   },
   itineraryLinkInner: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: spacing.sm,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: colors.nightBlack,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   itineraryLinkText: {
     color: colors.nightBlack,
