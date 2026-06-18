@@ -52,6 +52,7 @@ import {
   formatTripDurationText,
   formatTripTimerText,
 } from "@/src/utils/tripTimer";
+import { mapTripMembersForDisplay } from "@/src/utils/tripMemberDisplay";
 import Plane from "@/assets/icons/plane.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
 import Calendar from "@/assets/icons/calendar.svg";
@@ -695,6 +696,10 @@ export default function TripOverviewAdminScreen() {
         time: "00:00",
       },
     });
+
+    if (trip.members) {
+      setMembers(mapTripMembersForDisplay(trip.members));
+    }
   }, []);
 
   const refreshTripSnapshot = useCallback(
@@ -1471,7 +1476,7 @@ export default function TripOverviewAdminScreen() {
           destination,
           startDate: toLocalDateString(tripStart),
           endDate: toLocalDateString(tripEnd),
-          members: membersParam,
+          members: JSON.stringify(members),
           planningEndAt: tripTiming.planningEndAt,
           votingEndAt: tripTiming.votingEndAt,
           role: "admin",
@@ -1480,7 +1485,7 @@ export default function TripOverviewAdminScreen() {
     },
     [
       destination,
-      membersParam,
+      members,
       router,
       tripEnd,
       tripId,

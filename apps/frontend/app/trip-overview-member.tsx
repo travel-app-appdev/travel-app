@@ -52,6 +52,7 @@ import {
   isPastTripByEndDate,
   isTripStartedByStartDate,
 } from "@/src/utils/tripState";
+import { mapTripMembersForDisplay } from "@/src/utils/tripMemberDisplay";
 import type { TripState } from "@/src/types/trip";
 import Plane from "@/assets/icons/plane.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
@@ -375,6 +376,10 @@ export default function TripOverviewMemberScreen() {
           votingEndAt: currentTrip.voting_end_at ?? "",
         });
 
+        if (currentTrip.members) {
+          setMembers(mapTripMembersForDisplay(currentTrip.members));
+        }
+
         return currentTrip;
       } catch (error) {
         if (isTripNotFoundError(error)) {
@@ -492,13 +497,15 @@ export default function TripOverviewMemberScreen() {
     if (node) AccessibilityInfo.setAccessibilityFocus(node);
   }
 
-  const members: MemberParam[] = useMemo(() => {
+  const parsedMembers: MemberParam[] = (() => {
     try {
       return membersParam ? JSON.parse(membersParam) : [];
     } catch {
       return [];
     }
-  }, [membersParam]);
+  })();
+
+  const [members, setMembers] = useState<MemberParam[]>(parsedMembers);
 
   const tripStart = useMemo(
     () =>
@@ -603,7 +610,7 @@ export default function TripOverviewMemberScreen() {
           destination,
           startDate: tripSnapshot.startDate,
           endDate: tripSnapshot.endDate,
-          members: membersParam,
+          members: JSON.stringify(members),
           planningEndAt: tripSnapshot.planningEndAt,
           votingEndAt: tripSnapshot.votingEndAt,
           role: "member",
@@ -612,7 +619,7 @@ export default function TripOverviewMemberScreen() {
     },
     [
       destination,
-      membersParam,
+      members,
       router,
       title,
       tripId,
