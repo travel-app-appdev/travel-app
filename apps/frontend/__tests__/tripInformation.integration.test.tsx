@@ -70,13 +70,27 @@ jest.mock("@/app/home", () => ({
   invalidateTripsCache: jest.fn(),
 }));
 
+jest.mock("@/src/hooks/useSinglePress", () => ({
+  useSinglePress: (fn: unknown) => fn,
+}));
+
 // Firebase — inline object so Jest hoisting doesn't cause reference errors.
 jest.mock("@/src/lib/firebase", () => ({
   auth: {
     currentUser: {
+      uid: "user-123",
       getIdToken: jest.fn(),
     },
   },
+  db: {},
+}));
+
+jest.mock("@/src/context/AuthContext", () => ({
+  useAuth: () => ({
+    user: { uid: "user-123" },
+    setUser: jest.fn(),
+    setIdToken: jest.fn(),
+  }),
 }));
 
 // BackLink
@@ -144,7 +158,10 @@ describe("TripInformationScreen — leave trip flow", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     const auth = getMockedAuth();
-    auth.currentUser = { getIdToken: () => mockGetIdToken() };
+    auth.currentUser = {
+      uid: "user-123",
+      getIdToken: () => mockGetIdToken(),
+    };
     mockGetIdToken.mockResolvedValue("member-id-token");
   });
 
@@ -207,70 +224,50 @@ describe("TripInformationScreen — leave trip flow", () => {
 
   // ── Leave trip — API error ────────────────────────────────────────────────
 
-  it("shows a failure Alert and does NOT redirect when leaveTrip rejects", async () => {
+  it("shows a failure message and does NOT redirect when leaveTrip rejects", async () => {
     mockLeaveTrip.mockRejectedValueOnce(
       new Error("Admin cannot leave the trip. Delete it instead.")
     );
-
-    const { Alert } = require("react-native");
-    const alertSpy = jest
-      .spyOn(Alert, "alert")
-      .mockImplementationOnce(() => {});
 
     const { getByText } = render(<TripInformationScreen />);
     fireEvent.press(getByText("Leave trip"));
     fireEvent.press(getByText("Leave"));
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledTimes(1);
-      expect(alertSpy).toHaveBeenCalledWith(
-        "Leave failed",
-        "Admin cannot leave the trip. Delete it instead."
-      );
+      expect(getByText("Leave failed")).toBeTruthy();
+      expect(
+        getByText("Admin cannot leave the trip. Delete it instead.")
+      ).toBeTruthy();
     });
 
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it("shows a generic failure message when leaveTrip throws a non-Error", async () => {
+  it("shows the raw failure message when leaveTrip throws a non-Error", async () => {
     mockLeaveTrip.mockRejectedValueOnce("unknown error");
-
-    const { Alert } = require("react-native");
-    const alertSpy = jest
-      .spyOn(Alert, "alert")
-      .mockImplementationOnce(() => {});
 
     const { getByText } = render(<TripInformationScreen />);
     fireEvent.press(getByText("Leave trip"));
     fireEvent.press(getByText("Leave"));
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(
-        "Leave failed",
-        "Failed to leave trip"
-      );
+      expect(getByText("Leave failed")).toBeTruthy();
+      expect(getByText("unknown error")).toBeTruthy();
     });
   });
 
   // ── Not logged in ─────────────────────────────────────────────────────────
 
-  it("shows 'Not logged in' Alert and skips the API call when currentUser is null", async () => {
+  it("shows 'Not logged in' message and skips the API call when currentUser is null", async () => {
     getMockedAuth().currentUser = null;
-
-    const { Alert } = require("react-native");
-    const alertSpy = jest
-      .spyOn(Alert, "alert")
-      .mockImplementationOnce(() => {});
 
     const { getByText } = render(<TripInformationScreen />);
     fireEvent.press(getByText("Leave trip"));
     fireEvent.press(getByText("Leave"));
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(
-        "Not logged in",
-        "Please log in again."
-      );
+      expect(getByText("Not logged in")).toBeTruthy();
+      expect(getByText("Please log in again.")).toBeTruthy();
     });
 
     expect(mockLeaveTrip).not.toHaveBeenCalled();

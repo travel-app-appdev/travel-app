@@ -70,6 +70,14 @@ jest.mock("@/src/lib/firebase", () => ({
   db: {},
 }));
 
+jest.mock("@/src/context/AuthContext", () => ({
+  useAuth: () => ({
+    user: { uid: "user-123" },
+    setUser: jest.fn(),
+    setIdToken: jest.fn(),
+  }),
+}));
+
 jest.mock("@/app/home", () => ({
   invalidateTripsCache: jest.fn(),
 }));
