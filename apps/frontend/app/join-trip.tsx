@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useRouter } from "expo-router";
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import { AppButton } from "@/src/components/common/AppButton";
 import { BackLink } from "@/src/components/common/BackLink";
 import { joinTrip } from "@/src/api/trips";
 import { auth } from "@/src/lib/firebase";
+import { useApiFeedbackModal } from "@/src/hooks/useApiFeedbackModal";
 import { invalidateTripsCache } from "./home";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import LinkIcon from "@/assets/icons/link.svg";
@@ -25,19 +25,6 @@ import LeafDown from "@/assets/visuals/leaf_down.svg";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
-function ModalShell({ children }: { children: React.ReactNode }) {
-  return (
-    <SafeAreaView
-      style={styles.modalSafeArea}
-      edges={["top", "right", "bottom", "left"]}
-    >
-      <View style={styles.calendarOverlay}>
-        <View style={styles.calendarModal}>{children}</View>
-      </View>
-    </SafeAreaView>
-  );
-}
 
 function StickyHeader() {
   const router = useRouter();
@@ -63,23 +50,15 @@ function StickyHeader() {
 export default function JoinTripScreen() {
   const [code, setCode] = useState("");
   const [isJoining, setIsJoining] = useState(false);
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [feedbackTitle, setFeedbackTitle] = useState("");
-  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const { showFeedback, showApiError, feedbackModal } = useApiFeedbackModal();
   const router = useRouter();
-
-  function openFeedbackModal(title: string, message: string) {
-    setFeedbackTitle(title);
-    setFeedbackMessage(message);
-    setShowFeedbackModal(true);
-  }
 
   const handleJoin = async () => {
     try {
       setIsJoining(true);
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        openFeedbackModal("Not logged in", "Please log in again.");
+        showFeedback("Not logged in", "Please log in again.");
         return;
       }
       const idToken = await currentUser.getIdToken();
@@ -90,9 +69,7 @@ export default function JoinTripScreen() {
         params: { tripId: result.trip_id },
       });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to join trip";
-      openFeedbackModal("Join failed", message);
+      showApiError(error, "Join failed", "Failed to join trip");
     } finally {
       setIsJoining(false);
     }
@@ -167,35 +144,7 @@ export default function JoinTripScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
 
-        <Modal
-          visible={showFeedbackModal}
-          transparent
-          animationType="fade"
-          statusBarTranslucent
-          onRequestClose={() => setShowFeedbackModal(false)}
-        >
-          <ModalShell>
-            <AppText variant="body" style={styles.calendarTitle}>
-              {feedbackTitle}
-            </AppText>
-
-            <View style={styles.timeModalContent}>
-              <AppText variant="caption" style={styles.feedbackMessage}>
-                {feedbackMessage}
-              </AppText>
-            </View>
-
-            <View style={styles.calendarActions}>
-              <AppButton
-                title="Okay"
-                onPress={() => setShowFeedbackModal(false)}
-                style={styles.calendarApplyButton}
-                textStyle={styles.calendarApplyButtonText}
-                accessibilityLabel="Close message"
-              />
-            </View>
-          </ModalShell>
-        </Modal>
+        {feedbackModal}
       </SafeAreaView>
     </View>
   );

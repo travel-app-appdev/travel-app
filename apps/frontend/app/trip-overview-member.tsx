@@ -3,7 +3,6 @@ import * as Clipboard from "expo-clipboard";
 import { doc, onSnapshot } from "firebase/firestore";
 import {
   AccessibilityInfo,
-  Alert,
   findNodeHandle,
   Pressable,
   RefreshControl,
@@ -46,6 +45,7 @@ import {
   hiddenFromAccessibility,
 } from "@/src/utils/accessibility";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
+import { useApiFeedbackModal } from "@/src/hooks/useApiFeedbackModal";
 import {
   getChecklistDisplayState,
   getPhaseStatus,
@@ -285,6 +285,7 @@ export default function TripOverviewMemberScreen() {
   const inviteCodeParam = String(raw.inviteCode ?? "");
 
   const router = useRouter();
+  const { showFeedback, showApiError, feedbackModal } = useApiFeedbackModal();
   const { height: screenHeight } = useWindowDimensions();
   const isSmallScreen = screenHeight < 700;
   const [isLeaving, setIsLeaving] = useState(false);
@@ -694,9 +695,10 @@ export default function TripOverviewMemberScreen() {
       await updateMemberPreferences(tripId, preferences, idToken);
       setIsPrefsExpanded(false);
     } catch (error) {
-      Alert.alert(
+      showApiError(
+        error,
         "Update failed",
-        error instanceof Error ? error.message : "Failed to update travel preference"
+        "Failed to update travel preference"
       );
     } finally {
       setIsSavingPrefs(false);
@@ -710,7 +712,7 @@ export default function TripOverviewMemberScreen() {
 
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert("Not logged in", "Please log in again.");
+        showFeedback("Not logged in", "Please log in again.");
         return;
       }
 
@@ -719,9 +721,7 @@ export default function TripOverviewMemberScreen() {
       invalidateTripsCache();
       router.replace("/home");
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to leave trip";
-      Alert.alert("Leave failed", message);
+      showApiError(error, "Leave failed", "Failed to leave trip");
     } finally {
       setIsLeaving(false);
     }
@@ -1437,6 +1437,7 @@ export default function TripOverviewMemberScreen() {
               </View>
             </ModalShell>
           </Modal>
+          {feedbackModal}
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>

@@ -41,7 +41,10 @@ import {
 } from "@/src/api/trips";
 import { PreferenceChips } from "@/src/components/common/PreferenceChips";
 import { DestinationAutocomplete } from "@/src/components/common/DestinationAutocomplete";
+import { useAuth } from "@/src/context/AuthContext";
 import { auth, db } from "@/src/lib/firebase";
+import { getUserFacingApiError } from "@/src/lib/apiErrors";
+import { redirectToLogin } from "@/src/lib/sessionExpired";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { invalidateTripsCache } from "./home";
@@ -424,6 +427,8 @@ export default function TripOverviewAdminScreen() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackTitle, setFeedbackTitle] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackButtonLabel, setFeedbackButtonLabel] = useState("Okay");
+  const feedbackOnCloseRef = useRef<(() => void) | null>(null);
   const [memberToRemove, setMemberToRemove] = useState<{
     id: string;
     name: string;
@@ -438,10 +443,41 @@ export default function TripOverviewAdminScreen() {
     return id;
   };
 
-  const openFeedbackModal = (title: string, message: string) => {
+  const openFeedbackModal = (
+    title: string,
+    message: string,
+    options?: { buttonLabel?: string; onClose?: () => void }
+  ) => {
     setFeedbackTitle(title);
     setFeedbackMessage(message);
+    setFeedbackButtonLabel(options?.buttonLabel ?? "Okay");
+    feedbackOnCloseRef.current = options?.onClose ?? null;
     setShowFeedbackModal(true);
+  };
+
+  const closeFeedbackModal = () => {
+    setShowFeedbackModal(false);
+    const onClose = feedbackOnCloseRef.current;
+    feedbackOnCloseRef.current = null;
+    onClose?.();
+  };
+
+  const { setUser, setIdToken } = useAuth();
+
+  const openApiErrorModal = (
+    error: unknown,
+    contextTitle: string,
+    fallbackMessage: string
+  ) => {
+    const resolved = getUserFacingApiError(error, contextTitle, fallbackMessage);
+    openFeedbackModal(resolved.title, resolved.message, {
+      buttonLabel: resolved.buttonLabel,
+      onClose: resolved.isSessionExpired
+        ? () => {
+            void redirectToLogin(setUser, setIdToken);
+          }
+        : undefined,
+    });
   };
 
   useEffect(() => {
@@ -930,9 +966,10 @@ export default function TripOverviewAdminScreen() {
       await updateMemberPreferences(tripId, preferences, idToken);
       setOpenField(null);
     } catch (error) {
-      openFeedbackModal(
+      openApiErrorModal(
+        error,
         "Update failed",
-        error instanceof Error ? error.message : "Failed to update preferences"
+        "Failed to update preferences"
       );
     } finally {
       setIsSavingPrefs(false);
@@ -960,10 +997,7 @@ export default function TripOverviewAdminScreen() {
         setOpenField(null);
       }, 1500);
     } catch (error) {
-      openFeedbackModal(
-        "Update failed",
-        error instanceof Error ? error.message : "Failed to update name"
-      );
+      openApiErrorModal(error, "Update failed", "Failed to update name");
     } finally {
       setIsUpdatingName(false);
     }
@@ -989,9 +1023,10 @@ export default function TripOverviewAdminScreen() {
         setOpenField(null);
       }, 1500);
     } catch (error) {
-      openFeedbackModal(
+      openApiErrorModal(
+        error,
         "Update failed",
-        error instanceof Error ? error.message : "Failed to update destination"
+        "Failed to update destination"
       );
     } finally {
       setIsUpdatingDestination(false);
@@ -1059,10 +1094,7 @@ export default function TripOverviewAdminScreen() {
         setOpenField(null);
       }, 1500);
     } catch (error) {
-      openFeedbackModal(
-        "Update failed",
-        error instanceof Error ? error.message : "Failed to update dates"
-      );
+      openApiErrorModal(error, "Update failed", "Failed to update dates");
     } finally {
       setIsUpdatingDate(false);
     }
@@ -1097,9 +1129,18 @@ export default function TripOverviewAdminScreen() {
       setMembers((prev) => prev.filter((m) => m.id !== memberToRemove.id));
       setMemberToRemove(null);
     } catch (error) {
-      setRemoveMemberErrorMessage(
-        error instanceof Error ? error.message : "Failed to remove member."
+      const resolved = getUserFacingApiError(
+        error,
+        "Remove failed",
+        "Failed to remove member."
       );
+
+      if (resolved.isSessionExpired) {
+        openApiErrorModal(error, "Remove failed", "Failed to remove member.");
+        return;
+      }
+
+      setRemoveMemberErrorMessage(resolved.message);
       setShowRemoveMemberErrorModal(true);
     } finally {
       setRemovingMemberId(null);
@@ -1415,10 +1456,7 @@ export default function TripOverviewAdminScreen() {
         setOpenPhase(null);
       }, 1500);
     } catch (error) {
-      openFeedbackModal(
-        "Update failed",
-        error instanceof Error ? error.message : "Failed to update phase"
-      );
+      openApiErrorModal(error, "Update failed", "Failed to update phase");
     }
   };
 
@@ -1517,10 +1555,7 @@ export default function TripOverviewAdminScreen() {
       invalidateTripsCache();
       router.replace("/home");
     } catch (error) {
-      openFeedbackModal(
-        "Delete failed",
-        error instanceof Error ? error.message : "Failed to delete trip"
-      );
+      openApiErrorModal(error, "Delete failed", "Failed to delete trip");
     } finally {
       setIsDeleting(false);
     }
@@ -3089,7 +3124,8 @@ export default function TripOverviewAdminScreen() {
             visible={showFeedbackModal}
             title={feedbackTitle}
             message={feedbackMessage}
-            onClose={() => setShowFeedbackModal(false)}
+            buttonLabel={feedbackButtonLabel}
+            onClose={closeFeedbackModal}
           />
         </KeyboardAvoidingView>
       </SafeAreaView>

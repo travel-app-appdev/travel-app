@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   InteractionManager,
   Modal,
@@ -31,6 +30,7 @@ import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
 import { mapActivitiesToSlots } from "@/src/utils/itinerary/mapActivitiesToSlots";
 import { getActiveTripTimerText } from "@/src/utils/tripTimer";
 import { useAuth } from "@/src/context/AuthContext";
+import { useApiFeedbackModal } from "@/src/hooks/useApiFeedbackModal";
 
 import type {
   TripItinerary,
@@ -549,6 +549,7 @@ function TransitionOverlay({ visible, title, text }: TransitionOverlayProps) {
 
 export default function ItineraryScreen() {
   const { user, idToken: authToken } = useAuth();
+  const { showFeedback, showApiError, feedbackModal } = useApiFeedbackModal();
   const currentUserId = user?.uid ?? null;
 
   const {
@@ -1363,15 +1364,12 @@ export default function ItineraryScreen() {
           setIsMemorySelectionMode(false);
         }
       } catch (error) {
-        Alert.alert(
-          "Could not load memories",
-          error instanceof Error ? error.message : "Please try again."
-        );
+        showApiError(error, "Could not load memories", "Please try again.");
       } finally {
         setIsLoadingMemories(false);
       }
     },
-    [activeState, authToken, tripId]
+    [activeState, authToken, showApiError, tripId]
   );
 
   useEffect(() => {
@@ -1438,7 +1436,7 @@ export default function ItineraryScreen() {
     } else {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(
+        showFeedback(
           "Photo access needed",
           "Please allow photo library access to upload trip memories."
         );
@@ -1469,21 +1467,18 @@ export default function ItineraryScreen() {
 
       await loadMemories({ showLoading: false });
     } catch (error) {
-      Alert.alert(
-        "Could not upload memories",
-        error instanceof Error ? error.message : "Please try again."
-      );
+      showApiError(error, "Could not upload memories", "Please try again.");
     } finally {
       setIsUploadingMemories(false);
     }
-  }, [authToken, isUploadingMemories, loadMemories, tripId]);
+  }, [authToken, isUploadingMemories, loadMemories, showApiError, showFeedback, tripId]);
 
   const handleDownloadAllMemories = useCallback(() => {
-    Alert.alert(
+    showFeedback(
       "Download all",
       "Download all will be added after the backend zip endpoint is ready."
     );
-  }, []);
+  }, [showFeedback]);
 
   const removeMemories = useCallback(
     async (memoryIds: string[]) => {
@@ -1514,15 +1509,12 @@ export default function ItineraryScreen() {
         setIsMemorySelectionMode(false);
         await loadMemories({ showLoading: false });
       } catch (error) {
-        Alert.alert(
-          "Could not delete memories",
-          error instanceof Error ? error.message : "Please try again."
-        );
+        showApiError(error, "Could not delete memories", "Please try again.");
       } finally {
         setIsDeletingMemories(false);
       }
     },
-    [authToken, isDeletingMemories, loadMemories, tripId]
+    [authToken, isDeletingMemories, loadMemories, showApiError, tripId]
   );
 
   const handleSelectAllMemories = useCallback(() => {
@@ -2013,10 +2005,7 @@ export default function ItineraryScreen() {
       setApiActivities((current) => applyNew(current));
       if (tripId) updateCachedActivities(tripId, applyNew);
     } catch (err) {
-      Alert.alert(
-        "Could not add activity",
-        err instanceof Error ? err.message : "Please try again."
-      );
+      showApiError(err, "Could not add activity", "Please try again.");
       throw err;
     }
   }
@@ -2072,7 +2061,7 @@ export default function ItineraryScreen() {
     }
 
     if (!token) {
-      Alert.alert("Not logged in", "Please log in again.");
+      showFeedback("Not logged in", "Please log in again.");
       return;
     }
 
@@ -2109,11 +2098,10 @@ export default function ItineraryScreen() {
         await refreshTripTimerFields({ forceRefresh: true });
       }
     } catch (error) {
-      Alert.alert(
+      showApiError(
+        error,
         "One moment...",
-        error instanceof Error
-          ? error.message
-          : "Your group is all set! We're preparing the next step, hang tight. 🎉"
+        "Your group is all set! We're preparing the next step, hang tight. 🎉"
       );
     } finally {
       setIsSubmittingPlanning(false);
@@ -2146,7 +2134,7 @@ export default function ItineraryScreen() {
     }
 
     if (!authToken) {
-      Alert.alert("Not logged in", "Please log in again.");
+      showFeedback("Not logged in", "Please log in again.");
       return;
     }
 
@@ -2163,10 +2151,7 @@ export default function ItineraryScreen() {
         void refreshTripTimerFields({ forceRefresh: true });
       }
     } catch (error) {
-      Alert.alert(
-        "Could not finish voting",
-        error instanceof Error ? error.message : "Please try again."
-      );
+      showApiError(error, "Could not finish voting", "Please try again.");
     } finally {
       setIsSubmittingVoting(false);
     }
@@ -2313,7 +2298,7 @@ export default function ItineraryScreen() {
   const handleAddAlternativeToItinerary = useCallback(
     async (activityToToggle: Activity) => {
       if (!authToken || !tripId) {
-        Alert.alert("Could not update itinerary", "Please log in again.");
+        showFeedback("Could not update itinerary", "Please log in again.");
         return;
       }
 
@@ -2428,18 +2413,15 @@ export default function ItineraryScreen() {
         );
       } catch (error) {
         setSelectedAddedAlternativeActivityIds(previousAddedIds);
-        Alert.alert(
-          "Could not update itinerary",
-          error instanceof Error ? error.message : "Please try again."
-        );
+        showApiError(error, "Could not update itinerary", "Please try again.");
       }
     },
-    [authToken, tripId]
+    [authToken, showApiError, showFeedback, tripId]
   );
 
   async function handleAddVote(activityId: string) {
     if (!authToken || !tripId || !selectedVotingSlotId) {
-      Alert.alert("Could not vote", "Please log in again.");
+      showFeedback("Could not vote", "Please log in again.");
       return;
     }
 
@@ -2478,10 +2460,7 @@ export default function ItineraryScreen() {
         }, 1800);
       }
     } catch (error) {
-      Alert.alert(
-        "Could not add vote",
-        error instanceof Error ? error.message : "Please try again."
-      );
+      showApiError(error, "Could not add vote", "Please try again.");
     }
   }
 
@@ -2519,7 +2498,7 @@ export default function ItineraryScreen() {
     const activity = finalActivities.find((item) => item.id === activityId);
 
     if (!authToken || !tripId || !activity) {
-      Alert.alert("Could not update group", "Please log in again.");
+      showFeedback("Could not update group", "Please log in again.");
       return;
     }
 
@@ -2672,10 +2651,7 @@ export default function ItineraryScreen() {
         })
       );
     } catch (error) {
-      Alert.alert(
-        "Could not update group",
-        error instanceof Error ? error.message : "Please try again."
-      );
+      showApiError(error, "Could not update group", "Please try again.");
     }
   }
 
@@ -3314,6 +3290,7 @@ export default function ItineraryScreen() {
           onClose={() => setShowMemoryFeedbackModal(false)}
           buttonColor={colors.seaBlue}
         />
+        {feedbackModal}
         </View>
       </SafeAreaView>
 

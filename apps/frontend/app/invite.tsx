@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -22,6 +21,7 @@ import {
   type TripPreview,
 } from "@/src/api/trips";
 import { useAuth } from "@/src/context/AuthContext";
+import { useApiFeedbackModal } from "@/src/hooks/useApiFeedbackModal";
 import { auth } from "@/src/lib/firebase";
 import { invalidateTripsCache } from "./home";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
@@ -61,6 +61,7 @@ type ScreenState = "loading" | "preview" | "joining" | "error";
 export default function InviteScreen() {
   const { code } = useLocalSearchParams<{ code?: string }>();
   const { user, idToken } = useAuth();
+  const { showFeedback, showApiError, feedbackModal } = useApiFeedbackModal();
 
   const [screenState, setScreenState] = useState<ScreenState>("loading");
   const [trip, setTrip] = useState<TripPreview | null>(null);
@@ -151,7 +152,7 @@ export default function InviteScreen() {
     try {
       const token = idToken ?? (await auth.currentUser?.getIdToken());
       if (!token) {
-        Alert.alert("Not logged in", "Please log in again.");
+        showFeedback("Not logged in", "Please log in again.");
         return;
       }
 
@@ -184,7 +185,7 @@ export default function InviteScreen() {
         return;
       }
 
-      Alert.alert("Could not join trip", message);
+      showApiError(err, "Could not join trip", "Failed to join trip");
     } finally {
       setIsJoining(false);
     }
@@ -202,37 +203,43 @@ export default function InviteScreen() {
   // ── Loading ──
   if (screenState === "loading") {
     return (
-      <SafeAreaView style={styles.centeredScreen}>
-        <StatusBar style="dark" />
-        <ActivityIndicator size="large" color={colors.sunsetOrange} />
-        <AppText variant="body" style={styles.loadingText}>
-          Loading trip details…
-        </AppText>
-      </SafeAreaView>
+      <>
+        <SafeAreaView style={styles.centeredScreen}>
+          <StatusBar style="dark" />
+          <ActivityIndicator size="large" color={colors.sunsetOrange} />
+          <AppText variant="body" style={styles.loadingText}>
+            Loading trip details…
+          </AppText>
+        </SafeAreaView>
+        {feedbackModal}
+      </>
     );
   }
 
   // ── Error ──
   if (screenState === "error") {
     return (
-      <SafeAreaView style={styles.centeredScreen}>
-        <StatusBar style="dark" />
-        <View style={styles.errorCard}>
-          <AppText variant="subtitle" style={styles.errorTitle}>
-            Invite not found
-          </AppText>
-          <AppText variant="body" style={styles.errorMessage}>
-            {errorMessage}
-          </AppText>
-          <AppButton
-            title="Go to home"
-            onPress={() => router.replace(user ? "/home" : "/")}
-            style={styles.errorButton}
-            textStyle={styles.errorButtonText}
-            accessibilityLabel="Go to home screen"
-          />
-        </View>
-      </SafeAreaView>
+      <>
+        <SafeAreaView style={styles.centeredScreen}>
+          <StatusBar style="dark" />
+          <View style={styles.errorCard}>
+            <AppText variant="subtitle" style={styles.errorTitle}>
+              Invite not found
+            </AppText>
+            <AppText variant="body" style={styles.errorMessage}>
+              {errorMessage}
+            </AppText>
+            <AppButton
+              title="Go to home"
+              onPress={() => router.replace(user ? "/home" : "/")}
+              style={styles.errorButton}
+              textStyle={styles.errorButtonText}
+              accessibilityLabel="Go to home screen"
+            />
+          </View>
+        </SafeAreaView>
+        {feedbackModal}
+      </>
     );
   }
 
@@ -396,6 +403,7 @@ export default function InviteScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
+      {feedbackModal}
     </View>
   );
 }

@@ -1,6 +1,8 @@
 import { useRouter } from "expo-router";
 import { useAuth } from "@/src/context/AuthContext";
 import { createTrip, updateMemberPreferences } from "@/src/api/trips";
+import { getUserFacingApiError } from "@/src/lib/apiErrors";
+import { redirectToLogin } from "@/src/lib/sessionExpired";
 import { PreferenceChips } from "@/src/components/common/PreferenceChips";
 import { auth } from "@/src/lib/firebase";
 import {
@@ -349,11 +351,26 @@ export default function CreateTripScreen() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackTitle, setFeedbackTitle] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackButtonLabel, setFeedbackButtonLabel] = useState("Okay");
+  const feedbackOnCloseRef = useRef<(() => void) | null>(null);
 
-  const openFeedbackModal = (title: string, message: string) => {
+  const openFeedbackModal = (
+    title: string,
+    message: string,
+    options?: { buttonLabel?: string; onClose?: () => void }
+  ) => {
     setFeedbackTitle(title);
     setFeedbackMessage(message);
+    setFeedbackButtonLabel(options?.buttonLabel ?? "Okay");
+    feedbackOnCloseRef.current = options?.onClose ?? null;
     setShowFeedbackModal(true);
+  };
+
+  const closeFeedbackModal = () => {
+    setShowFeedbackModal(false);
+    const onClose = feedbackOnCloseRef.current;
+    feedbackOnCloseRef.current = null;
+    onClose?.();
   };
 
   const blinkingDotAnim = useRef(new Animated.Value(2)).current;
@@ -446,8 +463,24 @@ export default function CreateTripScreen() {
   const [createdTripId, setCreatedTripId] = useState<string | null>(null);
 
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const { user } = useAuth();
+  const { user, setUser, setIdToken } = useAuth();
   const router = useRouter();
+
+  const openApiErrorModal = (
+    error: unknown,
+    contextTitle: string,
+    fallbackMessage: string
+  ) => {
+    const resolved = getUserFacingApiError(error, contextTitle, fallbackMessage);
+    openFeedbackModal(resolved.title, resolved.message, {
+      buttonLabel: resolved.buttonLabel,
+      onClose: resolved.isSessionExpired
+        ? () => {
+            void redirectToLogin(setUser, setIdToken);
+          }
+        : undefined,
+    });
+  };
 
   const handleOnboardingPress = useCallback(() => {
     if (!PressLock.acquire()) return;
@@ -817,9 +850,7 @@ export default function CreateTripScreen() {
         setOpenPhase(null);
       }, 1500);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to update phase";
-      openFeedbackModal("Update failed", message);
+      openApiErrorModal(error, "Update failed", "Failed to update phase");
     }
   };
 
@@ -935,9 +966,7 @@ export default function CreateTripScreen() {
       setCreatedTripId(result.trip_id ?? null);
       setStep(4);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to create trip";
-      openFeedbackModal("Create trip failed", message);
+      openApiErrorModal(error, "Create trip failed", "Failed to create trip");
     } finally {
       setIsCreating(false);
     }
@@ -948,7 +977,8 @@ export default function CreateTripScreen() {
       visible={showFeedbackModal}
       title={feedbackTitle}
       message={feedbackMessage}
-      onClose={() => setShowFeedbackModal(false)}
+      buttonLabel={feedbackButtonLabel}
+      onClose={closeFeedbackModal}
     />
   );
 

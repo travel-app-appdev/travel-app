@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Modal,
   Platform,
@@ -15,6 +15,7 @@ import { StatusBar } from "expo-status-bar";
 
 import { AppText } from "@/src/components/common/AppText";
 import { AppButton } from "@/src/components/common/AppButton";
+import { FeedbackModal } from "@/src/components/common/FeedbackModal";
 import { colors, radius, spacing, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 
@@ -28,6 +29,8 @@ import Timer from "@/assets/icons/timer.svg";
 
 import { createActivity, updateActivity } from "@/src/services/activityService";
 import { useAuth } from "@/src/context/AuthContext";
+import { getUserFacingApiError } from "@/src/lib/apiErrors";
+import { redirectToLogin } from "@/src/lib/sessionExpired";
 import { auth } from "@/src/lib/firebase";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 
@@ -165,7 +168,7 @@ function StickyHeader({
 }
 
 export default function AddActivityScreen() {
-  const { idToken } = useAuth();
+  const { idToken, setUser, setIdToken } = useAuth();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
 
@@ -228,6 +231,8 @@ export default function AddActivityScreen() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackTitle, setFeedbackTitle] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackButtonLabel, setFeedbackButtonLabel] = useState("Okay");
+  const feedbackOnCloseRef = useRef<(() => void) | null>(null);
   const { startTime: startTimePlaceholder, endTime: endTimePlaceholder } =
     useMemo(() => getSlotTimePlaceholders(slotId), [slotId]);
   const activityTimePickerPlaceholder =
@@ -237,10 +242,39 @@ export default function AddActivityScreen() {
         ? endTimePlaceholder
         : FALLBACK_TIME_PLACEHOLDER;
 
-  function openFeedbackModal(title: string, message: string) {
+  function openFeedbackModal(
+    title: string,
+    message: string,
+    options?: { buttonLabel?: string; onClose?: () => void }
+  ) {
     setFeedbackTitle(title);
     setFeedbackMessage(message);
+    setFeedbackButtonLabel(options?.buttonLabel ?? "Okay");
+    feedbackOnCloseRef.current = options?.onClose ?? null;
     setShowFeedbackModal(true);
+  }
+
+  function closeFeedbackModal() {
+    setShowFeedbackModal(false);
+    const onClose = feedbackOnCloseRef.current;
+    feedbackOnCloseRef.current = null;
+    onClose?.();
+  }
+
+  function openApiErrorModal(
+    error: unknown,
+    contextTitle: string,
+    fallbackMessage: string
+  ) {
+    const resolved = getUserFacingApiError(error, contextTitle, fallbackMessage);
+    openFeedbackModal(resolved.title, resolved.message, {
+      buttonLabel: resolved.buttonLabel,
+      onClose: resolved.isSessionExpired
+        ? () => {
+            void redirectToLogin(setUser, setIdToken);
+          }
+        : undefined,
+    });
   }
 
   function openActivityTimePicker(field: ActivityTimeField) {
@@ -443,10 +477,7 @@ export default function AddActivityScreen() {
       }
     } catch (error) {
       console.log("createActivity error:", error);
-      openFeedbackModal(
-        "Could not save activity",
-        error instanceof Error ? error.message : "Please try again."
-      );
+      openApiErrorModal(error, "Could not save activity", "Please try again.");
     }
   }
 
@@ -745,35 +776,13 @@ export default function AddActivityScreen() {
         </CalendarModalWrapper>
       </Modal>
 
-      <Modal
+      <FeedbackModal
         visible={showFeedbackModal}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setShowFeedbackModal(false)}
-      >
-        <CalendarModalWrapper isLandscape={isLandscape}>
-          <AppText variant="body" style={styles.calendarTitle}>
-            {feedbackTitle}
-          </AppText>
-
-          <View style={styles.timeModalContent}>
-            <AppText variant="caption" style={styles.timeModalHint}>
-              {feedbackMessage}
-            </AppText>
-          </View>
-
-          <View style={styles.calendarActions}>
-            <AppButton
-              title="Okay"
-              onPress={() => setShowFeedbackModal(false)}
-              style={styles.calendarApplyButton}
-              textStyle={styles.calendarApplyButtonText}
-              accessibilityLabel="Close message"
-            />
-          </View>
-        </CalendarModalWrapper>
-      </Modal>
+        title={feedbackTitle}
+        message={feedbackMessage}
+        buttonLabel={feedbackButtonLabel}
+        onClose={closeFeedbackModal}
+      />
     </SafeAreaView>
   );
 }
