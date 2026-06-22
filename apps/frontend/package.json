@@ -14,7 +14,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "test": "jest",
+    "test": "NODE_OPTIONS='--max-old-space-size=4096' jest",
     "test:watch": "jest --watchAll"
   },
   "dependencies": {
