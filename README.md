@@ -22,12 +22,12 @@ Every trip moves through **four phases** in order. The trip admin sets deadlines
 Planning  →  Voting  →  Final  →  Memories
 ```
 
-| Phase | What happens |
-|-------|----------------|
-| **Planning** | Members join the trip (invite code or link) and fill the itinerary — add activities to time slots (breakfast, lunch, evening, etc.). Each member taps **Finish planning** when they are done. When **everyone** has finished (or the planning deadline passes), the trip moves on automatically. |
-| **Voting** | The group **votes on activities** for each open slot. Members pick their favourites; the app uses the results to decide what goes into the shared plan. When voting ends (deadline or admin finishes voting), the trip moves to Final. *Solo trips can skip Voting and go straight to Final.* |
-| **Final** | The **locked itinerary** is ready — the group’s chosen activities per day and time slot. During the trip, members can mark **attendance** on activities (who is joining). This is the “live” plan you follow while travelling. |
-| **Memories** | After the **trip start date**, the group can **upload and browse trip photos** in a shared gallery (JPEG, PNG, or WebP). Members can add memories from the trip and view what others shared. |
+| Phase | What happens                                                                                                                                                                                                                                                                                         |
+|-------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Planning** | Members join the trip (invite code or link) and fill the itinerary. They add activities to time slots (breakfast, lunch, evening, etc.). Each member taps **Finish planning** when they are done. When **everyone** has finished (or the planning deadline passes), the trip moves on automatically. |
+| **Voting** | The group **votes on activities** for each open slot. Members pick their favourites; the app uses the results to decide what goes into the shared plan. When voting ends (deadline or admin finishes voting), the trip moves to Final. *Solo trips can skip Voting and go straight to Final.*        |
+| **Final** | The **locked itinerary** is ready. The group’s chosen activities per day and time slot. During the trip, members can mark **attendance** on activities (who is joining). This is the “live” plan you follow while travelling.                                                                        |
+| **Memories** | After the **trip start date**, the group can **upload and browse trip photos** in a shared gallery (JPEG, PNG, or WebP). Members can add memories from the trip and view what others shared.                                                                                                         |
 
 The home screen and trip overview show which phase is active. Push notifications inform members when a phase changes.
 
