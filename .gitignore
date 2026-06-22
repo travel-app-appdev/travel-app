@@ -32,8 +32,14 @@ build/Release
 .npm
 .eslintcache
 
-# Firebase
+# Firebase — secrets (never commit; keep local copies for team dev & EAS builds)
 **/serviceAccount.json
+**/google-services.json
+**/GoogleService-Info.plist
+.firebaserc
+!.firebaserc.example
+!**/*.example
+!**/*.example.ts
 
 # IDE
 .idea/

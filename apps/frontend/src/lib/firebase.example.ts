@@ -1,5 +1,5 @@
-// apps/frontend/src/lib/firebase.ts
-// Team: paste real values locally (see firebase.example.ts). Do not commit real keys.
+// Copy to firebase.ts and paste your values from Firebase Console → Project settings → Web app.
+// See DEPLOYMENT.md Step 1.5.
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";

@@ -1,0 +1,3 @@
+# EAS Build uploads: include gitignored secrets needed for Android builds.
+# See README — google-services.json stays local, not on GitHub.
+!apps/frontend/google-services.json

@@ -1,51 +1,40 @@
-# TripVote — Backend
+# Votey — Backend
 
-Node.js + Express + TypeScript + Firebase
+Node.js + Express + TypeScript + Firebase.
 
-## Prerequisites
+**Full deployment guide:** [DEPLOYMENT.md](../../DEPLOYMENT.md)
 
-Make sure you have the following installed:
-- [Node.js](https://nodejs.org/) (v18 or higher)
-- npm
+## Files you must create (not on GitHub)
 
-## Getting Started
+| File | Path |
+|------|------|
+| Environment variables | `apps/backend/.env` ← copy from `.env.example` |
+| Firebase service account | `apps/backend/src/config/serviceAccount.json` |
 
-### 1. Clone the repository
+See [DEPLOYMENT.md](../../DEPLOYMENT.md) Steps 1.6 and 2 for how to get these from Firebase.
+
+## Run locally
+
+```bash
 git clone https://github.com/travel-app-appdev/travel-app.git
 cd travel-app/apps/backend
-
-### 2. Install dependencies
+cp .env.example .env
+# Create src/config/serviceAccount.json — see DEPLOYMENT.md
 npm install
-
-This will install all required packages:
-- express — web framework
-- firebase-admin — Firebase/Firestore connection
-- dotenv — environment variables
-- cors — cross-origin requests
-- typescript, ts-node, nodemon — TypeScript support
-
-### 3. Set up environment variables
-Create a `.env` file in `apps/backend/` and add:
-
-FIREBASE_PROJECT_ID=travel-app-66233
-PORT=3000
-
-### 4. Add Firebase service account
-Ask Milena for `serviceAccount.json` and place it in:
-apps/backend/src/config/serviceAccount.json
-
-⚠️ Never commit this file to GitHub!
-
-### 5. Run the development server
 npm run dev
+```
 
-Server will start at http://localhost:3000
+Server: [http://localhost:3000](http://localhost:3000)
 
-## Project Structure
+## Build for production
 
-src/
-├── config/         # Firebase and app configuration
-├── controllers/    # Business logic
-├── middleware/     # Auth, validation
-├── routes/         # API endpoints
-└── index.ts        # Entry point
+```bash
+npm run build
+npm start
+```
+
+## Tests
+
+```bash
+npm test
+```

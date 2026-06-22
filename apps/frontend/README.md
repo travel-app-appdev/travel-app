@@ -1,4 +1,8 @@
-# Frontend – Travel App
+# Votey — Frontend
+
+Expo / React Native / TypeScript.
+
+**Deployment:** [DEPLOYMENT.md](../../DEPLOYMENT.md) — especially Steps 1.4–1.5 (files not on GitHub).
 
 ## Overview
 
