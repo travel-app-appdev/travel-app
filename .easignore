@@ -1,3 +1,4 @@
 # EAS Build uploads: include gitignored secrets needed for Android builds.
-# See README — google-services.json stays local, not on GitHub.
+# See LOCAL_CONFIG.md — these stay local, not on GitHub.
 !apps/frontend/google-services.json
+!apps/frontend/src/lib/firebase.ts

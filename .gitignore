@@ -36,6 +36,7 @@ build/Release
 **/serviceAccount.json
 **/google-services.json
 **/GoogleService-Info.plist
+apps/frontend/src/lib/firebase.ts
 .firebaserc
 !.firebaserc.example
 !**/*.example

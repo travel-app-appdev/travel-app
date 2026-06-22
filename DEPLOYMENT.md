@@ -35,9 +35,8 @@ These files contain secrets or personal project settings. **They are not in the 
 | Service account key | **No** | `apps/backend/src/config/serviceAccount.json` |
 | Android Firebase template | Yes | `apps/frontend/google-services.json.example` |
 | Android Firebase config | **No** (gitignored) | `apps/frontend/google-services.json` — download from Firebase (Step 1.4) |
-| Web Firebase config | Yes (edit in place) | `apps/frontend/src/lib/firebase.ts` (Step 1.5) |
-
-You also need to put your Firebase **web config** into `apps/frontend/src/lib/firebase.ts` (see Step 1.5).
+| Web Firebase template | Yes | `apps/frontend/src/lib/firebase.example.ts` |
+| Web Firebase config | **No** (gitignored) | Copy example → `apps/frontend/src/lib/firebase.ts` (Step 1.5) |
 
 A template for the backend env file is included: `apps/backend/.env.example`.
 
@@ -76,11 +75,14 @@ apps/frontend/google-services.json
 
 See `google-services.json.example` for the expected structure.
 
-### 1.5 Update `firebase.ts`
+### 1.5 Create `firebase.ts`
+
+This file is **gitignored and not on GitHub**.
 
 1. In **Project settings**, add a **Web** app (`</>` icon).
 2. Copy the `firebaseConfig` object Firebase shows you.
-3. Open `apps/frontend/src/lib/firebase.ts` and replace the `firebaseConfig` values with yours.
+3. Copy the template: `cp apps/frontend/src/lib/firebase.example.ts apps/frontend/src/lib/firebase.ts`
+4. Paste your values into the `firebaseConfig` block in `firebase.ts`.
 
 ### 1.6 Create `serviceAccount.json`
 

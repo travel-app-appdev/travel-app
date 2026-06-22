@@ -58,7 +58,7 @@ You must **create them yourself** before the app can run. Step-by-step instructi
 | Backend environment | `apps/backend/.env` ← copy from `.env.example` |
 | Firebase service account (backend) | `apps/backend/src/config/serviceAccount.json` |
 | Android Firebase config | `apps/frontend/google-services.json` ← see template `google-services.json.example` |
-| Firebase web config | copy `apps/frontend/src/lib/firebase.example.ts` → `firebase.ts` and paste your values |
+| Firebase web config | `apps/frontend/src/lib/firebase.ts` (gitignored — copy from `firebase.example.ts`) |
 
 ### Should `google-services.json` be in `.gitignore`?
 
