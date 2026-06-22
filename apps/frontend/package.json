@@ -3,19 +3,21 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
+    "start": "bash ../../scripts/setup-local-config.sh && expo start",
+    "android": "bash ../../scripts/setup-local-config.sh && expo start --android",
     "android:device": "expo run:android",
-    "android:build": "eas build --platform android --profile preview",
     "ios": "expo start --ios",
     "ios:device": "expo run:ios",
-    "web": "expo start --web",
+    "web": "bash ../../scripts/setup-local-config.sh && expo start --web",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "test": "NODE_OPTIONS='--max-old-space-size=4096' jest",
-    "test:watch": "jest --watchAll"
+    "test:watch": "jest --watchAll",
+    "setup:local": "bash ../../scripts/setup-local-config.sh",
+    "android:build": "npx eas-cli build --platform android --profile preview",
+    "android:apk": "npx eas-cli build --platform android --profile preview"
   },
   "dependencies": {
     "@expo-google-fonts/bagel-fat-one": "^0.4.0",
