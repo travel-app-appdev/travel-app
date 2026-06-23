@@ -203,6 +203,7 @@ jest.mock("@/src/components/itinerary/FinalSlotCard", () => ({
 jest.mock("@/src/components/itinerary/SuggestionsModal", () => ({
   SuggestionsModal: () => null,
   getAddedElsewherePlaceIds: () => new Set<string>(),
+  getAddedInCurrentSlotPlaceIds: () => new Set<string>(),
 }));
 
 jest.mock("@/src/components/itinerary/FinalSuggestedActivitiesSection", () => ({

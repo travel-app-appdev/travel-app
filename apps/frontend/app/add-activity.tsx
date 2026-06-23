@@ -35,11 +35,16 @@ import {
 } from "@/src/api/trips";
 import {
   getAddedElsewherePlaceIds,
+  getAddedInCurrentSlotPlaceIds,
   SuggestionsModal,
 } from "@/src/components/itinerary/SuggestionsModal";
 import type { Activity } from "@/src/types/itinerary";
 
 import { createActivity, updateActivity } from "@/src/services/activityService";
+import {
+  loadPlanningActivitiesForTrip,
+  mergeActivitiesById,
+} from "@/src/utils/itinerary/loadPlanningActivities";
 import { useAuth } from "@/src/context/AuthContext";
 import { getUserFacingApiError } from "@/src/lib/apiErrors";
 import { redirectToLogin } from "@/src/lib/sessionExpired";
@@ -136,6 +141,19 @@ function parseActivitiesJson(value?: string): Activity[] {
   }
 }
 
+function parseMemberPreferencesJson(value?: string): string[] {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 type ActivityTimeField = "start" | "end";
 
 const CalendarModalWrapper = ({
@@ -214,6 +232,7 @@ export default function AddActivityScreen() {
     dayId,
     slotId,
     activitiesJson,
+    memberPreferencesJson,
     activityId,
     initialName,
     initialDescription,
@@ -235,6 +254,7 @@ export default function AddActivityScreen() {
     dayId?: string;
     slotId?: string;
     activitiesJson?: string;
+    memberPreferencesJson?: string;
     activityId?: string;
     initialName?: string;
     initialDescription?: string;
@@ -269,16 +289,32 @@ export default function AddActivityScreen() {
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
   const [isSuggestionsLoadingMore, setIsSuggestionsLoadingMore] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
-  const [memberPreferences, setMemberPreferences] = useState<string[]>([]);
+  const [memberPreferences, setMemberPreferences] = useState<string[]>(() =>
+    parseMemberPreferencesJson(memberPreferencesJson)
+  );
+  const [isPreferencesLoading, setIsPreferencesLoading] = useState(
+    () =>
+      !parseMemberPreferencesJson(memberPreferencesJson).length && Boolean(tripId)
+  );
+  const [appliedSuggestionPlaceId, setAppliedSuggestionPlaceId] = useState<
+    string | null
+  >(null);
+  const [tripActivities, setTripActivities] = useState<Activity[]>(() =>
+    parseActivitiesJson(activitiesJson)
+  );
 
   const normalizedSlot = useMemo(() => splitSlotId(slotId), [slotId]);
   const resolvedDayId = dayId ?? normalizedSlot.dayId ?? "";
   const resolvedSlotType = normalizedSlot.slotId ?? slotId ?? "";
   const slotLabel = resolvedSlotType || "this time slot";
   const hasMemberPreferences = memberPreferences.length > 0;
-  const canSuggestActivity = Boolean(
-    tripId && resolvedSlotType && hasMemberPreferences
+  const showSuggestSection = Boolean(
+    state === "planning" &&
+      tripId &&
+      resolvedSlotType &&
+      (hasMemberPreferences || isPreferencesLoading)
   );
+  const canSuggestActivity = showSuggestSection && hasMemberPreferences;
   const { startTime: startTimePlaceholder, endTime: endTimePlaceholder } =
     useMemo(() => getSlotTimePlaceholders(slotId), [slotId]);
   const activityTimePickerPlaceholder =
@@ -351,44 +387,107 @@ export default function AddActivityScreen() {
     return parseActivitiesJson(activitiesJson);
   }
 
+  const planningActivities = useMemo(
+    () => mergeActivitiesById(parseActivitiesJson(activitiesJson), tripActivities),
+    [activitiesJson, tripActivities]
+  );
+
+  const refreshTripActivities = useCallback(async () => {
+    if (!tripId || !startDate || !endDate) {
+      return parseActivitiesJson(activitiesJson);
+    }
+
+    const userId = auth.currentUser?.uid;
+    const fetched = await loadPlanningActivitiesForTrip(
+      tripId,
+      startDate,
+      endDate,
+      userId
+    );
+
+    return mergeActivitiesById(parseActivitiesJson(activitiesJson), fetched);
+  }, [activitiesJson, endDate, startDate, tripId]);
+
   const suggestionsAddedElsewherePlaceIds = useMemo(() => {
     if (!resolvedDayId || !resolvedSlotType) return [];
 
     return [
       ...getAddedElsewherePlaceIds(
-        parseActivitiesJson(activitiesJson),
+        planningActivities,
         suggestions,
         resolvedDayId,
         resolvedSlotType
       ),
     ];
-  }, [activitiesJson, resolvedDayId, resolvedSlotType, suggestions]);
+  }, [planningActivities, resolvedDayId, resolvedSlotType, suggestions]);
+
+  const suggestionsAddedInSlotPlaceIds = useMemo(() => {
+    if (!resolvedDayId || !resolvedSlotType) return [];
+
+    return [
+      ...getAddedInCurrentSlotPlaceIds(
+        planningActivities,
+        suggestions,
+        resolvedDayId,
+        resolvedSlotType
+      ),
+    ];
+  }, [planningActivities, resolvedDayId, resolvedSlotType, suggestions]);
 
   useFocusEffect(
     useCallback(() => {
       if (!tripId || !idToken) {
-        setMemberPreferences([]);
+        setMemberPreferences(parseMemberPreferencesJson(memberPreferencesJson));
+        setIsPreferencesLoading(false);
         return;
       }
 
       let cancelled = false;
+      const initialPreferences = parseMemberPreferencesJson(memberPreferencesJson);
+
+      if (initialPreferences.length > 0) {
+        setMemberPreferences(initialPreferences);
+        setIsPreferencesLoading(false);
+      } else {
+        setIsPreferencesLoading(true);
+      }
 
       getMemberPreferences(tripId, idToken)
         .then((preferences) => {
           if (!cancelled) {
             setMemberPreferences(preferences);
+            setIsPreferencesLoading(false);
           }
         })
         .catch(() => {
           if (!cancelled) {
-            setMemberPreferences([]);
+            setMemberPreferences(initialPreferences);
+            setIsPreferencesLoading(false);
+          }
+        });
+
+      refreshTripActivities()
+        .then((activities) => {
+          if (!cancelled) {
+            setTripActivities(activities);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setTripActivities(parseActivitiesJson(activitiesJson));
           }
         });
 
       return () => {
         cancelled = true;
       };
-    }, [idToken, tripId])
+    }, [
+      activitiesJson,
+      idToken,
+      memberPreferencesJson,
+      refreshTripActivities,
+      tripId,
+    ])
   );
 
   const getAuthToken = useCallback(async () => {
@@ -412,31 +511,41 @@ export default function AddActivityScreen() {
       return;
     }
 
-    const token = await getAuthToken();
-    if (!token) {
-      openFeedbackModal("Not logged in", "Please log in again.");
-      return;
-    }
-
     setSuggestions([]);
     setSuggestionsError(null);
     setIsSuggestionsLoading(true);
     setShowSuggestionsModal(true);
 
     try {
-      const [results, preferences] = await Promise.all([
-        fetchActivitySuggestions(tripId, resolvedSlotType, token),
-        getMemberPreferences(tripId, token).catch(() => [] as string[]),
-      ]);
+      let token = idToken;
+      if (!token && auth.currentUser) {
+        token = await auth.currentUser.getIdToken(false);
+      }
+      if (!token) {
+        setSuggestionsError("Please log in again.");
+        return;
+      }
 
+      void refreshTripActivities()
+        .then((activities) => {
+          setTripActivities(activities);
+        })
+        .catch(() => {
+          // Keep existing activities if the refresh fails.
+        });
+
+      const results = await fetchActivitySuggestions(
+        tripId,
+        resolvedSlotType,
+        token
+      );
       setSuggestions(results);
-      setMemberPreferences(preferences);
     } catch {
       setSuggestionsError("Could not load suggestions. Please try again.");
     } finally {
       setIsSuggestionsLoading(false);
     }
-  }, [getAuthToken, resolvedSlotType, tripId]);
+  }, [idToken, refreshTripActivities, resolvedSlotType, tripId]);
 
   const handleLoadMoreSuggestions = useCallback(async () => {
     if (!tripId || !resolvedSlotType) return;
@@ -477,10 +586,17 @@ export default function AddActivityScreen() {
       setActivityName(suggestion.name);
       setAddress(suggestion.address ?? "");
       setGoogleLink(googleMapsUrl);
-      setShowSuggestionsModal(false);
+      setAppliedSuggestionPlaceId(suggestion.sourcePlaceId);
     },
     []
   );
+
+  const handleDeselectSuggestion = useCallback(async () => {
+    setAppliedSuggestionPlaceId(null);
+    setActivityName("");
+    setAddress("");
+    setGoogleLink("");
+  }, []);
 
   const handleSuggestPress = useSinglePress(handleSuggestActivity);
 
@@ -701,7 +817,7 @@ export default function AddActivityScreen() {
             <View style={styles.stickyTopBlock}>
               <StickyHeader isEditMode={isEditMode} onBack={handleBack} />
 
-              {canSuggestActivity ? (
+              {showSuggestSection ? (
                 <View style={styles.suggestSection}>
                   <AppText variant="body" style={styles.suggestTitle}>
                     Not sure what to add?
@@ -709,13 +825,16 @@ export default function AddActivityScreen() {
 
                   <Pressable
                     onPress={handleSuggestPress}
+                    disabled={!canSuggestActivity}
                     style={({ pressed }) => [
                       styles.suggestPill,
-                      pressed && styles.suggestPillPressed,
+                      !canSuggestActivity && styles.suggestPillDisabled,
+                      pressed && canSuggestActivity && styles.suggestPillPressed,
                     ]}
                     accessibilityRole="button"
                     accessibilityLabel={`Suggest activity for ${slotLabel}`}
                     accessibilityHint="Shows real place suggestions based on your chosen travel preferences"
+                    accessibilityState={{ disabled: !canSuggestActivity }}
                   >
                     <AppText
                       variant="body"
@@ -1012,7 +1131,10 @@ export default function AddActivityScreen() {
         onAdd={handleApplySuggestion}
         onLoadMore={handleLoadMoreSuggestions}
         addedElsewherePlaceIds={suggestionsAddedElsewherePlaceIds}
+        addedInSlotPlaceIds={suggestionsAddedInSlotPlaceIds}
+        selectedPlaceId={appliedSuggestionPlaceId}
         selectedPreferences={memberPreferences}
+        onDeselect={handleDeselectSuggestion}
       />
     </View>
   );
@@ -1076,6 +1198,9 @@ const styles = StyleSheet.create({
   },
   suggestPillPressed: {
     opacity: 0.85,
+  },
+  suggestPillDisabled: {
+    opacity: 0.55,
   },
   suggestPillText: {
     color: colors.lightWhite,

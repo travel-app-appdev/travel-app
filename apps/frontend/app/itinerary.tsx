@@ -54,7 +54,7 @@ import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
 import { FinalSuggestedActivitiesSection } from "@/src/components/itinerary/FinalSuggestedActivitiesSection";
 import { ActivityDetailModal } from "@/src/components/itinerary/ActivityDetailModal";
-import { SuggestionsModal, getAddedElsewherePlaceIds } from "@/src/components/itinerary/SuggestionsModal";
+import { SuggestionsModal, getAddedElsewherePlaceIds, getAddedInCurrentSlotPlaceIds } from "@/src/components/itinerary/SuggestionsModal";
 import {
   fetchTripForUser,
   finishPlanning,
@@ -1198,7 +1198,7 @@ export default function ItineraryScreen() {
           ? `${tripId}_${activeState}`
           : activeState === "voting"
             ? `${tripId}_${activeState}`
-            : `${tripId}_${activeState}_${resolvedDayId}`;
+            : `${tripId}_${activeState}`;
 
       const cached = activitiesCache.get(cacheKey);
 
@@ -1288,21 +1288,23 @@ export default function ItineraryScreen() {
 
         const allActivities = (
           await Promise.all(
-            slots.map(async (slot) => {
-              const slotIdWithDate = `${resolvedDayId}_${slot.id}`;
-              const slotActivities = await getActivitiesBySlot(
-                tripId,
-                slotIdWithDate,
-                currentUserId ?? undefined
-              );
+            tripDays.flatMap((day) =>
+              slots.map(async (slot) => {
+                const slotIdWithDate = `${day.id}_${slot.id}`;
+                const slotActivities = await getActivitiesBySlot(
+                  tripId,
+                  slotIdWithDate,
+                  currentUserId ?? undefined
+                );
 
-              return slotActivities.map((activity: any) =>
-                mapBackendActivity(activity, {
-                  dayId: resolvedDayId,
-                  slotId: slot.id,
-                })
-              );
-            })
+                return slotActivities.map((activity: any) =>
+                  mapBackendActivity(activity, {
+                    dayId: day.id,
+                    slotId: slot.id,
+                  })
+                );
+              })
+            )
           )
         ).flat();
 
@@ -1819,6 +1821,24 @@ export default function ItineraryScreen() {
     ]
   );
 
+  const suggestionsAddedInSlotPlaceIds = useMemo(
+    () =>
+      Array.from(
+        getAddedInCurrentSlotPlaceIds(
+          planningActivities,
+          suggestions,
+          selectedDayId,
+          suggestionsSlotId
+        )
+      ),
+    [
+      planningActivities,
+      suggestions,
+      selectedDayId,
+      suggestionsSlotId,
+    ]
+  );
+
   const planningStatusParam = useMemo(
     () =>
       JSON.stringify(
@@ -1856,7 +1876,8 @@ export default function ItineraryScreen() {
         dayId: selectedDayId,
         slotId: `${selectedDayId}_${slotId}`,
         selectedDay: selectedDayId,
-        activitiesJson: JSON.stringify(itinerary.activities),
+        activitiesJson: JSON.stringify(planningActivities),
+        memberPreferencesJson: JSON.stringify(memberPreferences),
         planningEndAt: timerDeadlines.planningEndAt ?? "",
         votingEndAt: timerDeadlines.votingEndAt ?? "",
       },
@@ -1889,7 +1910,8 @@ export default function ItineraryScreen() {
         initialGoogleMapsUrl: activity.googleMapsUrl ?? "",
         initialStartTime: activity.startTime ?? "",
         initialEndTime: activity.endTime ?? "",
-        activitiesJson: JSON.stringify(itinerary.activities),
+        activitiesJson: JSON.stringify(planningActivities),
+        memberPreferencesJson: JSON.stringify(memberPreferences),
         planningEndAt: timerDeadlines.planningEndAt ?? "",
         votingEndAt: timerDeadlines.votingEndAt ?? "",
       },
@@ -2963,6 +2985,7 @@ export default function ItineraryScreen() {
           onAdd={handleAddSuggestion}
           onLoadMore={handleLoadMoreSuggestions}
           addedElsewherePlaceIds={suggestionsAddedElsewherePlaceIds}
+          addedInSlotPlaceIds={suggestionsAddedInSlotPlaceIds}
           selectedPreferences={memberPreferences}
         />
 

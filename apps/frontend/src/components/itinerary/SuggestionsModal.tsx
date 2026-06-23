@@ -36,7 +36,10 @@ type Props = {
   onAdd: (suggestion: ActivitySuggestion) => void | Promise<void>;
   onLoadMore?: () => void;
   addedElsewherePlaceIds?: string[];
+  addedInSlotPlaceIds?: string[];
+  selectedPlaceId?: string | null;
   selectedPreferences?: string[];
+  onDeselect?: () => void | Promise<void>;
 };
 
 function normalizeMatchText(value: string) {
@@ -47,6 +50,35 @@ function normalizeMapsUrl(url: string) {
   return url.trim().toLowerCase();
 }
 
+function normalizeActivitySlot(activity: Activity): {
+  dayId: string;
+  slotId: string;
+} {
+  if (activity.slotId.includes("_")) {
+    const [dayId, ...slotParts] = activity.slotId.split("_");
+    if (slotParts.length > 0) {
+      return {
+        dayId: dayId || activity.dayId,
+        slotId: slotParts.join("_"),
+      };
+    }
+  }
+
+  return {
+    dayId: activity.dayId,
+    slotId: activity.slotId,
+  };
+}
+
+function isActivityInSlot(
+  activity: Activity,
+  currentDayId: string,
+  currentSlotId: string
+): boolean {
+  const { dayId, slotId } = normalizeActivitySlot(activity);
+  return dayId === currentDayId && slotId === currentSlotId;
+}
+
 export function activityMatchesSuggestion(
   activity: Activity,
   suggestion: ActivitySuggestion
@@ -55,7 +87,11 @@ export function activityMatchesSuggestion(
   const suggestionMapsUrl = suggestion.googleMapsUrl?.trim();
 
   if (activityMapsUrl && suggestionMapsUrl) {
-    return normalizeMapsUrl(activityMapsUrl) === normalizeMapsUrl(suggestionMapsUrl);
+    if (
+      normalizeMapsUrl(activityMapsUrl) === normalizeMapsUrl(suggestionMapsUrl)
+    ) {
+      return true;
+    }
   }
 
   return (
@@ -65,6 +101,31 @@ export function activityMatchesSuggestion(
   );
 }
 
+export function getAddedInCurrentSlotPlaceIds(
+  activities: Activity[],
+  suggestions: ActivitySuggestion[],
+  currentDayId: string,
+  currentSlotId: string
+): Set<string> {
+  const slotActivities = activities.filter((activity) =>
+    isActivityInSlot(activity, currentDayId, currentSlotId)
+  );
+  const placeIds = new Set<string>();
+
+  for (const suggestion of suggestions) {
+    if (
+      suggestion.sourcePlaceId &&
+      slotActivities.some((activity) =>
+        activityMatchesSuggestion(activity, suggestion)
+      )
+    ) {
+      placeIds.add(suggestion.sourcePlaceId);
+    }
+  }
+
+  return placeIds;
+}
+
 export function getAddedElsewherePlaceIds(
   activities: Activity[],
   suggestions: ActivitySuggestion[],
@@ -72,8 +133,7 @@ export function getAddedElsewherePlaceIds(
   currentSlotId: string
 ): Set<string> {
   const otherActivities = activities.filter(
-    (activity) =>
-      !(activity.dayId === currentDayId && activity.slotId === currentSlotId)
+    (activity) => !isActivityInSlot(activity, currentDayId, currentSlotId)
   );
   const placeIds = new Set<string>();
 
@@ -335,7 +395,10 @@ export function SuggestionsModal({
   onAdd,
   onLoadMore,
   addedElsewherePlaceIds = [],
+  addedInSlotPlaceIds = [],
+  selectedPlaceId = null,
   selectedPreferences = [],
+  onDeselect,
 }: Props) {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -409,7 +472,7 @@ export function SuggestionsModal({
   useEffect(() => {
     if (visible) {
       setActiveFilter(ALL_FILTER);
-      setAddedPlaceId(null);
+      setAddedPlaceId(selectedPlaceId);
       setIsAdding(false);
     }
   }, [visible, slotLabel]);
@@ -423,10 +486,46 @@ export function SuggestionsModal({
     [addedElsewherePlaceIds]
   );
 
-  async function handleAdd(s: ActivitySuggestion) {
-    if (isAdding || elsewherePlaceIds.has(s.sourcePlaceId)) return;
+  const inSlotPlaceIds = useMemo(
+    () => new Set(addedInSlotPlaceIds),
+    [addedInSlotPlaceIds]
+  );
 
-    const previousPlaceId = addedPlaceId;
+  const isPickerMode = onDeselect != null;
+
+  function getActiveSelection() {
+    return isPickerMode ? addedPlaceId : (addedPlaceId ?? selectedPlaceId);
+  }
+
+  async function handleAdd(s: ActivitySuggestion) {
+    if (isAdding || elsewherePlaceIds.has(s.sourcePlaceId)) {
+      return;
+    }
+
+    const activeSelection = getActiveSelection();
+
+    if (inSlotPlaceIds.has(s.sourcePlaceId)) {
+      if (!isPickerMode || !activeSelection) {
+        return;
+      }
+    }
+
+    if (activeSelection === s.sourcePlaceId) {
+      if (!onDeselect) {
+        return;
+      }
+
+      setAddedPlaceId(null);
+      setIsAdding(true);
+      try {
+        await onDeselect();
+      } finally {
+        setIsAdding(false);
+      }
+      return;
+    }
+
+    const previousPlaceId = activeSelection;
     setAddedPlaceId(s.sourcePlaceId);
     setIsAdding(true);
     try {
@@ -552,10 +651,23 @@ export function SuggestionsModal({
   const showSuggestionList =
     suggestions.length > 0 || selectedPreferences.length > 0;
 
+  const activeSelection = getActiveSelection();
+
   const listContent = visibleSuggestionItems.map(({ suggestion: s, labels, key }) => {
-    const isAddedInSlot = addedPlaceId === s.sourcePlaceId;
+    const isSavedInSlot = inSlotPlaceIds.has(s.sourcePlaceId);
+    const isSelected = activeSelection === s.sourcePlaceId;
     const isAddedElsewhere = elsewherePlaceIds.has(s.sourcePlaceId);
-    const isAdded = isAddedInSlot || isAddedElsewhere;
+    const isAddedInCurrentSlot = isPickerMode
+      ? activeSelection
+        ? isSelected
+        : isSavedInSlot
+      : isSavedInSlot || isSelected;
+    const isAdded = isAddedElsewhere || isAddedInCurrentSlot;
+    const isAddDisabled =
+      isAdding ||
+      isAddedElsewhere ||
+      (!isPickerMode && isSavedInSlot) ||
+      (isPickerMode && !activeSelection && isSavedInSlot);
     return (
       <View key={key} style={styles.card}>
         <View style={styles.cardBody}>
@@ -612,19 +724,23 @@ export function SuggestionsModal({
 
         <Pressable
           onPress={() => handleAdd(s)}
-          disabled={isAdding || isAdded}
+          disabled={isAddDisabled}
           style={[styles.addBtn, isAdded && styles.addBtnDone]}
           accessibilityRole="button"
           accessibilityLabel={
             isAddedElsewhere
               ? `${s.name} already added in another time slot`
-              : isAdded
-                ? `${s.name} added`
-                : addedPlaceId
-                  ? `Replace with ${s.name}`
-                  : `Add ${s.name} to itinerary`
+              : isPickerMode && isSelected
+                ? `${s.name} added. Tap again to remove`
+                : !isPickerMode && isSavedInSlot
+                  ? `${s.name} already added in this time slot`
+                  : !isPickerMode && isSelected
+                    ? `${s.name} added`
+                    : activeSelection
+                      ? `Replace with ${s.name}`
+                      : `Add ${s.name} to itinerary`
           }
-          accessibilityState={{ disabled: isAdding || isAdded }}
+          accessibilityState={{ disabled: isAddDisabled }}
         >
           {isAdded ? (
             <View {...hiddenFromAccessibility}>
