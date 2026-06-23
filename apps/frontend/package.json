@@ -18,7 +18,6 @@
     "setup:local": "node ../../scripts/setup-local-config.mjs",
     "android:build": "npx eas-cli build --platform android --profile preview",
     "android:apk": "npx eas-cli build --platform android --profile preview"
-    "test:watch": "jest --watchAll"
   },
   "dependencies": {
     "@expo-google-fonts/bagel-fat-one": "^0.4.0",
