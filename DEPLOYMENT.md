@@ -1,7 +1,5 @@
 # Deployment Guide — Votey
 
-**Repository:** [https://github.com/travel-app-appdev/travel-app](https://github.com/travel-app-appdev/travel-app)
-
 This guide explains how to deploy Votey and each of its components.
 
 ---
@@ -177,14 +175,6 @@ Use PM2 or systemd so it keeps running.
 
 Verify: `curl https://YOUR_API_URL/` → health JSON response.
 
-### Reference: team API
-
-The Votey developers host a demo backend at:
-
-**https://cc231023-11019.node.ustp.cloud**
-
-Use this only as a **reference** (to see a live deployment). For your own deployment, use **your** URL in the mobile app config below.
-
 ---
 
 ## Step 5 — Build the Android app
@@ -228,7 +218,7 @@ Download the APK from [expo.dev](https://expo.dev).
 - [ ] `serviceAccount.json` created in `apps/backend/src/config/`
 - [ ] `.env` created from `.env.example` in `apps/backend/`
 - [ ] Backend runs locally on port 3000
-- [ ] Backend deployed to HTTPS URL (or using reference API for demo only)
+- [ ] Backend deployed to HTTPS URL
 - [ ] `eas.json` updated with my API URL
 - [ ] APK built and tested on a device
 

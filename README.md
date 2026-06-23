@@ -2,8 +2,6 @@
 
 Collaborative trip-planning app for groups. Create a trip, invite friends, build a shared itinerary together, vote on activities, follow the final plan on the trip, and collect photos afterwards.
 
-**Repository:** [https://github.com/travel-app-appdev/travel-app](https://github.com/travel-app-appdev/travel-app)
-
 ---
 
 ## Distribution rights
@@ -59,27 +57,6 @@ You must **create them yourself** before the app can run. Step-by-step instructi
 | Firebase service account (backend) | `apps/backend/src/config/serviceAccount.json` |
 | Android Firebase config | `apps/frontend/google-services.json` ← see template `google-services.json.example` |
 | Firebase web config | `apps/frontend/src/lib/firebase.ts` (gitignored — copy from `firebase.example.ts`) |
-
-### Should `google-services.json` be in `.gitignore`?
-
-**Yes — recommended** if the repo is public or shared with people outside your team. That file links the app to a specific Firebase project and should not be committed.
-
-- Use **`google-services.json.example`** in the repo as a guide.
-- Each developer downloads their own `google-services.json` from Firebase Console and saves it locally at `apps/frontend/google-services.json`.
-
-**Votey team:** see [LOCAL_CONFIG.md](./LOCAL_CONFIG.md) — real config files stay on your machine only; templates are `*.example` in the repo.
-
----
-
-## Reference deployment
-
-The Votey team runs a backend API for development and demos:
-
-**https://cc231023-11019.node.ustp.cloud**
-
-Health check: open that URL in a browser — you should see `{"message":"Travel API is running!"}`.
-
-If you **deploy your own instance** from this repo, you need your **own** Firebase project and backend URL. The team API is for reference only — it is tied to the team’s Firebase and will not work with your own login.
 
 ---
 
