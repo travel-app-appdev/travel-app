@@ -1,5 +1,5 @@
 // app/destination-voting.tsx
-import { PlaceholderScreen } from "@/src/components/common/placeholder-screen";
+import { PlaceholderScreen } from "@/src/components/common/PlaceholderScreen";
 
 export default function DestinationVotingScreen() {
   return (

@@ -32,6 +32,10 @@ import {
   isPastTripByEndDate,
   parseLocalTripDate,
 } from "@/src/utils/tripState";
+import {
+  getMemberInitials,
+  getTripCardMemberColor,
+} from "@/src/utils/tripMembers";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
@@ -129,13 +133,6 @@ function formatDate(dateString: string): string {
   });
 }
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-}
-
 function getCardColor(tripId: string): string {
   const palette = [colors.plantGreen, colors.sunsetOrange];
   let hash = 0;
@@ -160,16 +157,6 @@ function getUiStatus(
   return "planning";
 }
 
-function getMemberColor(index: number): string {
-  const palette = [
-    colors.sunsetOrange,
-    colors.plantGreen,
-    colors.sunsetPink,
-    colors.seaBlue,
-  ];
-  return palette[index % palette.length];
-}
-
 function mapTripToCardTrip(
   trip: TripWithMembers,
   today = new Date()
@@ -180,8 +167,8 @@ function mapTripToCardTrip(
       name: member.name,
       planning_done: member.planning_done,
       voting_done: member.voting_done,
-      initials: getInitials(member.name),
-      color: getMemberColor(index),
+      initials: getMemberInitials(member.name),
+      color: getTripCardMemberColor(index),
     })
   );
   const effectiveState = getEffectiveTripState(trip, today);

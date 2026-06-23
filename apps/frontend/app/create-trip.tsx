@@ -31,7 +31,14 @@ import { FeedbackModal } from "@/src/components/common/FeedbackModal";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { PressLock } from "@/src/utils/PressLock";
-import { toLocalDateString } from "@/src/utils/tripDate";
+import {
+  combineDateAndTime,
+  formatDateDisplay,
+  fromDateString,
+  isValidTimeString,
+  normalizeTimeInput,
+  toLocalDateString,
+} from "@/src/utils/tripDate";
 import { invalidateTripsCache } from "./home";
 import Plane from "@/assets/icons/plane.svg";
 import LeafUp from "@/assets/visuals/leaf_up.svg";
@@ -76,17 +83,15 @@ type CalendarDay = {
   dateString: string;
 };
 
-function formatDateDisplay(date: Date): string {
-  const d = date.getDate().toString().padStart(2, "0");
-  const m = (date.getMonth() + 1).toString().padStart(2, "0");
-  const y = date.getFullYear();
-  return `${d}.${m}.${y}`;
-}
-
-function fromDateString(dateString: string): Date {
-  const [year, month, day] = dateString.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
+type CalendarMarkedRange = Record<
+  string,
+  {
+    startingDay?: boolean;
+    endingDay?: boolean;
+    color: string;
+    textColor: string;
+  }
+>;
 
 function calcCalendarDays(start: Date, end: Date): number {
   const startOnly = new Date(start);
@@ -109,13 +114,6 @@ function calcDaysLeft(end: Date): number {
 function dayLabel(days: number, active: boolean): string {
   if (active) return days === 1 ? "1 day left" : `${days} days left`;
   return days === 1 ? "1 day" : `${days} days`;
-}
-
-function combineDateAndTime(date: Date, timeStr: string): string {
-  const [hours, minutes] = timeStr.split(":").map(Number);
-  const combined = new Date(date);
-  combined.setHours(hours, minutes, 0, 0);
-  return combined.toISOString();
 }
 
 function addMinutesFromNow(minutes: number): Date {
@@ -164,7 +162,7 @@ function getMarkedRange(
   end: string | null,
   edgeColor: string,
   fillColor: string
-) {
+): CalendarMarkedRange {
   if (!start) return {};
 
   if (!end || start === end) {
@@ -178,7 +176,7 @@ function getMarkedRange(
     };
   }
 
-  const marked: Record<string, any> = {};
+  const marked: CalendarMarkedRange = {};
   let current = fromDateString(start);
   const last = fromDateString(end);
 
@@ -198,16 +196,6 @@ function getMarkedRange(
   }
 
   return marked;
-}
-
-function isValidTimeString(value: string): boolean {
-  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
-}
-
-function normalizeTimeInput(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
 }
 
 const CalendarModalWrapper = ({
@@ -401,8 +389,7 @@ export default function CreateTripScreen() {
   const disabledTripOrange = colors.disabledSunsetOrange;
   const disabledPlanningYellow = colors.disabledBeachYellow;
 
-  const [activePhaseCalendar, setActivePhaseCalendar] =
-    useState<PhaseKey | null>(null);
+  const [, setActivePhaseCalendar] = useState<PhaseKey | null>(null);
 
   const phases = [
     {
@@ -471,7 +458,11 @@ export default function CreateTripScreen() {
     contextTitle: string,
     fallbackMessage: string
   ) => {
-    const resolved = getUserFacingApiError(error, contextTitle, fallbackMessage);
+    const resolved = getUserFacingApiError(
+      error,
+      contextTitle,
+      fallbackMessage
+    );
     openFeedbackModal(resolved.title, resolved.message, {
       buttonLabel: resolved.buttonLabel,
       onClose: resolved.isSessionExpired
@@ -511,7 +502,8 @@ export default function CreateTripScreen() {
   };
 
   useEffect(() => {
-    return () => timeoutRefs.current.forEach(clearTimeout);
+    const timeouts = timeoutRefs.current;
+    return () => timeouts.forEach(clearTimeout);
   }, []);
 
   const formatDate = (date: Date) =>

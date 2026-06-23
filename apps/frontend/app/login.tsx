@@ -26,6 +26,11 @@ import Back from "@/assets/icons/back.svg";
 import MascotHelloSeaBlue from "@/assets/mascots/mascot-hello-seablue.svg";
 import BlueBackground from "@/assets/visuals/blue-background.svg";
 
+type LoginError = {
+  message?: string;
+  code?: string;
+};
+
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -81,9 +86,10 @@ export default function LoginScreen() {
       } else {
         router.replace("/home");
       }
-    } catch (error: any) {
-      const rawMessage = error?.message ?? "";
-      const code = error?.code ?? "";
+    } catch (error: unknown) {
+      const loginError = error as LoginError;
+      const rawMessage = loginError.message ?? "";
+      const code = loginError.code ?? "";
 
       let message = "Something went wrong. Please try again.";
 

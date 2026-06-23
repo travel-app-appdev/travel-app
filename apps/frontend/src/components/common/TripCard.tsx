@@ -165,7 +165,7 @@ export function TripCard({
         </View>
 
         <AppText variant="caption" style={styles.date} numberOfLines={1}>
-          {startDate} – {endDate}
+          {startDate} - {endDate}
         </AppText>
       </View>
     </Pressable>

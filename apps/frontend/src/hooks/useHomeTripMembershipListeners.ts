@@ -38,7 +38,16 @@ export function useHomeTripMembershipListeners({
     const unsubscribeMemberships = onSnapshot(
       membershipQuery,
       (snapshot) => {
-        const activeTripIds = new Set<string>();
+        const activeTripIds = new Set<string>(
+          snapshot.docs
+            .map((membershipDoc) => membershipDoc.data())
+            .filter(
+              (data) =>
+                typeof data.trip_id === "string" &&
+                data.invite_status === "accepted"
+            )
+            .map((data) => data.trip_id as string)
+        );
 
         snapshot.docChanges().forEach((change) => {
           const data = change.doc.data();
@@ -50,8 +59,6 @@ export function useHomeTripMembershipListeners({
             onTripRemoved(tripId);
             return;
           }
-
-          activeTripIds.add(tripId);
 
           if (tripUnsubscribers.has(tripId)) return;
 

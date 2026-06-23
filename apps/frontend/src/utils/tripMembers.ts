@@ -1,5 +1,5 @@
 import { colors } from "@/src/theme";
-import type { Trip } from "@/src/api/trips";
+import type { Trip, TripMember } from "@/src/api/trips";
 
 export type MemberDisplay = {
   id: string;
@@ -8,10 +8,17 @@ export type MemberDisplay = {
   color: string;
 };
 
-const MEMBER_COLORS = [
+const MEMBER_PARAM_COLORS = [
   colors.beachYellow,
   colors.sunsetPink,
   colors.neonGreen,
+  colors.seaBlue,
+];
+
+const TRIP_CARD_MEMBER_COLORS = [
+  colors.sunsetOrange,
+  colors.plantGreen,
+  colors.sunsetPink,
   colors.seaBlue,
 ];
 
@@ -23,7 +30,11 @@ export function getMemberInitials(name: string): string {
 }
 
 export function getMemberColor(index: number): string {
-  return MEMBER_COLORS[index % MEMBER_COLORS.length];
+  return MEMBER_PARAM_COLORS[index % MEMBER_PARAM_COLORS.length];
+}
+
+export function getTripCardMemberColor(index: number): string {
+  return TRIP_CARD_MEMBER_COLORS[index % TRIP_CARD_MEMBER_COLORS.length];
 }
 
 export function mapTripMembersToMemberParams(
@@ -34,5 +45,16 @@ export function mapTripMembersToMemberParams(
     name: member.name,
     initials: getMemberInitials(member.name),
     color: getMemberColor(index),
+  }));
+}
+
+export function mapTripMembersForDisplay(
+  members: TripMember[] = []
+): MemberDisplay[] {
+  return members.map((member, index) => ({
+    id: member.id,
+    name: member.name,
+    initials: getMemberInitials(member.name),
+    color: getTripCardMemberColor(index),
   }));
 }

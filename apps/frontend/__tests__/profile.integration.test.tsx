@@ -432,7 +432,7 @@ describe("ProfileScreen", () => {
   });
 
   it("shows error when current password is incorrect", async () => {
-    const error: any = new Error("Wrong password");
+    const error = new Error("Wrong password") as Error & { code?: string };
     error.code = "auth/wrong-password";
     mockReauthenticate.mockRejectedValueOnce(error);
 
@@ -461,7 +461,7 @@ describe("ProfileScreen", () => {
   });
 
   it("shows error when current password is invalid credential", async () => {
-    const error: any = new Error("Invalid credential");
+    const error = new Error("Invalid credential") as Error & { code?: string };
     error.code = "auth/invalid-credential";
     mockReauthenticate.mockRejectedValueOnce(error);
 

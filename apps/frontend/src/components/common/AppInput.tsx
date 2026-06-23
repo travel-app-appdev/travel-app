@@ -23,7 +23,7 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
         accessibilityState={{
           disabled: props.editable === false,
         }}
-        // Communicate error state via hint — 'invalid' is not in RN's AccessibilityState
+        // Communicate error state via hint; 'invalid' is not in RN's AccessibilityState.
         accessibilityHint={
           hasError
             ? props.accessibilityHint

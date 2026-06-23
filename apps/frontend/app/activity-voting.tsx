@@ -1,5 +1,5 @@
 // app/activity-voting.tsx
-import { PlaceholderScreen } from "@/src/components/common/placeholder-screen";
+import { PlaceholderScreen } from "@/src/components/common/PlaceholderScreen";
 
 export default function ActivityVotingScreen() {
   return (
@@ -10,4 +10,3 @@ export default function ActivityVotingScreen() {
     />
   );
 }
-

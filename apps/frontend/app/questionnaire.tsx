@@ -1,4 +1,4 @@
-import { PlaceholderScreen } from "@/src/components/common/placeholder-screen";
+import { PlaceholderScreen } from "@/src/components/common/PlaceholderScreen";
 
 export default function QuestionnaireScreen() {
   return (
