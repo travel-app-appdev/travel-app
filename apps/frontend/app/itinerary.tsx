@@ -21,6 +21,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { Ionicons } from "@expo/vector-icons";
+import { doc, onSnapshot } from "firebase/firestore";
 
 import { colors, spacing, typography, radius } from "@/src/theme";
 import { ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
@@ -1965,7 +1966,7 @@ export default function ItineraryScreen() {
     try {
       const results = await fetchActivitySuggestions(tripId, slotId, authToken);
       setSuggestions(results);
-    } catch {
+    } catch (err) {
       setSuggestionsError("Could not load suggestions. Please try again.");
     } finally {
       setIsSuggestionsLoading(false);
@@ -2429,9 +2430,8 @@ export default function ItineraryScreen() {
           })
         );
 
-        const isAddedToItinerary = result.addedAlternativeActivityIds.includes(
-          activityToToggle.id
-        );
+        const isAddedToItinerary =
+          result.addedAlternativeActivityIds.includes(activityToToggle.id);
 
         setApiActivities((current) =>
           current.map((item) =>
@@ -3457,7 +3457,7 @@ const styles = StyleSheet.create({
   memoryTile: {
     width: "48.5%",
     aspectRatio: 1,
-    borderRadius: radius.sm,
+    borderRadius: 8,
     overflow: "hidden",
     backgroundColor: colors.border,
   },
