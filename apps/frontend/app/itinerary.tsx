@@ -229,22 +229,22 @@ function mapBackendFinalSlot(slot: FinalItinerarySlotDto): FinalSlotUi {
 
   const alternativeActivities = Array.isArray(slot.alternativeActivities)
     ? slot.alternativeActivities.map((activity) =>
-        mapBackendActivity(activity, {
-          dayId: split.dayId,
-          slotId: split.slotId,
-        })
-      )
+      mapBackendActivity(activity, {
+        dayId: split.dayId,
+        slotId: split.slotId,
+      })
+    )
     : [];
 
   const addedAlternativeActivities = Array.isArray(
     slot.addedAlternativeActivities
   )
     ? slot.addedAlternativeActivities.map((activity) =>
-        mapBackendActivity(activity, {
-          dayId: split.dayId,
-          slotId: split.slotId,
-        })
-      )
+      mapBackendActivity(activity, {
+        dayId: split.dayId,
+        slotId: split.slotId,
+      })
+    )
     : [];
 
   return {
@@ -970,7 +970,7 @@ export default function ItineraryScreen() {
         const shouldShowTransitionOverlay =
           currentState !== nextState &&
           ((currentState === "planning" &&
-            (nextState === "voting" || nextState === "final")) ||
+              (nextState === "voting" || nextState === "final")) ||
             (currentState === "voting" && nextState === "final"));
 
         if (shouldShowTransitionOverlay) {
@@ -2437,9 +2437,9 @@ export default function ItineraryScreen() {
           current.map((item) =>
             item.id === activityToToggle.id
               ? {
-                  ...item,
-                  isAddedToFinalItinerary: isAddedToItinerary,
-                }
+                ...item,
+                isAddedToFinalItinerary: isAddedToItinerary,
+              }
               : item
           )
         );
@@ -2451,9 +2451,9 @@ export default function ItineraryScreen() {
             cachedActivities.map((item) =>
               item.id === activityToToggle.id
                 ? {
-                    ...item,
-                    isAddedToFinalItinerary: isAddedToItinerary,
-                  }
+                  ...item,
+                  isAddedToFinalItinerary: isAddedToItinerary,
+                }
                 : item
             )
           );
@@ -2462,9 +2462,9 @@ export default function ItineraryScreen() {
         setSelectedActivity((current) =>
           current?.id === activityToToggle.id
             ? {
-                ...current,
-                isAddedToFinalItinerary: isAddedToItinerary,
-              }
+              ...current,
+              isAddedToFinalItinerary: isAddedToItinerary,
+            }
             : current
         );
       } catch (error) {
@@ -2641,11 +2641,11 @@ export default function ItineraryScreen() {
         current.dayId === activity.dayId &&
         current.slotId === activity.slotId
           ? {
-              ...current,
-              hasCurrentUserJoined: result.joined,
-              joinedCount: result.joinedCount,
-              joinedMembers: result.joinedMembers ?? current.joinedMembers,
-            }
+            ...current,
+            hasCurrentUserJoined: result.joined,
+            joinedCount: result.joinedCount,
+            joinedMembers: result.joinedMembers ?? current.joinedMembers,
+          }
           : current
       );
 
@@ -2856,18 +2856,18 @@ export default function ItineraryScreen() {
                     {isLoadingActivities
                       ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
                       : slotItems.map(({ slot, activity }) => (
-                          <PlanningSlotCard
-                            key={slot.id}
-                            slot={slot}
-                            activity={activity}
-                            onAddActivity={handleAddActivity}
-                            onEditActivity={handleEditActivity}
-                            onSuggest={
-                              hasMemberPreferences ? handleSuggest : undefined
-                            }
-                            disabled={hasCurrentUserFinished}
-                          />
-                        ))}
+                        <PlanningSlotCard
+                          key={slot.id}
+                          slot={slot}
+                          activity={activity}
+                          onAddActivity={handleAddActivity}
+                          onEditActivity={handleEditActivity}
+                          onSuggest={
+                            hasMemberPreferences ? handleSuggest : undefined
+                          }
+                          disabled={hasCurrentUserFinished}
+                        />
+                      ))}
                   </View>
                 )}
 
@@ -2910,45 +2910,45 @@ export default function ItineraryScreen() {
                     {isLoadingActivities
                       ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
                       : slots.map((slot) => {
-                          const finalSlot = finalSlotMap.get(slot.id);
+                        const finalSlot = finalSlotMap.get(slot.id);
 
-                          if (!finalSlot) {
-                            return (
-                              <FinalSlotCard
-                                key={slot.id}
-                                slot={slot}
-                                activity={undefined}
-                                onJoinGroup={handleJoinGroup}
-                                onPressDetails={handleOpenFinalActivityDetails}
-                              />
-                            );
-                          }
-
-                          const addedAlternatives =
-                            finalSlot.addedAlternativeActivities;
-                          const remainingAlternativeCount =
-                            finalSlot.alternativeActivities.length;
-
+                        if (!finalSlot) {
                           return (
-                            <View key={slot.id} style={styles.finalSlotSection}>
-                              <FinalSlotCard
-                                slot={slot}
-                                activity={finalSlot.selectedActivity}
-                                onJoinGroup={handleJoinGroup}
-                                onPressDetails={handleOpenFinalActivityDetails}
-                                otherSuggestedCount={remainingAlternativeCount}
-                              />
-
-                              <FinalSuggestedActivitiesSection
-                                slotLabel={slot.label}
-                                activities={addedAlternatives}
-                                onJoinGroup={handleJoinGroup}
-                                onPressDetails={handleOpenFinalActivityDetails}
-                                accentColor={stateAccentColor}
-                              />
-                            </View>
+                            <FinalSlotCard
+                              key={slot.id}
+                              slot={slot}
+                              activity={undefined}
+                              onJoinGroup={handleJoinGroup}
+                              onPressDetails={handleOpenFinalActivityDetails}
+                            />
                           );
-                        })}
+                        }
+
+                        const addedAlternatives =
+                          finalSlot.addedAlternativeActivities;
+                        const remainingAlternativeCount =
+                          finalSlot.alternativeActivities.length;
+
+                        return (
+                          <View key={slot.id} style={styles.finalSlotSection}>
+                            <FinalSlotCard
+                              slot={slot}
+                              activity={finalSlot.selectedActivity}
+                              onJoinGroup={handleJoinGroup}
+                              onPressDetails={handleOpenFinalActivityDetails}
+                              otherSuggestedCount={remainingAlternativeCount}
+                            />
+
+                            <FinalSuggestedActivitiesSection
+                              slotLabel={slot.label}
+                              activities={addedAlternatives}
+                              onJoinGroup={handleJoinGroup}
+                              onPressDetails={handleOpenFinalActivityDetails}
+                              accentColor={stateAccentColor}
+                            />
+                          </View>
+                        );
+                      })}
                   </View>
                 )}
               </View>
@@ -3017,145 +3017,145 @@ export default function ItineraryScreen() {
                     { width: memoryPreviewWidth },
                   ]}
                 >
-                <View style={styles.memoryPreviewHeader}>
-                  <View style={styles.memoryPreviewHeaderRow}>
-                    <View style={styles.memoryPreviewHeaderSpacer} />
-                    <View style={styles.memoryPreviewMenuAnchor}>
-                      <Pressable
-                        style={styles.memoryPreviewMenuButton}
-                        onPress={handleToggleMemoryPreviewMenu}
-                        hitSlop={8}
-                        accessibilityRole="button"
-                        accessibilityLabel="Open memory actions menu"
-                        accessibilityState={{ expanded: showMemoryPreviewMenu }}
-                      >
-                        <ImageMenuIcon width={24} height={24} />
-                      </Pressable>
+                  <View style={styles.memoryPreviewHeader}>
+                    <View style={styles.memoryPreviewHeaderRow}>
+                      <View style={styles.memoryPreviewHeaderSpacer} />
+                      <View style={styles.memoryPreviewMenuAnchor}>
+                        <Pressable
+                          style={styles.memoryPreviewMenuButton}
+                          onPress={handleToggleMemoryPreviewMenu}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel="Open memory actions menu"
+                          accessibilityState={{ expanded: showMemoryPreviewMenu }}
+                        >
+                          <ImageMenuIcon width={24} height={24} />
+                        </Pressable>
 
-                      {showMemoryPreviewMenu ? (
-                        <View style={styles.memoryPreviewMenu}>
-                          <Pressable
-                            style={[
-                              styles.memoryPreviewMenuItem,
-                              isDeletingMemories && styles.memoryActionDisabled,
-                            ]}
-                            onPress={handleDeletePreviewMemory}
-                            disabled={isDeletingMemories}
-                            accessibilityRole="button"
-                            accessibilityLabel="Delete this memory"
-                          >
-                            {isDeletingMemories ? (
-                              <ActivityIndicator color={colors.nightBlack} />
-                            ) : (
-                              <ImageDeleteIcon width={24} height={24} />
-                            )}
-                            <AppText
-                              variant="body"
-                              style={styles.memoryPreviewMenuItemText}
+                        {showMemoryPreviewMenu ? (
+                          <View style={styles.memoryPreviewMenu}>
+                            <Pressable
+                              style={[
+                                styles.memoryPreviewMenuItem,
+                                isDeletingMemories && styles.memoryActionDisabled,
+                              ]}
+                              onPress={handleDeletePreviewMemory}
+                              disabled={isDeletingMemories}
+                              accessibilityRole="button"
+                              accessibilityLabel="Delete this memory"
                             >
-                              Delete
-                            </AppText>
-                          </Pressable>
+                              {isDeletingMemories ? (
+                                <ActivityIndicator color={colors.nightBlack} />
+                              ) : (
+                                <ImageDeleteIcon width={24} height={24} />
+                              )}
+                              <AppText
+                                variant="body"
+                                style={styles.memoryPreviewMenuItemText}
+                              >
+                                Delete
+                              </AppText>
+                            </Pressable>
 
-                          <Pressable
-                            style={[
-                              styles.memoryPreviewMenuItem,
-                              isDownloadingMemories &&
+                            <Pressable
+                              style={[
+                                styles.memoryPreviewMenuItem,
+                                isDownloadingMemories &&
                                 styles.memoryActionDisabled,
-                            ]}
-                            onPress={handleDownloadPreviewMemory}
-                            disabled={isDownloadingMemories}
-                            accessibilityRole="button"
-                            accessibilityLabel="Download this memory"
-                          >
-                            {isDownloadingMemories ? (
-                              <ActivityIndicator color={colors.nightBlack} />
-                            ) : (
-                              <ImageDownloadIcon width={24} height={24} />
-                            )}
-                            <AppText
-                              variant="body"
-                              style={styles.memoryPreviewMenuItemText}
+                              ]}
+                              onPress={handleDownloadPreviewMemory}
+                              disabled={isDownloadingMemories}
+                              accessibilityRole="button"
+                              accessibilityLabel="Download this memory"
                             >
-                              Download
-                            </AppText>
-                          </Pressable>
-                        </View>
-                      ) : null}
+                              {isDownloadingMemories ? (
+                                <ActivityIndicator color={colors.nightBlack} />
+                              ) : (
+                                <ImageDownloadIcon width={24} height={24} />
+                              )}
+                              <AppText
+                                variant="body"
+                                style={styles.memoryPreviewMenuItemText}
+                              >
+                                Download
+                              </AppText>
+                            </Pressable>
+                          </View>
+                        ) : null}
+                      </View>
                     </View>
                   </View>
-                </View>
 
-                <View
-                  style={[
-                    styles.memoryPreviewImageWrapper,
-                    {
-                      width: memoryPreviewWidth,
-                      height: memoryPreviewImageHeight,
-                    },
-                  ]}
-                >
-                  {authToken && memories.length > 0 ? (
-                    <FlatList
-                      ref={memoryPreviewListRef}
-                      data={memories}
-                      horizontal
-                      pagingEnabled
-                      bounces={memories.length > 1}
-                      showsHorizontalScrollIndicator={false}
-                      initialScrollIndex={
-                        memories.length > 0 ? selectedMemoryIndex : undefined
-                      }
-                      keyExtractor={(memory) => memory.memory_id}
-                      getItemLayout={(_, index) => ({
-                        length: memoryPreviewWidth,
-                        offset: memoryPreviewWidth * index,
-                        index,
-                      })}
-                      onScrollToIndexFailed={(info) => {
-                        requestAnimationFrame(() => {
-                          memoryPreviewListRef.current?.scrollToIndex({
-                            index: info.index,
-                            animated: false,
+                  <View
+                    style={[
+                      styles.memoryPreviewImageWrapper,
+                      {
+                        width: memoryPreviewWidth,
+                        height: memoryPreviewImageHeight,
+                      },
+                    ]}
+                  >
+                    {authToken && memories.length > 0 ? (
+                      <FlatList
+                        ref={memoryPreviewListRef}
+                        data={memories}
+                        horizontal
+                        pagingEnabled
+                        bounces={memories.length > 1}
+                        showsHorizontalScrollIndicator={false}
+                        initialScrollIndex={
+                          memories.length > 0 ? selectedMemoryIndex : undefined
+                        }
+                        keyExtractor={(memory) => memory.memory_id}
+                        getItemLayout={(_, index) => ({
+                          length: memoryPreviewWidth,
+                          offset: memoryPreviewWidth * index,
+                          index,
+                        })}
+                        onScrollToIndexFailed={(info) => {
+                          requestAnimationFrame(() => {
+                            memoryPreviewListRef.current?.scrollToIndex({
+                              index: info.index,
+                              animated: false,
+                            });
                           });
-                        });
-                      }}
-                      onScrollBeginDrag={() => setShowMemoryPreviewMenu(false)}
-                      onMomentumScrollEnd={(event) =>
-                        handlePreviewMomentumScrollEnd(
-                          event.nativeEvent.contentOffset.x
-                        )
-                      }
-                      renderItem={({ item: memory }) => (
-                        <View
-                          style={[
-                            styles.memoryPreviewSlide,
-                            {
-                              width: memoryPreviewWidth,
-                              height: memoryPreviewImageHeight,
-                            },
-                          ]}
-                        >
-                          <ExpoImage
-                            source={{
-                              uri: getMemoryPhotoUrl(memory, authToken),
-                            }}
-                            style={styles.memoryPreviewImage}
-                            contentFit="contain"
-                            onLoad={(event) =>
-                              handleMemoryImageLoad(
-                                memory.memory_id,
-                                event.source.width,
-                                event.source.height
-                              )
-                            }
-                          />
-                        </View>
-                      )}
-                    />
-                  ) : null}
+                        }}
+                        onScrollBeginDrag={() => setShowMemoryPreviewMenu(false)}
+                        onMomentumScrollEnd={(event) =>
+                          handlePreviewMomentumScrollEnd(
+                            event.nativeEvent.contentOffset.x
+                          )
+                        }
+                        renderItem={({ item: memory }) => (
+                          <View
+                            style={[
+                              styles.memoryPreviewSlide,
+                              {
+                                width: memoryPreviewWidth,
+                                height: memoryPreviewImageHeight,
+                              },
+                            ]}
+                          >
+                            <ExpoImage
+                              source={{
+                                uri: getMemoryPhotoUrl(memory, authToken),
+                              }}
+                              style={styles.memoryPreviewImage}
+                              contentFit="contain"
+                              onLoad={(event) =>
+                                handleMemoryImageLoad(
+                                  memory.memory_id,
+                                  event.source.width,
+                                  event.source.height
+                                )
+                              }
+                            />
+                          </View>
+                        )}
+                      />
+                    ) : null}
+                  </View>
                 </View>
-              </View>
               </View>
             </View>
           </Modal>
@@ -3196,7 +3196,7 @@ export default function ItineraryScreen() {
                     style={[
                       styles.memorySelectionAction,
                       (selectedMemoryIds.length === 0 || isDeletingMemories) &&
-                        styles.memoryActionDisabled,
+                      styles.memoryActionDisabled,
                     ]}
                     onPress={handleDeleteSelectedMemories}
                     disabled={
@@ -3244,7 +3244,7 @@ export default function ItineraryScreen() {
                       styles.memorySelectionAction,
                       (selectedMemoryIds.length === 0 ||
                         isDownloadingMemories) &&
-                        styles.memoryActionDisabled,
+                      styles.memoryActionDisabled,
                     ]}
                     onPress={handleDownloadSelectedMemories}
                     disabled={
