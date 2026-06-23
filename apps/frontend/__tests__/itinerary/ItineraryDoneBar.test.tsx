@@ -149,6 +149,52 @@ describe("ItineraryDoneBar", () => {
     );
   });
 
+  it("uses checkbox semantics by default for planning completion", () => {
+    const { getByTestId } = render(
+      <ItineraryDoneBar
+        label="Planning done"
+        checked={true}
+        accentColor="#F7CE46"
+        shadowColor="#F77646"
+        shadow="0px -10px 16px rgba(255, 107, 53, 0.15)"
+        accessibilityLabel="Mark planning as done"
+        accessibilityCheckedLabel="Mark planning as not done"
+        infoAccessibilityLabel="Show planning done info"
+        onPress={jest.fn()}
+        onInfoPress={jest.fn()}
+      />
+    );
+
+    expect(getByTestId("done-bar-submit-button").props.accessibilityRole).toBe(
+      "checkbox"
+    );
+    expect(
+      getByTestId("done-bar-submit-button").props.accessibilityState.checked
+    ).toBe(true);
+  });
+
+  it("can use button semantics for submit actions", () => {
+    const { getByTestId } = render(
+      <ItineraryDoneBar
+        label="Submit Voting"
+        checked={false}
+        accentColor="#E582FB"
+        shadowColor="#E582FB"
+        shadow="0px -10px 16px rgba(229, 130, 251, 0.18)"
+        accessibilityRole="button"
+        accessibilityLabel="End voting for everyone"
+        accessibilityCheckedLabel="Voting is being submitted"
+        infoAccessibilityLabel="Show voting done info"
+        onPress={jest.fn()}
+        onInfoPress={jest.fn()}
+      />
+    );
+
+    expect(getByTestId("done-bar-submit-button").props.accessibilityRole).toBe(
+      "button"
+    );
+  });
+
   it("fires the submit action", async () => {
     const onPress = jest.fn();
     const { getByTestId } = render(

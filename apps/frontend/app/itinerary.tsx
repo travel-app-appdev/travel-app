@@ -1166,9 +1166,6 @@ export default function ItineraryScreen() {
         return;
       }
 
-      const resolvedDayId =
-        selectedDayId || tripDays[0]?.id || itinerary.startDate;
-
       const cacheKey =
         activeState === "final"
           ? `${tripId}_${activeState}`

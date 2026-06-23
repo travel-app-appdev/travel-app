@@ -51,7 +51,10 @@ import {
   isPastTripByEndDate,
   isTripStartedByStartDate,
 } from "@/src/utils/tripState";
-import { mapTripMembersForDisplay } from "@/src/utils/tripMemberDisplay";
+import {
+  mapTripMembersForDisplay,
+  type TripMemberDisplay,
+} from "@/src/utils/tripMemberDisplay";
 import type { TripState } from "@/src/types/trip";
 import Plane from "@/assets/icons/plane.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
@@ -86,12 +89,7 @@ type PhaseValue = {
 
 type PhaseDates = Record<PhaseKey, PhaseValue>;
 
-type MemberParam = {
-  id: string;
-  name: string;
-  initials: string;
-  color: string;
-};
+type MemberParam = TripMemberDisplay;
 
 function getChecklistSubtitle(tripState: TripState): string {
   switch (tripState) {
