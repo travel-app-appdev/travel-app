@@ -36,6 +36,7 @@ describe("updateTripForAdmin", () => {
       trip_id: TRIP_ID,
       user_id: USER_ID,
       role: "admin",
+      invite_status: "accepted",
     });
   });
 
@@ -48,7 +49,7 @@ describe("updateTripForAdmin", () => {
       end_date: "2026-07-10",
       planning_end_at: "2026-06-01T12:00:00.000Z",
       voting_end_at: "2026-06-10T12:00:00.000Z",
-      state: "Final",
+      state: "Final" as const,
     });
 
     await expect(
@@ -73,7 +74,7 @@ describe("updateTripForAdmin", () => {
       end_date: "2026-07-10",
       planning_end_at: "2026-06-01T12:00:00.000Z",
       voting_end_at: "2026-06-10T12:00:00.000Z",
-      state: "Final",
+      state: "Final" as const,
     };
 
     mocked(findTripById)

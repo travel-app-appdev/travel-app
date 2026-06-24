@@ -2995,6 +2995,8 @@ export default function ItineraryScreen() {
             visible={selectedMemory !== null}
             transparent
             animationType="fade"
+            statusBarTranslucent
+            presentationStyle="overFullScreen"
             onRequestClose={handleCloseMemoryPreview}
           >
             <View style={styles.memoryPreviewOverlay}>
@@ -3006,11 +3008,15 @@ export default function ItineraryScreen() {
               />
 
               <View
-                style={[
-                  styles.memoryPreviewContent,
-                  { width: memoryPreviewWidth },
-                ]}
+                style={styles.memoryPreviewCenterWrap}
+                pointerEvents="box-none"
               >
+                <View
+                  style={[
+                    styles.memoryPreviewContent,
+                    { width: memoryPreviewWidth },
+                  ]}
+                >
                 <View style={styles.memoryPreviewHeader}>
                   <View style={styles.memoryPreviewHeaderRow}>
                     <View style={styles.memoryPreviewHeaderSpacer} />
@@ -3149,6 +3155,7 @@ export default function ItineraryScreen() {
                     />
                   ) : null}
                 </View>
+              </View>
               </View>
             </View>
           </Modal>
@@ -3510,15 +3517,19 @@ const styles = StyleSheet.create({
 
   memoryPreviewOverlay: {
     flex: 1,
+  },
+  memoryPreviewBackdrop: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.42)",
+    zIndex: 0,
+  },
+  memoryPreviewCenterWrap: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xl,
-  },
-  memoryPreviewBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 0,
+    zIndex: 1,
   },
   memoryPreviewContent: {
     maxWidth: 420,
