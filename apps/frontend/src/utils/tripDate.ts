@@ -75,3 +75,52 @@ export function normalizeTimeInput(value: string): string {
   if (digits.length <= 2) return digits;
   return `${digits.slice(0, 2)}:${digits.slice(2)}`;
 }
+
+const DEFAULT_VOTING_GAP_MS = 60 * 60 * 1000;
+const MIN_VOTING_GAP_MS = 60 * 1000;
+
+export function endOfDay(date: Date): Date {
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+export function adjustVotingEndAfterPlanning(params: {
+  nextPlanningEnd: Date;
+  currentVotingEnd: Date;
+  previousPlanningEnd?: Date | null;
+  tripEndBoundary?: Date | null;
+}): Date {
+  const { nextPlanningEnd, currentVotingEnd, previousPlanningEnd, tripEndBoundary } =
+    params;
+
+  if (currentVotingEnd > nextPlanningEnd) {
+    let result = currentVotingEnd;
+    if (tripEndBoundary && result > tripEndBoundary) {
+      result = tripEndBoundary;
+    }
+    if (result > nextPlanningEnd) {
+      return result;
+    }
+  }
+
+  const gapMs =
+    previousPlanningEnd && currentVotingEnd > previousPlanningEnd
+      ? currentVotingEnd.getTime() - previousPlanningEnd.getTime()
+      : DEFAULT_VOTING_GAP_MS;
+  const minGap = Math.max(gapMs, MIN_VOTING_GAP_MS);
+  let adjusted = new Date(nextPlanningEnd.getTime() + minGap);
+
+  if (tripEndBoundary && adjusted > tripEndBoundary) {
+    adjusted = tripEndBoundary;
+  }
+
+  if (adjusted <= nextPlanningEnd) {
+    adjusted = new Date(nextPlanningEnd.getTime() + MIN_VOTING_GAP_MS);
+    if (tripEndBoundary && adjusted > tripEndBoundary) {
+      adjusted = tripEndBoundary;
+    }
+  }
+
+  return adjusted;
+}

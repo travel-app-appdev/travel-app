@@ -84,8 +84,11 @@ import {
   isTripStartedByStartDate,
 } from "@/src/utils/tripState";
 import {
+  adjustVotingEndAfterPlanning,
   combineDateAndTime,
   combineDateAndTimeToDate,
+  dateToTimeString,
+  endOfDay,
   formatDateDisplay,
   fromDateString,
   isDeadlinePast,
@@ -176,12 +179,6 @@ function formatPhaseTimerText(
 
   // For past or future phases: no time remaining
   return "0 hours";
-}
-
-function endOfDay(date: Date): Date {
-  const next = new Date(date);
-  next.setHours(23, 59, 59, 999);
-  return next;
 }
 
 function getMarkedRange(
@@ -517,7 +514,9 @@ export default function TripOverviewAdminScreen() {
   const checklistTripState = tripState;
   const isTripStarted = isTripStartedByStartDate(toLocalDateString(tripStart));
   const isTripEnded = isPastTripByEndDate(toLocalDateString(tripEnd));
+  const isVotingEnded = isDeadlinePast(tripTiming.votingEndAt);
   const isTripDetailsEditable = !isTripEnded;
+  const isTripDateEditable = !isTripEnded && !isVotingEnded;
   const checklistDisplayState = getChecklistDisplayState(
     checklistTripState,
     isTripStarted
@@ -868,6 +867,7 @@ export default function TripOverviewAdminScreen() {
 
   const toggleField = (key: FieldKey) => {
     if (isTripEnded && PAST_TRIP_LOCKED_FIELDS.includes(key)) return;
+    if (key === "date" && isVotingEnded) return;
     setOpenField((prev) => (prev === key ? null : key));
     setTripNameUpdated(false);
     setTripDateUpdated(false);
@@ -875,14 +875,17 @@ export default function TripOverviewAdminScreen() {
   };
 
   useEffect(() => {
-    if (
-      isTripEnded &&
-      openField &&
-      PAST_TRIP_LOCKED_FIELDS.includes(openField)
-    ) {
+    if (!openField) return;
+
+    if (openField === "date" && (isTripEnded || isVotingEnded)) {
+      setOpenField(null);
+      return;
+    }
+
+    if (isTripEnded && PAST_TRIP_LOCKED_FIELDS.includes(openField)) {
       setOpenField(null);
     }
-  }, [isTripEnded, openField]);
+  }, [isTripEnded, isVotingEnded, openField]);
 
   const closePhaseCalendar = () => {
     setShowPhaseDateCalendar(null);
@@ -992,7 +995,7 @@ export default function TripOverviewAdminScreen() {
   };
 
   const handleUpdateTripDate = async () => {
-    if (isUpdatingDate) return;
+    if (isUpdatingDate || !isTripDateEditable) return;
     const idToken = await getIdToken();
     if (!idToken) return;
 
@@ -1000,7 +1003,7 @@ export default function TripOverviewAdminScreen() {
       const planningEnd = new Date(
         combineDateAndTime(phaseDates.planning.end, phaseDates.planning.time)
       );
-      const votingEnd = new Date(
+      let votingEnd = new Date(
         combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
       );
       const tripEndBoundary = endOfDay(tripEnd);
@@ -1013,10 +1016,19 @@ export default function TripOverviewAdminScreen() {
         return;
       }
 
-      if (planningEnd >= votingEnd) {
+      if (votingEnd <= planningEnd) {
+        votingEnd = adjustVotingEndAfterPlanning({
+          nextPlanningEnd: planningEnd,
+          currentVotingEnd: votingEnd,
+          previousPlanningEnd: parseIsoToDate(tripTiming.planningEndAt),
+          tripEndBoundary,
+        });
+      }
+
+      if (votingEnd <= planningEnd) {
         openFeedbackModal(
-          "Invalid phase order",
-          "Planning end must be before voting end."
+          "Invalid trip end",
+          "Trip end is too close to the planning end to leave room for voting."
         );
         return;
       }
@@ -1039,10 +1051,7 @@ export default function TripOverviewAdminScreen() {
           phaseDates.planning.end,
           phaseDates.planning.time
         ),
-        voting_end_at: combineDateAndTime(
-          phaseDates.voting.end,
-          phaseDates.voting.time
-        ),
+        voting_end_at: votingEnd.toISOString(),
       });
 
       syncTripResponse(updatedTrip);
@@ -1106,6 +1115,7 @@ export default function TripOverviewAdminScreen() {
   }
 
   const openTripCalendar = () => {
+    if (!isTripDateEditable) return;
     setTripRangeStart(toLocalDateString(tripStart));
     setTripRangeEnd(toLocalDateString(tripEnd));
     setShowTripDateCalendar(true);
@@ -1158,6 +1168,25 @@ export default function TripOverviewAdminScreen() {
       const safeVotingEnd =
         votingEnd < safePlanningEnd ? safePlanningEnd : votingEnd;
 
+      const nextPlanningEnd = combineDateAndTimeToDate(
+        safePlanningEnd,
+        prev.planning.time
+      );
+      const currentVotingEnd = combineDateAndTimeToDate(
+        safeVotingEnd,
+        prev.voting.time
+      );
+      const previousPlanningEnd = combineDateAndTimeToDate(
+        prev.planning.end,
+        prev.planning.time
+      );
+      const adjustedVotingEnd = adjustVotingEndAfterPlanning({
+        nextPlanningEnd,
+        currentVotingEnd,
+        previousPlanningEnd,
+        tripEndBoundary: endOfDay(nextTripEnd),
+      });
+
       return {
         planning: {
           ...prev.planning,
@@ -1167,13 +1196,14 @@ export default function TripOverviewAdminScreen() {
         voting: {
           ...prev.voting,
           start: safePlanningEnd,
-          end: safeVotingEnd,
+          end: adjustedVotingEnd,
+          time: dateToTimeString(adjustedVotingEnd),
         },
         final: {
           ...prev.final,
-          start: safeVotingEnd,
-          end: safeVotingEnd,
-          time: prev.voting.time,
+          start: adjustedVotingEnd,
+          end: adjustedVotingEnd,
+          time: dateToTimeString(adjustedVotingEnd),
         },
         memories: {
           ...prev.memories,
@@ -1217,21 +1247,43 @@ export default function TripOverviewAdminScreen() {
 
       if (selectedDate < today || selectedDate > tripEndOnly) return;
 
-      setPhaseDates((prev) => ({
-        ...prev,
-        planning: { ...prev.planning, end: selectedDate },
-        voting: {
-          ...prev.voting,
-          start: combineDateAndTimeToDate(selectedDate, prev.planning.time),
-          end: prev.voting.end < selectedDate ? selectedDate : prev.voting.end,
-        },
-        final: {
-          ...prev.final,
-          start:
-            prev.voting.end < selectedDate ? selectedDate : prev.final.start,
-          end: prev.voting.end < selectedDate ? selectedDate : prev.final.end,
-        },
-      }));
+      setPhaseDates((prev) => {
+        const nextPlanningEnd = combineDateAndTimeToDate(
+          selectedDate,
+          prev.planning.time
+        );
+        const currentVotingEnd = combineDateAndTimeToDate(
+          prev.voting.end,
+          prev.voting.time
+        );
+        const previousPlanningEnd = combineDateAndTimeToDate(
+          prev.planning.end,
+          prev.planning.time
+        );
+        const adjustedVotingEnd = adjustVotingEndAfterPlanning({
+          nextPlanningEnd,
+          currentVotingEnd,
+          previousPlanningEnd,
+          tripEndBoundary: endOfDay(tripEnd),
+        });
+
+        return {
+          ...prev,
+          planning: { ...prev.planning, end: selectedDate },
+          voting: {
+            ...prev.voting,
+            start: selectedDate,
+            end: adjustedVotingEnd,
+            time: dateToTimeString(adjustedVotingEnd),
+          },
+          final: {
+            ...prev.final,
+            start: adjustedVotingEnd,
+            end: adjustedVotingEnd,
+            time: dateToTimeString(adjustedVotingEnd),
+          },
+        };
+      });
       return;
     }
 
@@ -1302,21 +1354,54 @@ export default function TripOverviewAdminScreen() {
       return;
     }
 
-    setPhaseDates((prev) => ({
-      ...prev,
-      [showPhaseTimePicker]: {
-        ...prev[showPhaseTimePicker],
-        time: tempPhaseTime,
-      },
-      ...(showPhaseTimePicker === "planning"
-        ? {
-            voting: {
-              ...prev.voting,
-              start: combineDateAndTimeToDate(prev.planning.end, tempPhaseTime),
-            },
-          }
-        : {}),
-    }));
+    setPhaseDates((prev) => {
+      const next = {
+        ...prev,
+        [showPhaseTimePicker]: {
+          ...prev[showPhaseTimePicker],
+          time: tempPhaseTime,
+        },
+      };
+
+      if (showPhaseTimePicker !== "planning") {
+        return next;
+      }
+
+      const nextPlanningEnd = combineDateAndTimeToDate(
+        prev.planning.end,
+        tempPhaseTime
+      );
+      const currentVotingEnd = combineDateAndTimeToDate(
+        prev.voting.end,
+        prev.voting.time
+      );
+      const previousPlanningEnd = combineDateAndTimeToDate(
+        prev.planning.end,
+        prev.planning.time
+      );
+      const adjustedVotingEnd = adjustVotingEndAfterPlanning({
+        nextPlanningEnd,
+        currentVotingEnd,
+        previousPlanningEnd,
+        tripEndBoundary: endOfDay(tripEnd),
+      });
+
+      return {
+        ...next,
+        voting: {
+          ...prev.voting,
+          start: prev.planning.end,
+          end: adjustedVotingEnd,
+          time: dateToTimeString(adjustedVotingEnd),
+        },
+        final: {
+          ...prev.final,
+          start: adjustedVotingEnd,
+          end: adjustedVotingEnd,
+          time: dateToTimeString(adjustedVotingEnd),
+        },
+      };
+    });
 
     setShowPhaseTimePicker(null);
   };
@@ -1346,11 +1431,18 @@ export default function TripOverviewAdminScreen() {
         const currentVotingEnd = new Date(
           combineDateAndTime(phaseDates.voting.end, phaseDates.voting.time)
         );
+        const previousPlanningEnd = parseIsoToDate(tripTiming.planningEndAt);
+        const adjustedVotingEnd = adjustVotingEndAfterPlanning({
+          nextPlanningEnd,
+          currentVotingEnd,
+          previousPlanningEnd,
+          tripEndBoundary,
+        });
 
-        if (currentVotingEnd <= nextPlanningEnd) {
+        if (adjustedVotingEnd <= nextPlanningEnd) {
           openFeedbackModal(
-            "Invalid phase order",
-            "Planning end must be before voting end."
+            "Invalid planning end",
+            "Planning end is too close to the trip end to leave room for voting."
           );
           return;
         }
@@ -1359,7 +1451,24 @@ export default function TripOverviewAdminScreen() {
           idToken,
           tripId,
           planning_end_at: combineDateAndTime(phase.end, phase.time),
+          voting_end_at: adjustedVotingEnd.toISOString(),
         });
+
+        setPhaseDates((prev) => ({
+          ...prev,
+          voting: {
+            ...prev.voting,
+            start: phase.end,
+            end: adjustedVotingEnd,
+            time: dateToTimeString(adjustedVotingEnd),
+          },
+          final: {
+            ...prev.final,
+            start: adjustedVotingEnd,
+            end: adjustedVotingEnd,
+            time: dateToTimeString(adjustedVotingEnd),
+          },
+        }));
 
         syncTripResponse(updatedTrip);
       }
@@ -1702,7 +1811,7 @@ export default function TripOverviewAdminScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              {!isTripDetailsEditable ? (
+              {!isTripDateEditable ? (
                 <View
                   style={styles.infoRow}
                   accessibilityLabel={`Trip dates: ${formatDateDisplay(
@@ -1800,7 +1909,7 @@ export default function TripOverviewAdminScreen() {
                 </Pressable>
               )}
 
-              {isTripDetailsEditable && openField === "date" && (
+              {isTripDateEditable && openField === "date" && (
                 <View style={styles.expandedField}>
                   <AppButton
                     title={isUpdatingDate ? "Updating..." : "Update"}

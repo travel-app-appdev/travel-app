@@ -240,6 +240,8 @@ export default function TripOverviewMemberScreen() {
   const blinkingDotAnim = useRef(new Animated.Value(1)).current;
 
   const [tripSnapshot, setTripSnapshot] = useState({
+    title,
+    destination,
     state: initialTripState,
     startDate,
     endDate,
@@ -308,6 +310,8 @@ export default function TripOverviewMemberScreen() {
         if (!currentTrip || options.shouldApply?.() === false) return null;
 
         setTripSnapshot({
+          title: currentTrip.title,
+          destination: currentTrip.destination,
           state: currentTrip.state,
           startDate: currentTrip.start_date,
           endDate: currentTrip.end_date,
@@ -534,8 +538,8 @@ export default function TripOverviewMemberScreen() {
         params: {
           tripId,
           state: targetState,
-          title,
-          destination,
+          title: tripSnapshot.title,
+          destination: tripSnapshot.destination,
           startDate: tripSnapshot.startDate,
           endDate: tripSnapshot.endDate,
           members: JSON.stringify(members),
@@ -546,14 +550,14 @@ export default function TripOverviewMemberScreen() {
       });
     },
     [
-      destination,
       members,
       router,
-      title,
       tripId,
+      tripSnapshot.destination,
       tripSnapshot.endDate,
       tripSnapshot.planningEndAt,
       tripSnapshot.startDate,
+      tripSnapshot.title,
       tripSnapshot.votingEndAt,
     ]
   );
@@ -716,9 +720,9 @@ export default function TripOverviewMemberScreen() {
               <AppText
                 variant="caption"
                 style={styles.infoValue}
-                accessibilityLabel={`Trip name: ${title || "not set"}`}
+                accessibilityLabel={`Trip name: ${tripSnapshot.title || "not set"}`}
               >
-                {title || "—"}
+                {tripSnapshot.title || "—"}
               </AppText>
             </View>
 
@@ -751,9 +755,9 @@ export default function TripOverviewMemberScreen() {
               <AppText
                 variant="caption"
                 style={styles.infoValue}
-                accessibilityLabel={`Destination: ${destination || "not set"}`}
+                accessibilityLabel={`Destination: ${tripSnapshot.destination || "not set"}`}
               >
-                {destination || "—"}
+                {tripSnapshot.destination || "—"}
               </AppText>
             </View>
 

@@ -394,12 +394,36 @@ export async function updateTripForAdmin(input: {
         };
     }
 
+    const touchesTripDates =
+        input.start_date !== undefined || input.end_date !== undefined;
+    const votingEnd = parseIsoDate(current.voting_end_at);
+    if (touchesTripDates && votingEnd && isPast(votingEnd)) {
+        throw {
+            status: 400,
+            message: "Trip dates cannot be changed after voting has ended",
+        };
+    }
+
     const effectiveTimeline = {
         start_date: input.start_date ?? current.start_date,
         end_date: input.end_date ?? current.end_date,
         planning_end_at: input.planning_end_at ?? current.planning_end_at,
         voting_end_at: input.voting_end_at ?? current.voting_end_at,
     };
+
+    let autoAdjustedVotingEnd: string | null = null;
+    if (input.planning_end_at !== undefined && input.voting_end_at === undefined) {
+        autoAdjustedVotingEnd = adjustVotingEndAfterPlanningChange({
+            nextPlanningEndIso: effectiveTimeline.planning_end_at ?? "",
+            currentPlanningEndIso: current.planning_end_at,
+            currentVotingEndIso: effectiveTimeline.voting_end_at,
+            tripEndDate: effectiveTimeline.end_date,
+        });
+
+        if (autoAdjustedVotingEnd) {
+            effectiveTimeline.voting_end_at = autoAdjustedVotingEnd;
+        }
+    }
 
     // Only validate the timeline when the request actually touches a timeline
     // field. A title- or destination-only edit must not be rejected because of
@@ -449,7 +473,11 @@ export async function updateTripForAdmin(input: {
     if (input.start_date !== undefined)  updates.start_date = input.start_date;
     if (input.end_date !== undefined)    updates.end_date = input.end_date;
     if (input.planning_end_at !== undefined) updates.planning_end_at = input.planning_end_at;
-    if (input.voting_end_at !== undefined) updates.voting_end_at = input.voting_end_at;
+    if (input.voting_end_at !== undefined) {
+        updates.voting_end_at = input.voting_end_at;
+    } else if (autoAdjustedVotingEnd) {
+        updates.voting_end_at = autoAdjustedVotingEnd;
+    }
 
     updates.state = nextState;
 
@@ -598,6 +626,49 @@ function deriveTripStateFromTimeline(input: {
     }
 
     return "Final";
+}
+
+const DEFAULT_VOTING_GAP_MS = 60 * 60 * 1000;
+const MIN_VOTING_GAP_MS = 60 * 1000;
+
+function adjustVotingEndAfterPlanningChange(params: {
+    nextPlanningEndIso: string;
+    currentPlanningEndIso?: string;
+    currentVotingEndIso?: string;
+    tripEndDate?: string;
+}): string | null {
+    const nextPlanningEnd = parseIsoDate(params.nextPlanningEndIso);
+    const currentVotingEnd = parseIsoDate(params.currentVotingEndIso);
+
+    if (!nextPlanningEnd || !currentVotingEnd) {
+        return null;
+    }
+
+    if (currentVotingEnd > nextPlanningEnd) {
+        return null;
+    }
+
+    const previousPlanningEnd = parseIsoDate(params.currentPlanningEndIso);
+    const gapMs =
+        previousPlanningEnd && currentVotingEnd > previousPlanningEnd
+            ? currentVotingEnd.getTime() - previousPlanningEnd.getTime()
+            : DEFAULT_VOTING_GAP_MS;
+    const minGap = Math.max(gapMs, MIN_VOTING_GAP_MS);
+    let adjusted = new Date(nextPlanningEnd.getTime() + minGap);
+
+    if (params.tripEndDate) {
+        const tripEnd = new Date(params.tripEndDate);
+        tripEnd.setHours(23, 59, 59, 999);
+        if (adjusted > tripEnd) {
+            adjusted = tripEnd;
+        }
+    }
+
+    if (adjusted <= nextPlanningEnd) {
+        return null;
+    }
+
+    return adjusted.toISOString();
 }
 
 function ensureValidTripTimeline(input: {
