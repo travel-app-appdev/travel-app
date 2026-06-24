@@ -1,5 +1,11 @@
 import { useCallback, type ReactNode } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type AccessibilityRole,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/common/AppText";
 import { ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
@@ -21,6 +27,7 @@ type Props = {
   accessibilityLabel: string;
   accessibilityCheckedLabel: string;
   infoAccessibilityLabel: string;
+  accessibilityRole?: AccessibilityRole;
   onPress: () => void;
   onInfoPress: () => void;
 };
@@ -96,6 +103,7 @@ export function ItineraryDoneBar({
   accessibilityLabel,
   accessibilityCheckedLabel,
   infoAccessibilityLabel,
+  accessibilityRole = "checkbox",
   onPress,
   onInfoPress,
 }: Props) {
@@ -124,7 +132,7 @@ export function ItineraryDoneBar({
         disabled={isDisabled}
         hitSlop={8}
         testID="done-bar-submit-button"
-        accessibilityRole="checkbox"
+        accessibilityRole={accessibilityRole}
         accessibilityLabel={
           checked ? accessibilityCheckedLabel : accessibilityLabel
         }
@@ -256,7 +264,7 @@ const styles = StyleSheet.create({
   },
   doneButton: {
     minHeight: 56,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -277,12 +285,12 @@ const styles = StyleSheet.create({
   doneText: {
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
-    fontSize: 18,
+    fontSize: typography.size.lg,
   },
   infoButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },

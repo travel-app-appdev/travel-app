@@ -14,8 +14,8 @@ export type JoinedMember = {
 
 export type BackendActivity = {
   activity_id: string;
-  trip_id: string;
-  user_id: string;
+  trip_id?: string;
+  user_id?: string;
   slot_id?: string;
   name: string;
   description?: string;
@@ -29,7 +29,8 @@ export type BackendActivity = {
   joinedCount?: number;
   hasCurrentUserJoined?: boolean;
   joinedMembers?: JoinedMember[];
-  source_type?: "manual";
+  isAddedToFinalItinerary?: boolean;
+  source_type?: string;
 };
 
 export type FinalItinerarySlotDto = {
@@ -80,7 +81,19 @@ export type ToggleAddedAlternativeResponse = {
   addedAlternativeActivityIds: string[];
 };
 
-export async function createActivity(payload: CreateActivityPayload) {
+export type ToggleActivityAttendanceResponse = {
+  joined: boolean;
+  joinedCount: number;
+  joinedMembers?: JoinedMember[];
+};
+
+export type CreatedActivityResponse = BackendActivity & {
+  dayId: string;
+};
+
+export async function createActivity(
+  payload: CreateActivityPayload
+): Promise<CreatedActivityResponse> {
   const encodedSlotId = encodePathSegment(payload.slotId);
   const response = await fetch(
     `${API_URL}/itinerary/${payload.tripId}/slots/${encodedSlotId}/activities`,
@@ -101,10 +114,14 @@ export async function createActivity(payload: CreateActivityPayload) {
     }
   );
 
-  const data = await response.json();
+  const data = (await response.json()) as BackendActivity & {
+    error?: string;
+  };
 
   if (!response.ok) {
-    throw new Error(data.error || "Could not create activity");
+    throw new Error(
+      (data as { error?: string }).error || "Could not create activity"
+    );
   }
 
   return { ...data, dayId: payload.dayId };
@@ -114,20 +131,24 @@ export async function getActivitiesBySlot(
   tripId: string,
   slotId: string,
   userId?: string
-) {
+): Promise<BackendActivity[]> {
   const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
   const encodedSlotId = encodePathSegment(slotId);
   const response = await fetch(
     `${API_URL}/itinerary/${tripId}/slots/${encodedSlotId}/activities${query}`
   );
 
-  const data = await response.json();
+  const data = (await response.json()) as
+    | BackendActivity[]
+    | { error?: string };
 
   if (!response.ok) {
-    throw new Error(data.error || "Could not load activities");
+    throw new Error(
+      (data as { error?: string }).error || "Could not load activities"
+    );
   }
 
-  return data;
+  return data as BackendActivity[];
 }
 
 export async function voteForActivity(payload: {
@@ -182,7 +203,7 @@ export async function toggleActivityAttendance(payload: {
   tripId: string;
   slotId: string;
   activityId: string;
-}) {
+}): Promise<ToggleActivityAttendanceResponse> {
   const encodedSlotId = encodePathSegment(payload.slotId);
   const response = await fetch(
     `${API_URL}/itinerary/${payload.tripId}/slots/${encodedSlotId}/attendance`,
@@ -198,13 +219,17 @@ export async function toggleActivityAttendance(payload: {
     }
   );
 
-  const data = await response.json();
+  const data = (await response.json()) as
+    | ToggleActivityAttendanceResponse
+    | { error?: string };
 
   if (!response.ok) {
-    throw new Error(data.error || "Could not update attendance");
+    throw new Error(
+      (data as { error?: string }).error || "Could not update attendance"
+    );
   }
 
-  return data;
+  return data as ToggleActivityAttendanceResponse;
 }
 
 export async function toggleAddedAlternativeToItinerary(payload: {
@@ -240,7 +265,7 @@ export async function toggleAddedAlternativeToItinerary(payload: {
 export async function updateActivity(
   activityId: string,
   payload: UpdateActivityPayload
-) {
+): Promise<BackendActivity> {
   const response = await fetch(`${API_URL}/activities/${activityId}`, {
     method: "PATCH",
     headers: {
@@ -249,13 +274,15 @@ export async function updateActivity(
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
+  const data = (await response.json()) as BackendActivity | { error?: string };
 
   if (!response.ok) {
-    throw new Error(data.error || "Could not update activity");
+    throw new Error(
+      (data as { error?: string }).error || "Could not update activity"
+    );
   }
 
-  return data;
+  return data as BackendActivity;
 }
 
 export async function deleteActivity(activityId: string) {

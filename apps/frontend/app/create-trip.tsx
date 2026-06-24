@@ -31,7 +31,14 @@ import { FeedbackModal } from "@/src/components/common/FeedbackModal";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { PressLock } from "@/src/utils/PressLock";
-import { toLocalDateString } from "@/src/utils/tripDate";
+import {
+  combineDateAndTime,
+  formatDateDisplay,
+  fromDateString,
+  isValidTimeString,
+  normalizeTimeInput,
+  toLocalDateString,
+} from "@/src/utils/tripDate";
 import { invalidateTripsCache } from "./home";
 import Plane from "@/assets/icons/plane.svg";
 import LeafUp from "@/assets/visuals/leaf_up.svg";
@@ -76,17 +83,15 @@ type CalendarDay = {
   dateString: string;
 };
 
-function formatDateDisplay(date: Date): string {
-  const d = date.getDate().toString().padStart(2, "0");
-  const m = (date.getMonth() + 1).toString().padStart(2, "0");
-  const y = date.getFullYear();
-  return `${d}.${m}.${y}`;
-}
-
-function fromDateString(dateString: string): Date {
-  const [year, month, day] = dateString.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
+type CalendarMarkedRange = Record<
+  string,
+  {
+    startingDay?: boolean;
+    endingDay?: boolean;
+    color: string;
+    textColor: string;
+  }
+>;
 
 function calcCalendarDays(start: Date, end: Date): number {
   const startOnly = new Date(start);
@@ -109,13 +114,6 @@ function calcDaysLeft(end: Date): number {
 function dayLabel(days: number, active: boolean): string {
   if (active) return days === 1 ? "1 day left" : `${days} days left`;
   return days === 1 ? "1 day" : `${days} days`;
-}
-
-function combineDateAndTime(date: Date, timeStr: string): string {
-  const [hours, minutes] = timeStr.split(":").map(Number);
-  const combined = new Date(date);
-  combined.setHours(hours, minutes, 0, 0);
-  return combined.toISOString();
 }
 
 function addMinutesFromNow(minutes: number): Date {
@@ -164,7 +162,7 @@ function getMarkedRange(
   end: string | null,
   edgeColor: string,
   fillColor: string
-) {
+): CalendarMarkedRange {
   if (!start) return {};
 
   if (!end || start === end) {
@@ -178,7 +176,7 @@ function getMarkedRange(
     };
   }
 
-  const marked: Record<string, any> = {};
+  const marked: CalendarMarkedRange = {};
   let current = fromDateString(start);
   const last = fromDateString(end);
 
@@ -200,20 +198,10 @@ function getMarkedRange(
   return marked;
 }
 
-function isValidTimeString(value: string): boolean {
-  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
-}
-
-function normalizeTimeInput(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
-}
-
 const CalendarModalWrapper = ({
-                                children,
-                                isLandscape,
-                              }: {
+  children,
+  isLandscape,
+}: {
   children: React.ReactNode;
   isLandscape: boolean;
 }) => (
@@ -245,17 +233,17 @@ type ProgressBarProps = {
 };
 
 const ProgressBar: React.FC<ProgressBarProps> = ({
-                                                   progressWidth,
-                                                   currentStep,
-                                                   totalSteps,
-                                                 }) => {
+  progressWidth,
+  currentStep,
+  totalSteps,
+}) => {
   return (
     <View style={styles.progressBarContainer}>
       <View
         style={{
           width: "100%",
           height: 8,
-          borderRadius: 8,
+          borderRadius: radius.sm,
           backgroundColor:
             currentStep === 3 ? colors.grayedOut : colors.lightWhite,
           overflow: "hidden",
@@ -264,7 +252,7 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
         <Animated.View
           style={{
             height: "100%",
-            borderRadius: 8,
+            borderRadius: radius.sm,
             backgroundColor: colors.seaBlue,
             width: progressWidth,
           }}
@@ -275,8 +263,8 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
           marginTop: 6,
           alignSelf: "center",
           color: colors.nightBlack,
-          fontSize: 14,
-          fontWeight: "600",
+          fontSize: typography.size.sm,
+          fontFamily: typography.fontFamily.bodySemiBold,
         }}
       >
         {currentStep}/{totalSteps}
@@ -398,11 +386,10 @@ export default function CreateTripScreen() {
     };
   }, [blinkingDotAnim]);
 
-  const disabledTripOrange = "#facbb8";
-  const disabledPlanningYellow = "#F6E08F";
+  const disabledTripOrange = colors.disabledSunsetOrange;
+  const disabledPlanningYellow = colors.disabledBeachYellow;
 
-  const [activePhaseCalendar, setActivePhaseCalendar] =
-    useState<PhaseKey | null>(null);
+  const [, setActivePhaseCalendar] = useState<PhaseKey | null>(null);
 
   const phases = [
     {
@@ -471,7 +458,11 @@ export default function CreateTripScreen() {
     contextTitle: string,
     fallbackMessage: string
   ) => {
-    const resolved = getUserFacingApiError(error, contextTitle, fallbackMessage);
+    const resolved = getUserFacingApiError(
+      error,
+      contextTitle,
+      fallbackMessage
+    );
     openFeedbackModal(resolved.title, resolved.message, {
       buttonLabel: resolved.buttonLabel,
       onClose: resolved.isSessionExpired
@@ -511,7 +502,8 @@ export default function CreateTripScreen() {
   };
 
   useEffect(() => {
-    return () => timeoutRefs.current.forEach(clearTimeout);
+    const timeouts = timeoutRefs.current;
+    return () => timeouts.forEach(clearTimeout);
   }, []);
 
   const formatDate = (date: Date) =>
@@ -715,7 +707,8 @@ export default function CreateTripScreen() {
     );
 
     if (isPlanningEditor) return { ...tripRange, ...planningRange };
-    if (isVotingEditor) return { ...tripRange, ...planningRange, ...votingRange };
+    if (isVotingEditor)
+      return { ...tripRange, ...planningRange, ...votingRange };
     return tripRange;
   }, [
     showPhaseDateCalendar,
@@ -857,10 +850,7 @@ export default function CreateTripScreen() {
   const handleApplyPhaseTime = () => {
     if (!showPhaseTimePicker) return;
     if (!isValidTimeString(tempPhaseTime)) {
-      openFeedbackModal(
-        "Invalid time",
-        "Please enter a valid time as HH:MM."
-      );
+      openFeedbackModal("Invalid time", "Please enter a valid time as HH:MM.");
       return;
     }
     setPhaseDates((prev) => ({
@@ -1027,7 +1017,10 @@ export default function CreateTripScreen() {
               <View style={styles.setupSection}>
                 {showOnboardingHint && (
                   <View style={styles.onboardingTooltip}>
-                    <AppText variant="body" style={styles.onboardingTooltipText}>
+                    <AppText
+                      variant="body"
+                      style={styles.onboardingTooltipText}
+                    >
                       Need a refresher? Open{" "}
                       <AppText
                         variant="body"
@@ -1249,9 +1242,7 @@ export default function CreateTripScreen() {
                 disabled={isCreating}
                 style={styles.nextButton}
                 textStyle={styles.nextButtonText}
-                accessibilityLabel={
-                  isCreating ? "Continuing" : "Continue"
-                }
+                accessibilityLabel={isCreating ? "Continuing" : "Continue"}
               />
             </View>
 
@@ -1542,7 +1533,9 @@ export default function CreateTripScreen() {
                 </AppText>
               </AppText>
               <AppText variant="caption" style={styles.prefsHintText}>
-                {"Pick up to 5 categories. We'll use your picks to suggest activities during planning."}
+                {
+                  "Pick up to 5 categories. We'll use your picks to suggest activities during planning."
+                }
               </AppText>
             </View>
 
@@ -1561,7 +1554,10 @@ export default function CreateTripScreen() {
             <Pressable
               onPress={handlePreferencesContinue}
               disabled={isSavingPrefs}
-              style={[styles.prefsContinueBtn, isSavingPrefs && styles.prefsContinueBtnDisabled]}
+              style={[
+                styles.prefsContinueBtn,
+                isSavingPrefs && styles.prefsContinueBtnDisabled,
+              ]}
               accessibilityRole="button"
               accessibilityLabel="Continue"
             >
@@ -1723,7 +1719,9 @@ export default function CreateTripScreen() {
                     Where is your trip taking place?
                   </AppText>
 
-                  <View style={[styles.fieldGroup, { marginTop: 20, zIndex: 9999 }]}>
+                  <View
+                    style={[styles.fieldGroup, { marginTop: 20, zIndex: 9999 }]}
+                  >
                     <View
                       style={styles.fieldLabelRow}
                       {...hiddenFromAccessibility}
@@ -2247,7 +2245,7 @@ const styles = StyleSheet.create({
   },
   setupText: {
     flex: 1,
-    fontSize: 18,
+    fontSize: typography.size.lg,
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
     lineHeight: typography.lineHeight.md,
@@ -2583,8 +2581,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   prefsBackArrow: {
-    fontSize: 32,
-    lineHeight: 36,
+    fontSize: typography.size.displaySm,
+    lineHeight: typography.lineHeight.displaySm,
     color: colors.nightBlack,
     fontFamily: typography.fontFamily.bodyBold,
   },

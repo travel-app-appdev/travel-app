@@ -1,7 +1,6 @@
 //apps/frontend/app/trip-overview-admin.tsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { doc, onSnapshot } from "firebase/firestore";
 import {
   AccessibilityInfo,
   findNodeHandle,
@@ -42,17 +41,14 @@ import {
 import { PreferenceChips } from "@/src/components/common/PreferenceChips";
 import { DestinationAutocomplete } from "@/src/components/common/DestinationAutocomplete";
 import { useAuth } from "@/src/context/AuthContext";
-import { auth, db } from "@/src/lib/firebase";
+import { auth } from "@/src/lib/firebase";
 import { getUserFacingApiError } from "@/src/lib/apiErrors";
 import { redirectToLogin } from "@/src/lib/sessionExpired";
 import { colors, spacing, radius, typography } from "@/src/theme";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
+import { useTripDocumentListener } from "@/src/hooks/useTripDocumentListener";
 import { invalidateTripsCache } from "./home";
-import {
-  formatTripDurationText,
-  formatTripTimerText,
-} from "@/src/utils/tripTimer";
-import { mapTripMembersForDisplay } from "@/src/utils/tripMemberDisplay";
+import { formatTripTimerText } from "@/src/utils/tripTimer";
 import Plane from "@/assets/icons/plane.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
 import Calendar from "@/assets/icons/calendar.svg";
@@ -82,13 +78,38 @@ import {
 } from "@/src/utils/accessibility";
 import {
   getChecklistDisplayState,
+  getChecklistSubtitle,
   getPhaseStatus,
   isPastTripByEndDate,
   isTripStartedByStartDate,
 } from "@/src/utils/tripState";
+import {
+  combineDateAndTime,
+  combineDateAndTimeToDate,
+  formatDateDisplay,
+  fromDateString,
+  isDeadlinePast,
+  isValidTimeString,
+  normalizeTimeInput,
+  parseIsoToDate,
+  parseIsoToTimeString,
+  parseTripDate,
+  toLocalDateString,
+} from "@/src/utils/tripDate";
+import {
+  mapTripMembersForDisplay,
+  mapTripMembersToMemberParams,
+  type MemberDisplay,
+} from "@/src/utils/tripMembers";
 import type { TripState } from "@/src/types/trip";
 
-type FieldKey = "name" | "date" | "destination" | "members" | "code" | "preferences";
+type FieldKey =
+  | "name"
+  | "date"
+  | "destination"
+  | "members"
+  | "code"
+  | "preferences";
 type PhaseKey = "planning" | "voting" | "final" | "memories";
 
 const PAST_TRIP_LOCKED_FIELDS: FieldKey[] = [
@@ -106,35 +127,26 @@ type PhaseValue = {
 
 type PhaseDates = Record<PhaseKey, PhaseValue>;
 
-type MemberParam = {
-  id: string;
-  name: string;
-  initials: string;
-  color: string;
-};
+type MemberParam = MemberDisplay;
 
 type CalendarDay = {
   dateString: string;
 };
 
+type CalendarMarkedRange = Record<
+  string,
+  {
+    startingDay?: boolean;
+    endingDay?: boolean;
+    color: string;
+    textColor: string;
+  }
+>;
+
 type PhaseStatus = "past" | "active" | "future";
 
 const CHECKBOX_SIZE = 24;
 const TIMELINE_LINE_WIDTH = 1;
-
-function getChecklistSubtitle(tripState: TripState): string {
-  switch (tripState) {
-    case "Memories":
-      return "Here you can upload your photos of the trip and share it to the other members.";
-    case "Voting":
-      return "Vote on conflicting activities in the itinerary.";
-    case "Final":
-      return "Here you find your final itinerary of your group.";
-    case "Planning":
-    default:
-      return "Let's plan your trip step by step by adding activities to your itinerary.";
-  }
-}
 
 function getChecklistMascot(tripState: TripState) {
   switch (tripState) {
@@ -148,42 +160,6 @@ function getChecklistMascot(tripState: TripState) {
     default:
       return VoteyYellow;
   }
-}
-
-function formatDateDisplay(date: Date): string {
-  const d = date.getDate().toString().padStart(2, "0");
-  const m = (date.getMonth() + 1).toString().padStart(2, "0");
-  const y = date.getFullYear();
-  return `${d}.${m}.${y}`;
-}
-
-function toLocalDateString(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function fromDateString(dateString: string): Date {
-  const [year, month, day] = dateString.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function dateToTimeString(date: Date): string {
-  const h = date.getHours().toString().padStart(2, "0");
-  const m = date.getMinutes().toString().padStart(2, "0");
-  return `${h}:${m}`;
-}
-
-function combineDateAndTime(date: Date, timeStr: string): string {
-  const [hours, minutes] = timeStr.split(":").map(Number);
-  const combined = new Date(date);
-  combined.setHours(hours, minutes, 0, 0);
-  return combined.toISOString();
-}
-
-function combineDateAndTimeToDate(date: Date, timeStr: string): Date {
-  return new Date(combineDateAndTime(date, timeStr));
 }
 
 function formatPhaseTimerText(
@@ -208,47 +184,12 @@ function endOfDay(date: Date): Date {
   return next;
 }
 
-function parseIsoToDate(value?: string): Date | null {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function parseIsoToTimeString(value?: string): string {
-  const parsed = parseIsoToDate(value);
-  return parsed ? dateToTimeString(parsed) : "00:00";
-}
-
-function parseTripDate(value: string | undefined, fallback: Date): Date {
-  if (!value) return fallback;
-  const dateOnly = value.split("T")[0];
-  if (!dateOnly) return fallback;
-  const parsed = fromDateString(dateOnly);
-  return Number.isNaN(parsed.getTime()) ? fallback : parsed;
-}
-
-function isDeadlinePast(deadline?: string): boolean {
-  if (!deadline) return false;
-  const parsed = new Date(deadline);
-  return !Number.isNaN(parsed.getTime()) && parsed.getTime() <= Date.now();
-}
-
-function isValidTimeString(value: string): boolean {
-  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
-}
-
-function normalizeTimeInput(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
-}
-
 function getMarkedRange(
   start: string | null,
   end: string | null,
   edgeColor: string,
   fillColor: string
-) {
+): CalendarMarkedRange {
   if (!start) return {};
   if (!end || start === end) {
     return {
@@ -261,7 +202,7 @@ function getMarkedRange(
     };
   }
 
-  const marked: Record<string, any> = {};
+  const marked: CalendarMarkedRange = {};
   let current = fromDateString(start);
   const last = fromDateString(end);
 
@@ -470,7 +411,11 @@ export default function TripOverviewAdminScreen() {
     contextTitle: string,
     fallbackMessage: string
   ) => {
-    const resolved = getUserFacingApiError(error, contextTitle, fallbackMessage);
+    const resolved = getUserFacingApiError(
+      error,
+      contextTitle,
+      fallbackMessage
+    );
     openFeedbackModal(resolved.title, resolved.message, {
       buttonLabel: resolved.buttonLabel,
       onClose: resolved.isSessionExpired
@@ -604,29 +549,49 @@ export default function TripOverviewAdminScreen() {
       id: "planning",
       label: "Planning",
       color: colors.beachYellow,
-      disabledColor: "#F6E08F",
-      status: getPhaseStatus("planning", checklistTripState, isTripEnded, isTripStarted),
+      disabledColor: colors.disabledBeachYellow,
+      status: getPhaseStatus(
+        "planning",
+        checklistTripState,
+        isTripEnded,
+        isTripStarted
+      ),
     },
     {
       id: "voting",
       label: "Voting",
       color: colors.sunsetPink,
-      disabledColor: "#F0B8FB",
-      status: getPhaseStatus("voting", checklistTripState, isTripEnded, isTripStarted),
+      disabledColor: colors.disabledSunsetPink,
+      status: getPhaseStatus(
+        "voting",
+        checklistTripState,
+        isTripEnded,
+        isTripStarted
+      ),
     },
     {
       id: "final",
       label: "Final",
       color: colors.neonGreen,
-      disabledColor: "#C8F5BE",
-      status: getPhaseStatus("final", checklistTripState, isTripEnded, isTripStarted),
+      disabledColor: colors.disabledNeonGreen,
+      status: getPhaseStatus(
+        "final",
+        checklistTripState,
+        isTripEnded,
+        isTripStarted
+      ),
     },
     {
       id: "memories",
       label: "Memory",
       color: colors.seaBlue,
-      disabledColor: "#A8D4F0",
-      status: getPhaseStatus("memories", checklistTripState, isTripEnded, isTripStarted),
+      disabledColor: colors.disabledSeaBlue,
+      status: getPhaseStatus(
+        "memories",
+        checklistTripState,
+        isTripEnded,
+        isTripStarted
+      ),
     },
   ];
 
@@ -669,6 +634,10 @@ export default function TripOverviewAdminScreen() {
     setDestinationInput(trip.destination);
     setTripStart(nextTripStart);
     setTripEnd(nextTripEnd);
+    const nextMembers = mapTripMembersToMemberParams(trip.members);
+    if (nextMembers.length > 0) {
+      setMembers(nextMembers);
+    }
     setTripTiming({
       planningStartedAt: trip.planning_started_at ?? "",
       planningEndAt: trip.planning_end_at ?? "",
@@ -749,35 +718,25 @@ export default function TripOverviewAdminScreen() {
     }, [refreshTripSnapshot])
   );
 
-  useEffect(() => {
-    if (!tripId) {
-      return;
-    }
+  const handleTripMissing = useCallback(() => {
+    invalidateTripsCache();
+    router.replace("/home");
+  }, [router]);
 
-    let isInitialSnapshot = true;
-    const unsubscribe = onSnapshot(
-      doc(db, "trips", tripId),
-      (snapshot) => {
-        if (!snapshot.exists()) {
-          invalidateTripsCache();
-          router.replace("/home");
-          return;
-        }
+  const handleTripSnapshotChanged = useCallback(() => {
+    void refreshTripSnapshot({ forceRefresh: true });
+  }, [refreshTripSnapshot]);
 
-        if (isInitialSnapshot) {
-          isInitialSnapshot = false;
-          return;
-        }
+  const handleTripListenerError = useCallback((error: Error) => {
+    console.log("Trip deletion listener error:", error);
+  }, []);
 
-        void refreshTripSnapshot({ forceRefresh: true });
-      },
-      (error) => {
-        console.log("Trip deletion listener error:", error);
-      }
-    );
-
-    return unsubscribe;
-  }, [refreshTripSnapshot, router, tripId]);
+  useTripDocumentListener({
+    tripId,
+    onMissing: handleTripMissing,
+    onChange: handleTripSnapshotChanged,
+    onError: handleTripListenerError,
+  });
 
   useEffect(() => {
     if (!tripId || (tripState !== "Planning" && tripState !== "Voting")) {
@@ -875,12 +834,14 @@ export default function TripOverviewAdminScreen() {
   useEffect(() => {
     getIdToken().then((idToken) => {
       if (!idToken) return;
-      getMemberPreferences(tripId, idToken).then(setPreferences).catch(() => {});
+      getMemberPreferences(tripId, idToken)
+        .then(setPreferences)
+        .catch(() => {});
     });
   }, [tripId]);
 
-  const disabledTripOrange = "#facbb8";
-  const disabledPlanningYellow = "#F6E08F";
+  const disabledTripOrange = colors.disabledSunsetOrange;
+  const disabledPlanningYellow = colors.disabledBeachYellow;
 
   const [showPhaseDateCalendar, setShowPhaseDateCalendar] =
     useState<PhaseKey | null>(null);
@@ -971,11 +932,7 @@ export default function TripOverviewAdminScreen() {
       await updateMemberPreferences(tripId, preferences, idToken);
       setOpenField(null);
     } catch (error) {
-      openApiErrorModal(
-        error,
-        "Update failed",
-        "Failed to update preferences"
-      );
+      openApiErrorModal(error, "Update failed", "Failed to update preferences");
     } finally {
       setIsSavingPrefs(false);
     }
@@ -1028,11 +985,7 @@ export default function TripOverviewAdminScreen() {
         setOpenField(null);
       }, 1500);
     } catch (error) {
-      openApiErrorModal(
-        error,
-        "Update failed",
-        "Failed to update destination"
-      );
+      openApiErrorModal(error, "Update failed", "Failed to update destination");
     } finally {
       setIsUpdatingDestination(false);
     }
@@ -1345,10 +1298,7 @@ export default function TripOverviewAdminScreen() {
     if (!showPhaseTimePicker) return;
 
     if (!isValidTimeString(tempPhaseTime)) {
-      openFeedbackModal(
-        "Invalid time",
-        "Please enter a valid time as HH:MM."
-      );
+      openFeedbackModal("Invalid time", "Please enter a valid time as HH:MM.");
       return;
     }
 
@@ -1906,7 +1856,13 @@ export default function TripOverviewAdminScreen() {
                   </View>
                 </View>
               ) : openField === "destination" ? (
-                <View style={[styles.infoRow, styles.infoRowEditing, { zIndex: 9999 }]}>
+                <View
+                  style={[
+                    styles.infoRow,
+                    styles.infoRowEditing,
+                    { zIndex: 9999 },
+                  ]}
+                >
                   <View style={[styles.infoLeft, { zIndex: 9999 }]}>
                     <View
                       style={styles.infoLabelRow}
@@ -2092,13 +2048,20 @@ export default function TripOverviewAdminScreen() {
                   }`}
                 >
                   <View style={styles.infoLeft}>
-                    <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
                       <Settings width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Your Travel Preference
                       </AppText>
                     </View>
-                    <AppText variant="caption" style={styles.infoValue} accessible={false}>
+                    <AppText
+                      variant="caption"
+                      style={styles.infoValue}
+                      accessible={false}
+                    >
                       {preferences.length > 0
                         ? `${preferences.length} selected`
                         : "Not set"}
@@ -2111,21 +2074,32 @@ export default function TripOverviewAdminScreen() {
                     styles.infoRow,
                     openField === "preferences" && styles.infoRowEditing,
                   ]}
-                  onPress={openField === "preferences" ? undefined : handlePrefsRow}
+                  onPress={
+                    openField === "preferences" ? undefined : handlePrefsRow
+                  }
                   accessibilityRole="button"
                   accessibilityLabel="Edit your travel preference"
                   accessibilityState={{ expanded: openField === "preferences" }}
                 >
                   <View style={styles.infoLeft}>
-                    <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
                       <Settings width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Your Travel Preference
                       </AppText>
                     </View>
                     {openField !== "preferences" && (
-                      <AppText variant="caption" style={styles.infoValue} accessible={false}>
-                        {preferences.length > 0 ? `${preferences.length} selected` : "Not set"}
+                      <AppText
+                        variant="caption"
+                        style={styles.infoValue}
+                        accessible={false}
+                      >
+                        {preferences.length > 0
+                          ? `${preferences.length} selected`
+                          : "Not set"}
                       </AppText>
                     )}
                     {openField === "preferences" && (
@@ -2436,7 +2410,8 @@ export default function TripOverviewAdminScreen() {
                                       </AppText>
                                     </View>
 
-                                    {phaseId === "planning" || phaseId === "voting" ? (
+                                    {phaseId === "planning" ||
+                                    phaseId === "voting" ? (
                                       <View style={styles.phaseTimerBlock}>
                                         <View
                                           style={styles.hourglassCol}
@@ -2581,7 +2556,8 @@ export default function TripOverviewAdminScreen() {
                                   ) : null}
                                 </View>
 
-                                {phaseId === "planning" || phaseId === "voting" ? (
+                                {phaseId === "planning" ||
+                                phaseId === "voting" ? (
                                   <AppText
                                     variant="caption"
                                     style={[
@@ -3483,7 +3459,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
   },
   phaseCardShadowPlanning: {
-    shadowColor: "#ebb822",
+    shadowColor: colors.shadowYellow,
     shadowOpacity: 0.16,
     shadowRadius: 1,
     shadowOffset: { width: 0, height: 1 },

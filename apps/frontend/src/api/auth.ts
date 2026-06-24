@@ -18,6 +18,14 @@ type ApiErrorResponse = {
   code?: string;
 };
 
+type AuthApiError = Error & {
+  response?: {
+    status: number;
+    data: AuthResponse | ApiErrorResponse;
+  };
+  code?: string;
+};
+
 export async function registerUser(
   payload: RegisterPayload
 ): Promise<AuthResponse> {
@@ -32,11 +40,11 @@ export async function registerUser(
   const data: AuthResponse | ApiErrorResponse = await response.json();
 
   if (!response.ok) {
-    const error: any = new Error(
+    const error = new Error(
       (data as ApiErrorResponse).message ||
         (data as ApiErrorResponse).error ||
         "Registration failed"
-    );
+    ) as AuthApiError;
 
     error.response = {
       status: response.status,
@@ -62,11 +70,11 @@ export async function loginWithToken(idToken: string): Promise<AuthResponse> {
   const data: AuthResponse | ApiErrorResponse = await response.json();
 
   if (!response.ok) {
-    const error: any = new Error(
+    const error = new Error(
       (data as ApiErrorResponse).message ||
         (data as ApiErrorResponse).error ||
         "Login failed"
-    );
+    ) as AuthApiError;
 
     error.response = {
       status: response.status,

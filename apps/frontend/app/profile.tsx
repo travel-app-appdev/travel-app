@@ -81,6 +81,11 @@ function StickyHeader() {
   );
 }
 
+type ProfileError = {
+  message?: string;
+  code?: string;
+};
+
 export default function ProfileScreen() {
   const { user, setUser } = useAuth();
   const router = useRouter();
@@ -192,8 +197,9 @@ export default function ProfileScreen() {
         setNameUpdated(false);
         setNameOpen(false);
       }, 1500);
-    } catch (error: any) {
-      setNameError(error.message || "Failed to update name.");
+    } catch (error: unknown) {
+      const profileError = error as ProfileError;
+      setNameError(profileError.message || "Failed to update name.");
     } finally {
       setIsUpdatingName(false);
     }
@@ -222,11 +228,12 @@ export default function ProfileScreen() {
           }
         );
       }, 1000);
-    } catch (error: any) {
-      if (error.message?.includes("already in use")) {
+    } catch (error: unknown) {
+      const profileError = error as ProfileError;
+      if (profileError.message?.includes("already in use")) {
         setEmailError("This email is already in use.");
       } else {
-        setEmailError(error.message || "Failed to update email.");
+        setEmailError(profileError.message || "Failed to update email.");
       }
     } finally {
       setIsUpdatingEmail(false);
@@ -262,18 +269,19 @@ export default function ProfileScreen() {
         setPasswordVisible(false);
         setCurrentPasswordVisible(false);
       }, 1500);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const profileError = error as ProfileError;
       if (
-        error.code === "auth/wrong-password" ||
-        error.code === "auth/invalid-credential"
+        profileError.code === "auth/wrong-password" ||
+        profileError.code === "auth/invalid-credential"
       ) {
         setPasswordError("Current password is incorrect.");
-      } else if (error.code === "auth/weak-password") {
+      } else if (profileError.code === "auth/weak-password") {
         setPasswordError("New password must be at least 6 characters.");
-      } else if (error.code === "auth/too-many-requests") {
+      } else if (profileError.code === "auth/too-many-requests") {
         setPasswordError("Too many attempts. Please try again later.");
       } else {
-        setPasswordError(error.message || "Failed to update password.");
+        setPasswordError(profileError.message || "Failed to update password.");
       }
     } finally {
       setIsUpdatingPassword(false);

@@ -1,6 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
-import { doc, onSnapshot } from "firebase/firestore";
 import {
   AccessibilityInfo,
   findNodeHandle,
@@ -30,29 +29,38 @@ import {
   isTripNotFoundError,
   leaveTrip,
   updateMemberPreferences,
-  type Trip,
 } from "@/src/api/trips";
 import { PreferenceChips } from "@/src/components/common/PreferenceChips";
-import { auth, db } from "@/src/lib/firebase";
+import { auth } from "@/src/lib/firebase";
 import { invalidateTripsCache } from "./home";
 import { colors, spacing, radius, typography } from "@/src/theme";
-import {
-  formatTripDurationText,
-  formatTripTimerText,
-} from "@/src/utils/tripTimer";
+import { formatTripTimerText } from "@/src/utils/tripTimer";
 import {
   nativeImportantForAccessibility,
   hiddenFromAccessibility,
 } from "@/src/utils/accessibility";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
 import { useApiFeedbackModal } from "@/src/hooks/useApiFeedbackModal";
+import { useTripDocumentListener } from "@/src/hooks/useTripDocumentListener";
 import {
   getChecklistDisplayState,
+  getChecklistSubtitle,
   getPhaseStatus,
   isPastTripByEndDate,
   isTripStartedByStartDate,
 } from "@/src/utils/tripState";
-import { mapTripMembersForDisplay } from "@/src/utils/tripMemberDisplay";
+import {
+  combineDateAndTimeToDate,
+  formatDateDisplay,
+  formatDateDisplayFromString,
+  isDeadlinePast,
+  parseIsoToDate,
+  parseIsoToTimeString,
+} from "@/src/utils/tripDate";
+import {
+  mapTripMembersForDisplay,
+  type MemberDisplay,
+} from "@/src/utils/tripMembers";
 import type { TripState } from "@/src/types/trip";
 import Plane from "@/assets/icons/plane.svg";
 import TripTitle from "@/assets/icons/trip_title.svg";
@@ -87,26 +95,7 @@ type PhaseValue = {
 
 type PhaseDates = Record<PhaseKey, PhaseValue>;
 
-type MemberParam = {
-  id: string;
-  name: string;
-  initials: string;
-  color: string;
-};
-
-function getChecklistSubtitle(tripState: TripState): string {
-  switch (tripState) {
-    case "Memories":
-      return "Here you can upload your photos of the trip and share it to the other members.";
-    case "Voting":
-      return "Vote on conflicting activities in the itinerary.";
-    case "Final":
-      return "Here you find your final itinerary of your group.";
-    case "Planning":
-    default:
-      return "Let's plan your trip step by step by adding activities to your itinerary.";
-  }
-}
+type MemberParam = MemberDisplay;
 
 function getChecklistMascot(tripState: TripState) {
   switch (tripState) {
@@ -120,37 +109,6 @@ function getChecklistMascot(tripState: TripState) {
     default:
       return VoteyYellow;
   }
-}
-
-function formatDateDisplay(date: Date): string {
-  const d = date.getDate().toString().padStart(2, "0");
-  const m = (date.getMonth() + 1).toString().padStart(2, "0");
-  const y = date.getFullYear();
-  return `${d}.${m}.${y}`;
-}
-
-function formatDateDisplayFromString(dateString: string): string {
-  if (!dateString) return "—";
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return dateString;
-  return formatDateDisplay(date);
-}
-
-function dateToTimeString(date: Date): string {
-  const h = date.getHours().toString().padStart(2, "0");
-  const m = date.getMinutes().toString().padStart(2, "0");
-  return `${h}:${m}`;
-}
-
-function combineDateAndTime(date: Date, timeStr: string): string {
-  const [hours, minutes] = timeStr.split(":").map(Number);
-  const combined = new Date(date);
-  combined.setHours(hours, minutes, 0, 0);
-  return combined.toISOString();
-}
-
-function combineDateAndTimeToDate(date: Date, timeStr: string): Date {
-  return new Date(combineDateAndTime(date, timeStr));
 }
 
 function formatPhaseTimerText(
@@ -169,26 +127,8 @@ function formatPhaseTimerText(
   return "0 hours";
 }
 
-function parseIsoToDate(value?: string): Date | null {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function parseIsoToTimeString(value?: string): string {
-  const parsed = parseIsoToDate(value);
-  return parsed ? dateToTimeString(parsed) : "00:00";
-}
-
 const CHECKBOX_SIZE = 24;
 const TIMELINE_LINE_WIDTH = 2;
-
-function isDeadlinePast(deadline?: string): boolean {
-  if (!deadline) return false;
-
-  const parsed = new Date(deadline);
-  return !Number.isNaN(parsed.getTime()) && parsed.getTime() <= Date.now();
-}
 
 function PhaseCheckbox({
   phaseId,
@@ -375,7 +315,6 @@ export default function TripOverviewMemberScreen() {
           planningEndAt: currentTrip.planning_end_at ?? "",
           votingEndAt: currentTrip.voting_end_at ?? "",
         });
-
         if (currentTrip.members) {
           setMembers(mapTripMembersForDisplay(currentTrip.members));
         }
@@ -409,35 +348,25 @@ export default function TripOverviewMemberScreen() {
     }, [refreshTripSnapshot])
   );
 
-  useEffect(() => {
-    if (!tripId) {
-      return;
-    }
+  const handleTripMissing = useCallback(() => {
+    invalidateTripsCache();
+    router.replace("/home");
+  }, [router]);
 
-    let isInitialSnapshot = true;
-    const unsubscribe = onSnapshot(
-      doc(db, "trips", tripId),
-      (snapshot) => {
-        if (!snapshot.exists()) {
-          invalidateTripsCache();
-          router.replace("/home");
-          return;
-        }
+  const handleTripSnapshotChanged = useCallback(() => {
+    void refreshTripSnapshot({ forceRefresh: true });
+  }, [refreshTripSnapshot]);
 
-        if (isInitialSnapshot) {
-          isInitialSnapshot = false;
-          return;
-        }
+  const handleTripListenerError = useCallback((error: Error) => {
+    console.log("Trip deletion listener error:", error);
+  }, []);
 
-        void refreshTripSnapshot({ forceRefresh: true });
-      },
-      (error) => {
-        console.log("Trip deletion listener error:", error);
-      }
-    );
-
-    return unsubscribe;
-  }, [refreshTripSnapshot, router, tripId]);
+  useTripDocumentListener({
+    tripId,
+    onMissing: handleTripMissing,
+    onChange: handleTripSnapshotChanged,
+    onError: handleTripListenerError,
+  });
 
   useEffect(() => {
     if (!tripId || (tripState !== "Planning" && tripState !== "Voting")) {
@@ -497,15 +426,14 @@ export default function TripOverviewMemberScreen() {
     if (node) AccessibilityInfo.setAccessibilityFocus(node);
   }
 
-  const parsedMembers: MemberParam[] = (() => {
+  const routeMembers: MemberParam[] = useMemo(() => {
     try {
       return membersParam ? JSON.parse(membersParam) : [];
     } catch {
       return [];
     }
-  })();
-
-  const [members, setMembers] = useState<MemberParam[]>(parsedMembers);
+  }, [membersParam]);
+  const [members, setMembers] = useState<MemberParam[]>(routeMembers);
 
   const tripStart = useMemo(
     () =>
@@ -536,28 +464,28 @@ export default function TripOverviewMemberScreen() {
       id: "planning",
       label: "Planning",
       color: colors.beachYellow,
-      disabledColor: "#F6E08F",
+      disabledColor: colors.disabledBeachYellow,
       status: getPhaseStatus("planning", tripState, isTripEnded, isTripStarted),
     },
     {
       id: "voting",
       label: "Voting",
       color: colors.sunsetPink,
-      disabledColor: "#F0B8FB",
+      disabledColor: colors.disabledSunsetPink,
       status: getPhaseStatus("voting", tripState, isTripEnded, isTripStarted),
     },
     {
       id: "final",
       label: "Final",
       color: colors.neonGreen,
-      disabledColor: "#C8F5BE",
+      disabledColor: colors.disabledNeonGreen,
       status: getPhaseStatus("final", tripState, isTripEnded, isTripStarted),
     },
     {
       id: "memories",
       label: "Memory",
       color: colors.seaBlue,
-      disabledColor: "#A8D4F0",
+      disabledColor: colors.disabledSeaBlue,
       status: getPhaseStatus("memories", tripState, isTripEnded, isTripStarted),
     },
   ];
@@ -862,13 +790,20 @@ export default function TripOverviewMemberScreen() {
                   }`}
                 >
                   <View style={styles.infoLeft}>
-                    <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                    <View
+                      style={styles.infoLabelRow}
+                      {...hiddenFromAccessibility}
+                    >
                       <Settings width={20} height={20} />
                       <AppText variant="body" style={styles.fieldLabel}>
                         Your Travel Preference
                       </AppText>
                     </View>
-                    <AppText variant="caption" style={styles.infoValue} accessible={false}>
+                    <AppText
+                      variant="caption"
+                      style={styles.infoValue}
+                      accessible={false}
+                    >
                       {preferences.length > 0
                         ? `${preferences.length} selected`
                         : "Not set"}
@@ -888,14 +823,21 @@ export default function TripOverviewMemberScreen() {
                     accessibilityState={{ expanded: isPrefsExpanded }}
                   >
                     <View style={styles.infoLeft}>
-                      <View style={styles.infoLabelRow} {...hiddenFromAccessibility}>
+                      <View
+                        style={styles.infoLabelRow}
+                        {...hiddenFromAccessibility}
+                      >
                         <Settings width={20} height={20} />
                         <AppText variant="body" style={styles.fieldLabel}>
                           Your Travel Preference
                         </AppText>
                       </View>
                       {!isPrefsExpanded && (
-                        <AppText variant="caption" style={styles.infoValue} accessible={false}>
+                        <AppText
+                          variant="caption"
+                          style={styles.infoValue}
+                          accessible={false}
+                        >
                           {preferences.length > 0
                             ? `${preferences.length} selected`
                             : "Not set"}
@@ -931,7 +873,10 @@ export default function TripOverviewMemberScreen() {
                   </Pressable>
                   {isPrefsExpanded && (
                     <Pressable
-                      style={[styles.saveBtn, isSavingPrefs && { opacity: 0.6 }]}
+                      style={[
+                        styles.saveBtn,
+                        isSavingPrefs && { opacity: 0.6 },
+                      ]}
                       onPress={handleSavePreferences}
                       disabled={isSavingPrefs}
                       accessibilityRole="button"
@@ -1145,10 +1090,7 @@ export default function TripOverviewMemberScreen() {
                         <View
                           style={
                             isActive
-                              ? [
-                                  styles.phaseCardShadowWrap,
-                                  activeShadowStyle,
-                                ]
+                              ? [styles.phaseCardShadowWrap, activeShadowStyle]
                               : undefined
                           }
                         >
@@ -1186,7 +1128,8 @@ export default function TripOverviewMemberScreen() {
                                       </AppText>
                                     </View>
 
-                                    {phaseId === "planning" || phaseId === "voting" ? (
+                                    {phaseId === "planning" ||
+                                    phaseId === "voting" ? (
                                       <View style={styles.phaseTimerBlock}>
                                         <View
                                           style={styles.hourglassCol}
@@ -1322,7 +1265,8 @@ export default function TripOverviewMemberScreen() {
                                   </View>
                                 </View>
 
-                                {phaseId === "planning" || phaseId === "voting" ? (
+                                {phaseId === "planning" ||
+                                phaseId === "voting" ? (
                                   <AppText
                                     variant="caption"
                                     style={[
@@ -1670,7 +1614,7 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   phaseCardShadowPlanning: {
-    shadowColor: "#ebb822",
+    shadowColor: colors.shadowYellow,
     shadowOpacity: 0.16,
     shadowRadius: 1,
     shadowOffset: { width: 0, height: 1 },

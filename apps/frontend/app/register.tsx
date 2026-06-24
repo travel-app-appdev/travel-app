@@ -29,6 +29,19 @@ import MascotHelloPink from "@/assets/mascots/mascot-hello-pink.svg";
 import PinkBackground from "@/assets/visuals/pink-background.svg";
 import Flowers from "@/assets/visuals/flowers-blue.svg";
 
+type RegisterError = {
+  message?: string;
+  code?: string;
+  response?: {
+    status?: number;
+    data?: {
+      code?: string;
+      message?: string;
+      error?: string;
+    };
+  };
+};
+
 export default function RegisterScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -92,15 +105,16 @@ export default function RegisterScreen() {
       } else {
         router.replace("/onboarding");
       }
-    } catch (error: any) {
-      const status = error?.response?.status;
-      const backendCode = error?.response?.data?.code ?? "";
+    } catch (error: unknown) {
+      const registerError = error as RegisterError;
+      const status = registerError.response?.status;
+      const backendCode = registerError.response?.data?.code ?? "";
       const backendMessage =
-        error?.response?.data?.message ??
-        error?.response?.data?.error ??
-        error?.message ??
+        registerError.response?.data?.message ??
+        registerError.response?.data?.error ??
+        registerError.message ??
         "";
-      const firebaseCode = error?.code ?? "";
+      const firebaseCode = registerError.code ?? "";
 
       if (
         status === 409 ||
@@ -523,7 +537,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.error,
     fontSize: typography.size.sm,
-    lineHeight: 18,
+    lineHeight: typography.lineHeight.sm,
   },
   bottomArea: {
     marginTop: spacing.xxxl,

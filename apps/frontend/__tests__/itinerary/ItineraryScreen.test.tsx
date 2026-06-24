@@ -188,7 +188,7 @@ jest.mock("@/src/components/itinerary/PlanningDoneBar", () => ({
   },
 }));
 
-jest.mock("@/src/components/itinerary/VoteSlotCard", () => ({
+jest.mock("@/src/components/itinerary/VotingSlotCard", () => ({
   VotingSlotCard: () => null,
 }));
 
@@ -360,9 +360,9 @@ describe("ItineraryScreen transition overlays", () => {
 
     expect(queryByTestId("planning-screen-lock-overlay")).toBeNull();
 
-    const latestPlanningProps = mockPlanningDoneBarProps.mock.calls.at(-1)?.[0] as
-      | { checked: boolean }
-      | undefined;
+    const latestPlanningProps = mockPlanningDoneBarProps.mock.calls.at(
+      -1
+    )?.[0] as { checked: boolean } | undefined;
 
     expect(latestPlanningProps?.checked).toBe(false);
 
@@ -400,15 +400,17 @@ describe("ItineraryScreen transition overlays", () => {
       ],
     });
 
-    const { queryByText, getByLabelText, unmount } = render(<ItineraryScreen />);
+    const { queryByText, getByLabelText, unmount } = render(
+      <ItineraryScreen />
+    );
 
     await waitFor(() => {
       expect(mockPlanningDoneBarProps).toHaveBeenCalled();
     });
 
-    const latestPlanningProps = mockPlanningDoneBarProps.mock.calls.at(-1)?.[0] as
-      | { checked: boolean; onPress: () => void }
-      | undefined;
+    const latestPlanningProps = mockPlanningDoneBarProps.mock.calls.at(
+      -1
+    )?.[0] as { checked: boolean; onPress: () => void } | undefined;
 
     expect(latestPlanningProps?.checked).toBe(false);
 

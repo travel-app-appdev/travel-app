@@ -1,6 +1,5 @@
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/src/context/AuthContext";
 import {
   AccessibilityInfo,
@@ -22,14 +21,21 @@ import {
   removeTripFromCache,
   type Trip,
 } from "@/src/api/trips";
-import { db } from "@/src/lib/firebase";
 import { useSinglePress } from "@/src/hooks/useSinglePress";
+import {
+  useHomeTripMembershipListeners,
+  type HomeTripDocumentData,
+} from "@/src/hooks/useHomeTripMembershipListeners";
 import { hiddenFromAccessibility } from "@/src/utils/accessibility";
 import {
   getEffectiveTripState,
   isPastTripByEndDate,
   parseLocalTripDate,
 } from "@/src/utils/tripState";
+import {
+  getMemberInitials,
+  getTripCardMemberColor,
+} from "@/src/utils/tripMembers";
 import Profile from "@/assets/icons/profile.svg";
 import ButtonCreate from "@/assets/icons/Button_Create.svg";
 import ButtonJoin from "@/assets/icons/Button_Join.svg";
@@ -127,13 +133,6 @@ function formatDate(dateString: string): string {
   });
 }
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-}
-
 function getCardColor(tripId: string): string {
   const palette = [colors.plantGreen, colors.sunsetOrange];
   let hash = 0;
@@ -158,16 +157,6 @@ function getUiStatus(
   return "planning";
 }
 
-function getMemberColor(index: number): string {
-  const palette = [
-    colors.sunsetOrange,
-    colors.plantGreen,
-    colors.sunsetPink,
-    colors.seaBlue,
-  ];
-  return palette[index % palette.length];
-}
-
 function mapTripToCardTrip(
   trip: TripWithMembers,
   today = new Date()
@@ -178,8 +167,8 @@ function mapTripToCardTrip(
       name: member.name,
       planning_done: member.planning_done,
       voting_done: member.voting_done,
-      initials: getInitials(member.name),
-      color: getMemberColor(index),
+      initials: getMemberInitials(member.name),
+      color: getTripCardMemberColor(index),
     })
   );
   const effectiveState = getEffectiveTripState(trip, today);
@@ -556,102 +545,52 @@ export default function HomeScreen() {
     }, [loadTrips, user?.uid])
   );
 
-  // UPDATED: extend listener to also watch trip docs and patch badge state immediately
-  useEffect(() => {
-    const userId = user?.uid ?? null;
-    if (!userId) return;
+  const handleHomeTripChanged = useCallback(
+    (tripId: string, data: HomeTripDocumentData) => {
+      const tripData = data as Partial<TripWithMembers>;
+      const nextState = (tripData.state as Trip["state"]) ?? "Planning";
 
-    const membershipQuery = query(
-      collection(db, "trip_members"),
-      where("user_id", "==", userId)
-    );
+      const existingTrip =
+        listsRef.current.yourTrips.find((t) => t.id === tripId) ??
+        listsRef.current.pastTrips.find((t) => t.id === tripId);
 
-    const tripUnsubscribers = new Map<string, () => void>();
+      const memberCount = existingTrip?.members.length ?? 0;
 
-    const unsubscribeMemberships = onSnapshot(
-      membershipQuery,
-      (snapshot) => {
-        const activeTripIds = new Set<string>();
+      const rawEndDate = existingTrip?.rawEndDate ?? "";
+      const effectiveState = rawEndDate
+        ? getEffectiveTripState({
+            state: nextState,
+            end_date: rawEndDate,
+          })
+        : nextState;
+      const isPast = rawEndDate ? isPastTripByEndDate(rawEndDate) : false;
 
-        snapshot.docChanges().forEach((change) => {
-          const data = change.doc.data();
-          const tripId = data.trip_id;
+      patchTripInLocalLists(tripId, {
+        rawState: effectiveState,
+        status: getUiStatus(effectiveState, memberCount, isPast),
+        planningStartedAt: tripData.planning_started_at,
+        planningEndAt: tripData.planning_end_at,
+        votingEndAt: tripData.voting_end_at,
+      });
+    },
+    [patchTripInLocalLists]
+  );
 
-          if (typeof tripId !== "string") return;
+  const handleTripListenerError = useCallback((error: Error) => {
+    console.log("Trip listener error:", error);
+  }, []);
 
-          if (change.type === "removed" || data.invite_status !== "accepted") {
-            removeTripFromLocalLists(tripId);
-            return;
-          }
+  const handleMembershipListenerError = useCallback((error: Error) => {
+    console.log("Trip membership listener error:", error);
+  }, []);
 
-          activeTripIds.add(tripId);
-
-          if (tripUnsubscribers.has(tripId)) return;
-
-          const unsubscribeTrip = onSnapshot(
-            doc(db, "trips", tripId),
-            (tripSnap) => {
-              if (!tripSnap.exists()) {
-                removeTripFromLocalLists(tripId);
-                return;
-              }
-
-              const tripData = tripSnap.data() as Partial<TripWithMembers>;
-              const nextState = (tripData.state as Trip["state"]) ?? "Planning";
-
-              const existingTrip =
-                listsRef.current.yourTrips.find((t) => t.id === tripId) ??
-                listsRef.current.pastTrips.find((t) => t.id === tripId);
-
-              const memberCount = existingTrip?.members.length ?? 0;
-
-              const rawEndDate = existingTrip?.rawEndDate ?? "";
-              const effectiveState = rawEndDate
-                ? getEffectiveTripState({
-                    state: nextState,
-                    end_date: rawEndDate,
-                  })
-                : nextState;
-              const isPast = rawEndDate
-                ? isPastTripByEndDate(rawEndDate)
-                : false;
-
-              patchTripInLocalLists(tripId, {
-                rawState: effectiveState,
-                status: getUiStatus(effectiveState, memberCount, isPast),
-                planningStartedAt: tripData.planning_started_at,
-                planningEndAt: tripData.planning_end_at,
-                votingEndAt: tripData.voting_end_at,
-              });
-            },
-            (error) => {
-              console.log("Trip listener error:", error);
-            }
-          );
-
-          tripUnsubscribers.set(tripId, unsubscribeTrip);
-        });
-
-        for (const [tripId, unsubscribeTrip] of tripUnsubscribers.entries()) {
-          if (!activeTripIds.has(tripId)) {
-            unsubscribeTrip();
-            tripUnsubscribers.delete(tripId);
-          }
-        }
-      },
-      (error) => {
-        console.log("Trip membership listener error:", error);
-      }
-    );
-
-    return () => {
-      unsubscribeMemberships();
-      for (const unsubscribeTrip of tripUnsubscribers.values()) {
-        unsubscribeTrip();
-      }
-      tripUnsubscribers.clear();
-    };
-  }, [removeTripFromLocalLists, user?.uid, patchTripInLocalLists]);
+  useHomeTripMembershipListeners({
+    userId: user?.uid ?? null,
+    onTripRemoved: removeTripFromLocalLists,
+    onTripChanged: handleHomeTripChanged,
+    onTripListenerError: handleTripListenerError,
+    onMembershipListenerError: handleMembershipListenerError,
+  });
 
   const trips = activeTab === "your" ? yourTrips : pastTrips;
 
@@ -672,6 +611,69 @@ export default function HomeScreen() {
       setIsRefreshing(false);
     }
   }, [isLoading, isRefreshing, loadTrips]);
+
+  const handleTripPress = useCallback(
+    (trip: TripCardItem) => {
+      if (trip.role === "admin") {
+        router.push({
+          pathname: "/trip-overview-admin",
+          params: {
+            tripId: trip.id,
+            title: trip.title,
+            destination: trip.destination,
+            startDate: trip.rawStartDate,
+            endDate: trip.rawEndDate,
+            members: JSON.stringify(trip.members),
+            inviteCode: trip.inviteCode,
+            state: trip.rawState,
+            planningStartedAt: trip.planningStartedAt ?? "",
+            planningEndAt: trip.planningEndAt ?? "",
+            votingEndAt: trip.votingEndAt ?? "",
+          },
+        });
+        return;
+      }
+
+      router.push({
+        pathname: "/trip-overview-member",
+        params: {
+          tripId: trip.id,
+          title: trip.title,
+          destination: trip.destination,
+          startDate: trip.rawStartDate,
+          endDate: trip.rawEndDate,
+          members: JSON.stringify(trip.members),
+          inviteCode: trip.inviteCode,
+          state: trip.rawState,
+          planningStartedAt: trip.planningStartedAt ?? "",
+          planningEndAt: trip.planningEndAt ?? "",
+          votingEndAt: trip.votingEndAt ?? "",
+        },
+      });
+    },
+    [router]
+  );
+
+  const handleTripStatusPress = useCallback(
+    (trip: TripCardItem, status: TripCardItem["status"]) => {
+      router.push({
+        pathname: "/itinerary",
+        params: {
+          tripId: trip.id,
+          state: status === "memories" ? "memories" : status,
+          title: trip.title,
+          destination: trip.destination,
+          startDate: trip.rawStartDate,
+          endDate: trip.rawEndDate,
+          members: JSON.stringify(trip.members),
+          planningEndAt: trip.planningEndAt ?? "",
+          votingEndAt: trip.votingEndAt ?? "",
+          role: trip.role,
+        },
+      });
+    },
+    [router]
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -820,60 +822,8 @@ export default function HomeScreen() {
                 cardColor={trip.cardColor}
                 members={trip.members}
                 role={trip.role}
-                onPress={() => {
-                  if (trip.role === "admin") {
-                    router.push({
-                      pathname: "/trip-overview-admin",
-                      params: {
-                        tripId: trip.id,
-                        title: trip.title,
-                        destination: trip.destination,
-                        startDate: trip.rawStartDate,
-                        endDate: trip.rawEndDate,
-                        members: JSON.stringify(trip.members),
-                        inviteCode: trip.inviteCode,
-                        state: trip.rawState,
-                        planningStartedAt: trip.planningStartedAt ?? "",
-                        planningEndAt: trip.planningEndAt ?? "",
-                        votingEndAt: trip.votingEndAt ?? "",
-                      },
-                    });
-                  } else {
-                    router.push({
-                      pathname: "/trip-overview-member",
-                      params: {
-                        tripId: trip.id,
-                        title: trip.title,
-                        destination: trip.destination,
-                        startDate: trip.rawStartDate,
-                        endDate: trip.rawEndDate,
-                        members: JSON.stringify(trip.members),
-                        inviteCode: trip.inviteCode,
-                        state: trip.rawState,
-                        planningStartedAt: trip.planningStartedAt ?? "",
-                        planningEndAt: trip.planningEndAt ?? "",
-                        votingEndAt: trip.votingEndAt ?? "",
-                      },
-                    });
-                  }
-                }}
-                onStatusPress={(status) => {
-                  router.push({
-                    pathname: "/itinerary",
-                    params: {
-                      tripId: trip.id,
-                      state: status === "memories" ? "memories" : status,
-                      title: trip.title,
-                      destination: trip.destination,
-                      startDate: trip.rawStartDate,
-                      endDate: trip.rawEndDate,
-                      members: JSON.stringify(trip.members),
-                      planningEndAt: trip.planningEndAt ?? "",
-                      votingEndAt: trip.votingEndAt ?? "",
-                      role: trip.role,
-                    },
-                  });
-                }}
+                onPress={() => handleTripPress(trip)}
+                onStatusPress={(status) => handleTripStatusPress(trip, status)}
               />
             ))}
           </View>

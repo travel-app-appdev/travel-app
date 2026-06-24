@@ -1088,7 +1088,7 @@ const Styles = StyleSheet.create({
     alignSelf: "center",
     marginTop: spacing.xl + spacing.md,
     minHeight: 56,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

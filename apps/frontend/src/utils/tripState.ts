@@ -86,3 +86,17 @@ export function getChecklistDisplayState(
 
   return tripState;
 }
+
+export function getChecklistSubtitle(tripState: TripState): string {
+  switch (tripState) {
+    case "Memories":
+      return "Here you can upload your photos of the trip and share it to the other members.";
+    case "Voting":
+      return "Vote on conflicting activities in the itinerary.";
+    case "Final":
+      return "Here you find your final itinerary of your group.";
+    case "Planning":
+    default:
+      return "Let's plan your trip step by step by adding activities to your itinerary.";
+  }
+}

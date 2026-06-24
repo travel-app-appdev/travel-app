@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   InteractionManager,
+  type ListRenderItem,
   Modal,
   Platform,
   Pressable,
@@ -20,17 +21,17 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { Ionicons } from "@expo/vector-icons";
-import { doc, onSnapshot } from "firebase/firestore";
 
 import { colors, spacing, typography, radius } from "@/src/theme";
 import { ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
-import { db, auth } from "@/src/lib/firebase";
+import { auth } from "@/src/lib/firebase";
 import { generateTimeSlots } from "@/src/utils/itinerary/generateTimeSlots";
 import { generateTripDays } from "@/src/utils/itinerary/generateTripDays";
 import { mapActivitiesToSlots } from "@/src/utils/itinerary/mapActivitiesToSlots";
 import { getActiveTripTimerText } from "@/src/utils/tripTimer";
 import { useAuth } from "@/src/context/AuthContext";
 import { useApiFeedbackModal } from "@/src/hooks/useApiFeedbackModal";
+import { useItineraryTrip } from "@/src/hooks/useItineraryTrip";
 
 import type {
   TripItinerary,
@@ -49,12 +50,16 @@ import { SkeletonSlotCard } from "@/src/components/itinerary/SkeletonSlotCard";
 import { PlanningDoneBar } from "@/src/components/itinerary/PlanningDoneBar";
 import { VotingDoneBar } from "@/src/components/itinerary/VotingDoneBar";
 import { ItineraryInfoModal } from "@/src/components/itinerary/ItineraryInfoModal";
-import { VotingSlotCard } from "@/src/components/itinerary/VoteSlotCard";
+import { VotingSlotCard } from "@/src/components/itinerary/VotingSlotCard";
 import { VotingTimeFilter } from "@/src/components/itinerary/VotingTimeFilter";
 import { FinalSlotCard } from "@/src/components/itinerary/FinalSlotCard";
 import { FinalSuggestedActivitiesSection } from "@/src/components/itinerary/FinalSuggestedActivitiesSection";
 import { ActivityDetailModal } from "@/src/components/itinerary/ActivityDetailModal";
-import { SuggestionsModal, getAddedElsewherePlaceIds, getAddedInCurrentSlotPlaceIds } from "@/src/components/itinerary/SuggestionsModal";
+import {
+  SuggestionsModal,
+  getAddedElsewherePlaceIds,
+  getAddedInCurrentSlotPlaceIds,
+} from "@/src/components/itinerary/SuggestionsModal";
 import {
   fetchTripForUser,
   finishPlanning,
@@ -81,7 +86,9 @@ import {
   voteForActivity,
   createActivity,
   updateActivity,
+  type BackendActivity,
   type FinalItineraryResponseDto,
+  type FinalItinerarySlotDto,
 } from "@/src/services/activityService";
 import {
   deleteMemoryPhoto,
@@ -175,7 +182,7 @@ function updateCachedActivities(
 }
 
 function mapBackendActivity(
-  activity: any,
+  activity: BackendActivity,
   fallback: { dayId: string; slotId: string }
 ): Activity {
   const backendSlot = activity.slot_id
@@ -211,7 +218,7 @@ type FinalSlotUi = {
   alternativeCount: number;
 };
 
-function mapBackendFinalSlot(slot: any): FinalSlotUi {
+function mapBackendFinalSlot(slot: FinalItinerarySlotDto): FinalSlotUi {
   const split = splitBackendSlotId(slot.slot_id);
 
   const selectedActivity = mapBackendActivity(slot.selectedActivity, {
@@ -220,7 +227,7 @@ function mapBackendFinalSlot(slot: any): FinalSlotUi {
   });
 
   const alternativeActivities = Array.isArray(slot.alternativeActivities)
-    ? slot.alternativeActivities.map((activity: any) =>
+    ? slot.alternativeActivities.map((activity) =>
         mapBackendActivity(activity, {
           dayId: split.dayId,
           slotId: split.slotId,
@@ -231,7 +238,7 @@ function mapBackendFinalSlot(slot: any): FinalSlotUi {
   const addedAlternativeActivities = Array.isArray(
     slot.addedAlternativeActivities
   )
-    ? slot.addedAlternativeActivities.map((activity: any) =>
+    ? slot.addedAlternativeActivities.map((activity) =>
         mapBackendActivity(activity, {
           dayId: split.dayId,
           slotId: split.slotId,
@@ -686,7 +693,10 @@ export default function ItineraryScreen() {
   >({});
   const getMemoryPreviewHeight = useCallback(
     (aspectRatio?: number) => {
-      const maxHeight = Math.min(windowHeight * 0.62, memoryPreviewWidth * 1.45);
+      const maxHeight = Math.min(
+        windowHeight * 0.62,
+        memoryPreviewWidth * 1.45
+      );
       const minHeight = memoryPreviewWidth * 0.45;
 
       if (!aspectRatio) {
@@ -755,7 +765,8 @@ export default function ItineraryScreen() {
   const [suggestionsSlotLabel, setSuggestionsSlotLabel] = useState("");
   const [suggestions, setSuggestions] = useState<ActivitySuggestion[]>([]);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
-  const [isSuggestionsLoadingMore, setIsSuggestionsLoadingMore] = useState(false);
+  const [isSuggestionsLoadingMore, setIsSuggestionsLoadingMore] =
+    useState(false);
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
   const suggestionsSlotActivityIdRef = useRef<string | null>(null);
   const [memberPreferences, setMemberPreferences] = useState<string[]>([]);
@@ -796,7 +807,6 @@ export default function ItineraryScreen() {
     typeof setTimeout
   > | null>(null);
   const initialTripRefreshKeyRef = useRef<string | null>(null);
-  const lastFinalUpdateRef = useRef<string | null | undefined>(undefined);
 
   const [isPreparingFinalItinerary, setIsPreparingFinalItinerary] =
     useState(false);
@@ -1124,52 +1134,18 @@ export default function ItineraryScreen() {
     }
   }, [tripId, currentUserId]);
 
-  useEffect(() => {
-    if (!tripId) {
-      return;
-    }
+  const handleItineraryTripMissing = useCallback(() => {
+    invalidateTripsCache();
+    router.replace("/home");
+  }, []);
 
-    let isInitialSnapshot = true;
-    const unsubscribe = onSnapshot(
-      doc(db, "trips", tripId),
-      async (snapshot) => {
-        if (!snapshot.exists()) {
-          invalidateTripsCache();
-          router.replace("/home");
-          return;
-        }
-
-        const data = snapshot.data();
-
-        if (activeState === "final") {
-          const nextValue =
-            data?.final_itinerary_updated_at?.toMillis?.()?.toString?.() ??
-            null;
-
-          if (lastFinalUpdateRef.current === undefined) {
-            lastFinalUpdateRef.current = nextValue;
-          } else if (nextValue !== lastFinalUpdateRef.current) {
-            lastFinalUpdateRef.current = nextValue;
-            await refreshFinalItinerary();
-          }
-        }
-
-        if (isInitialSnapshot) {
-          isInitialSnapshot = false;
-          return;
-        }
-
-        if (activeState === "planning" || activeState === "voting") {
-          void refreshTripTimerFields({ forceRefresh: true });
-        }
-      },
-      (error) => {
-        console.log("Trip listener error:", error);
-      }
-    );
-
-    return unsubscribe;
-  }, [activeState, refreshFinalItinerary, refreshTripTimerFields, tripId]);
+  const { resetFinalUpdateTracking } = useItineraryTrip({
+    tripId,
+    activeState,
+    onMissing: handleItineraryTripMissing,
+    refreshFinalItinerary,
+    refreshTripTimerFields,
+  });
 
   const loadActivities = useCallback(
     async (options: { showLoading?: boolean } = {}) => {
@@ -1189,9 +1165,6 @@ export default function ItineraryScreen() {
       if (activeState === "planning" && !currentUserId) {
         return;
       }
-
-      const resolvedDayId =
-        selectedDayId || tripDays[0]?.id || itinerary.startDate;
 
       const cacheKey =
         activeState === "final"
@@ -1257,7 +1230,7 @@ export default function ItineraryScreen() {
                     currentUserId ?? undefined
                   );
 
-                  return slotActivities.map((activity: any) =>
+                  return slotActivities.map((activity) =>
                     mapBackendActivity(activity, {
                       dayId: day.id,
                       slotId: slot.id,
@@ -1297,7 +1270,7 @@ export default function ItineraryScreen() {
                   currentUserId ?? undefined
                 );
 
-                return slotActivities.map((activity: any) =>
+                return slotActivities.map((activity) =>
                   mapBackendActivity(activity, {
                     dayId: day.id,
                     slotId: slot.id,
@@ -1436,7 +1409,8 @@ export default function ItineraryScreen() {
       // Web browsers only allow the file picker during the original click gesture.
       result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
     } else {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         showFeedback(
           "Photo access needed",
@@ -1473,7 +1447,14 @@ export default function ItineraryScreen() {
     } finally {
       setIsUploadingMemories(false);
     }
-  }, [authToken, isUploadingMemories, loadMemories, showApiError, showFeedback, tripId]);
+  }, [
+    authToken,
+    isUploadingMemories,
+    loadMemories,
+    showApiError,
+    showFeedback,
+    tripId,
+  ]);
 
   const handleDownloadAllMemories = useCallback(() => {
     showFeedback(
@@ -1651,6 +1632,63 @@ export default function ItineraryScreen() {
     );
   }, []);
 
+  const renderMemoryTile = useCallback<ListRenderItem<MemoryPhoto>>(
+    ({ item: memory }) => {
+      const isSelected = selectedMemoryIds.includes(memory.memory_id);
+
+      return (
+        <Pressable
+          style={styles.memoryTile}
+          onPress={() => handleMemoryPress(memory)}
+          onLongPress={() => handleMemoryLongPress(memory)}
+          accessibilityRole="imagebutton"
+          accessibilityLabel={`Memory photo uploaded by ${
+            memory.uploaded_by_name ?? "a trip member"
+          }`}
+          accessibilityHint={
+            isMemorySelectionMode
+              ? "Selects or unselects this photo"
+              : "Opens a larger preview"
+          }
+          accessibilityState={{ selected: isSelected }}
+        >
+          <ExpoImage
+            source={{
+              uri: authToken ? getMemoryPhotoUrl(memory, authToken) : "",
+            }}
+            style={styles.memoryImage}
+            contentFit="cover"
+          />
+          {isMemorySelectionMode && (
+            <Pressable
+              style={styles.memorySelectIcon}
+              onPress={() => toggleMemorySelection(memory.memory_id)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isSelected ? "Unselect image" : "Select image"
+              }
+            >
+              {isSelected ? (
+                <ImageSelectedIcon width={24} height={24} />
+              ) : (
+                <UnselectImageIcon width={24} height={24} />
+              )}
+            </Pressable>
+          )}
+        </Pressable>
+      );
+    },
+    [
+      authToken,
+      handleMemoryLongPress,
+      handleMemoryPress,
+      isMemorySelectionMode,
+      selectedMemoryIds,
+      toggleMemorySelection,
+    ]
+  );
+
   const handleDeletePreviewMemory = useCallback(() => {
     if (!selectedMemory) return;
     setShowMemoryPreviewMenu(false);
@@ -1734,9 +1772,9 @@ export default function ItineraryScreen() {
   useEffect(() => {
     if (activeState !== "final") {
       setFinalSlots([]);
-      lastFinalUpdateRef.current = undefined;
+      resetFinalUpdateTracking();
     }
-  }, [activeState]);
+  }, [activeState, resetFinalUpdateTracking]);
 
   function handlePlanningInfoPress() {
     setShowPlanningInfoPopup(true);
@@ -1813,12 +1851,7 @@ export default function ItineraryScreen() {
           suggestionsSlotId
         )
       ),
-    [
-      planningActivities,
-      suggestions,
-      selectedDayId,
-      suggestionsSlotId,
-    ]
+    [planningActivities, suggestions, selectedDayId, suggestionsSlotId]
   );
 
   const suggestionsAddedInSlotPlaceIds = useMemo(
@@ -1831,12 +1864,7 @@ export default function ItineraryScreen() {
           suggestionsSlotId
         )
       ),
-    [
-      planningActivities,
-      suggestions,
-      selectedDayId,
-      suggestionsSlotId,
-    ]
+    [planningActivities, suggestions, selectedDayId, suggestionsSlotId]
   );
 
   const planningStatusParam = useMemo(
@@ -1937,7 +1965,7 @@ export default function ItineraryScreen() {
     try {
       const results = await fetchActivitySuggestions(tripId, slotId, authToken);
       setSuggestions(results);
-    } catch (err) {
+    } catch {
       setSuggestionsError("Could not load suggestions. Please try again.");
     } finally {
       setIsSuggestionsLoading(false);
@@ -1948,7 +1976,12 @@ export default function ItineraryScreen() {
     if (!authToken || !tripId || !suggestionsSlotId) return;
     setIsSuggestionsLoadingMore(true);
     try {
-      const results = await fetchActivitySuggestions(tripId, suggestionsSlotId, authToken, suggestions.length);
+      const results = await fetchActivitySuggestions(
+        tripId,
+        suggestionsSlotId,
+        authToken,
+        suggestions.length
+      );
       // Merge, deduplicating by sourcePlaceId
       setSuggestions((prev) => {
         const existingIds = new Set(prev.map((s) => s.sourcePlaceId));
@@ -2396,8 +2429,9 @@ export default function ItineraryScreen() {
           })
         );
 
-        const isAddedToItinerary =
-          result.addedAlternativeActivityIds.includes(activityToToggle.id);
+        const isAddedToItinerary = result.addedAlternativeActivityIds.includes(
+          activityToToggle.id
+        );
 
         setApiActivities((current) =>
           current.map((item) =>
@@ -2714,606 +2748,564 @@ export default function ItineraryScreen() {
         <View style={styles.screen}>
           <View style={styles.mainContent}>
             <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={handleRefresh}
-                tintColor={colors.nightBlack}
-                colors={[colors.nightBlack]}
+              style={styles.scroll}
+              contentContainerStyle={styles.content}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={colors.nightBlack}
+                  colors={[colors.nightBlack]}
+                />
+              }
+            >
+              <ItineraryHeader
+                title={activeState === "memories" ? "Memories" : "Itinerary"}
+                tripName={itinerary.title}
+                startDate={itinerary.startDate}
+                endDate={itinerary.endDate}
+                introText={getIntroText(activeState)}
+                daysLeftText={timerText}
+                onBackPress={handleBackPress}
+                state={activeState}
               />
-            }
-          >
-          <ItineraryHeader
-            title={activeState === "memories" ? "Memories" : "Itinerary"}
-            tripName={itinerary.title}
-            startDate={itinerary.startDate}
-            endDate={itinerary.endDate}
-            introText={getIntroText(activeState)}
-            daysLeftText={timerText}
-            onBackPress={handleBackPress}
-            state={activeState}
-          />
 
-          <View style={styles.contentPanel}>
-            {activeState !== "memories" && (
-              <ItineraryDaySelector
-                days={tripDays}
-                selectedDayId={selectedDayId}
-                onSelectDay={setSelectedDayId}
-                enabledDayIds={
-                  activeState === "voting"
-                    ? daysWithVotingActivities
-                    : undefined
-                }
-                accentColor={stateAccentColor}
-              />
-            )}
+              <View style={styles.contentPanel}>
+                {activeState !== "memories" && (
+                  <ItineraryDaySelector
+                    days={tripDays}
+                    selectedDayId={selectedDayId}
+                    onSelectDay={setSelectedDayId}
+                    enabledDayIds={
+                      activeState === "voting"
+                        ? daysWithVotingActivities
+                        : undefined
+                    }
+                    accentColor={stateAccentColor}
+                  />
+                )}
 
-            {activeState === "memories" && (
-              <View style={styles.memoriesSection}>
-                <View style={styles.memoriesActions}>
-                  <Pressable
-                    style={[
-                      styles.memoryActionButton,
-                      styles.uploadMemoryButton,
-                      isUploadingMemories && styles.memoryActionDisabled,
-                    ]}
-                    onPress={handleUploadMemories}
-                    disabled={isUploadingMemories}
-                    accessibilityRole="button"
-                    accessibilityLabel="Upload images"
-                    accessibilityState={{ busy: isUploadingMemories }}
-                  >
-                    {isUploadingMemories ? (
-                      <ActivityIndicator color={colors.nightBlack} />
+                {activeState === "memories" && (
+                  <View style={styles.memoriesSection}>
+                    <View style={styles.memoriesActions}>
+                      <Pressable
+                        style={[
+                          styles.memoryActionButton,
+                          styles.uploadMemoryButton,
+                          isUploadingMemories && styles.memoryActionDisabled,
+                        ]}
+                        onPress={handleUploadMemories}
+                        disabled={isUploadingMemories}
+                        accessibilityRole="button"
+                        accessibilityLabel="Upload images"
+                        accessibilityState={{ busy: isUploadingMemories }}
+                      >
+                        {isUploadingMemories ? (
+                          <ActivityIndicator color={colors.nightBlack} />
+                        ) : (
+                          <Ionicons
+                            name="cloud-upload-outline"
+                            size={22}
+                            color={colors.nightBlack}
+                          />
+                        )}
+                        <AppText variant="body" style={styles.memoryActionText}>
+                          Upload images
+                        </AppText>
+                      </Pressable>
+                    </View>
+
+                    {isLoadingMemories ? (
+                      <View style={styles.memoryGrid}>
+                        {Array.from({ length: 6 }).map((_, index) => (
+                          <View
+                            key={`memory-loading-${index}`}
+                            style={styles.memoryPlaceholder}
+                          />
+                        ))}
+                      </View>
+                    ) : memories.length === 0 ? (
+                      <View style={styles.emptyMemoriesPanel}>
+                        <View style={styles.emptyMemoriesCenter}>
+                          <ImageIcon width={34} height={34} />
+                          <AppText
+                            variant="body"
+                            style={styles.emptyMemoriesText}
+                          >
+                            No images here yet
+                          </AppText>
+                        </View>
+                      </View>
                     ) : (
-                      <Ionicons
-                        name="cloud-upload-outline"
-                        size={22}
-                        color={colors.nightBlack}
+                      <FlatList
+                        data={memories}
+                        keyExtractor={(memory) => memory.memory_id}
+                        renderItem={renderMemoryTile}
+                        numColumns={2}
+                        scrollEnabled={false}
+                        contentContainerStyle={styles.memoryListContent}
+                        columnWrapperStyle={styles.memoryListRow}
                       />
                     )}
-                    <AppText variant="body" style={styles.memoryActionText}>
-                      Upload images
-                    </AppText>
-                  </Pressable>
-                </View>
-
-                {isLoadingMemories ? (
-                  <View style={styles.memoryGrid}>
-                    {Array.from({ length: 6 }).map((_, index) => (
-                      <View
-                        key={`memory-loading-${index}`}
-                        style={styles.memoryPlaceholder}
-                      />
-                    ))}
-                  </View>
-                ) : memories.length === 0 ? (
-                  <View style={styles.emptyMemoriesPanel}>
-                    <View style={styles.emptyMemoriesCenter}>
-                      <ImageIcon width={34} height={34} />
-                      <AppText variant="body" style={styles.emptyMemoriesText}>
-                        No images here yet
-                      </AppText>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={styles.memoryGrid}>
-                    {memories.map((memory) => {
-                      const isSelected = selectedMemoryIds.includes(
-                        memory.memory_id
-                      );
-
-                      return (
-                        <Pressable
-                          key={memory.memory_id}
-                          style={styles.memoryTile}
-                          onPress={() => handleMemoryPress(memory)}
-                          onLongPress={() => handleMemoryLongPress(memory)}
-                          accessibilityRole="imagebutton"
-                          accessibilityLabel={`Memory photo uploaded by ${
-                            memory.uploaded_by_name ?? "a trip member"
-                          }`}
-                          accessibilityHint={
-                            isMemorySelectionMode
-                              ? "Selects or unselects this photo"
-                              : "Opens a larger preview"
-                          }
-                          accessibilityState={{ selected: isSelected }}
-                        >
-                          <ExpoImage
-                            source={{
-                              uri: authToken
-                                ? getMemoryPhotoUrl(memory, authToken)
-                                : "",
-                            }}
-                            style={styles.memoryImage}
-                            contentFit="cover"
-                          />
-                          {isMemorySelectionMode && (
-                            <Pressable
-                              style={styles.memorySelectIcon}
-                              onPress={() =>
-                                toggleMemorySelection(memory.memory_id)
-                              }
-                              hitSlop={10}
-                              accessibilityRole="button"
-                              accessibilityLabel={
-                                isSelected ? "Unselect image" : "Select image"
-                              }
-                            >
-                              {isSelected ? (
-                                <ImageSelectedIcon width={24} height={24} />
-                              ) : (
-                                <UnselectImageIcon width={24} height={24} />
-                              )}
-                            </Pressable>
-                          )}
-                        </Pressable>
-                      );
-                    })}
                   </View>
                 )}
-              </View>
-            )}
 
-            {activeState === "planning" && (
-              <View style={styles.slotList}>
-                {isLoadingActivities
-                  ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
-                  : slotItems.map(({ slot, activity }) => (
-                      <PlanningSlotCard
-                        key={slot.id}
-                        slot={slot}
-                        activity={activity}
-                        onAddActivity={handleAddActivity}
-                        onEditActivity={handleEditActivity}
-                        onSuggest={
-                          hasMemberPreferences ? handleSuggest : undefined
-                        }
-                        disabled={hasCurrentUserFinished}
-                      />
-                    ))}
-              </View>
-            )}
-
-            {activeState === "voting" && (
-              <View style={styles.votingSection}>
-                {isLoadingActivities ? (
+                {activeState === "planning" && (
                   <View style={styles.slotList}>
-                    {slots.slice(0, 3).map((slot) => (
-                      <SkeletonSlotCard key={slot.id} />
-                    ))}
-                  </View>
-                ) : votingTimeChips.length > 0 ? (
-                  <>
-                    <VotingTimeFilter
-                      chips={votingTimeChips}
-                      selectedSlotId={selectedVotingSlotId}
-                      onSelectSlot={setSelectedVotingSlotId}
-                    />
-
-                    <View style={styles.slotList}>
-                      {votingSlotActivities.map((activity) => (
-                        <VotingSlotCard
-                          key={activity.id}
-                          activity={activity}
-                          onAddVote={handleAddVote}
-                          onPressDetails={handleOpenVotingActivityDetails}
-                          selected={activity.hasCurrentUserVote === true}
-                        />
-                      ))}
-                    </View>
-                  </>
-                ) : (
-                  <View style={styles.emptyVoting} />
-                )}
-              </View>
-            )}
-
-            {activeState === "final" && (
-              <View style={styles.slotList}>
-                {isLoadingActivities
-                  ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
-                  : slots.map((slot) => {
-                      const finalSlot = finalSlotMap.get(slot.id);
-
-                      if (!finalSlot) {
-                        return (
-                          <FinalSlotCard
+                    {isLoadingActivities
+                      ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
+                      : slotItems.map(({ slot, activity }) => (
+                          <PlanningSlotCard
                             key={slot.id}
                             slot={slot}
-                            activity={undefined}
-                            onJoinGroup={handleJoinGroup}
-                            onPressDetails={handleOpenFinalActivityDetails}
+                            activity={activity}
+                            onAddActivity={handleAddActivity}
+                            onEditActivity={handleEditActivity}
+                            onSuggest={
+                              hasMemberPreferences ? handleSuggest : undefined
+                            }
+                            disabled={hasCurrentUserFinished}
                           />
-                        );
-                      }
-
-                      const addedAlternatives =
-                        finalSlot.addedAlternativeActivities;
-                      const remainingAlternativeCount =
-                        finalSlot.alternativeActivities.length;
-
-                      return (
-                        <View key={slot.id} style={styles.finalSlotSection}>
-                          <FinalSlotCard
-                            slot={slot}
-                            activity={finalSlot.selectedActivity}
-                            onJoinGroup={handleJoinGroup}
-                            onPressDetails={handleOpenFinalActivityDetails}
-                            otherSuggestedCount={remainingAlternativeCount}
-                          />
-
-                          <FinalSuggestedActivitiesSection
-                            slotLabel={slot.label}
-                            activities={addedAlternatives}
-                            onJoinGroup={handleJoinGroup}
-                            onPressDetails={handleOpenFinalActivityDetails}
-                            accentColor={stateAccentColor}
-                          />
-                        </View>
-                      );
-                    })}
-              </View>
-            )}
-          </View>
-        </ScrollView>
-        </View>
-
-        {activeState === "voting" && isAdmin && (
-          <VotingDoneBar
-            checked={isSubmittingVoting || isPreparingFinalItinerary}
-            disabled={isSubmittingVoting || isPreparingFinalItinerary}
-            onPress={handleFinishVoting}
-            onInfoPress={handleVotingInfoPress}
-          />
-        )}
-
-        <SuggestionsModal
-          visible={showSuggestionsModal}
-          slotLabel={suggestionsSlotLabel}
-          destination={itinerary.destination}
-          suggestions={suggestions}
-          loading={isSuggestionsLoading}
-          loadingMore={isSuggestionsLoadingMore}
-          error={suggestionsError}
-          onClose={() => setShowSuggestionsModal(false)}
-          onAdd={handleAddSuggestion}
-          onLoadMore={handleLoadMoreSuggestions}
-          addedElsewherePlaceIds={suggestionsAddedElsewherePlaceIds}
-          addedInSlotPlaceIds={suggestionsAddedInSlotPlaceIds}
-          selectedPreferences={memberPreferences}
-        />
-
-        <ActivityDetailModal
-          visible={showActivityDetailModal}
-          activity={selectedActivity}
-          slotLabel={selectedActivitySlotLabel}
-          state={activeState}
-          alternativeActivities={selectedDisplayedAlternativeActivities}
-          addedAlternativeActivityIds={selectedAddedAlternativeActivityIds}
-          onAddAlternativeToItinerary={handleAddAlternativeToItinerary}
-          onClose={handleCloseActivityDetails}
-        />
-
-        <Modal
-          visible={selectedMemory !== null}
-          transparent
-          animationType="fade"
-          onRequestClose={handleCloseMemoryPreview}
-        >
-          <View style={styles.memoryPreviewOverlay}>
-            <Pressable
-              style={styles.memoryPreviewBackdrop}
-              onPress={handleCloseMemoryPreview}
-              accessibilityRole="button"
-              accessibilityLabel="Close memory preview"
-            />
-
-            <View
-              style={[
-                styles.memoryPreviewContent,
-                { width: memoryPreviewWidth },
-              ]}
-            >
-              <View style={styles.memoryPreviewHeader}>
-                <View style={styles.memoryPreviewHeaderRow}>
-                  <View style={styles.memoryPreviewHeaderSpacer} />
-                  <View style={styles.memoryPreviewMenuAnchor}>
-                    <Pressable
-                      style={styles.memoryPreviewMenuButton}
-                      onPress={handleToggleMemoryPreviewMenu}
-                      hitSlop={8}
-                      accessibilityRole="button"
-                      accessibilityLabel="Open memory actions menu"
-                      accessibilityState={{ expanded: showMemoryPreviewMenu }}
-                    >
-                      <ImageMenuIcon width={24} height={24} />
-                    </Pressable>
-
-                    {showMemoryPreviewMenu ? (
-                      <View style={styles.memoryPreviewMenu}>
-                        <Pressable
-                          style={[
-                            styles.memoryPreviewMenuItem,
-                            isDeletingMemories && styles.memoryActionDisabled,
-                          ]}
-                          onPress={handleDeletePreviewMemory}
-                          disabled={isDeletingMemories}
-                          accessibilityRole="button"
-                          accessibilityLabel="Delete this memory"
-                        >
-                          {isDeletingMemories ? (
-                            <ActivityIndicator color={colors.nightBlack} />
-                          ) : (
-                            <ImageDeleteIcon width={24} height={24} />
-                          )}
-                          <AppText
-                            variant="body"
-                            style={styles.memoryPreviewMenuItemText}
-                          >
-                            Delete
-                          </AppText>
-                        </Pressable>
-
-                        <Pressable
-                          style={[
-                            styles.memoryPreviewMenuItem,
-                            isDownloadingMemories &&
-                              styles.memoryActionDisabled,
-                          ]}
-                          onPress={handleDownloadPreviewMemory}
-                          disabled={isDownloadingMemories}
-                          accessibilityRole="button"
-                          accessibilityLabel="Download this memory"
-                        >
-                          {isDownloadingMemories ? (
-                            <ActivityIndicator color={colors.nightBlack} />
-                          ) : (
-                            <ImageDownloadIcon width={24} height={24} />
-                          )}
-                          <AppText
-                            variant="body"
-                            style={styles.memoryPreviewMenuItemText}
-                          >
-                            Download
-                          </AppText>
-                        </Pressable>
-                      </View>
-                    ) : null}
+                        ))}
                   </View>
-                </View>
+                )}
+
+                {activeState === "voting" && (
+                  <View style={styles.votingSection}>
+                    {isLoadingActivities ? (
+                      <View style={styles.slotList}>
+                        {slots.slice(0, 3).map((slot) => (
+                          <SkeletonSlotCard key={slot.id} />
+                        ))}
+                      </View>
+                    ) : votingTimeChips.length > 0 ? (
+                      <>
+                        <VotingTimeFilter
+                          chips={votingTimeChips}
+                          selectedSlotId={selectedVotingSlotId}
+                          onSelectSlot={setSelectedVotingSlotId}
+                        />
+
+                        <View style={styles.slotList}>
+                          {votingSlotActivities.map((activity) => (
+                            <VotingSlotCard
+                              key={activity.id}
+                              activity={activity}
+                              onAddVote={handleAddVote}
+                              onPressDetails={handleOpenVotingActivityDetails}
+                              selected={activity.hasCurrentUserVote === true}
+                            />
+                          ))}
+                        </View>
+                      </>
+                    ) : (
+                      <View style={styles.emptyVoting} />
+                    )}
+                  </View>
+                )}
+
+                {activeState === "final" && (
+                  <View style={styles.slotList}>
+                    {isLoadingActivities
+                      ? slots.map((slot) => <SkeletonSlotCard key={slot.id} />)
+                      : slots.map((slot) => {
+                          const finalSlot = finalSlotMap.get(slot.id);
+
+                          if (!finalSlot) {
+                            return (
+                              <FinalSlotCard
+                                key={slot.id}
+                                slot={slot}
+                                activity={undefined}
+                                onJoinGroup={handleJoinGroup}
+                                onPressDetails={handleOpenFinalActivityDetails}
+                              />
+                            );
+                          }
+
+                          const addedAlternatives =
+                            finalSlot.addedAlternativeActivities;
+                          const remainingAlternativeCount =
+                            finalSlot.alternativeActivities.length;
+
+                          return (
+                            <View key={slot.id} style={styles.finalSlotSection}>
+                              <FinalSlotCard
+                                slot={slot}
+                                activity={finalSlot.selectedActivity}
+                                onJoinGroup={handleJoinGroup}
+                                onPressDetails={handleOpenFinalActivityDetails}
+                                otherSuggestedCount={remainingAlternativeCount}
+                              />
+
+                              <FinalSuggestedActivitiesSection
+                                slotLabel={slot.label}
+                                activities={addedAlternatives}
+                                onJoinGroup={handleJoinGroup}
+                                onPressDetails={handleOpenFinalActivityDetails}
+                                accentColor={stateAccentColor}
+                              />
+                            </View>
+                          );
+                        })}
+                  </View>
+                )}
               </View>
+            </ScrollView>
+          </View>
+
+          {activeState === "voting" && isAdmin && (
+            <VotingDoneBar
+              checked={isSubmittingVoting || isPreparingFinalItinerary}
+              disabled={isSubmittingVoting || isPreparingFinalItinerary}
+              onPress={handleFinishVoting}
+              onInfoPress={handleVotingInfoPress}
+            />
+          )}
+
+          <SuggestionsModal
+            visible={showSuggestionsModal}
+            slotLabel={suggestionsSlotLabel}
+            destination={itinerary.destination}
+            suggestions={suggestions}
+            loading={isSuggestionsLoading}
+            loadingMore={isSuggestionsLoadingMore}
+            error={suggestionsError}
+            onClose={() => setShowSuggestionsModal(false)}
+            onAdd={handleAddSuggestion}
+            onLoadMore={handleLoadMoreSuggestions}
+            addedElsewherePlaceIds={suggestionsAddedElsewherePlaceIds}
+            addedInSlotPlaceIds={suggestionsAddedInSlotPlaceIds}
+            selectedPreferences={memberPreferences}
+          />
+
+          <ActivityDetailModal
+            visible={showActivityDetailModal}
+            activity={selectedActivity}
+            slotLabel={selectedActivitySlotLabel}
+            state={activeState}
+            alternativeActivities={selectedDisplayedAlternativeActivities}
+            addedAlternativeActivityIds={selectedAddedAlternativeActivityIds}
+            onAddAlternativeToItinerary={handleAddAlternativeToItinerary}
+            onClose={handleCloseActivityDetails}
+          />
+
+          <Modal
+            visible={selectedMemory !== null}
+            transparent
+            animationType="fade"
+            onRequestClose={handleCloseMemoryPreview}
+          >
+            <View style={styles.memoryPreviewOverlay}>
+              <Pressable
+                style={styles.memoryPreviewBackdrop}
+                onPress={handleCloseMemoryPreview}
+                accessibilityRole="button"
+                accessibilityLabel="Close memory preview"
+              />
 
               <View
                 style={[
-                  styles.memoryPreviewImageWrapper,
-                  {
-                    width: memoryPreviewWidth,
-                    height: memoryPreviewImageHeight,
-                  },
+                  styles.memoryPreviewContent,
+                  { width: memoryPreviewWidth },
                 ]}
               >
-                {authToken && memories.length > 0 ? (
-                  <FlatList
-                    ref={memoryPreviewListRef}
-                    data={memories}
-                    horizontal
-                    pagingEnabled
-                    bounces={memories.length > 1}
-                    showsHorizontalScrollIndicator={false}
-                    initialScrollIndex={
-                      memories.length > 0 ? selectedMemoryIndex : undefined
-                    }
-                    keyExtractor={(memory) => memory.memory_id}
-                    getItemLayout={(_, index) => ({
-                      length: memoryPreviewWidth,
-                      offset: memoryPreviewWidth * index,
-                      index,
-                    })}
-                    onScrollToIndexFailed={(info) => {
-                      requestAnimationFrame(() => {
-                        memoryPreviewListRef.current?.scrollToIndex({
-                          index: info.index,
-                          animated: false,
-                        });
-                      });
-                    }}
-                    onScrollBeginDrag={() => setShowMemoryPreviewMenu(false)}
-                    onMomentumScrollEnd={(event) =>
-                      handlePreviewMomentumScrollEnd(
-                        event.nativeEvent.contentOffset.x
-                      )
-                    }
-                    renderItem={({ item: memory }) => (
-                      <View
-                        style={[
-                          styles.memoryPreviewSlide,
-                          {
-                            width: memoryPreviewWidth,
-                            height: memoryPreviewImageHeight,
-                          },
-                        ]}
+                <View style={styles.memoryPreviewHeader}>
+                  <View style={styles.memoryPreviewHeaderRow}>
+                    <View style={styles.memoryPreviewHeaderSpacer} />
+                    <View style={styles.memoryPreviewMenuAnchor}>
+                      <Pressable
+                        style={styles.memoryPreviewMenuButton}
+                        onPress={handleToggleMemoryPreviewMenu}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel="Open memory actions menu"
+                        accessibilityState={{ expanded: showMemoryPreviewMenu }}
                       >
-                        <ExpoImage
-                          source={{
-                            uri: getMemoryPhotoUrl(memory, authToken),
-                          }}
-                          style={styles.memoryPreviewImage}
-                          contentFit="contain"
-                          onLoad={(event) =>
-                            handleMemoryImageLoad(
-                              memory.memory_id,
-                              event.source.width,
-                              event.source.height
-                            )
-                          }
-                        />
-                      </View>
+                        <ImageMenuIcon width={24} height={24} />
+                      </Pressable>
+
+                      {showMemoryPreviewMenu ? (
+                        <View style={styles.memoryPreviewMenu}>
+                          <Pressable
+                            style={[
+                              styles.memoryPreviewMenuItem,
+                              isDeletingMemories && styles.memoryActionDisabled,
+                            ]}
+                            onPress={handleDeletePreviewMemory}
+                            disabled={isDeletingMemories}
+                            accessibilityRole="button"
+                            accessibilityLabel="Delete this memory"
+                          >
+                            {isDeletingMemories ? (
+                              <ActivityIndicator color={colors.nightBlack} />
+                            ) : (
+                              <ImageDeleteIcon width={24} height={24} />
+                            )}
+                            <AppText
+                              variant="body"
+                              style={styles.memoryPreviewMenuItemText}
+                            >
+                              Delete
+                            </AppText>
+                          </Pressable>
+
+                          <Pressable
+                            style={[
+                              styles.memoryPreviewMenuItem,
+                              isDownloadingMemories &&
+                                styles.memoryActionDisabled,
+                            ]}
+                            onPress={handleDownloadPreviewMemory}
+                            disabled={isDownloadingMemories}
+                            accessibilityRole="button"
+                            accessibilityLabel="Download this memory"
+                          >
+                            {isDownloadingMemories ? (
+                              <ActivityIndicator color={colors.nightBlack} />
+                            ) : (
+                              <ImageDownloadIcon width={24} height={24} />
+                            )}
+                            <AppText
+                              variant="body"
+                              style={styles.memoryPreviewMenuItemText}
+                            >
+                              Download
+                            </AppText>
+                          </Pressable>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                </View>
+
+                <View
+                  style={[
+                    styles.memoryPreviewImageWrapper,
+                    {
+                      width: memoryPreviewWidth,
+                      height: memoryPreviewImageHeight,
+                    },
+                  ]}
+                >
+                  {authToken && memories.length > 0 ? (
+                    <FlatList
+                      ref={memoryPreviewListRef}
+                      data={memories}
+                      horizontal
+                      pagingEnabled
+                      bounces={memories.length > 1}
+                      showsHorizontalScrollIndicator={false}
+                      initialScrollIndex={
+                        memories.length > 0 ? selectedMemoryIndex : undefined
+                      }
+                      keyExtractor={(memory) => memory.memory_id}
+                      getItemLayout={(_, index) => ({
+                        length: memoryPreviewWidth,
+                        offset: memoryPreviewWidth * index,
+                        index,
+                      })}
+                      onScrollToIndexFailed={(info) => {
+                        requestAnimationFrame(() => {
+                          memoryPreviewListRef.current?.scrollToIndex({
+                            index: info.index,
+                            animated: false,
+                          });
+                        });
+                      }}
+                      onScrollBeginDrag={() => setShowMemoryPreviewMenu(false)}
+                      onMomentumScrollEnd={(event) =>
+                        handlePreviewMomentumScrollEnd(
+                          event.nativeEvent.contentOffset.x
+                        )
+                      }
+                      renderItem={({ item: memory }) => (
+                        <View
+                          style={[
+                            styles.memoryPreviewSlide,
+                            {
+                              width: memoryPreviewWidth,
+                              height: memoryPreviewImageHeight,
+                            },
+                          ]}
+                        >
+                          <ExpoImage
+                            source={{
+                              uri: getMemoryPhotoUrl(memory, authToken),
+                            }}
+                            style={styles.memoryPreviewImage}
+                            contentFit="contain"
+                            onLoad={(event) =>
+                              handleMemoryImageLoad(
+                                memory.memory_id,
+                                event.source.width,
+                                event.source.height
+                              )
+                            }
+                          />
+                        </View>
+                      )}
+                    />
+                  ) : null}
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          <ItineraryInfoModal
+            visible={activeState === "planning" && showPlanningInfoPopup}
+            title="Planning done"
+            text="You can uncheck Planning done to edit your activities again until every member has submitted."
+            primaryButtonColor={colors.beachYellow}
+            accessibilityLabel="Planning done information"
+            closeAccessibilityLabel="Close planning information"
+            onClose={() => setShowPlanningInfoPopup(false)}
+          />
+
+          <ConfirmModal
+            visible={activeState === "planning" && showPlanningConfirmModal}
+            title="Submit your activities?"
+            message="You can still edit your activities until every member has finished planning. Once everyone submits, planning closes and your group moves on to voting."
+            confirmLabel="Submit"
+            confirmButtonColor={colors.beachYellow}
+            accessibilityLabel="Submit planning confirmation"
+            confirmAccessibilityLabel="Submit your activities"
+            cancelAccessibilityLabel="Cancel submitting activities"
+            onConfirm={handleConfirmSubmitPlanning}
+            onCancel={() => setShowPlanningConfirmModal(false)}
+          />
+
+          {activeState === "memories" &&
+          isMemorySelectionMode &&
+          memories.length > 0 ? (
+            <SafeAreaView
+              edges={["bottom"]}
+              style={styles.memorySelectionSafeArea}
+            >
+              <View style={styles.memorySelectionWrapper}>
+                <View style={styles.memorySelectionTray}>
+                  <Pressable
+                    style={[
+                      styles.memorySelectionAction,
+                      (selectedMemoryIds.length === 0 || isDeletingMemories) &&
+                        styles.memoryActionDisabled,
+                    ]}
+                    onPress={handleDeleteSelectedMemories}
+                    disabled={
+                      selectedMemoryIds.length === 0 || isDeletingMemories
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Delete selected images"
+                  >
+                    {isDeletingMemories ? (
+                      <ActivityIndicator color={colors.nightBlack} />
+                    ) : (
+                      <ImageDeleteIcon width={24} height={24} />
                     )}
-                  />
-                ) : null}
+                    <AppText
+                      variant="body"
+                      style={styles.memorySelectionActionText}
+                    >
+                      Delete
+                    </AppText>
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.memorySelectionAction}
+                    onPress={handleSelectAllMemories}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      selectedMemoryIds.length === memories.length
+                        ? "Deselect all images"
+                        : "Select all images"
+                    }
+                  >
+                    <SelectAllIcon width={24} height={24} />
+                    <AppText
+                      variant="body"
+                      style={styles.memorySelectionActionText}
+                    >
+                      {selectedMemoryIds.length === memories.length
+                        ? "Deselect all"
+                        : "Select all"}
+                    </AppText>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.memorySelectionAction,
+                      (selectedMemoryIds.length === 0 ||
+                        isDownloadingMemories) &&
+                        styles.memoryActionDisabled,
+                    ]}
+                    onPress={handleDownloadSelectedMemories}
+                    disabled={
+                      selectedMemoryIds.length === 0 || isDownloadingMemories
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Download selected images"
+                  >
+                    {isDownloadingMemories ? (
+                      <ActivityIndicator color={colors.nightBlack} />
+                    ) : (
+                      <ImageDownloadIcon width={24} height={24} />
+                    )}
+                    <AppText
+                      variant="body"
+                      style={styles.memorySelectionActionText}
+                    >
+                      Download
+                    </AppText>
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          </View>
-        </Modal>
+            </SafeAreaView>
+          ) : null}
 
-        <ItineraryInfoModal
-          visible={activeState === "planning" && showPlanningInfoPopup}
-          title="Planning done"
-          text="You can uncheck Planning done to edit your activities again until every member has submitted."
-          primaryButtonColor={colors.beachYellow}
-          accessibilityLabel="Planning done information"
-          closeAccessibilityLabel="Close planning information"
-          onClose={() => setShowPlanningInfoPopup(false)}
-        />
+          <ItineraryInfoModal
+            visible={showVotingInfoPopup}
+            title="Submit voting"
+            text="Only admins can end voting manually. This closes voting for all members and creates the final itinerary."
+            primaryButtonColor={colors.sunsetPink}
+            accessibilityLabel="Submit voting information"
+            closeAccessibilityLabel="Close voting information"
+            onClose={() => setShowVotingInfoPopup(false)}
+          />
 
-        <ConfirmModal
-          visible={activeState === "planning" && showPlanningConfirmModal}
-          title="Submit your activities?"
-          message="You can still edit your activities until every member has finished planning. Once everyone submits, planning closes and your group moves on to voting."
-          confirmLabel="Submit"
-          confirmButtonColor={colors.beachYellow}
-          accessibilityLabel="Submit planning confirmation"
-          confirmAccessibilityLabel="Submit your activities"
-          cancelAccessibilityLabel="Cancel submitting activities"
-          onConfirm={handleConfirmSubmitPlanning}
-          onCancel={() => setShowPlanningConfirmModal(false)}
-        />
+          <ConfirmModal
+            visible={showVotingConfirmModal}
+            title="Submit voting?"
+            message="This ends voting for everyone immediately. No one can add or change votes after that, and your group moves on to the final itinerary."
+            confirmLabel="Submit"
+            confirmButtonColor={colors.sunsetPink}
+            accessibilityLabel="Submit voting confirmation"
+            confirmAccessibilityLabel="Submit voting for everyone"
+            cancelAccessibilityLabel="Cancel submitting voting"
+            onConfirm={handleConfirmFinishVoting}
+            onCancel={() => setShowVotingConfirmModal(false)}
+          />
 
-        {activeState === "memories" &&
-        isMemorySelectionMode &&
-        memories.length > 0 ? (
-          <SafeAreaView
-            edges={["bottom"]}
-            style={styles.memorySelectionSafeArea}
-          >
-            <View style={styles.memorySelectionWrapper}>
-              <View style={styles.memorySelectionTray}>
-                <Pressable
-                  style={[
-                    styles.memorySelectionAction,
-                    (selectedMemoryIds.length === 0 || isDeletingMemories) &&
-                      styles.memoryActionDisabled,
-                  ]}
-                  onPress={handleDeleteSelectedMemories}
-                  disabled={
-                    selectedMemoryIds.length === 0 || isDeletingMemories
-                  }
-                  accessibilityRole="button"
-                  accessibilityLabel="Delete selected images"
-                >
-                  {isDeletingMemories ? (
-                    <ActivityIndicator color={colors.nightBlack} />
-                  ) : (
-                    <ImageDeleteIcon width={24} height={24} />
-                  )}
-                  <AppText
-                    variant="body"
-                    style={styles.memorySelectionActionText}
-                  >
-                    Delete
-                  </AppText>
-                </Pressable>
+          <TransitionOverlay
+            visible={isPreparingFinalItinerary}
+            title="Making your itinerary ready"
+            text="We are choosing the group favorites for each time slot."
+          />
 
-                <Pressable
-                  style={styles.memorySelectionAction}
-                  onPress={handleSelectAllMemories}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    selectedMemoryIds.length === memories.length
-                      ? "Deselect all images"
-                      : "Select all images"
-                  }
-                >
-                  <SelectAllIcon width={24} height={24} />
-                  <AppText
-                    variant="body"
-                    style={styles.memorySelectionActionText}
-                  >
-                    {selectedMemoryIds.length === memories.length
-                      ? "Deselect all"
-                      : "Select all"}
-                  </AppText>
-                </Pressable>
+          <TransitionOverlay
+            visible={isPreparingVoting}
+            title="Getting voting ready"
+            text="We are preparing the activities your group can vote on."
+          />
 
-                <Pressable
-                  style={[
-                    styles.memorySelectionAction,
-                    (selectedMemoryIds.length === 0 || isDownloadingMemories) &&
-                      styles.memoryActionDisabled,
-                  ]}
-                  onPress={handleDownloadSelectedMemories}
-                  disabled={
-                    selectedMemoryIds.length === 0 || isDownloadingMemories
-                  }
-                  accessibilityRole="button"
-                  accessibilityLabel="Download selected images"
-                >
-                  {isDownloadingMemories ? (
-                    <ActivityIndicator color={colors.nightBlack} />
-                  ) : (
-                    <ImageDownloadIcon width={24} height={24} />
-                  )}
-                  <AppText
-                    variant="body"
-                    style={styles.memorySelectionActionText}
-                  >
-                    Download
-                  </AppText>
-                </Pressable>
-              </View>
-            </View>
-          </SafeAreaView>
-        ) : null}
-
-        <ItineraryInfoModal
-          visible={showVotingInfoPopup}
-          title="Submit voting"
-          text="Only admins can end voting manually. This closes voting for all members and creates the final itinerary."
-          primaryButtonColor={colors.sunsetPink}
-          accessibilityLabel="Submit voting information"
-          closeAccessibilityLabel="Close voting information"
-          onClose={() => setShowVotingInfoPopup(false)}
-        />
-
-        <ConfirmModal
-          visible={showVotingConfirmModal}
-          title="Submit voting?"
-          message="This ends voting for everyone immediately. No one can add or change votes after that, and your group moves on to the final itinerary."
-          confirmLabel="Submit"
-          confirmButtonColor={colors.sunsetPink}
-          accessibilityLabel="Submit voting confirmation"
-          confirmAccessibilityLabel="Submit voting for everyone"
-          cancelAccessibilityLabel="Cancel submitting voting"
-          onConfirm={handleConfirmFinishVoting}
-          onCancel={() => setShowVotingConfirmModal(false)}
-        />
-
-        <TransitionOverlay
-          visible={isPreparingFinalItinerary}
-          title="Making your itinerary ready"
-          text="We are choosing the group favorites for each time slot."
-        />
-
-        <TransitionOverlay
-          visible={isPreparingVoting}
-          title="Getting voting ready"
-          text="We are preparing the activities your group can vote on."
-        />
-
-        <FeedbackModal
-          visible={showMemoryFeedbackModal}
-          title={memoryFeedbackTitle}
-          message={memoryFeedbackMessage}
-          onClose={() => setShowMemoryFeedbackModal(false)}
-          buttonColor={colors.seaBlue}
-        />
-        {feedbackModal}
+          <FeedbackModal
+            visible={showMemoryFeedbackModal}
+            title={memoryFeedbackTitle}
+            message={memoryFeedbackMessage}
+            onClose={() => setShowMemoryFeedbackModal(false)}
+            buttonColor={colors.seaBlue}
+          />
+          {feedbackModal}
         </View>
       </SafeAreaView>
 
@@ -3405,7 +3397,7 @@ const styles = StyleSheet.create({
   memoryActionButton: {
     alignSelf: "flex-start",
     minHeight: 56,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -3449,17 +3441,23 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: spacing.sm,
   },
+  memoryListContent: {
+    gap: spacing.sm,
+  },
+  memoryListRow: {
+    justifyContent: "space-between",
+  },
   memoryTile: {
     width: "48.5%",
     aspectRatio: 1,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     overflow: "hidden",
     backgroundColor: colors.border,
   },
   memoryPlaceholder: {
     width: "48.5%",
     aspectRatio: 1,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     backgroundColor: colors.border,
   },
   memoryImage: {

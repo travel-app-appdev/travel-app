@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  FlatList,
+  type ListRenderItem,
   Linking,
   Modal,
   Pressable,
@@ -155,6 +157,12 @@ const ALL_FILTER = "All";
 const SHEET_ANIMATION_MS = 280;
 const SHEET_BODY_RESERVE = 168;
 
+type SuggestionListItem = {
+  suggestion: ActivitySuggestion;
+  labels: string[];
+  key: string;
+};
+
 function getSheetLayout(
   windowWidth: number,
   windowHeight: number,
@@ -218,7 +226,10 @@ const CATEGORY_LABEL_RULES: { label: string; categories: string[] }[] = [
     label: "Gallery",
     categories: ["entertainment.culture.gallery", "commercial.art"],
   },
-  { label: "Sightseeing", categories: ["tourism.sights", "tourism.attraction"] },
+  {
+    label: "Sightseeing",
+    categories: ["tourism.sights", "tourism.attraction"],
+  },
   { label: "Viewpoint", categories: ["tourism.attraction.viewpoint"] },
   {
     label: "Culture",
@@ -426,7 +437,7 @@ export function SuggestionsModal({
   const [mounted, setMounted] = useState(visible);
   const slideAnim = useRef(new Animated.Value(sheetMaxHeight)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
-  const listScrollRef = useRef<ScrollView>(null);
+  const listScrollRef = useRef<FlatList<SuggestionListItem>>(null);
 
   useEffect(() => {
     if (visible) {
@@ -475,11 +486,11 @@ export function SuggestionsModal({
       setAddedPlaceId(selectedPlaceId);
       setIsAdding(false);
     }
-  }, [visible, slotLabel]);
+  }, [selectedPlaceId, slotLabel, visible]);
 
-  function handleClose() {
+  const handleClose = useCallback(() => {
     onClose();
-  }
+  }, [onClose]);
 
   const elsewherePlaceIds = useMemo(
     () => new Set(addedElsewherePlaceIds),
@@ -493,49 +504,60 @@ export function SuggestionsModal({
 
   const isPickerMode = onDeselect != null;
 
-  function getActiveSelection() {
+  const getActiveSelection = useCallback(() => {
     return isPickerMode ? addedPlaceId : (addedPlaceId ?? selectedPlaceId);
-  }
+  }, [addedPlaceId, isPickerMode, selectedPlaceId]);
 
-  async function handleAdd(s: ActivitySuggestion) {
-    if (isAdding || elsewherePlaceIds.has(s.sourcePlaceId)) {
-      return;
-    }
-
-    const activeSelection = getActiveSelection();
-
-    if (inSlotPlaceIds.has(s.sourcePlaceId)) {
-      if (!isPickerMode || !activeSelection) {
-        return;
-      }
-    }
-
-    if (activeSelection === s.sourcePlaceId) {
-      if (!onDeselect) {
+  const handleAdd = useCallback(
+    async (s: ActivitySuggestion) => {
+      if (isAdding || elsewherePlaceIds.has(s.sourcePlaceId)) {
         return;
       }
 
-      setAddedPlaceId(null);
+      const activeSelection = getActiveSelection();
+
+      if (inSlotPlaceIds.has(s.sourcePlaceId)) {
+        if (!isPickerMode || !activeSelection) {
+          return;
+        }
+      }
+
+      if (activeSelection === s.sourcePlaceId) {
+        if (!onDeselect) {
+          return;
+        }
+
+        setAddedPlaceId(null);
+        setIsAdding(true);
+        try {
+          await onDeselect();
+        } finally {
+          setIsAdding(false);
+        }
+        return;
+      }
+
+      const previousPlaceId = activeSelection;
+      setAddedPlaceId(s.sourcePlaceId);
       setIsAdding(true);
       try {
-        await onDeselect();
+        await onAdd(s);
+      } catch {
+        setAddedPlaceId(previousPlaceId);
       } finally {
         setIsAdding(false);
       }
-      return;
-    }
-
-    const previousPlaceId = activeSelection;
-    setAddedPlaceId(s.sourcePlaceId);
-    setIsAdding(true);
-    try {
-      await onAdd(s);
-    } catch {
-      setAddedPlaceId(previousPlaceId);
-    } finally {
-      setIsAdding(false);
-    }
-  }
+    },
+    [
+      elsewherePlaceIds,
+      getActiveSelection,
+      inSlotPlaceIds,
+      isAdding,
+      isPickerMode,
+      onAdd,
+      onDeselect,
+    ]
+  );
 
   // Build subtitle: "Based on your preferences · Museums, Shopping · Prague"
   const allowedFilterLabels = useMemo(() => {
@@ -551,7 +573,7 @@ export function SuggestionsModal({
   }, [selectedPreferences]);
 
   const suggestionItems = useMemo(
-    () =>
+    (): SuggestionListItem[] =>
       suggestions
         .filter((suggestion) => {
           if (selectedPreferences.length === 0) return true;
@@ -580,7 +602,9 @@ export function SuggestionsModal({
 
     const counts = new Map<string, number>();
     suggestionItems.forEach(({ labels }) => {
-      labels.forEach((label) => counts.set(label, (counts.get(label) ?? 0) + 1));
+      labels.forEach((label) =>
+        counts.set(label, (counts.get(label) ?? 0) + 1)
+      );
     });
 
     return Array.from(counts.entries())
@@ -622,7 +646,7 @@ export function SuggestionsModal({
   );
 
   useEffect(() => {
-    listScrollRef.current?.scrollTo({ y: 0, animated: false });
+    listScrollRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [effectiveFilter, loading, suggestions.length]);
 
   const prefsText =
@@ -635,13 +659,15 @@ export function SuggestionsModal({
   if (destination) subtitleParts.push(destination);
   const subtitle = subtitleParts.join(" · ");
 
-  function openMapsForPlace(s: ActivitySuggestion) {
-    const query = encodeURIComponent(s.name + (s.address ? ", " + s.address : ""));
+  const openMapsForPlace = useCallback((s: ActivitySuggestion) => {
+    const query = encodeURIComponent(
+      s.name + (s.address ? ", " + s.address : "")
+    );
     const url =
       s.googleMapsUrl ??
       "https://www.google.com/maps/search/?api=1&query=" + query;
     Linking.openURL(url).catch(() => {});
-  }
+  }, []);
 
   const showFilterChips =
     !loading &&
@@ -651,116 +677,127 @@ export function SuggestionsModal({
   const showSuggestionList =
     suggestions.length > 0 || selectedPreferences.length > 0;
 
-  const activeSelection = getActiveSelection();
+  const renderSuggestionItem = useCallback<ListRenderItem<SuggestionListItem>>(
+    ({ item: { suggestion: s, labels } }) => {
+      const activeSelection = getActiveSelection();
+      const isSavedInSlot = inSlotPlaceIds.has(s.sourcePlaceId);
+      const isSelected = activeSelection === s.sourcePlaceId;
+      const isAddedElsewhere = elsewherePlaceIds.has(s.sourcePlaceId);
+      const isAddedInCurrentSlot = isPickerMode
+        ? activeSelection
+          ? isSelected
+          : isSavedInSlot
+        : isSavedInSlot || isSelected;
+      const isAdded = isAddedElsewhere || isAddedInCurrentSlot;
+      const isAddDisabled =
+        isAdding ||
+        isAddedElsewhere ||
+        (!isPickerMode && isSavedInSlot) ||
+        (isPickerMode && !activeSelection && isSavedInSlot);
 
-  const listContent = visibleSuggestionItems.map(({ suggestion: s, labels, key }) => {
-    const isSavedInSlot = inSlotPlaceIds.has(s.sourcePlaceId);
-    const isSelected = activeSelection === s.sourcePlaceId;
-    const isAddedElsewhere = elsewherePlaceIds.has(s.sourcePlaceId);
-    const isAddedInCurrentSlot = isPickerMode
-      ? activeSelection
-        ? isSelected
-        : isSavedInSlot
-      : isSavedInSlot || isSelected;
-    const isAdded = isAddedElsewhere || isAddedInCurrentSlot;
-    const isAddDisabled =
-      isAdding ||
-      isAddedElsewhere ||
-      (!isPickerMode && isSavedInSlot) ||
-      (isPickerMode && !activeSelection && isSavedInSlot);
-    return (
-      <View key={key} style={styles.card}>
-        <View style={styles.cardBody}>
-          <View style={styles.titleRow}>
-            <AppText
-              variant="body"
-              style={styles.placeName}
-              numberOfLines={2}
-            >
-              {s.name}
-            </AppText>
-            {labels.length > 0 && (
-              <View style={styles.titleLabels}>
-                {labels.slice(0, 3).map((label) => (
-                  <View key={label} style={styles.placeLabel}>
-                    <AppText variant="body" style={styles.placeLabelText}>
-                      {label}
-                    </AppText>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {!!s.address && (
-            <View style={styles.infoRow}>
-              <LocationPin
-                width={18}
-                height={18}
-                {...hiddenFromAccessibility}
-              />
+      return (
+        <View style={styles.card}>
+          <View style={styles.cardBody}>
+            <View style={styles.titleRow}>
               <AppText
                 variant="body"
-                style={styles.addressText}
+                style={styles.placeName}
                 numberOfLines={2}
               >
-                {s.address}
+                {s.name}
               </AppText>
+              {labels.length > 0 && (
+                <View style={styles.titleLabels}>
+                  {labels.slice(0, 3).map((label) => (
+                    <View key={label} style={styles.placeLabel}>
+                      <AppText variant="body" style={styles.placeLabelText}>
+                        {label}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
-          )}
+
+            {!!s.address && (
+              <View style={styles.infoRow}>
+                <LocationPin
+                  width={18}
+                  height={18}
+                  {...hiddenFromAccessibility}
+                />
+                <AppText
+                  variant="body"
+                  style={styles.addressText}
+                  numberOfLines={2}
+                >
+                  {s.address}
+                </AppText>
+              </View>
+            )}
+
+            <Pressable
+              onPress={() => openMapsForPlace(s)}
+              style={styles.mapsLink}
+              accessibilityRole="link"
+              accessibilityLabel={`Open ${s.name} in Google Maps`}
+            >
+              <GoogleIcon width={18} height={18} {...hiddenFromAccessibility} />
+              <AppText variant="body" style={styles.mapsLinkText}>
+                Open in Google Maps
+              </AppText>
+            </Pressable>
+          </View>
 
           <Pressable
-            onPress={() => openMapsForPlace(s)}
-            style={styles.mapsLink}
-            accessibilityRole="link"
-            accessibilityLabel={`Open ${s.name} in Google Maps`}
+            onPress={() => handleAdd(s)}
+            disabled={isAddDisabled}
+            style={[styles.addBtn, isAdded && styles.addBtnDone]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isAddedElsewhere
+                ? `${s.name} already added in another time slot`
+                : isPickerMode && isSelected
+                  ? `${s.name} added. Tap again to remove`
+                  : !isPickerMode && isSavedInSlot
+                    ? `${s.name} already added in this time slot`
+                    : !isPickerMode && isSelected
+                      ? `${s.name} added`
+                      : activeSelection
+                        ? `Replace with ${s.name}`
+                        : `Add ${s.name} to itinerary`
+            }
+            accessibilityState={{ disabled: isAddDisabled }}
           >
-            <GoogleIcon width={18} height={18} {...hiddenFromAccessibility} />
-            <AppText variant="body" style={styles.mapsLinkText}>
-              Open in Google Maps
+            {isAdded ? (
+              <View {...hiddenFromAccessibility}>
+                <CheckIcon width={20} height={20} color={colors.nightBlack} />
+              </View>
+            ) : (
+              <View {...hiddenFromAccessibility}>
+                <AddIcon width={20} height={20} color={colors.nightBlack} />
+              </View>
+            )}
+            <AppText
+              variant="body"
+              style={[styles.addBtnText, isAdded && styles.addBtnTextDone]}
+            >
+              {isAdded ? "Added" : "Add Activity"}
             </AppText>
           </Pressable>
         </View>
-
-        <Pressable
-          onPress={() => handleAdd(s)}
-          disabled={isAddDisabled}
-          style={[styles.addBtn, isAdded && styles.addBtnDone]}
-          accessibilityRole="button"
-          accessibilityLabel={
-            isAddedElsewhere
-              ? `${s.name} already added in another time slot`
-              : isPickerMode && isSelected
-                ? `${s.name} added. Tap again to remove`
-                : !isPickerMode && isSavedInSlot
-                  ? `${s.name} already added in this time slot`
-                  : !isPickerMode && isSelected
-                    ? `${s.name} added`
-                    : activeSelection
-                      ? `Replace with ${s.name}`
-                      : `Add ${s.name} to itinerary`
-          }
-          accessibilityState={{ disabled: isAddDisabled }}
-        >
-          {isAdded ? (
-            <View {...hiddenFromAccessibility}>
-              <CheckIcon width={20} height={20} color={colors.nightBlack} />
-            </View>
-          ) : (
-            <View {...hiddenFromAccessibility}>
-              <AddIcon width={20} height={20} color={colors.nightBlack} />
-            </View>
-          )}
-          <AppText
-            variant="body"
-            style={[styles.addBtnText, isAdded && styles.addBtnTextDone]}
-          >
-            {isAdded ? "Added" : "Add Activity"}
-          </AppText>
-        </Pressable>
-      </View>
-    );
-  });
+      );
+    },
+    [
+      elsewherePlaceIds,
+      getActiveSelection,
+      handleAdd,
+      inSlotPlaceIds,
+      isAdding,
+      isPickerMode,
+      openMapsForPlace,
+    ]
+  );
 
   return (
     <Modal
@@ -808,166 +845,178 @@ export function SuggestionsModal({
           ]}
           pointerEvents="box-none"
         >
-        <Animated.View
-          style={[
-            styles.sheet,
-            isLandscape && styles.sheetLandscape,
-            {
-              width: "100%",
-              maxHeight: sheetMaxHeight,
-              ...(isLandscape ? { height: sheetMaxHeight } : null),
-              paddingBottom: spacing.lg + insets.bottom,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
-          <View style={styles.header}>
-            <View style={styles.headerText}>
-              <AppText variant="body" style={styles.title}>
-                Suggestions for{" "}
-                <AppText variant="body" style={styles.titleSlot}>
-                  {slotLabel.toLowerCase()}
-                </AppText>
-              </AppText>
-              <View style={styles.subtitleSlot}>
-                {showFilterChips && (
-                  <AppText variant="body" style={styles.subtitleText} numberOfLines={2}>
-                    {subtitle}
+          <Animated.View
+            style={[
+              styles.sheet,
+              isLandscape && styles.sheetLandscape,
+              {
+                width: "100%",
+                maxHeight: sheetMaxHeight,
+                ...(isLandscape ? { height: sheetMaxHeight } : null),
+                paddingBottom: spacing.lg + insets.bottom,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <View style={styles.header}>
+              <View style={styles.headerText}>
+                <AppText variant="body" style={styles.title}>
+                  Suggestions for{" "}
+                  <AppText variant="body" style={styles.titleSlot}>
+                    {slotLabel.toLowerCase()}
                   </AppText>
-                )}
+                </AppText>
+                <View style={styles.subtitleSlot}>
+                  {showFilterChips && (
+                    <AppText
+                      variant="body"
+                      style={styles.subtitleText}
+                      numberOfLines={2}
+                    >
+                      {subtitle}
+                    </AppText>
+                  )}
+                </View>
               </View>
-            </View>
-            <Pressable
-              onPress={handleClose}
-              style={styles.closeBtn}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel="Close suggestions"
-            >
-              <View {...hiddenFromAccessibility}>
-                <CloseIcon width={22} height={22} />
-              </View>
-            </Pressable>
-          </View>
-
-          <View style={styles.filterScroller}>
-            {showFilterChips && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filterRow}
-                style={styles.filterScrollFill}
+              <Pressable
+                onPress={handleClose}
+                style={styles.closeBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Close suggestions"
               >
-                <Pressable
-                  onPress={() => setActiveFilter(ALL_FILTER)}
-                  style={[
-                    styles.filterChip,
-                    effectiveFilter === ALL_FILTER && styles.filterChipActive,
-                  ]}
-                  accessibilityRole="button"
+                <View {...hiddenFromAccessibility}>
+                  <CloseIcon width={22} height={22} />
+                </View>
+              </Pressable>
+            </View>
+
+            <View style={styles.filterScroller}>
+              {showFilterChips && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.filterRow}
+                  style={styles.filterScrollFill}
+                >
+                  <Pressable
+                    onPress={() => setActiveFilter(ALL_FILTER)}
+                    style={[
+                      styles.filterChip,
+                      effectiveFilter === ALL_FILTER && styles.filterChipActive,
+                    ]}
+                    accessibilityRole="button"
                     accessibilityLabel={`Show all ${suggestionItems.length} suggestions`}
                   >
                     <AppText
                       variant="body"
                       style={[
                         styles.filterChipText,
-                        effectiveFilter === ALL_FILTER && styles.filterChipTextActive,
+                        effectiveFilter === ALL_FILTER &&
+                          styles.filterChipTextActive,
                       ]}
                     >
                       All ({suggestionItems.length})
                     </AppText>
                   </Pressable>
 
-                {filterOptions.map(({ key, label, count }) => {
-                  const active = effectiveFilter === key;
-                  return (
-                    <Pressable
-                      key={key}
-                      onPress={() => setActiveFilter(key)}
-                      style={[styles.filterChip, active && styles.filterChipActive]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Show ${label} suggestions`}
-                      accessibilityState={{ selected: active }}
-                    >
-                      <AppText
-                        variant="body"
+                  {filterOptions.map(({ key, label, count }) => {
+                    const active = effectiveFilter === key;
+                    return (
+                      <Pressable
+                        key={key}
+                        onPress={() => setActiveFilter(key)}
                         style={[
-                          styles.filterChipText,
-                          active && styles.filterChipTextActive,
+                          styles.filterChip,
+                          active && styles.filterChipActive,
                         ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Show ${label} suggestions`}
+                        accessibilityState={{ selected: active }}
                       >
-                        {label} ({count})
-                      </AppText>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            )}
-          </View>
+                        <AppText
+                          variant="body"
+                          style={[
+                            styles.filterChipText,
+                            active && styles.filterChipTextActive,
+                          ]}
+                        >
+                          {label} ({count})
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </View>
 
-          <View style={[styles.listContainer, { height: listMaxHeight }]}>
-            {loading ? (
-              <View style={styles.listStatusCenter}>
-                <ActivityIndicator color={colors.nightBlack} size="large" />
-                <AppText variant="body" style={styles.stateText}>
-                  Finding places nearby...
-                </AppText>
-              </View>
-            ) : error ? (
-              <View style={styles.listStatusCenter}>
-                <AppText variant="body" style={styles.stateText}>
-                  {error}
-                </AppText>
-              </View>
-            ) : !showSuggestionList ? (
-              <View style={styles.listStatusCenter}>
-                <AppText variant="body" style={styles.stateText}>
-                  No suggestions found for this destination.{"\n"}Try setting
-                  preferences to get better results.
-                </AppText>
-              </View>
-            ) : (
-              <ScrollView
-                ref={listScrollRef}
-                style={styles.listScroll}
-                contentContainerStyle={styles.list}
-                showsVerticalScrollIndicator
-                nestedScrollEnabled
-              >
-                {listContent.length > 0 ? (
-                  listContent
-                ) : (
-                  <View style={styles.emptyFilterState}>
-                    <AppText variant="body" style={styles.stateText}>
-                      No matching activities for this preference.
-                    </AppText>
-                  </View>
-                )}
-
-                {!!onLoadMore && listContent.length > 0 && (
-                  <Pressable
-                    style={[
-                      styles.loadMoreBtn,
-                      loadingMore && styles.loadMoreBtnDisabled,
-                    ]}
-                    onPress={onLoadMore}
-                    disabled={loadingMore}
-                    accessibilityRole="button"
-                    accessibilityLabel="Load more suggestions"
-                  >
-                    {loadingMore ? (
-                      <ActivityIndicator color={colors.nightBlack} size="small" />
-                    ) : (
-                      <AppText variant="body" style={styles.loadMoreText}>
-                        Load more suggestions
+            <View style={[styles.listContainer, { height: listMaxHeight }]}>
+              {loading ? (
+                <View style={styles.listStatusCenter}>
+                  <ActivityIndicator color={colors.nightBlack} size="large" />
+                  <AppText variant="body" style={styles.stateText}>
+                    Finding places nearby...
+                  </AppText>
+                </View>
+              ) : error ? (
+                <View style={styles.listStatusCenter}>
+                  <AppText variant="body" style={styles.stateText}>
+                    {error}
+                  </AppText>
+                </View>
+              ) : !showSuggestionList ? (
+                <View style={styles.listStatusCenter}>
+                  <AppText variant="body" style={styles.stateText}>
+                    No suggestions found for this destination.{"\n"}Try setting
+                    preferences to get better results.
+                  </AppText>
+                </View>
+              ) : (
+                <FlatList
+                  ref={listScrollRef}
+                  style={styles.listScroll}
+                  contentContainerStyle={styles.list}
+                  data={visibleSuggestionItems}
+                  keyExtractor={(item) => item.key}
+                  renderItem={renderSuggestionItem}
+                  showsVerticalScrollIndicator
+                  nestedScrollEnabled
+                  ListEmptyComponent={
+                    <View style={styles.emptyFilterState}>
+                      <AppText variant="body" style={styles.stateText}>
+                        No matching activities for this preference.
                       </AppText>
-                    )}
-                  </Pressable>
-                )}
-              </ScrollView>
-            )}
-          </View>
-        </Animated.View>
+                    </View>
+                  }
+                  ListFooterComponent={
+                    !!onLoadMore && visibleSuggestionItems.length > 0 ? (
+                      <Pressable
+                        style={[
+                          styles.loadMoreBtn,
+                          loadingMore && styles.loadMoreBtnDisabled,
+                        ]}
+                        onPress={onLoadMore}
+                        disabled={loadingMore}
+                        accessibilityRole="button"
+                        accessibilityLabel="Load more suggestions"
+                      >
+                        {loadingMore ? (
+                          <ActivityIndicator
+                            color={colors.nightBlack}
+                            size="small"
+                          />
+                        ) : (
+                          <AppText variant="body" style={styles.loadMoreText}>
+                            Load more suggestions
+                          </AppText>
+                        )}
+                      </Pressable>
+                    ) : null
+                  }
+                />
+              )}
+            </View>
+          </Animated.View>
         </View>
       </View>
     </Modal>
@@ -1158,7 +1207,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.beachYellow,
-    backgroundColor: "#FFF4C2",
+    backgroundColor: colors.highlightYellow,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
