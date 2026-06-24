@@ -666,46 +666,47 @@ export function SuggestionsModal({
   const showSuggestionList =
     suggestions.length > 0 || selectedPreferences.length > 0;
 
-  const activeSelection = getActiveSelection();
+  const renderSuggestionItem = useCallback<ListRenderItem<SuggestionListItem>>(
+    ({ item: { suggestion: s, labels } }) => {
+      const activeSelection = getActiveSelection();
+      const isSavedInSlot = inSlotPlaceIds.has(s.sourcePlaceId);
+      const isSelected = activeSelection === s.sourcePlaceId;
+      const isAddedElsewhere = elsewherePlaceIds.has(s.sourcePlaceId);
+      const isAddedInCurrentSlot = isPickerMode
+        ? activeSelection
+          ? isSelected
+          : isSavedInSlot
+        : isSavedInSlot || isSelected;
+      const isAdded = isAddedElsewhere || isAddedInCurrentSlot;
+      const isAddDisabled =
+        isAdding ||
+        isAddedElsewhere ||
+        (!isPickerMode && isSavedInSlot) ||
+        (isPickerMode && !activeSelection && isSavedInSlot);
 
-  const listContent = visibleSuggestionItems.map(({ suggestion: s, labels, key }) => {
-    const isSavedInSlot = inSlotPlaceIds.has(s.sourcePlaceId);
-    const isSelected = activeSelection === s.sourcePlaceId;
-    const isAddedElsewhere = elsewherePlaceIds.has(s.sourcePlaceId);
-    const isAddedInCurrentSlot = isPickerMode
-      ? activeSelection
-        ? isSelected
-        : isSavedInSlot
-      : isSavedInSlot || isSelected;
-    const isAdded = isAddedElsewhere || isAddedInCurrentSlot;
-    const isAddDisabled =
-      isAdding ||
-      isAddedElsewhere ||
-      (!isPickerMode && isSavedInSlot) ||
-      (isPickerMode && !activeSelection && isSavedInSlot);
-    return (
-      <View key={key} style={styles.card}>
-        <View style={styles.cardBody}>
-          <View style={styles.titleRow}>
-            <AppText
-              variant="body"
-              style={styles.placeName}
-              numberOfLines={2}
-            >
-              {s.name}
-            </AppText>
-            {labels.length > 0 && (
-              <View style={styles.titleLabels}>
-                {labels.slice(0, 3).map((label) => (
-                  <View key={label} style={styles.placeLabel}>
-                    <AppText variant="body" style={styles.placeLabelText}>
-                      {label}
-                    </AppText>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
+      return (
+        <View style={styles.card}>
+          <View style={styles.cardBody}>
+            <View style={styles.titleRow}>
+              <AppText
+                variant="body"
+                style={styles.placeName}
+                numberOfLines={2}
+              >
+                {s.name}
+              </AppText>
+              {labels.length > 0 && (
+                <View style={styles.titleLabels}>
+                  {labels.slice(0, 3).map((label) => (
+                    <View key={label} style={styles.placeLabel}>
+                      <AppText variant="body" style={styles.placeLabelText}>
+                        {label}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
 
             {!!s.address && (
               <View style={styles.infoRow}>
@@ -737,45 +738,55 @@ export function SuggestionsModal({
             </Pressable>
           </View>
 
-        <Pressable
-          onPress={() => handleAdd(s)}
-          disabled={isAddDisabled}
-          style={[styles.addBtn, isAdded && styles.addBtnDone]}
-          accessibilityRole="button"
-          accessibilityLabel={
-            isAddedElsewhere
-              ? `${s.name} already added in another time slot`
-              : isPickerMode && isSelected
-                ? `${s.name} added. Tap again to remove`
-                : !isPickerMode && isSavedInSlot
-                  ? `${s.name} already added in this time slot`
-                  : !isPickerMode && isSelected
-                    ? `${s.name} added`
-                    : activeSelection
-                      ? `Replace with ${s.name}`
-                      : `Add ${s.name} to itinerary`
-          }
-          accessibilityState={{ disabled: isAddDisabled }}
-        >
-          {isAdded ? (
-            <View {...hiddenFromAccessibility}>
-              <CheckIcon width={20} height={20} color={colors.nightBlack} />
-            </View>
-          ) : (
-            <View {...hiddenFromAccessibility}>
-              <AddIcon width={20} height={20} color={colors.nightBlack} />
-            </View>
-          )}
-          <AppText
-            variant="body"
-            style={[styles.addBtnText, isAdded && styles.addBtnTextDone]}
+          <Pressable
+            onPress={() => handleAdd(s)}
+            disabled={isAddDisabled}
+            style={[styles.addBtn, isAdded && styles.addBtnDone]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isAddedElsewhere
+                ? `${s.name} already added in another time slot`
+                : isPickerMode && isSelected
+                  ? `${s.name} added. Tap again to remove`
+                  : !isPickerMode && isSavedInSlot
+                    ? `${s.name} already added in this time slot`
+                    : !isPickerMode && isSelected
+                      ? `${s.name} added`
+                      : activeSelection
+                        ? `Replace with ${s.name}`
+                        : `Add ${s.name} to itinerary`
+            }
+            accessibilityState={{ disabled: isAddDisabled }}
           >
-            {isAdded ? "Added" : "Add Activity"}
-          </AppText>
-        </Pressable>
-      </View>
-    );
-  });
+            {isAdded ? (
+              <View {...hiddenFromAccessibility}>
+                <CheckIcon width={20} height={20} color={colors.nightBlack} />
+              </View>
+            ) : (
+              <View {...hiddenFromAccessibility}>
+                <AddIcon width={20} height={20} color={colors.nightBlack} />
+              </View>
+            )}
+            <AppText
+              variant="body"
+              style={[styles.addBtnText, isAdded && styles.addBtnTextDone]}
+            >
+              {isAdded ? "Added" : "Add Activity"}
+            </AppText>
+          </Pressable>
+        </View>
+      );
+    },
+    [
+      elsewherePlaceIds,
+      getActiveSelection,
+      handleAdd,
+      inSlotPlaceIds,
+      isAdding,
+      isPickerMode,
+      openMapsForPlace,
+    ]
+  );
 
   return (
     <Modal

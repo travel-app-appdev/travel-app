@@ -21,7 +21,6 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { Ionicons } from "@expo/vector-icons";
-import { doc, onSnapshot } from "firebase/firestore";
 
 import { colors, spacing, typography, radius } from "@/src/theme";
 import { ACTION_CARD_HEIGHT } from "@/src/components/common/ActionCard";
