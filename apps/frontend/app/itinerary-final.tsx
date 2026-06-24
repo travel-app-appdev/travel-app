@@ -1,11 +1,5 @@
-import { PlaceholderScreen } from "@/src/components/common/PlaceholderScreen";
+import { Redirect } from "expo-router";
 
-export default function ItineraryScreen() {
-  return (
-    <PlaceholderScreen
-      title="Itinerary"
-      description="Placeholder screen for the trip timeline, daily schedule, and planning overview."
-      primaryLink={{ href: "/past-trips", label: "Open past trips" }}
-    />
-  );
+export default function ItineraryFinalScreen() {
+  return <Redirect href="/home" />;
 }
